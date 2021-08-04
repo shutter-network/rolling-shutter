@@ -22,6 +22,6 @@ repos:
     hooks:
       - id: prettier
         additional_dependencies:
-          ["prettier@2.3.1", "prettier-plugin-solidity@1.0.0-beta.13"]
+          ["prettier@2.3.2", "prettier-plugin-solidity@1.0.0-beta.16"]
         args: ["--plugin=prettier-plugin-solidity"]
         exclude: "^contracts/openzeppelin/.*|wasm_exec.js$"
