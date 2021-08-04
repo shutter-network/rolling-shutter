@@ -6,6 +6,13 @@ executors:
       - image: cimg/python:3.7.11
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  node12:
+    docker:
+      - image: cimg/node:12.22.4
+
+  node14:
+    docker:
+      - image: cimg/node:14.17.4
 
 jobs:
   pre-commit:
@@ -27,11 +34,29 @@ jobs:
             - ~/.local
       - run: pre-commit run  --show-diff-on-failure -a
 
+  hardhat:
+    executor: node14
+    working_directory: ~/src/contracts
+    steps:
+      - checkout:
+          path: ~/src
+      - restore_cache:
+          keys:
+            - contracts-v1-deps-{{ checksum "package-lock.json" }}
+            - contracts-v1-deps-
+      - run: npm ci
+      - save_cache:
+          key: contracts-v1-deps-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+      - run: npx hardhat test
+
 workflows:
   version: 2
   main:
     jobs:
       - pre-commit
+      - hardhat
 # Local Variables:
 # compile-command: "circleci config validate"
 # projectile-project-compilation-cmd: "circleci config validate"
