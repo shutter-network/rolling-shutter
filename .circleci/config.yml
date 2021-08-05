@@ -1,15 +1,14 @@
 version: 2.1
 
+orbs:
+  node: circleci/node@4.6
+
 executors:
   py37:
     docker:
       - image: cimg/python:3.7.11
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  node12:
-    docker:
-      - image: cimg/node:12.22.4
-
   node14:
     docker:
       - image: cimg/node:14.17.4
@@ -22,17 +21,14 @@ jobs:
       - checkout
       - restore_cache:
           key: pre-commit-cache-v1-{{ checksum ".pre-commit-config.yaml" }}
-      - run:
-          name: Install pre-commit
-          command: |
-            pip install --user pre-commit
-            pre-commit install-hooks
+      - run: pip install --user pre-commit
+      - run: pre-commit install-hooks
       - save_cache:
           key: pre-commit-cache-v1-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local
-      - run: pre-commit run  --show-diff-on-failure -a
+      - run: pre-commit run --show-diff-on-failure -a
 
   hardhat:
     executor: node14
@@ -40,15 +36,7 @@ jobs:
     steps:
       - checkout:
           path: ~/src
-      - restore_cache:
-          keys:
-            - contracts-v1-deps-{{ checksum "package-lock.json" }}
-            - contracts-v1-deps-
-      - run: npm ci
-      - save_cache:
-          key: contracts-v1-deps-{{ checksum "package-lock.json" }}
-          paths:
-            - node_modules
+      - node/install-packages
       - run: npx hardhat test
 
 workflows:
