@@ -1,7 +1,7 @@
 # Desired Properties of Rolling Shutter
 
 - Author: Ralf Schmitt
-- Status: proposed
+- Status: accepted
 - Date: 2021-07-14
 
 This document lists the desired properties of a rollup implementation using Shutter for frontrunning protection. At the moment we're trying to come up with an architecture for the final system. We can use this document to decide if our proposed architecture will have those desired properties. In fact we extracted these properties from one of the proposals.
