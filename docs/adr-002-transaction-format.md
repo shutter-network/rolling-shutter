@@ -158,8 +158,9 @@ the sequencer contract right after it has been decrypted, and a second time on
 the execution rollup in an account contract.
 
 The sequencer contract on the sequencer rollup first verifies that `epochIndex`
-matches the currently executed batch. If it does, the contract sends the
-transaction to the inbox of the execution rollup.
+matches the currently executed batch. This prevents replaying a transaction in a
+later epoch. If the check passes, the contract sends the transaction to the
+inbox of the execution rollup.
 
 The account contract on the execution rollup executes the transaction as a
 standard transaction, similar to Optimism's `OVM_ECDSAContractAccount` but
@@ -181,3 +182,8 @@ taking into account the different transaction format.
   address of the sequencer contract on the sequencer rollup. Alternatively, we
   could use the chain id of the execution rollup, but there we wouldn't have a
   canonical contract address.
+- The reason why the execution transaction includes the epoch index is to
+  prevent an attack based on transaction replay: In Shutter, transactions that
+  have not been included successfully will still be decrypted when the epoch has
+  passed. An attacker might take such a transaction, reencrypt it for a later
+  epoch, and frontrun it. Including the epoch index prevents this.
