@@ -85,6 +85,16 @@ Optimism's executor contract is forked such that it executes only batches with
 valid decryption signatures. In addition, the chain makes sure that the
 execution context matches the batch commitment.
 
+Note that phase 2 still allows for frontrunning via L1-to-L2 transactions.
+Depending on the state of development of phase 3, there are multiple options to
+deal with this:
+
+- Ignore it, assuming phase 3 will be ready soon.
+- Disable L1-to-L2 transactions. This will prevent frontrunning, but make the
+  rollup unusable except for demo applications.
+- Delay L1-to-L2 transactions via a special contract. This will prevent
+  frontrunning, but worsen the user experience.
+
 ### Phase 3: Full Rollup Implementation
 
 Phase 3 improves on the naive rollup implementation by preventing censorship by
