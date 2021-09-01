@@ -49,6 +49,4 @@ require (
 	gotest.tools/v3 v3.0.3
 )
 
-require github.com/shutter-network/shutter/shlib v0.0.0
-
-replace github.com/shutter-network/shutter/shlib => ../shlib
+require github.com/shutter-network/shutter/shlib v0.1.5
