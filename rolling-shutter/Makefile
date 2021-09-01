@@ -19,7 +19,7 @@ wasm:
 	GOARCH=wasm GOOS=js ${GO} build ${GOFLAGS} -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/main_wasm.go
 
 protoc:
-	protoc shmsg/shmsg.proto --go_out=shmsg/
+	protoc shmsg/*.proto --go_out=shmsg/
 
 ${TESTROOT}:
 	${BINDIR}/shuttermint init --dev --root ${TESTROOT}

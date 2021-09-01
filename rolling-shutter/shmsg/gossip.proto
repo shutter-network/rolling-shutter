@@ -1,0 +1,29 @@
+syntax = "proto3";
+package shmsg;
+
+option go_package = ".;shmsg";
+
+message DecryptionTrigger {
+    uint64 instanceID = 1;
+    uint64 epochID = 2;
+}
+
+message DecryptionKey {
+    uint64 instanceID = 1;
+    uint64 epochID = 2;
+    bytes key = 3;
+}
+
+message CipherBatch {
+    uint64 instanceID = 1;
+    uint64 epochID = 2;
+    repeated bytes cipherTransactions = 3;
+}
+
+message AggregatedDecryptionSignature {
+    uint64 instanceID = 1;
+    uint64 epochID = 2;
+    bytes signedHash = 3;
+    bytes aggregatedSignature = 4;
+    bytes signerBitfield = 5;
+}
