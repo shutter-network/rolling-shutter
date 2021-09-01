@@ -1,0 +1,96 @@
+syntax = "proto3";
+package shmsg;
+
+option go_package = ".;shmsg";
+
+message G1 {
+        bytes g1bytes = 1; // Unmarshal with new(G1).Unmarshal(msg.g1bytes)
+}
+
+message G2 {
+        bytes g2bytes = 1; // Unmarshal with new(G2).Unmarshal(msg.g2bytes)
+}
+
+message GT {
+        bytes gtbytes =1; // Unmarshal with new(GT).Unmarshal(msg.g2bytes)
+}
+
+message BatchConfig {
+        uint64 start_batch_index = 1;
+        repeated bytes keypers = 2;
+        uint64 threshold = 3 ;
+        bytes config_contract_address = 4;
+        uint64 config_index = 5;
+        bool started = 6;
+        bool validatorsUpdated = 7;
+}
+
+message BatchConfigStarted {
+        uint64 batch_config_index = 1;
+}
+
+message CheckIn {
+        bytes validator_public_key = 1;  // 32 byte ed25519 public key
+        bytes encryption_public_key = 2;  // compressed ecies public key
+}
+
+message DecryptionSignature {
+        uint64 batch_index = 1;
+        bytes signature = 2;
+}
+
+message PolyEval {
+        uint64 eon = 1;
+        repeated bytes receivers = 2;
+        repeated bytes encrypted_evals = 3;
+}
+
+message PolyCommitment {
+        uint64 eon = 1;
+        repeated bytes gammas = 2;
+}
+
+message Accusation {
+        uint64 eon = 1;
+        repeated bytes accused = 2;
+}
+
+message Apology {
+        uint64 eon = 1;
+        repeated bytes accusers = 2;
+        repeated bytes poly_evals = 3;
+}
+
+message EpochSecretKeyShare {
+        uint64 eon = 1;
+        uint64 epoch = 2;
+        bytes share = 3;
+}
+
+message EonStartVote {
+        uint64 start_batch_index = 1;
+}
+
+message Message {
+        oneof payload {
+                BatchConfig batch_config = 4;
+                BatchConfigStarted batch_config_started = 6;
+                CheckIn check_in = 7;
+                DecryptionSignature decryption_signature = 8;
+
+                // DKG messages
+                PolyEval poly_eval = 9;
+                PolyCommitment poly_commitment = 10;
+                Accusation accusation = 11;
+                Apology apology = 12;
+
+                EonStartVote eon_start_vote = 13;
+                EpochSecretKeyShare epoch_secret_key_share = 14;
+        }
+}
+
+message MessageWithNonce {
+        Message msg = 1;
+        bytes chain_id = 2;
+        uint64 random_nonce = 3;
+}
