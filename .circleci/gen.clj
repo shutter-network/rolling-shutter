@@ -9,8 +9,10 @@
   "maps regular expressions to keywords, which we use in get-yml-files"
   [[#"contracts/.*" :contracts-changed?]
    [#"\.circleci/contracts.*" :contracts-changed?]
+
    [#"rolling-shutter/.*" :rolling-shutter-changed?]
    [#"\.circleci/rolling-shutter.*$" :rolling-shutter-changed?]
+
    [#"\.circleci/basis.yml$" :build-all?]])
 
 (defn extra-keywords
@@ -21,13 +23,14 @@
            {:build-all? true})))
 
 (defn get-yml-files
-  [{:keys [contracts-changed? shuttermint-changed? build-all?] :as kws}]
+  [{:keys [contracts-changed? rolling-shutter-changed? build-all?] :as kws}]
   (println "Choose yml files based on" kws)
   (remove nil?
           ["basis.yml"
            (when (or contracts-changed? build-all?)
              "contracts.yml")
-           ]))
+           (when (or rolling-shutter-changed? build-all?)
+             "rolling-shutter.yml")]))
 
 (defn slurp-yml
   "read yaml file from the given path"

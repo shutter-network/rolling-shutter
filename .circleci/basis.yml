@@ -10,6 +10,25 @@ executors:
     docker:
       - image: cimg/node:14.17.4
 
+  go:
+    docker:
+      - image: cimg/go:1.17
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  go115:
+    docker:
+      - image: cimg/go:1.15
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  go116:
+    docker:
+      - image: cimg/go:1.16
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
 jobs:
   pre-commit:
     executor: py37
