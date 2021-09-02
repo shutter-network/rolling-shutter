@@ -65,7 +65,7 @@ jobs:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
 workflows:
-  shuttermint:
+  rolling-shutter:
     jobs:
       - rs-build:
           matrix:
@@ -84,7 +84,6 @@ workflows:
               ignore: /.*/
             tags:
               only: /^v\d+\.\d+\.\d+$/
-
       - rs-lint:
           filters:
             branches:
