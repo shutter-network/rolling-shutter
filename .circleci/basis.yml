@@ -1,0 +1,34 @@
+version: 2.1
+
+executors:
+  py37:
+    docker:
+      - image: cimg/python:3.7.11@sha256:5280078dacde9c6093da25c5544d224483e89ac17b19404b8c348d00b7289bdf
+        environment:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  node14:
+    docker:
+      - image: cimg/node:14.17.4
+
+jobs:
+  pre-commit:
+    executor: py37
+    working_directory: ~/src
+    steps:
+      - checkout
+      - restore_cache:
+          key: pre-commit-cache-v2-{{ checksum ".pre-commit-config.yaml" }}
+      - run: pip install --user pre-commit
+      - run: pre-commit install-hooks
+      - save_cache:
+          key: pre-commit-cache-v2-{{ checksum ".pre-commit-config.yaml" }}
+          paths:
+            - ~/.cache/pre-commit
+            - ~/.local
+      - run: pre-commit run --show-diff-on-failure -a
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - pre-commit

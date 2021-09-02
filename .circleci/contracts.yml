@@ -1,0 +1,18 @@
+orbs:
+  node: circleci/node@4.6
+
+jobs:
+  hardhat:
+    executor: node14
+    working_directory: ~/src/contracts
+    steps:
+      - checkout:
+          path: ~/src
+      - node/install-packages
+      - run: npx hardhat test
+
+workflows:
+  version: 2
+  contracts:
+    jobs:
+      - hardhat

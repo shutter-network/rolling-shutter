@@ -1,51 +1,38 @@
 version: 2.1
 
+# CircleCI dynamic configuration file, see
+# https://circleci.com/docs/2.0/dynamic-config/
+
+setup: true
+
 orbs:
-  node: circleci/node@4.6
+  continuation: circleci/continuation@0.2.0
 
 executors:
-  py37:
+  clojure:
     docker:
-      - image: cimg/python:3.7.11@sha256:5280078dacde9c6093da25c5544d224483e89ac17b19404b8c348d00b7289bdf
-        environment:
-          PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  node14:
-    docker:
-      - image: cimg/node:14.17.4
+      - image: clojure:openjdk-11-tools-deps-slim-buster
 
 jobs:
-  pre-commit:
-    executor: py37
-    working_directory: ~/src
+  gen:
+    executor: clojure
     steps:
+      - run:
+          name: Install curl, jq and git
+          command: |
+            apt-get update
+            apt-get install -y curl jq git
       - checkout
-      - restore_cache:
-          key: pre-commit-cache-v2-{{ checksum ".pre-commit-config.yaml" }}
-      - run: pip install --user pre-commit
-      - run: pre-commit install-hooks
-      - save_cache:
-          key: pre-commit-cache-v2-{{ checksum ".pre-commit-config.yaml" }}
-          paths:
-            - ~/.cache/pre-commit
-            - ~/.local
-      - run: pre-commit run --show-diff-on-failure -a
-
-  hardhat:
-    executor: node14
-    working_directory: ~/src/contracts
-    steps:
-      - checkout:
-          path: ~/src
-      - node/install-packages
-      - run: npx hardhat test
+      - run:
+          name: Generate continuation config
+          command: |
+            cd .circleci
+            clojure -X gen/gen :validate false :base '"origin/main"'
+            cd ..
+      - continuation/continue:
+          configuration_path: .circleci/continue-generated.yml
 
 workflows:
-  version: 2
-  main:
+  always:
     jobs:
-      - pre-commit
-      - hardhat
-# Local Variables:
-# compile-command: "circleci config validate"
-# projectile-project-compilation-cmd: "circleci config validate"
-# End:
+      - gen
