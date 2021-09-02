@@ -49,4 +49,7 @@ require (
 	gotest.tools/v3 v3.0.3
 )
 
-require github.com/shutter-network/shutter/shlib v0.1.5
+require (
+	github.com/multiformats/go-multiaddr v0.4.0 // indirect
+	github.com/shutter-network/shutter/shlib v0.1.5
+)
