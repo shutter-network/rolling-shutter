@@ -13,7 +13,6 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-toml
-      - id: debug-statements
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
@@ -25,3 +24,16 @@ repos:
           ["prettier@2.3.2", "prettier-plugin-solidity@1.0.0-beta.16"]
         args: ["--plugin=prettier-plugin-solidity"]
         exclude: "^contracts/openzeppelin/.*|wasm_exec.js$"
+
+  - repo: https://github.com/schmir-at-bb/gci
+    rev: "9283498f6ee8b0be960df5bf6bca058422eb971b"
+    hooks:
+      - id: gci
+        args: ["-local", "github.com/shutter-network/shutter"]
+        exclude: ^rolling-shutter/contract/binding\.go|rolling-shutter/shmsg/.*\.pb\.go|rolling-shutter/shcryptowasm/.*_wasm\.go$
+
+  - repo: https://github.com/schmir-at-bb/gofumpt
+    rev: "45be18d02b08dbeeb38ce0b092ba41fef322b482"
+    hooks:
+      - id: gofumpt
+        exclude: ^rolling-shutter/contract/binding\.go|rolling-shutter/shmsg/.*\.pb\.go$

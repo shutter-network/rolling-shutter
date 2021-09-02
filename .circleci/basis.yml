@@ -1,5 +1,15 @@
 version: 2.1
 
+commands:
+  install-go:
+    steps:
+      - run:
+          name: Install go
+          command: |
+            curl -sSL "https://golang.org/dl/go1.17.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+            mkdir -p ~/go/bin
+            echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
+
 executors:
   py37:
     docker:
@@ -35,6 +45,7 @@ jobs:
     working_directory: ~/src
     steps:
       - checkout
+      - install-go
       - restore_cache:
           key: pre-commit-cache-v2-{{ checksum ".pre-commit-config.yaml" }}
       - run: pip install --user pre-commit
