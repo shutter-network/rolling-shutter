@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -17,6 +18,7 @@ var decryptorCmd = &cobra.Command{
 }
 
 type DecryptorConfig struct {
+	PeerMultiaddrs []multiaddr.Multiaddr
 }
 
 func init() {
@@ -50,7 +52,7 @@ func readDecryptorConfig() (DecryptorConfig, error) {
 		return config, err // Config file was found but another error was produced
 	}
 
-	err = viper.Unmarshal(&config)
+	err = viper.Unmarshal(&config, viper.DecodeHook(MultiaddrHook()))
 	if err != nil {
 		return config, err
 	}
