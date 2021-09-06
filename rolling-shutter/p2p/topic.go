@@ -19,7 +19,6 @@ type TopicGossip struct {
 	// Messages is a channel of messages received from other peers in the chat room
 	Messages chan *Message
 
-	ctx   context.Context
 	ps    *pubsub.PubSub
 	Topic *pubsub.Topic
 	sub   *pubsub.Subscription
@@ -49,7 +48,6 @@ func JoinTopic(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topicName
 	}
 
 	topicGossip := &TopicGossip{
-		ctx:       ctx,
 		ps:        ps,
 		Topic:     topic,
 		sub:       sub,
@@ -59,12 +57,12 @@ func JoinTopic(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topicName
 	}
 
 	// start reading messages from the subscription in a loop
-	go topicGossip.readLoop()
+	go topicGossip.readLoop(ctx)
 	return topicGossip, nil
 }
 
 // Publish sends a message to the pubsub topic.
-func (topicGossip *TopicGossip) Publish(message string) error {
+func (topicGossip *TopicGossip) Publish(ctx context.Context, message string) error {
 	m := Message{
 		Message:  message,
 		SenderID: topicGossip.Self.Pretty(),
@@ -74,7 +72,7 @@ func (topicGossip *TopicGossip) Publish(message string) error {
 		return err
 	}
 	fmt.Println("Publishing message: ", message)
-	return topicGossip.Topic.Publish(topicGossip.ctx, msgBytes)
+	return topicGossip.Topic.Publish(ctx, msgBytes)
 }
 
 func (topicGossip *TopicGossip) ListPeers() []peer.ID {
@@ -82,9 +80,9 @@ func (topicGossip *TopicGossip) ListPeers() []peer.ID {
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
-func (topicGossip *TopicGossip) readLoop() {
+func (topicGossip *TopicGossip) readLoop(ctx context.Context) {
 	for {
-		msg, err := topicGossip.sub.Next(topicGossip.ctx)
+		msg, err := topicGossip.sub.Next(ctx)
 		if err != nil {
 			close(topicGossip.Messages)
 			return

@@ -72,7 +72,7 @@ func main() {
 		fmt.Println(topicGossip.ListPeers())
 
 		for {
-			if err := topicGossip.Publish(message); err != nil {
+			if err := topicGossip.Publish(ctx, message); err != nil {
 				panic(err)
 			}
 			time.Sleep(1 * time.Second)
