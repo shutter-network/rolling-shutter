@@ -1,9 +1,11 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -19,6 +21,7 @@ var decryptorCmd = &cobra.Command{
 
 type DecryptorConfig struct {
 	PeerMultiaddrs []multiaddr.Multiaddr
+	DatabaseURL    string
 }
 
 func init() {
@@ -26,11 +29,19 @@ func init() {
 }
 
 func decryptorMain() error {
+	ctx := context.Background()
+
 	config, err := readDecryptorConfig()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%+v", config)
+
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+
 	return nil
 }
 
