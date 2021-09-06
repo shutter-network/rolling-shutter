@@ -48,9 +48,6 @@ install:
 
 install-tools: install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
 
-install-geth:
-	${GO} install github.com/ethereum/go-ethereum/cmd/geth@latest
-
 install-protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go
 
@@ -76,7 +73,4 @@ lint-changes:
 	base=`git merge-base HEAD origin/main`; \
 	golangci-lint run --new-from-rev $${base}
 
-deploy-ganache:
-	${GO} run ./sandbox/deploy/deploy.go deploy
-
-.PHONY: build install run init clean test generate install-geth install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-tools lint lint-changes coverage
+.PHONY: build install run init clean test generate install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-tools lint lint-changes coverage
