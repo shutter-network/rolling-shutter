@@ -20,41 +20,19 @@ import (
 
 // Config contains validated configuration parameters for the keyper client.
 type Config struct {
-	ShuttermintURL              string
-	EthereumURL                 string
-	DBDir                       string
-	SigningKey                  *ecdsa.PrivateKey
-	ValidatorKey                ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
-	EncryptionKey               *ecies.PrivateKey
-	ConfigContractAddress       common.Address `mapstructure:"ConfigContract"`
-	BatcherContractAddress      common.Address `mapstructure:"BatcherContract"`
-	KeyBroadcastContractAddress common.Address `mapstructure:"KeyBroadcastContract"`
-	ExecutorContractAddress     common.Address `mapstructure:"ExecutorContract"`
-	DepositContractAddress      common.Address `mapstructure:"DepositContract"`
-	KeyperSlasherAddress        common.Address `mapstructure:"KeyperSlasher"`
-	MainChainFollowDistance     uint64         // in main chain blocks
-	ExecutionStaggering         uint64         // in main chain blocks
-	DKGPhaseLength              uint64         // in shuttermint blocks
-	GasPriceMultiplier          float64
+	ShuttermintURL string
+	DBDir          string
+	SigningKey     *ecdsa.PrivateKey
+	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
+	EncryptionKey  *ecies.PrivateKey
+	DKGPhaseLength uint64 // in shuttermint blocks
 }
 
 const configTemplate = `# Shutter keyper configuration for {{ .Address }}
 
-# Contract addresses
-BatcherContract		= "{{ .BatcherContractAddress }}"
-ConfigContract		= "{{ .ConfigContractAddress }}"
-DepositContract		= "{{ .DepositContractAddress }}"
-ExecutorContract	= "{{ .ExecutorContractAddress }}"
-KeyBroadcastContract	= "{{ .KeyBroadcastContractAddress }}"
-KeyperSlasher		= "{{ .KeyperSlasherAddress }}"
-
-EthereumURL		= "{{ .EthereumURL }}"
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 DBDir			= "{{ .DBDir }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
-ExecutionStaggering	= {{ .ExecutionStaggering }}
-MainChainFollowDistance = {{ .MainChainFollowDistance }}
-GasPriceMultiplier      = {{ .GasPriceMultiplier }}
 
 # Secret Keys
 EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"

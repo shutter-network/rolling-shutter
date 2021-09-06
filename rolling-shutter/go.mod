@@ -36,7 +36,6 @@ require (
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	golang.org/x/tools v0.1.1
 	google.golang.org/genproto v0.0.0-20210302174412-5ede27ff9881 // indirect
@@ -46,11 +45,9 @@ require (
 )
 
 require (
-	github.com/daixiang0/gci v0.2.9 // indirect
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-pubsub v0.5.4
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/shutter-network/shutter/shlib v0.1.5
-	mvdan.cc/gofumpt v0.1.1 // indirect
 )

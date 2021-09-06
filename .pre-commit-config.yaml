@@ -30,10 +30,10 @@ repos:
     hooks:
       - id: gci
         args: ["-local", "github.com/shutter-network/shutter"]
-        exclude: ^rolling-shutter/contract/binding\.go|rolling-shutter/shmsg/.*\.pb\.go|rolling-shutter/shcryptowasm/.*_wasm\.go$
+        exclude: ^rolling-shutter/shmsg/.*\.pb\.go|rolling-shutter/shcryptowasm/.*_wasm\.go$
 
   - repo: https://github.com/schmir-at-bb/gofumpt
     rev: "45be18d02b08dbeeb38ce0b092ba41fef322b482"
     hooks:
       - id: gofumpt
-        exclude: ^rolling-shutter/contract/binding\.go|rolling-shutter/shmsg/.*\.pb\.go$
+        exclude: ^rolling-shutter/shmsg/.*\.pb\.go$

@@ -46,13 +46,10 @@ clean:
 install:
 	install -o root -m 0555 ${BINDIR}/shuttermint ${PREFIX}/bin/shuttermint
 
-install-tools: install-abigen install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
+install-tools: install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
 
 install-geth:
 	${GO} install github.com/ethereum/go-ethereum/cmd/geth@latest
-
-install-abigen:
-	${GO} install github.com/ethereum/go-ethereum/cmd/abigen
 
 install-protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go
@@ -79,11 +76,7 @@ lint-changes:
 	base=`git merge-base HEAD origin/main`; \
 	golangci-lint run --new-from-rev $${base}
 
-abigen:
-	solc --allow-paths . ${OPENZEPPELIN_CONTRACTS}=${OPENZEPPELIN_CONTRACTS_DIR} --combined-json=bin,bin-runtime,ast,metadata,abi,srcmap,srcmap-runtime,storage-layout --optimize ../contracts/contracts/binding.sol > contract/combined.json
-	abigen --pkg contract --out contract/binding.go --combined-json contract/combined.json
-
 deploy-ganache:
 	${GO} run ./sandbox/deploy/deploy.go deploy
 
-.PHONY: build install run init clean test generate install-abigen install-geth install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-tools lint lint-changes abigen coverage
+.PHONY: build install run init clean test generate install-geth install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-tools lint lint-changes coverage

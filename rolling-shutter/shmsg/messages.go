@@ -15,7 +15,6 @@ func NewBatchConfig(
 	startBatchIndex uint64,
 	keypers []common.Address,
 	threshold uint64,
-	configContractAddress common.Address,
 	configIndex uint64,
 	started bool,
 	validatorsUpdated bool,
@@ -28,13 +27,12 @@ func NewBatchConfig(
 	return &Message{
 		Payload: &Message_BatchConfig{
 			BatchConfig: &BatchConfig{
-				StartBatchIndex:       startBatchIndex,
-				Keypers:               keypersBytes,
-				Threshold:             threshold,
-				ConfigContractAddress: configContractAddress.Bytes(),
-				ConfigIndex:           configIndex,
-				Started:               started,
-				ValidatorsUpdated:     validatorsUpdated,
+				StartBatchIndex:   startBatchIndex,
+				Keypers:           keypersBytes,
+				Threshold:         threshold,
+				ConfigIndex:       configIndex,
+				Started:           started,
+				ValidatorsUpdated: validatorsUpdated,
 			},
 		},
 	}

@@ -8,9 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd/config"
-	"github.com/shutter-network/shutter/shuttermint/cmd/deploy"
-	"github.com/shutter-network/shutter/shuttermint/cmd/prepare"
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
@@ -65,14 +62,11 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&logformat, "log", "long", "set log format, possible values:  min, short, long, max")
 	rootCmd.AddCommand(chainCmd)
-	rootCmd.AddCommand(config.ConfigCmd)
 	rootCmd.AddCommand(keyperCmd)
 	rootCmd.AddCommand(showCmd)
 	rootCmd.AddCommand(txsearchCmd)
 	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(deploy.DeployCmd)
-	rootCmd.AddCommand(prepare.PrepareCmd)
 	rootCmd.AddCommand(decryptorCmd)
 	rootCmd.AddCommand(completionCmd)
 }

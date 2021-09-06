@@ -1,12 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"log"
-	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -14,7 +10,6 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
-	"github.com/shutter-network/shutter/shuttermint/keyper/gaspricer"
 )
 
 // keyperCmd represents the keyper command.
@@ -36,18 +31,9 @@ func init() {
 func readKeyperConfig() (keyper.Config, error) {
 	viper.SetEnvPrefix("KEYPER")
 	viper.BindEnv("ShuttermintURL")
-	viper.BindEnv("EthereumURL")
 	viper.BindEnv("SigningKey")
 	viper.BindEnv("ValidatorSeed")
 	viper.BindEnv("EncryptionKey")
-	viper.BindEnv("ConfigContract")
-	viper.BindEnv("BatcherContract")
-	viper.BindEnv("KeyBroadcastContract")
-	viper.BindEnv("ExecutorContract")
-	viper.BindEnv("DepositContract")
-	viper.BindEnv("KeyperSlasher")
-	viper.BindEnv("MainChainFollowDistance")
-	viper.BindEnv("ExecutionStaggering")
 	viper.BindEnv("DKGPhaseLength")
 
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
@@ -90,10 +76,6 @@ func readKeyperConfig() (keyper.Config, error) {
 		config.DBDir = dbdir
 	}
 
-	if !keyper.IsWebsocketURL(config.EthereumURL) {
-		return config, errors.Errorf("field EthereumURL must start with ws:// or wss://")
-	}
-
 	return config, err
 }
 
@@ -102,39 +84,12 @@ func keyperMain() error {
 	if err != nil {
 		return errors.WithMessage(err, "Please check your configuration")
 	}
-	err = gaspricer.SetMultiplier(kc.GasPriceMultiplier)
-	if err != nil {
-		return errors.WithMessage(err, "Please check your configuration")
-	}
 
 	log.Printf(
-		"Starting keyper version %s with signing key %s, using %s for Shuttermint and %s for Ethereum",
+		"Starting keyper version %s with signing key %s, using %s for Shuttermint",
 		shversion.Version(),
 		kc.Address().Hex(),
 		kc.ShuttermintURL,
-		kc.EthereumURL,
 	)
-	kpr := keyper.NewKeyper(kc)
-	err = kpr.LoadState()
-	if err != nil {
-		return errors.WithMessage(err, "LoadState")
-	}
-	log.Printf("Loaded state with %d actions, %s", len(kpr.State.Actions), kpr.ShortInfo())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Printf("Received %s signal, shutting down", sig)
-		cancel()
-	}()
-
-	err = kpr.Run(ctx)
-	if err == context.Canceled {
-		log.Printf("Bye.")
-		return nil
-	}
-	return err
+	return errors.Errorf("keyper command not implemented")
 }
