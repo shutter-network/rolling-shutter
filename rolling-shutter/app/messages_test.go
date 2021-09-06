@@ -5,16 +5,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"gotest.tools/v3/assert"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 func TestMessageParsing(t *testing.T) {
 	eon := uint64(5)
-	epoch := uint64(10)
 	sender := common.BigToAddress(new(big.Int).SetUint64(123))
 	anotherAddress := common.BigToAddress(new(big.Int).SetUint64(456))
 	anotherAddressBytes := anotherAddress.Bytes()
@@ -95,16 +92,5 @@ func TestMessageParsing(t *testing.T) {
 		}
 		_, err = ParseApologyMsg(&smsg, sender)
 		assert.Assert(t, err != nil)
-	})
-
-	t.Run("ParseEpochSecretKeyShareMsg", func(t *testing.T) {
-		share := (*shcrypto.EpochSecretKeyShare)(new(bn256.G1).ScalarBaseMult(big.NewInt(1111)))
-		smsg := shmsg.NewEpochSecretKeyShare(eon, epoch, share).GetEpochSecretKeyShare()
-		msg, err := ParseEpochSecretKeyShareMsg(smsg, sender)
-		assert.NilError(t, err)
-		assert.DeepEqual(t, sender, msg.Sender)
-		assert.Equal(t, eon, msg.Eon)
-		assert.Equal(t, epoch, msg.Epoch)
-		assert.DeepEqual(t, share, msg.Share)
 	})
 }

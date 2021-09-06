@@ -642,21 +642,6 @@ func (app *ShutterApp) handleApologyMsg(msg *shmsg.Apology, sender common.Addres
 	}
 }
 
-func (app *ShutterApp) handleEpochSecretKeyShareMsg(msg *shmsg.EpochSecretKeyShare, sender common.Address) abcitypes.ResponseDeliverTx {
-	appMsg, err := ParseEpochSecretKeyShareMsg(msg, sender)
-	if err != nil {
-		msg := fmt.Sprintf("Error: Failed to parse EpochSecretKeyShare message: %+v", err)
-		log.Print(msg)
-		return makeErrorResponse(msg)
-	}
-	// XXX At the moment we just publish the message without any additional checks.
-	events := []abcitypes.Event{appMsg.MakeABCIEvent()}
-	return abcitypes.ResponseDeliverTx{
-		Code:   0,
-		Events: events,
-	}
-}
-
 func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address) abcitypes.ResponseDeliverTx {
 	if msg.GetBatchConfig() != nil {
 		return app.deliverBatchConfig(msg.GetBatchConfig(), sender)
@@ -685,9 +670,6 @@ func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address)
 	}
 	if msg.GetApology() != nil {
 		return app.handleApologyMsg(msg.GetApology(), sender)
-	}
-	if msg.GetEpochSecretKeyShare() != nil {
-		return app.handleEpochSecretKeyShareMsg(msg.GetEpochSecretKeyShare(), sender)
 	}
 	log.Print("Error: cannot deliver messsage: ", msg)
 	return makeErrorResponse("cannot deliver message")

@@ -1,7 +1,7 @@
 syntax = "proto3";
 package shmsg;
 
-option go_package = ".;shmsg";
+option go_package = "./;shmsg";
 
 message DecryptionTrigger {
     uint64 instanceID = 1;

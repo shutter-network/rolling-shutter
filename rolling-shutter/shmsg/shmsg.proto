@@ -1,7 +1,7 @@
 syntax = "proto3";
 package shmsg;
 
-option go_package = ".;shmsg";
+option go_package = "./;shmsg";
 
 message G1 {
         bytes g1bytes = 1; // Unmarshal with new(G1).Unmarshal(msg.g1bytes)
@@ -61,12 +61,6 @@ message Apology {
         repeated bytes poly_evals = 3;
 }
 
-message EpochSecretKeyShare {
-        uint64 eon = 1;
-        uint64 epoch = 2;
-        bytes share = 3;
-}
-
 message EonStartVote {
         uint64 start_batch_index = 1;
 }
@@ -85,7 +79,6 @@ message Message {
                 Apology apology = 12;
 
                 EonStartVote eon_start_vote = 13;
-                EpochSecretKeyShare epoch_secret_key_share = 14;
         }
 }
 
