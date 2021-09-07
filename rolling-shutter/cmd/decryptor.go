@@ -11,7 +11,11 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
+
+var gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
 
 var decryptorCmd = &cobra.Command{
 	Use:   "decryptor",
@@ -32,6 +36,7 @@ var initDecryptorDBCmd = &cobra.Command{
 }
 
 type DecryptorConfig struct {
+	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 	DatabaseURL    string
 }
@@ -39,23 +44,6 @@ type DecryptorConfig struct {
 func init() {
 	decryptorCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	decryptorCmd.AddCommand(initDecryptorDBCmd)
-}
-
-func decryptorMain() error {
-	ctx := context.Background()
-
-	config, err := readDecryptorConfig()
-	if err != nil {
-		return err
-	}
-
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to database")
-	}
-	defer dbpool.Close()
-
-	return nil
 }
 
 func initDecryptorDB() error {
@@ -83,6 +71,14 @@ func initDecryptorDB() error {
 }
 
 func readDecryptorConfig() (DecryptorConfig, error) {
+	viper.SetEnvPrefix("DECRYPTOR")
+	viper.BindEnv("ListenAddress")
+	viper.BindEnv("PeerMultiaddrs")
+	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
+	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
+	viper.SetDefault("ListenAddress", defaultListenAddress)
+	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+
 	config := DecryptorConfig{}
 
 	viper.AddConfigPath("$HOME/.config/shutter")
@@ -100,10 +96,38 @@ func readDecryptorConfig() (DecryptorConfig, error) {
 		return config, err // Config file was found but another error was produced
 	}
 
-	err = viper.Unmarshal(&config, viper.DecodeHook(MultiaddrHook()))
+	err = viper.Unmarshal(&config, viper.DecodeHook(medley.MultiaddrHook()))
 	if err != nil {
 		return config, err
 	}
 
 	return config, nil
+}
+
+func decryptorMain() error {
+	ctx := context.Background()
+
+	config, err := readDecryptorConfig()
+	if err != nil {
+		return err
+	}
+
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+
+	p := p2p.NewP2p()
+	if err := p.CreateHost(ctx, config.ListenAddress); err != nil {
+		return err
+	}
+	if err := p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
+		return err
+	}
+	if err := p.ConnectToPeers(ctx, config.PeerMultiaddrs); err != nil {
+		return err
+	}
+
+	return nil
 }

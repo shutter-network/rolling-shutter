@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,8 +65,13 @@ func readKeyperConfig() (keyper.Config, error) {
 	viper.BindEnv("EncryptionKey")
 	viper.BindEnv("DKGPhaseLength")
 	viper.BindEnv("DatabaseURL")
+	viper.BindEnv("ListenAddress")
+	viper.BindEnv("PeerMultiaddrs")
 
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
+	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
+	viper.SetDefault("ListenAddress", defaultListenAddress)
+	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
 
 	defer func() {
 		if viper.ConfigFileUsed() != "" {
@@ -130,6 +136,10 @@ func keyperMain() error {
 	defer dbpool.Close()
 
 	if err := kprdb.ValidateKeyperDB(ctx, dbpool); err != nil {
+		return err
+	}
+
+	if err := keyper.InitP2p(ctx, kc.ListenAddress, kc.PeerMultiaddrs); err != nil {
 		return err
 	}
 
