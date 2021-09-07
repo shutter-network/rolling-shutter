@@ -11,7 +11,8 @@ import (
 const tableNamesQuery = `
 	SELECT table_name
 	FROM information_schema.tables
-	WHERE table_schema='public'
+	WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+	AND table_schema NOT LIKE 'pg_toast%'
 `
 
 // ValidateKeyperDB checks that all expected tables exist in the database. If not, it returns an
