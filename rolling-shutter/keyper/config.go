@@ -14,8 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/mitchellh/mapstructure"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
 // Config contains validated configuration parameters for the keyper client.
@@ -27,6 +30,8 @@ type Config struct {
 	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
 	EncryptionKey  *ecies.PrivateKey
 	DKGPhaseLength uint64 // in shuttermint blocks
+	ListenAddress  multiaddr.Multiaddr
+	PeerMultiaddrs []multiaddr.Multiaddr
 }
 
 const configTemplate = `# Shutter keyper configuration for {{ .Address }}
@@ -38,6 +43,8 @@ DBDir			= "{{ .DBDir }}"
 # It it's empty, we use the standard PG* environment variables
 DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
+ListenAddress	= "{{ .ListenAddress }}"
+PeerMultiaddrs	= "{{ .PeerMultiaddrs }}"
 
 # Secret Keys
 EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
@@ -156,6 +163,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				stringToAddress,
 				mapstructure.StringToTimeDurationHookFunc(),
 				mapstructure.StringToSliceHookFunc(","),
+				medley.MultiaddrHook(),
 			),
 		),
 	)
