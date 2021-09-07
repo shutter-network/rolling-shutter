@@ -1,15 +1,18 @@
 package cmd
 
 import (
+	"context"
 	"log"
 	"path/filepath"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 // keyperCmd represents the keyper command.
@@ -35,6 +38,7 @@ func readKeyperConfig() (keyper.Config, error) {
 	viper.BindEnv("ValidatorSeed")
 	viper.BindEnv("EncryptionKey")
 	viper.BindEnv("DKGPhaseLength")
+	viper.BindEnv("DatabaseURL")
 
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
 
@@ -80,6 +84,8 @@ func readKeyperConfig() (keyper.Config, error) {
 }
 
 func keyperMain() error {
+	ctx := context.Background()
+
 	kc, err := readKeyperConfig()
 	if err != nil {
 		return errors.WithMessage(err, "Please check your configuration")
@@ -91,5 +97,16 @@ func keyperMain() error {
 		kc.Address().Hex(),
 		kc.ShuttermintURL,
 	)
+
+	dbpool, err := pgxpool.Connect(ctx, kc.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+
+	if err := shdb.ValidateKeyperDB(ctx, dbpool); err != nil {
+		return err
+	}
+
 	return errors.Errorf("keyper command not implemented")
 }

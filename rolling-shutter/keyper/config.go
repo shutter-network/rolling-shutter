@@ -22,6 +22,7 @@ import (
 type Config struct {
 	ShuttermintURL string
 	DBDir          string
+	DatabaseURL    string
 	SigningKey     *ecdsa.PrivateKey
 	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
 	EncryptionKey  *ecies.PrivateKey
@@ -32,6 +33,7 @@ const configTemplate = `# Shutter keyper configuration for {{ .Address }}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 DBDir			= "{{ .DBDir }}"
+DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
 
 # Secret Keys
