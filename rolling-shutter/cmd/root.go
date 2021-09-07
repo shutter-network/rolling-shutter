@@ -19,8 +19,8 @@ var (
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
-	Use:     "shuttermint",
-	Short:   "A collection of commands to run and interact with Shutter nodes",
+	Use:     "rolling-shutter",
+	Short:   "A collection of commands to run and interact with Rolling Shutter nodes",
 	Version: shversion.Version(),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		err := medley.BindFlags(cmd)

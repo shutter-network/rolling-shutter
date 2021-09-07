@@ -7,13 +7,15 @@ SHROOT ?= $(CURDIR)
 TESTROOT=$(SHROOT)/testchain
 BINDIR ?= ./bin
 
+EXECUTABLE ?= ${BINDIR}/rolling-shutter
 OPENZEPPELIN_CONTRACTS=openzeppelin
 OPENZEPPELIN_CONTRACTS_DIR=../contracts/openzeppelin
 
 build:
 	@VERSION=`git describe --tags --always --abbrev=4 --dirty`; \
-	echo "Building shuttermint $${VERSION}"; \
-	${GO} build ${GOFLAGS} -o ${BINDIR} -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=$${VERSION}" . ./sandbox/testclient
+	echo "Building ${EXECUTABLE} $${VERSION}"; \
+	${GO} build ${GOFLAGS} -o ${EXECUTABLE} -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=$${VERSION}"; \
+	${GO} build ${GOFLAGS} -o ${BINDIR} -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=$${VERSION}" ./sandbox/testclient
 
 wasm:
 	GOARCH=wasm GOOS=js ${GO} build ${GOFLAGS} -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/main_wasm.go
@@ -22,12 +24,12 @@ protoc:
 	protoc shmsg/*.proto --go_out=shmsg/
 
 ${TESTROOT}:
-	${BINDIR}/shuttermint init --dev --root ${TESTROOT}
+	${EXECUTABLE} init --dev --root ${TESTROOT}
 
 init: ${TESTROOT}
 
 run: build init
-	${BINDIR}/shuttermint chain --config ${TESTROOT}/config/config.toml
+	${EXECUTABLE} chain --config ${TESTROOT}/config/config.toml
 
 test:
 	${GO} test ${GOFLAGS} ./...
@@ -41,10 +43,10 @@ coverage:
 
 clean:
 	rm -rf ${TESTROOT}
-	rm -f ${BINDIR}/shuttermint ${BINDIR}/testclient ${BINDIR}/prepare
+	rm -f ${EXECUTABLE} ${BINDIR}/testclient ${BINDIR}/shuttermint
 
 install:
-	install -o root -m 0555 ${BINDIR}/shuttermint ${PREFIX}/bin/shuttermint
+	install -o root -m 0555 ${EXECUTABLE} ${PREFIX}/bin/
 
 install-tools: install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
 
