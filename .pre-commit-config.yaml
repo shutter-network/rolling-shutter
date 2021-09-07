@@ -2,6 +2,18 @@ default_language_version:
   python: python3
 
 repos:
+  - repo: local
+    hooks:
+      # This one replaces github.com/dnephin/pre-commit-golang's
+      # go-mod-tidy hook because it only works with top-level
+      # go.mod/go.sum file
+      - id: go-mod-tidy-rolling-shutter
+        name: Run go mod tidy in rolling-shutter
+        entry: tools/go-mod-tidy
+        files: '\.go$|go.mod$|go.sum$'
+        language: script
+        args: ["rolling-shutter"]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
     hooks:
