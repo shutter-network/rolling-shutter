@@ -53,11 +53,13 @@ func validateDB(ctx context.Context, dbpool *pgxpool.Pool, requiredTables []stri
 			return errors.Wrap(err, "failed to query table names from db")
 		}
 		delete(requiredTableMap, tableName)
-
-		if len(requiredTableMap) == 0 {
-			return nil
-		}
+	}
+	if rows.Err() != nil {
+		return errors.Wrap(rows.Err(), "read table names")
 	}
 
-	return errors.New("database misses one or more required table")
+	if len(requiredTableMap) != 0 {
+		return errors.New("database misses one or more required table")
+	}
+	return nil
 }
