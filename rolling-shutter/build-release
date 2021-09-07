@@ -6,7 +6,7 @@ set -euo pipefail
 : "${TARGETS:=linux-amd64 linux-arm linux-arm64 freebsd-amd64 openbsd-amd64 darwin-amd64}"
 
 if [[ -z "${VERSION}" ]]; then
-   VERSION=$(git describe --tags --always --abbrev=4 --dirty)
+   VERSION=$(git describe --tags --always --abbrev=4 --dirty --match 'rolling-shutter/v*' | sed -e s#^rolling-shutter/##)
 fi
 
 for osarch in ${TARGETS}; do
