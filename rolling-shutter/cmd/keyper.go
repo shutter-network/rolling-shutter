@@ -27,8 +27,18 @@ Shuttermint node which have to be started separately in advance.`,
 	},
 }
 
+var initKeyperDBCmd = &cobra.Command{
+	Use:   "initdb",
+	Short: "Initialize the database of the keyper",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return initKeyperDB()
+	},
+}
+
 func init() {
 	keyperCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	keyperCmd.AddCommand(initKeyperDBCmd)
 }
 
 func readKeyperConfig() (keyper.Config, error) {
@@ -109,4 +119,28 @@ func keyperMain() error {
 	}
 
 	return errors.Errorf("keyper command not implemented")
+}
+
+func initKeyperDB() error {
+	ctx := context.Background()
+
+	kc, err := readKeyperConfig()
+	if err != nil {
+		return errors.WithMessage(err, "Please check your configuration")
+	}
+
+	dbpool, err := pgxpool.Connect(ctx, kc.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+
+	// initialize the db
+	err = shdb.InitKeyperDB(ctx, dbpool)
+	if err != nil {
+		return err
+	}
+	log.Println("database successfully initialized")
+
+	return nil
 }

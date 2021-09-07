@@ -34,11 +34,37 @@ const createDecryptorTables = `
 	);
 `
 
+const createKeyperTables = `
+	CREATE TABLE IF NOT EXISTS decryption_trigger (
+		round_id bigint PRIMARY KEY
+	);
+	CREATE TABLE IF NOT EXISTS decryption_key_share (
+		round_id bigint,
+		keyper_index bigint,
+		decryption_key_share bytea,
+		PRIMARY KEY (round_id, keyper_index)
+	);
+	CREATE TABLE IF NOT EXISTS decryption_key (
+		round_id bigint PRIMARY KEY,
+		keyper_index bigint,
+		decryption_key bytea
+	);
+`
+
 // InitDecryptorDB initializes the database of the decryptor. It is assumed that the db is empty.
 func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	_, err := dbpool.Exec(ctx, createDecryptorTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create decryptor tables")
+	}
+	return nil
+}
+
+// InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
+func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	_, err := dbpool.Exec(ctx, createKeyperTables)
+	if err != nil {
+		return errors.Wrap(err, "failed to create keyper tables")
 	}
 	return nil
 }
