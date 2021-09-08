@@ -173,7 +173,7 @@ func (config *Config) Address() common.Address {
 	return crypto.PubkeyToAddress(config.SigningKey.PublicKey)
 }
 
-// WriteTOML writes a toml configuratio file with the given config.
+// WriteTOML writes a toml configuration file with the given config.
 func (config *Config) WriteTOML(w io.Writer) error {
 	return tmpl.Execute(w, config)
 }
