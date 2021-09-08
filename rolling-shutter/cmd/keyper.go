@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -14,6 +15,8 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
+
+var outputFile string
 
 // keyperCmd represents the keyper command.
 var keyperCmd = &cobra.Command{
@@ -36,9 +39,21 @@ var initKeyperDBCmd = &cobra.Command{
 	},
 }
 
+var generateConfigCmd = &cobra.Command{
+	Use:   "generate-config",
+	Short: "Generate a keyper configuration file",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return generateKeyperConfig()
+	},
+}
+
 func init() {
 	keyperCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	keyperCmd.AddCommand(initKeyperDBCmd)
+	generateConfigCmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
+	generateConfigCmd.MarkPersistentFlagRequired("output")
+	keyperCmd.AddCommand(generateConfigCmd)
 }
 
 func readKeyperConfig() (keyper.Config, error) {
@@ -142,5 +157,28 @@ func initKeyperDB() error {
 	}
 	log.Println("database successfully initialized")
 
+	return nil
+}
+
+func generateKeyperConfig() error {
+	cfg := keyper.Config{
+		ShuttermintURL: "http://localhost:26657",
+		DKGPhaseLength: 30,
+	}
+	err := cfg.GenerateNewKeys()
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return errors.Wrap(err, "failed to create keyper config file")
+	}
+	if err = cfg.WriteTOML(file); err != nil {
+		return errors.Wrap(err, "failed to write keyper config file")
+	}
+	if err = file.Close(); err != nil {
+		return errors.Wrap(err, "failed to close keyper config file")
+	}
 	return nil
 }
