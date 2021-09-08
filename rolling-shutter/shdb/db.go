@@ -18,34 +18,34 @@ const tableNamesQuery = `
 // createDecryptorTables creates the tables for the decryptor db.
 const createDecryptorTables = `
 	CREATE TABLE IF NOT EXISTS cipher_batch (
-		round_id bigint PRIMARY KEY,
+		epoch_id bigint PRIMARY KEY,
 		data bytea
 	);
 	CREATE TABLE IF NOT EXISTS decryption_key (
-		round_id bigint PRIMARY KEY,
+		epoch_id bigint PRIMARY KEY,
 		key bytea
 	);
 	CREATE TABLE IF NOT EXISTS decryption_signature (
-		round_id bigint,
+		epoch_id bigint,
 		signed_hash bytea,
 		signer_index bigint,
 		signature bytea,
-		PRIMARY KEY (round_id, signer_index)
+		PRIMARY KEY (epoch_id, signer_index)
 	);
 `
 
 const createKeyperTables = `
 	CREATE TABLE IF NOT EXISTS decryption_trigger (
-		round_id bigint PRIMARY KEY
+		epoch_id bigint PRIMARY KEY
 	);
 	CREATE TABLE IF NOT EXISTS decryption_key_share (
-		round_id bigint,
+		epoch_id bigint,
 		keyper_index bigint,
 		decryption_key_share bytea,
-		PRIMARY KEY (round_id, keyper_index)
+		PRIMARY KEY (epoch_id, keyper_index)
 	);
 	CREATE TABLE IF NOT EXISTS decryption_key (
-		round_id bigint PRIMARY KEY,
+		epoch_id bigint PRIMARY KEY,
 		keyper_index bigint,
 		decryption_key bytea
 	);
