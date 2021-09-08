@@ -143,7 +143,7 @@ func (config *Config) GenerateNewKeys() error {
 
 // Unmarshal unmarshals a keyper Config from the the given Viper object.
 func (config *Config) Unmarshal(v *viper.Viper) error {
-	return v.Unmarshal(
+	err := v.Unmarshal(
 		config,
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
@@ -156,6 +156,16 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			),
 		),
 	)
+	if err != nil {
+		return err
+	}
+	if config.SigningKey == nil {
+		return errors.Errorf("SigningKey is missing")
+	}
+	if config.EncryptionKey == nil {
+		return errors.Errorf("EncryptionKey is missing")
+	}
+	return nil
 }
 
 // Address returns the keyper's Ethereum address.
