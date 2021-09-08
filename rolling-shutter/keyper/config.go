@@ -33,6 +33,9 @@ const configTemplate = `# Shutter keyper configuration for {{ .Address }}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 DBDir			= "{{ .DBDir }}"
+
+# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
+# It it's empty, we use the standard PG* environment variables
 DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
 
