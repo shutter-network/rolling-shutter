@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 var decryptorCmd = &cobra.Command{
@@ -19,6 +22,15 @@ var decryptorCmd = &cobra.Command{
 	},
 }
 
+var initDecryptorDBCmd = &cobra.Command{
+	Use:   "initdb",
+	Short: "Initialize the database of the decryptor",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return initDecryptorDB()
+	},
+}
+
 type DecryptorConfig struct {
 	PeerMultiaddrs []multiaddr.Multiaddr
 	DatabaseURL    string
@@ -26,6 +38,7 @@ type DecryptorConfig struct {
 
 func init() {
 	decryptorCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	decryptorCmd.AddCommand(initDecryptorDBCmd)
 }
 
 func decryptorMain() error {
@@ -41,6 +54,30 @@ func decryptorMain() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+
+	return nil
+}
+
+func initDecryptorDB() error {
+	ctx := context.Background()
+
+	config, err := readDecryptorConfig()
+	if err != nil {
+		return err
+	}
+
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+
+	// initialize the db
+	err = shdb.InitDecryptorDB(ctx, dbpool)
+	if err != nil {
+		return err
+	}
+	log.Println("database successfully initialized")
 
 	return nil
 }

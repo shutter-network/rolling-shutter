@@ -11,8 +11,63 @@ import (
 const tableNamesQuery = `
 	SELECT table_name
 	FROM information_schema.tables
-	WHERE table_schema='public'
+	WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+	AND table_schema NOT LIKE 'pg_toast%'
 `
+
+// createDecryptorTables creates the tables for the decryptor db.
+const createDecryptorTables = `
+	CREATE TABLE IF NOT EXISTS cipher_batch (
+		round_id bigint PRIMARY KEY,
+		data bytea
+	);
+	CREATE TABLE IF NOT EXISTS decryption_key (
+		round_id bigint PRIMARY KEY,
+		key bytea
+	);
+	CREATE TABLE IF NOT EXISTS decryption_signature (
+		round_id bigint,
+		signed_hash bytea,
+		signer_index bigint,
+		signature bytea,
+		PRIMARY KEY (round_id, signer_index)
+	);
+`
+
+const createKeyperTables = `
+	CREATE TABLE IF NOT EXISTS decryption_trigger (
+		round_id bigint PRIMARY KEY
+	);
+	CREATE TABLE IF NOT EXISTS decryption_key_share (
+		round_id bigint,
+		keyper_index bigint,
+		decryption_key_share bytea,
+		PRIMARY KEY (round_id, keyper_index)
+	);
+	CREATE TABLE IF NOT EXISTS decryption_key (
+		round_id bigint PRIMARY KEY,
+		keyper_index bigint,
+		decryption_key bytea
+	);
+`
+
+// InitDecryptorDB initializes the database of the decryptor. It is assumed that the db is empty.
+func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	_, err := dbpool.Exec(ctx, createDecryptorTables)
+	if err != nil {
+		return errors.Wrap(err, "failed to create decryptor tables")
+	}
+	return nil
+}
+
+// InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
+func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	_, err := dbpool.Exec(ctx, createKeyperTables)
+	if err != nil {
+		return errors.Wrap(err, "failed to create keyper tables")
+	}
+	return nil
+}
 
 // ValidateKeyperDB checks that all expected tables exist in the database. If not, it returns an
 // error.
