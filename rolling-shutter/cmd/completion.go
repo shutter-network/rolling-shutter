@@ -14,13 +14,13 @@ var completionCmd = &cobra.Command{
 
 Bash:
 
-  $ source <(shuttermint completion bash)
+  $ source <(rolling-shutter completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ shuttermint completion bash > /etc/bash_completion.d/shuttermint
+  $ rolling-shutter completion bash > /etc/bash_completion.d/rolling-shutter
   # macOS:
-  $ shuttermint completion bash > /usr/local/etc/bash_completion.d/shuttermint
+  $ rolling-shutter completion bash > /usr/local/etc/bash_completion.d/rolling-shutter
 
 Zsh:
 
@@ -30,23 +30,23 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ shuttermint completion zsh > "${fpath[1]}/_shuttermint"
+  $ rolling-shutter completion zsh > "${fpath[1]}/_rolling-shutter"
 
   # You will need to start a new shell for this setup to take effect.
 
 fish:
 
-  $ shuttermint completion fish | source
+  $ rolling-shutter completion fish | source
 
   # To load completions for each session, execute once:
-  $ shuttermint completion fish > ~/.config/fish/completions/shuttermint.fish
+  $ rolling-shutter completion fish > ~/.config/fish/completions/rolling-shutter.fish
 
 PowerShell:
 
-  PS> shuttermint completion powershell | Out-String | Invoke-Expression
+  PS> rolling-shutter completion powershell | Out-String | Invoke-Expression
 
   # To load completions for every new session, run:
-  PS> shuttermint completion powershell > shuttermint.ps1
+  PS> rolling-shutter completion powershell > rolling-shutter.ps1
   # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,
