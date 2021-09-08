@@ -11,21 +11,22 @@ import (
 const tableNamesQuery = `
 	SELECT table_name
 	FROM information_schema.tables
-	WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-	AND table_schema NOT LIKE 'pg_toast%'
+	WHERE table_schema = $1
 `
 
 // createDecryptorTables creates the tables for the decryptor db.
 const createDecryptorTables = `
-	CREATE TABLE IF NOT EXISTS cipher_batch (
+	CREATE SCHEMA IF NOT EXISTS decryptor;
+
+	CREATE TABLE IF NOT EXISTS decryptor.cipher_batch (
 		epoch_id bigint PRIMARY KEY,
 		data bytea
 	);
-	CREATE TABLE IF NOT EXISTS decryption_key (
+	CREATE TABLE IF NOT EXISTS decryptor.decryption_key (
 		epoch_id bigint PRIMARY KEY,
 		key bytea
 	);
-	CREATE TABLE IF NOT EXISTS decryption_signature (
+	CREATE TABLE IF NOT EXISTS decryptor.decryption_signature (
 		epoch_id bigint,
 		signed_hash bytea,
 		signer_index bigint,
@@ -35,16 +36,17 @@ const createDecryptorTables = `
 `
 
 const createKeyperTables = `
-	CREATE TABLE IF NOT EXISTS decryption_trigger (
+	CREATE SCHEMA IF NOT EXISTS keyper;
+	CREATE TABLE IF NOT EXISTS keyper.decryption_trigger (
 		epoch_id bigint PRIMARY KEY
 	);
-	CREATE TABLE IF NOT EXISTS decryption_key_share (
+	CREATE TABLE IF NOT EXISTS keyper.decryption_key_share (
 		epoch_id bigint,
 		keyper_index bigint,
 		decryption_key_share bytea,
 		PRIMARY KEY (epoch_id, keyper_index)
 	);
-	CREATE TABLE IF NOT EXISTS decryption_key (
+	CREATE TABLE IF NOT EXISTS keyper.decryption_key (
 		epoch_id bigint PRIMARY KEY,
 		keyper_index bigint,
 		decryption_key bytea
@@ -72,7 +74,7 @@ func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 // ValidateKeyperDB checks that all expected tables exist in the database. If not, it returns an
 // error.
 func ValidateKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	return validateDB(ctx, dbpool, []string{
+	return validateDB(ctx, dbpool, "keyper", []string{
 		"decryption_trigger",
 		"decryption_key_share",
 		"decryption_key",
@@ -82,20 +84,20 @@ func ValidateKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 // ValidateDecryptorDB checks that all expected tables exist in the database. If not, it returns an
 // error.
 func ValidateDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	return validateDB(ctx, dbpool, []string{
+	return validateDB(ctx, dbpool, "decryptor", []string{
 		"cipher_batch",
 		"decryption_key",
 		"decryption_signature",
 	})
 }
 
-func validateDB(ctx context.Context, dbpool *pgxpool.Pool, requiredTables []string) error {
+func validateDB(ctx context.Context, dbpool *pgxpool.Pool, schema string, requiredTables []string) error {
 	requiredTableMap := make(map[string]bool)
 	for _, table := range requiredTables {
 		requiredTableMap[table] = true
 	}
 
-	rows, err := dbpool.Query(ctx, tableNamesQuery)
+	rows, err := dbpool.Query(ctx, tableNamesQuery, schema)
 	if err != nil {
 		return errors.Wrap(err, "failed to query table names from db")
 	}
