@@ -48,7 +48,10 @@ clean:
 install:
 	install -o root -m 0555 ${EXECUTABLE} ${PREFIX}/bin/
 
-install-tools: install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
+install-tools: install-sqlc install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
+
+install-sqlc:
+	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc
 
 install-protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go
