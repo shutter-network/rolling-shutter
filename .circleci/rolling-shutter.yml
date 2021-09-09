@@ -1,4 +1,22 @@
 jobs:
+  rs-generate:
+    executor: go
+    working_directory: ~/src/rolling-shutter
+    steps:
+      - checkout:
+          path: ~/src
+      - restore_cache:
+          keys:
+            - generate-v1-{{ checksum "go.sum" }}
+      - run: make install-sqlc
+      - run: make generate
+      - save_cache:
+          key: generate-v1-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
+            - "~/.cache/go-build"
+      - run: git diff --exit-code
+
   rs-build:
     parameters:
       go-version:
@@ -67,6 +85,10 @@ jobs:
 workflows:
   rolling-shutter:
     jobs:
+      - rs-generate:
+          filters:
+            tags:
+              only: /^v\d+\.\d+\.\d+$/
       - rs-build:
           matrix:
             parameters:
