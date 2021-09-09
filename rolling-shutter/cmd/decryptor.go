@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 )
 
 var decryptorCmd = &cobra.Command{
@@ -73,7 +73,7 @@ func initDecryptorDB() error {
 	defer dbpool.Close()
 
 	// initialize the db
-	err = shdb.InitDecryptorDB(ctx, dbpool)
+	err = dcrdb.InitDecryptorDB(ctx, dbpool)
 	if err != nil {
 		return err
 	}

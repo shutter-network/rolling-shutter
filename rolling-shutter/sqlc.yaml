@@ -1,0 +1,13 @@
+version: 1
+packages:
+  - path: "keyper/kprdb"
+    name: "kprdb"
+    engine: "postgresql"
+    schema: "keyper/kprdb/schema.sql"
+    queries: "keyper/kprdb/query.sql"
+
+  - path: "decryptor/dcrdb"
+    name: "dcrdb"
+    engine: "postgresql"
+    schema: "decryptor/dcrdb/schema.sql"
+    queries: "decryptor/dcrdb/query.sql"

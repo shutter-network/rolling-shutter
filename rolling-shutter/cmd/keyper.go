@@ -13,7 +13,7 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 )
 
 var outputFile string
@@ -129,7 +129,7 @@ func keyperMain() error {
 	}
 	defer dbpool.Close()
 
-	if err := shdb.ValidateKeyperDB(ctx, dbpool); err != nil {
+	if err := kprdb.ValidateKeyperDB(ctx, dbpool); err != nil {
 		return err
 	}
 
@@ -151,7 +151,7 @@ func initKeyperDB() error {
 	defer dbpool.Close()
 
 	// initialize the db
-	err = shdb.InitKeyperDB(ctx, dbpool)
+	err = kprdb.InitKeyperDB(ctx, dbpool)
 	if err != nil {
 		return err
 	}

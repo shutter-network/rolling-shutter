@@ -70,7 +70,7 @@ workflows:
       - rs-build:
           matrix:
             parameters:
-              go-version: [go, go115, go116]
+              go-version: [go, go116]
           filters:
             tags:
               only: /^v\d+\.\d+\.\d+$/
