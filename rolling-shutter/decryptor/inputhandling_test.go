@@ -9,7 +9,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func TestInvalidInputTypes(t *testing.T) {
+func TestInvalidInputTypesIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
@@ -21,7 +25,11 @@ func TestInvalidInputTypes(t *testing.T) {
 	}
 }
 
-func TestInsertDecryptionKey(t *testing.T) {
+func TestInsertDecryptionKeyIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
@@ -65,7 +73,11 @@ func TestInsertDecryptionKey(t *testing.T) {
 	}
 }
 
-func TestInsertCipherBatch(t *testing.T) {
+func TestInsertCipherBatchIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
