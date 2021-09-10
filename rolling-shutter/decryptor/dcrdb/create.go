@@ -1,3 +1,5 @@
+// Package dcrdb contains the sqlc generated files for interacting with the decryptor's database
+// schema.
 package dcrdb
 
 import (

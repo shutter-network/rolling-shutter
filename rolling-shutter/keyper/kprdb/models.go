@@ -21,3 +21,8 @@ type KeyperDecryptionKeyShare struct {
 type KeyperDecryptionTrigger struct {
 	EpochID int64
 }
+
+type KeyperMetaInf struct {
+	Key   string
+	Value string
+}

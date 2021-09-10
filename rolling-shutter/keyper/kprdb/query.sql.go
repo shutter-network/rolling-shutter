@@ -18,3 +18,28 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (KeyperDe
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
 	return i, err
 }
+
+const getMeta = `-- name: GetMeta :one
+SELECT key, value FROM keyper.meta_inf WHERE key = $1
+`
+
+func (q *Queries) GetMeta(ctx context.Context, key string) (KeyperMetaInf, error) {
+	row := q.db.QueryRow(ctx, getMeta, key)
+	var i KeyperMetaInf
+	err := row.Scan(&i.Key, &i.Value)
+	return i, err
+}
+
+const insertMeta = `-- name: InsertMeta :exec
+INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2)
+`
+
+type InsertMetaParams struct {
+	Key   string
+	Value string
+}
+
+func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
+	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
+}
