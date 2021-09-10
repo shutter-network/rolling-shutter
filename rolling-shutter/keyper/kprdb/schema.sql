@@ -1,5 +1,6 @@
--- Please change kprdb.schemaVersion if you make incompatible changes
--- to the schema
+-- schema-version: 1 --
+-- Please change the version above if you make incompatible changes to
+-- the schema. We'll use this to check we're using the right schema.
 
 CREATE SCHEMA IF NOT EXISTS keyper;
 CREATE TABLE IF NOT EXISTS keyper.decryption_trigger (

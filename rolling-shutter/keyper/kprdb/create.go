@@ -5,17 +5,28 @@ package kprdb
 import (
 	"context"
 	_ "embed"
+	"log"
+	"regexp"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 )
 
-// schemaVersion is used to check that we use the right schema.
-var schemaVersion = "1"
-
 //go:embed schema.sql
 // CreateKeyperTables contains the SQL statements to create the keyper namespace and tables.
 var CreateKeyperTables string
+
+func expectedSchemaVersion() string {
+	rx := "-- schema-version: ([0-9]+) --"
+	matches := regexp.MustCompile(rx).FindStringSubmatch(CreateKeyperTables)
+	if len(matches) != 2 {
+		log.Fatalf("internal error: kprdb/schema.sql is wrongly formatted, cannot find regular expression %s", rx)
+	}
+	return matches[1]
+}
+
+// schemaVersion is used to check that we use the right schema.
+var schemaVersion = expectedSchemaVersion()
 
 // InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
 func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
