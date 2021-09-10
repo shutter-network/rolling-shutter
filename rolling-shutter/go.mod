@@ -44,4 +44,5 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/shutter-network/shutter/shlib v0.1.5
 	golang.org/x/sys v0.0.0-20210906170528-6f6e22806c34 // indirect
+	gotest.tools v2.2.0+incompatible
 )

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
+	"gotest.tools/assert"
 )
 
 // TestStartNetworkNode test that we can init two p2p nodes and make them send/receive messages.
@@ -13,19 +14,19 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	defer cancel()
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
-	nodeShortAddress1 := "/ip4/127.0.0.1/tcp/2000"
-	nodeAddress1, _ := multiaddr.NewMultiaddr(nodeShortAddress1)
+	nodeAddress1, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	nodeAddress2, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/3000")
 	testMessage := "test message"
 
 	p1 := NewP2p()
 	p2 := NewP2p()
 
-	nodeAddreses := []multiaddr.Multiaddr{nodeAddress1, nodeAddress2}
+	nodeAddresses := []multiaddr.Multiaddr{nodeAddress1, nodeAddress2}
 	for i, p := range []*P2P{p1, p2} {
-		if err := p.CreateHost(ctx, nodeAddreses[i]); err != nil {
+		if err := p.CreateHost(ctx, nodeAddresses[i]); err != nil {
 			t.Fatalf("Error while creating node %d: %v", i, err)
 		}
 		if err := p.JoinTopics(ctx, gossipTopicNames); err != nil {
@@ -42,27 +43,25 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		t.Fatalf("Error while connecting to node 1: %v", err)
 	}
 
-	// give time for nodes to connect to each other
-	ticker := time.NewTicker(500 * time.Millisecond)
-	for {
-		timeElapsed := <-ticker.C
-		if len(p2.ConnectedPeers()) != 0 {
-			break
+	// The following loop publishes the same message over and over. Even though we did call
+	// ConnectToPeer, libp2p takes some time until the peer receives the first message.
+	var message *Message
+	topicName := gossipTopicNames[0]
+	for message == nil {
+		if err := p2.TopicGossips[topicName].Publish(ctx, testMessage); err != nil {
+			t.Fatalf("error while publishing message: %v", err)
 		}
-		if timeElapsed.Second() >= 4 {
-			t.Fatalf("Timeout while waiting for peers to connect")
-		}
-	}
 
-	topicNameForMessage := gossipTopicNames[0]
-	if err := p2.TopicGossips[topicNameForMessage].Publish(ctx, testMessage); err != nil {
-		t.Fatalf("error while publishing message: %v", err)
+		select {
+		case message = <-p1.TopicGossips[topicName].Messages:
+			if message == nil {
+				t.Fatalf("channel closed unexpectedly")
+			}
+		case <-ctx.Done():
+			t.Fatalf("waiting for message: %s", ctx.Err())
+		case <-time.After(5 * time.Millisecond):
+		}
 	}
-	message := <-p1.TopicGossips[topicNameForMessage].Messages
-	if message.Message != testMessage {
-		t.Fatalf("received wrong message: %s", message.Message)
-	}
-	if message.SenderID != p2.HostID() {
-		t.Fatalf("received message with wrong sender: %s", message.SenderID)
-	}
+	assert.Equal(t, testMessage, message.Message, "received wrong message")
+	assert.Equal(t, p2.HostID(), message.SenderID, "received message with wrong sender")
 }
