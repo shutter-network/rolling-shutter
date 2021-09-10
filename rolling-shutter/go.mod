@@ -35,6 +35,7 @@ require (
 
 require (
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
+	github.com/jackc/pgconn v1.10.0
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/kyleconroy/sqlc v1.10.0
 	github.com/libp2p/go-libp2p v0.14.4

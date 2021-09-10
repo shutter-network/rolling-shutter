@@ -13,7 +13,7 @@ WHERE epoch_id = $1
 `
 
 func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (KeyperDecryptionKey, error) {
-	row := q.db.QueryRowContext(ctx, getDecryptionKey, epochID)
+	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i KeyperDecryptionKey
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
 	return i, err

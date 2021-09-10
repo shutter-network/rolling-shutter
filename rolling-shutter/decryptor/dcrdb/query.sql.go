@@ -13,7 +13,7 @@ WHERE epoch_id = $1
 `
 
 func (q *Queries) GetCipherBatch(ctx context.Context, epochID int64) (DecryptorCipherBatch, error) {
-	row := q.db.QueryRowContext(ctx, getCipherBatch, epochID)
+	row := q.db.QueryRow(ctx, getCipherBatch, epochID)
 	var i DecryptorCipherBatch
 	err := row.Scan(&i.EpochID, &i.Data)
 	return i, err
