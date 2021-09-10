@@ -24,9 +24,9 @@ const dropEverything = `
 func NewTestDBPool(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 
-	testDBURL := os.Getenv(testDBURLVar)
-	if testDBURL == "" {
-		t.Fatal("no test db specified")
+	testDBURL, exists := os.LookupEnv(testDBURLVar)
+	if !exists {
+		t.Skipf("no test db specified, please set %s", testDBURLVar)
 	}
 
 	dbpool, err := pgxpool.Connect(ctx, testDBURL)
