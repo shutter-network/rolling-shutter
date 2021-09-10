@@ -38,7 +38,7 @@ jobs:
       - run:
           name: "Run integration tests with gotestsum"
           command: |
-            gotestsum -f standard-verbose --junitfile report/integration-tests.xml -- -run Integration ./...
+            gotestsum -f standard-verbose --junitfile report/integration-tests.xml -- -run Integration -count=1 ./...
       - store_test_results:
           path: report
       - save_cache:
