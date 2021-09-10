@@ -31,10 +31,14 @@ jobs:
             - shuttermint-<< parameters.go-version >>-v8-{{ checksum "go.sum" }}
       - run: make build wasm
       - run:
-          name: "Run tests with gotestsum"
+          name: "Run unit tests with gotestsum"
           command: |
             mkdir report
-            gotestsum -f standard-verbose --junitfile report/unit-tests.xml ./...
+            gotestsum -f standard-verbose --junitfile report/unit-tests.xml -- -short ./...
+      - run:
+          name: "Run integration tests with gotestsum"
+          command: |
+            gotestsum -f standard-verbose --junitfile report/integration-tests.xml -- -run Integration ./...
       - store_test_results:
           path: report
       - save_cache:

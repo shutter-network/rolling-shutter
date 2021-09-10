@@ -31,8 +31,18 @@ init: ${TESTROOT}
 run: build init
 	${EXECUTABLE} chain --config ${TESTROOT}/config/config.toml
 
-test:
-	${GO} test ${GOFLAGS} ./...
+test-unit:
+	@echo "====================> Running unit tests"
+	gotestsum -- -short ${GOFLAGS} ./...
+
+test-integration:
+	@echo "====================>  Running integration tests"
+	gotestsum -- -run Integration ${GOFLAGS} ./...
+
+test: test-unit
+
+test-all: test-unit test-integration
+
 
 generate:
 	${GO} generate -x ./...
@@ -48,7 +58,7 @@ clean:
 install:
 	install -o root -m 0555 ${EXECUTABLE} ${PREFIX}/bin/
 
-install-tools: install-sqlc install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci
+install-tools: install-sqlc install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
 
 install-sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc
@@ -71,6 +81,9 @@ install-stringer:
 install-gci:
 	${GO} install github.com/daixiang0/gci@latest
 
+install-gotestsum:
+	${GO} install gotest.tools/gotestsum@latest
+
 lint:
 	golangci-lint run --tests
 
@@ -78,4 +91,4 @@ lint-changes:
 	base=`git merge-base HEAD origin/main`; \
 	golangci-lint run --new-from-rev $${base}
 
-.PHONY: build install run init clean test generate install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-tools lint lint-changes coverage
+.PHONY: build install run init clean test test-all test-unit test-integration generate install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage

@@ -9,7 +9,10 @@ import (
 )
 
 // TestStartNetworkNode test that we can init two p2p nodes and make them send/receive messages.
-func TestStartNetworkNode(t *testing.T) {
+func TestStartNetworkNodeIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
 	nodeShortAddress1 := "/ip4/127.0.0.1/tcp/2000"
