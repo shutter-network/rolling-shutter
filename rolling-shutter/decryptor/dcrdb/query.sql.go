@@ -5,6 +5,8 @@ package dcrdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgconn"
 )
 
 const getCipherBatch = `-- name: GetCipherBatch :one
@@ -17,4 +19,52 @@ func (q *Queries) GetCipherBatch(ctx context.Context, epochID int64) (DecryptorC
 	var i DecryptorCipherBatch
 	err := row.Scan(&i.EpochID, &i.Data)
 	return i, err
+}
+
+const getDecryptionKey = `-- name: GetDecryptionKey :one
+SELECT epoch_id, key FROM decryptor.decryption_key
+WHERE epoch_id = $1
+`
+
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (DecryptorDecryptionKey, error) {
+	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
+	var i DecryptorDecryptionKey
+	err := row.Scan(&i.EpochID, &i.Key)
+	return i, err
+}
+
+const insertCipherBatch = `-- name: InsertCipherBatch :execresult
+INSERT INTO decryptor.cipher_batch (
+    epoch_id, data
+) VALUES (
+    $1, $2
+)
+ON CONFLICT DO NOTHING
+`
+
+type InsertCipherBatchParams struct {
+	EpochID int64
+	Data    []byte
+}
+
+func (q *Queries) InsertCipherBatch(ctx context.Context, arg InsertCipherBatchParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertCipherBatch, arg.EpochID, arg.Data)
+}
+
+const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
+INSERT INTO decryptor.decryption_key (
+    epoch_id, key
+) VALUES (
+    $1, $2
+)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDecryptionKeyParams struct {
+	EpochID int64
+	Key     []byte
+}
+
+func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.Key)
 }
