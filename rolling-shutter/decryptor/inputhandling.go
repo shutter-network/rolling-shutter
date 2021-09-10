@@ -51,6 +51,16 @@ func (d *Decryptor) handleDecryptionKeyInput(ctx context.Context, key *shmsg.Dec
 	return nil
 }
 
-func (d *Decryptor) handleCipherBatchInput(_ context.Context, _ *shmsg.CipherBatch) error {
+func (d *Decryptor) handleCipherBatchInput(ctx context.Context, cipherBatch *shmsg.CipherBatch) error {
+	tag, err := d.db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
+		EpochID: int64(cipherBatch.EpochID),
+		Data:    cipherBatch.Data,
+	})
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
+	}
 	return nil
 }
