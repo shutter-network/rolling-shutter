@@ -26,6 +26,18 @@ executors:
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  go-integration:
+    docker:
+      - image: cimg/go:1.17
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          ROLLING_SHUTTER_TESTDB_URL: postgres://pguser:password@localhost:5432/testdb
+      - image: circleci/postgres:12.3
+        environment:
+          POSTGRES_USER: pguser
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
   go116:
     docker:
       - image: cimg/go:1.16

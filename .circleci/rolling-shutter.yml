@@ -36,6 +36,12 @@ jobs:
             mkdir -p report/unit report/integration
             gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short ./...
       - run:
+          name: Wait for PostgreSQL
+          command: |
+            if [[ -v ROLLING_SHUTTER_TESTDB_URL ]]; then
+              dockerize -wait tcp://localhost:5432 -timeout 1m
+            fi
+      - run:
           name: "Run integration tests with gotestsum"
           command: |
             gotestsum -f standard-verbose --junitfile report/integration/tests.xml -- -run Integration -count=1 ./...
@@ -96,7 +102,7 @@ workflows:
       - rs-build:
           matrix:
             parameters:
-              go-version: [go, go116]
+              go-version: [go-integration, go116]
           filters:
             tags:
               only: /^v\d+\.\d+\.\d+$/
