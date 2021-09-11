@@ -21,3 +21,9 @@ INSERT INTO decryptor.decryption_key (
     $1, $2
 )
 ON CONFLICT DO NOTHING;
+
+-- name: InsertMeta :exec
+INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);
+
+-- name: GetMeta :one
+SELECT * FROM decryptor.meta_inf WHERE key = $1;

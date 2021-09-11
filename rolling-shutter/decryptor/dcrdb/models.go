@@ -20,3 +20,8 @@ type DecryptorDecryptionSignature struct {
 	SignerIndex int64
 	Signature   []byte
 }
+
+type DecryptorMetaInf struct {
+	Key   string
+	Value string
+}

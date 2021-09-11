@@ -33,6 +33,17 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (Decrypto
 	return i, err
 }
 
+const getMeta = `-- name: GetMeta :one
+SELECT key, value FROM decryptor.meta_inf WHERE key = $1
+`
+
+func (q *Queries) GetMeta(ctx context.Context, key string) (DecryptorMetaInf, error) {
+	row := q.db.QueryRow(ctx, getMeta, key)
+	var i DecryptorMetaInf
+	err := row.Scan(&i.Key, &i.Value)
+	return i, err
+}
+
 const insertCipherBatch = `-- name: InsertCipherBatch :execresult
 INSERT INTO decryptor.cipher_batch (
     epoch_id, data
@@ -67,4 +78,18 @@ type InsertDecryptionKeyParams struct {
 
 func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
 	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.Key)
+}
+
+const insertMeta = `-- name: InsertMeta :exec
+INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2)
+`
+
+type InsertMetaParams struct {
+	Key   string
+	Value string
+}
+
+func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
+	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
 }

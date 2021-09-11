@@ -117,6 +117,10 @@ func decryptorMain() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+	err = dcrdb.ValidateDecryptorDB(ctx, dbpool)
+	if err != nil {
+		return err
+	}
 
 	p := p2p.NewP2p()
 	if err := p.CreateHost(ctx, config.ListenAddress); err != nil {
