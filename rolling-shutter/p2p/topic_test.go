@@ -21,8 +21,8 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	nodeAddress2, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/3000")
 	testMessage := "test message"
 
-	p1 := NewP2p()
-	p2 := NewP2p()
+	p1 := NewP2P()
+	p2 := NewP2P()
 
 	nodeAddresses := []multiaddr.Multiaddr{nodeAddress1, nodeAddress2}
 	for i, p := range []*P2P{p1, p2} {

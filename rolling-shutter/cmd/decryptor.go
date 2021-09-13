@@ -122,7 +122,7 @@ func decryptorMain() error {
 		return err
 	}
 
-	p := p2p.NewP2p()
+	p := p2p.NewP2P()
 	if err := p.CreateHost(ctx, config.ListenAddress); err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/libp2p/go-libp2p"
@@ -23,9 +24,9 @@ type TopicGossip struct {
 	// Messages is a channel of messages received from other peers in the chat room
 	Messages chan *Message
 
-	ps    *pubsub.PubSub
-	Topic *pubsub.Topic
-	sub   *pubsub.Subscription
+	pubSub       *pubsub.PubSub
+	Topic        *pubsub.Topic
+	subscription *pubsub.Subscription
 
 	topicName string
 	Self      peer.ID
@@ -43,10 +44,10 @@ type P2P struct {
 
 	TopicGossips map[string]*TopicGossip
 	host         host.Host
-	ps           *pubsub.PubSub
+	pubSub       *pubsub.PubSub
 }
 
-func NewP2p() *P2P {
+func NewP2P() *P2P {
 	p := P2P{}
 	p.TopicGossips = make(map[string]*TopicGossip)
 	p.PeerMultiaddrs = []multiaddr.Multiaddr{}
@@ -54,36 +55,44 @@ func NewP2p() *P2P {
 }
 
 func (p *P2P) CreateHost(ctx context.Context, listenAddress multiaddr.Multiaddr) error {
+	var err error
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
 	p.ListenAddress = listenAddress
 	// create a new libp2p Host
-	h, err := libp2p.New(ctx, libp2p.ListenAddrs(listenAddress))
+	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(listenAddress))
 	if err != nil {
 		return err
 	}
-	p.host = h
 
 	// print the node's PeerInfo in multiaddr format
+	log.Println("libp2p node address:", p.P2PAddress())
+
+	// create a new PubSub service using the GossipSub router
+	pubSub, err := pubsub.NewGossipSub(ctx, p.host)
+	if err != nil {
+		return err
+	}
+	p.pubSub = pubSub
+
+	return nil
+}
+
+// P2PAddress returns the node's PeerInfo in multiaddr format.
+func (p *P2P) P2PAddress() string {
+	if p.host == nil {
+		return "<not connected yet>"
+	}
 	peerInfo := peer.AddrInfo{
-		ID:    h.ID(),
-		Addrs: h.Addrs(),
+		ID:    p.host.ID(),
+		Addrs: p.host.Addrs(),
 	}
 	addrs, err := peer.AddrInfoToP2pAddrs(&peerInfo)
 	if err != nil {
-		return err
+		return fmt.Sprintf("<error: %s>", err)
 	}
-	log.Println("libp2p node address:", addrs[0])
-
-	// create a new PubSub service using the GossipSub router
-	ps, err := pubsub.NewGossipSub(ctx, h)
-	if err != nil {
-		return err
-	}
-	p.ps = ps
-
-	return nil
+	return addrs[0].String()
 }
 
 func (p *P2P) JoinTopics(ctx context.Context, topicNames []string) error {
@@ -95,14 +104,34 @@ func (p *P2P) JoinTopics(ctx context.Context, topicNames []string) error {
 	return nil
 }
 
+// JoinTopic tries to subscribe to the PubSub topic.
 func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
 	if _, ok := p.TopicGossips[topicName]; ok {
 		return errors.New("Cannot join new topic if already joined")
 	}
-	topicGossip, err := JoinTopic(ctx, p.ps, p.host.ID(), topicName)
+	// join the pubsub topic
+	topic, err := p.pubSub.Join(topicName)
 	if err != nil {
 		return err
 	}
+
+	// and subscribe to it
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return err
+	}
+
+	topicGossip := &TopicGossip{
+		pubSub:       p.pubSub,
+		Topic:        topic,
+		subscription: sub,
+		Self:         p.host.ID(),
+		topicName:    topicName,
+		Messages:     make(chan *Message, MessagesBufSize),
+	}
+
+	// start reading messages from the subscription in a loop
+	go topicGossip.readLoop(ctx)
 	p.TopicGossips[topicName] = topicGossip
 	return nil
 }
@@ -145,34 +174,6 @@ func (p *P2P) HostID() string {
 	return p.host.ID().Pretty()
 }
 
-// JoinTopic tries to subscribe to the PubSub topic returning a TopicGossip on success.
-func JoinTopic(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topicName string) (*TopicGossip, error) {
-	// join the pubsub topic
-	topic, err := ps.Join(topicName)
-	if err != nil {
-		return nil, err
-	}
-
-	// and subscribe to it
-	sub, err := topic.Subscribe()
-	if err != nil {
-		return nil, err
-	}
-
-	topicGossip := &TopicGossip{
-		ps:        ps,
-		Topic:     topic,
-		sub:       sub,
-		Self:      selfID,
-		topicName: topicName,
-		Messages:  make(chan *Message, MessagesBufSize),
-	}
-
-	// start reading messages from the subscription in a loop
-	go topicGossip.readLoop(ctx)
-	return topicGossip, nil
-}
-
 // Publish sends a message to the pubsub topic.
 func (topicGossip *TopicGossip) Publish(ctx context.Context, message string) error {
 	m := Message{
@@ -187,13 +188,13 @@ func (topicGossip *TopicGossip) Publish(ctx context.Context, message string) err
 }
 
 func (topicGossip *TopicGossip) ListPeers() []peer.ID {
-	return topicGossip.ps.ListPeers(topicGossip.topicName)
+	return topicGossip.pubSub.ListPeers(topicGossip.topicName)
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
 func (topicGossip *TopicGossip) readLoop(ctx context.Context) {
 	for {
-		msg, err := topicGossip.sub.Next(ctx)
+		msg, err := topicGossip.subscription.Next(ctx)
 		if err != nil {
 			close(topicGossip.Messages)
 			return
