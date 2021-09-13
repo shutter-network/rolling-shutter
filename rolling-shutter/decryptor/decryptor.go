@@ -7,14 +7,16 @@ import (
 )
 
 type Decryptor struct {
-	db           *dcrdb.Queries
-	inputChannel <-chan interface{}
+	db            *dcrdb.Queries
+	inputChannel  <-chan interface{}
+	outputChannel chan interface{}
 }
 
 func NewDecryptor(db *dcrdb.Queries) *Decryptor {
 	return &Decryptor{
-		db:           db,
-		inputChannel: make(<-chan interface{}),
+		db:            db,
+		inputChannel:  make(<-chan interface{}),
+		outputChannel: make(chan interface{}),
 	}
 }
 

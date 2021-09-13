@@ -33,6 +33,28 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (Decrypto
 	return i, err
 }
 
+const getDecryptionSignature = `-- name: GetDecryptionSignature :one
+SELECT epoch_id, signed_hash, signer_index, signature FROM decryptor.decryption_signature
+WHERE epoch_id = $1 AND signer_index = $2
+`
+
+type GetDecryptionSignatureParams struct {
+	EpochID     int64
+	SignerIndex int64
+}
+
+func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionSignatureParams) (DecryptorDecryptionSignature, error) {
+	row := q.db.QueryRow(ctx, getDecryptionSignature, arg.EpochID, arg.SignerIndex)
+	var i DecryptorDecryptionSignature
+	err := row.Scan(
+		&i.EpochID,
+		&i.SignedHash,
+		&i.SignerIndex,
+		&i.Signature,
+	)
+	return i, err
+}
+
 const getMeta = `-- name: GetMeta :one
 SELECT key, value FROM decryptor.meta_inf WHERE key = $1
 `
@@ -78,6 +100,31 @@ type InsertDecryptionKeyParams struct {
 
 func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
 	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.Key)
+}
+
+const insertDecryptionSignature = `-- name: InsertDecryptionSignature :execresult
+INSERT INTO decryptor.decryption_signature (
+    epoch_id, signed_hash, signer_index, signature
+) VALUES (
+    $1, $2, $3, $4
+)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDecryptionSignatureParams struct {
+	EpochID     int64
+	SignedHash  []byte
+	SignerIndex int64
+	Signature   []byte
+}
+
+func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecryptionSignatureParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertDecryptionSignature,
+		arg.EpochID,
+		arg.SignedHash,
+		arg.SignerIndex,
+		arg.Signature,
+	)
 }
 
 const insertMeta = `-- name: InsertMeta :exec

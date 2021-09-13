@@ -22,6 +22,18 @@ INSERT INTO decryptor.decryption_key (
 )
 ON CONFLICT DO NOTHING;
 
+-- name: GetDecryptionSignature :one
+SELECT * FROM decryptor.decryption_signature
+WHERE epoch_id = $1 AND signer_index = $2;
+
+-- name: InsertDecryptionSignature :execresult
+INSERT INTO decryptor.decryption_signature (
+    epoch_id, signed_hash, signer_index, signature
+) VALUES (
+    $1, $2, $3, $4
+)
+ON CONFLICT DO NOTHING;
+
 -- name: InsertMeta :exec
 INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);
 
