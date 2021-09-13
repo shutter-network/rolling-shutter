@@ -138,20 +138,25 @@ func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
 
 func (p *P2P) ConnectToPeers(ctx context.Context, peerMultiaddrs []multiaddr.Multiaddr) error {
 	for _, address := range peerMultiaddrs {
-		peerAddr, err := peer.AddrInfoFromP2pAddr(address)
+		err := p.ConnectToPeer(ctx, address)
 		if err != nil {
 			return err
 		}
-		if err := p.host.Connect(ctx, *peerAddr); err != nil {
-			return err
-		}
-		p.PeerMultiaddrs = append(p.PeerMultiaddrs, address)
 	}
 	return nil
 }
 
-func (p *P2P) ConnectToPeer(ctx context.Context, peerMultiaddr multiaddr.Multiaddr) error {
-	return p.ConnectToPeers(ctx, []multiaddr.Multiaddr{peerMultiaddr})
+func (p *P2P) ConnectToPeer(ctx context.Context, address multiaddr.Multiaddr) error {
+	peerAddr, err := peer.AddrInfoFromP2pAddr(address)
+	if err != nil {
+		return err
+	}
+	err = p.host.Connect(ctx, *peerAddr)
+	if err != nil {
+		return err
+	}
+	p.PeerMultiaddrs = append(p.PeerMultiaddrs, address)
+	return nil
 }
 
 func (p *P2P) ConnectedPeers() []peer.ID {
