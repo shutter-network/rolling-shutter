@@ -7,11 +7,11 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - generate-v1-{{ checksum "go.sum" }}
+            - rs-generate-v1-{{ checksum "go.sum" }}
       - run: make install-sqlc
       - run: make generate
       - save_cache:
-          key: generate-v1-{{ checksum "go.sum" }}
+          key: rs-generate-v1-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
@@ -28,7 +28,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - shuttermint-<< parameters.go-version >>-v8-{{ checksum "go.sum" }}
+            - rs-build-<< parameters.go-version >>-v1-{{ checksum "go.sum" }}
       - run: make build wasm
       - run:
           name: "Run unit tests with gotestsum"
@@ -48,8 +48,7 @@ jobs:
       - store_test_results:
           path: report
       - save_cache:
-          key:
-            shuttermint-<< parameters.go-version >>-v8-{{ checksum "go.sum" }}
+          key: rs-build-<< parameters.go-version >>-v1-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
@@ -62,7 +61,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - shuttermint-go-v8-{{ checksum "go.sum" }}
+            - rs-build-go-integration-v1-{{ checksum "go.sum" }}
       - run: env VERSION=${CIRCLE_TAG} ./build-release
       - run: go install github.com/tcnksm/ghr@v0.13.0
       - attach_workspace:
@@ -81,13 +80,13 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - lint-shuttermint-go-v7-{{ checksum "go.sum" }}
+            - lint-shuttermint-go-v9-{{ checksum "go.sum" }}
       - run:
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1
       - run: |
           make lint-changes
       - save_cache:
-          key: lint-shuttermint-go-v7-{{ checksum "go.sum" }}
+          key: lint-shuttermint-go-v9-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
