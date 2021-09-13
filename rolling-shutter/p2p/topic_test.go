@@ -22,8 +22,9 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	testMessage := "test message"
 
 	p1 := NewP2P()
+	defer p1.Close()
 	p2 := NewP2P()
-
+	defer p2.Close()
 	nodeAddresses := []multiaddr.Multiaddr{nodeAddress1, nodeAddress2}
 	for i, p := range []*P2P{p1, p2} {
 		if err := p.CreateHost(ctx, nodeAddresses[i]); err != nil {

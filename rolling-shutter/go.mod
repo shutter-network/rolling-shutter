@@ -43,6 +43,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.5.4
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/shutter-network/shutter/shlib v0.1.5
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210906170528-6f6e22806c34 // indirect
 	gotest.tools v2.2.0+incompatible
 )

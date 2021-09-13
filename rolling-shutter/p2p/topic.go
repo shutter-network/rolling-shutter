@@ -12,6 +12,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // MessagesBufSize is the number of incoming messages to buffer for each topic.
@@ -45,13 +46,30 @@ type P2P struct {
 	TopicGossips map[string]*TopicGossip
 	host         host.Host
 	pubSub       *pubsub.PubSub
+	errgroup     *errgroup.Group
+	errgroupctx  context.Context
+	cancel       context.CancelFunc
 }
 
 func NewP2P() *P2P {
 	p := P2P{}
 	p.TopicGossips = make(map[string]*TopicGossip)
 	p.PeerMultiaddrs = []multiaddr.Multiaddr{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	p.cancel = cancel
+	p.errgroup, p.errgroupctx = errgroup.WithContext(ctx)
 	return &p
+}
+
+func (p *P2P) Close() error {
+	if p.host == nil {
+		return nil
+	}
+	p.cancel()
+	_ = p.errgroup.Wait()
+
+	return p.host.Close()
 }
 
 func (p *P2P) CreateHost(ctx context.Context, listenAddress multiaddr.Multiaddr) error {
@@ -65,7 +83,6 @@ func (p *P2P) CreateHost(ctx context.Context, listenAddress multiaddr.Multiaddr)
 	if err != nil {
 		return err
 	}
-
 	// print the node's PeerInfo in multiaddr format
 	log.Println("libp2p node address:", p.P2PAddress())
 
@@ -131,7 +148,9 @@ func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
 	}
 
 	// start reading messages from the subscription in a loop
-	go topicGossip.readLoop(ctx)
+	p.errgroup.Go(func() error {
+		return topicGossip.readLoop(p.errgroupctx)
+	})
 	p.TopicGossips[topicName] = topicGossip
 	return nil
 }
@@ -197,12 +216,14 @@ func (topicGossip *TopicGossip) ListPeers() []peer.ID {
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
-func (topicGossip *TopicGossip) readLoop(ctx context.Context) {
+func (topicGossip *TopicGossip) readLoop(ctx context.Context) error {
+	defer func() {
+		close(topicGossip.Messages)
+	}()
 	for {
 		msg, err := topicGossip.subscription.Next(ctx)
 		if err != nil {
-			close(topicGossip.Messages)
-			return
+			return err
 		}
 		// only forward messages delivered by others
 		if msg.ReceivedFrom == topicGossip.Self {
@@ -213,7 +234,12 @@ func (topicGossip *TopicGossip) readLoop(ctx context.Context) {
 		if err != nil {
 			continue
 		}
+
 		// send valid messages onto the Messages channel
-		topicGossip.Messages <- m
+		select {
+		case topicGossip.Messages <- m:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
