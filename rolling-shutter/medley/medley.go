@@ -135,16 +135,16 @@ func normName(s string) string {
 	return strings.ToUpper(strings.ReplaceAll(s, "-", "_"))
 }
 
-func argumentFromEnvironmentVariable(cmd *cobra.Command, f *pflag.Flag) error {
+func argumentFromEnvironmentVariable(cmd *cobra.Command, prefix string, f *pflag.Flag) error {
 	if f.Changed {
 		return nil
 	}
 
 	candidates := []string{}
 	if cmd.Parent() != nil {
-		candidates = append(candidates, normName(fmt.Sprintf("SHUTTER_%s_%s", cmd.Name(), f.Name)))
+		candidates = append(candidates, normName(fmt.Sprintf("%s_%s_%s", prefix, cmd.Name(), f.Name)))
 	}
-	candidates = append(candidates, normName(fmt.Sprintf("SHUTTER_%s", f.Name)))
+	candidates = append(candidates, normName(fmt.Sprintf("%s_%s", prefix, f.Name)))
 
 	for _, envvar := range candidates {
 		val, ok := os.LookupEnv(envvar)
@@ -160,14 +160,15 @@ func argumentFromEnvironmentVariable(cmd *cobra.Command, f *pflag.Flag) error {
 	return nil
 }
 
-// BindFlags automatically sets options to command line flags from environment variables.
-func BindFlags(cmd *cobra.Command) error {
+// BindFlags automatically sets options to command line flags from environment variables with the
+// given prefix.
+func BindFlags(cmd *cobra.Command, prefix string) error {
 	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if err != nil {
 			return
 		}
-		err = argumentFromEnvironmentVariable(cmd, f)
+		err = argumentFromEnvironmentVariable(cmd, prefix, f)
 	})
 	return err
 }

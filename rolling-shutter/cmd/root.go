@@ -23,7 +23,7 @@ var rootCmd = &cobra.Command{
 	Short:   "A collection of commands to run and interact with Rolling Shutter nodes",
 	Version: shversion.Version(),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		err := medley.BindFlags(cmd)
+		err := medley.BindFlags(cmd, "ROLLING_SHUTTER")
 		if err != nil {
 			return err
 		}
