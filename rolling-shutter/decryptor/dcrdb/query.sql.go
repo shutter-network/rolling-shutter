@@ -14,7 +14,7 @@ SELECT epoch_id, data FROM decryptor.cipher_batch
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetCipherBatch(ctx context.Context, epochID int64) (DecryptorCipherBatch, error) {
+func (q *Queries) GetCipherBatch(ctx context.Context, epochID []byte) (DecryptorCipherBatch, error) {
 	row := q.db.QueryRow(ctx, getCipherBatch, epochID)
 	var i DecryptorCipherBatch
 	err := row.Scan(&i.EpochID, &i.Data)
@@ -26,7 +26,7 @@ SELECT epoch_id, key FROM decryptor.decryption_key
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (DecryptorDecryptionKey, error) {
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptorDecryptionKey, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i DecryptorDecryptionKey
 	err := row.Scan(&i.EpochID, &i.Key)
@@ -39,7 +39,7 @@ WHERE epoch_id = $1 AND signer_index = $2
 `
 
 type GetDecryptionSignatureParams struct {
-	EpochID     int64
+	EpochID     []byte
 	SignerIndex int64
 }
 
@@ -76,7 +76,7 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertCipherBatchParams struct {
-	EpochID int64
+	EpochID []byte
 	Data    []byte
 }
 
@@ -94,7 +94,7 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyParams struct {
-	EpochID int64
+	EpochID []byte
 	Key     []byte
 }
 
@@ -112,7 +112,7 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionSignatureParams struct {
-	EpochID     int64
+	EpochID     []byte
 	SignedHash  []byte
 	SignerIndex int64
 	Signature   []byte

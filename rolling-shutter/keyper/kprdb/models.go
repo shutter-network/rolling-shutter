@@ -7,19 +7,19 @@ import (
 )
 
 type KeyperDecryptionKey struct {
-	EpochID       int64
+	EpochID       []byte
 	KeyperIndex   sql.NullInt64
 	DecryptionKey []byte
 }
 
 type KeyperDecryptionKeyShare struct {
-	EpochID            int64
+	EpochID            []byte
 	KeyperIndex        int64
 	DecryptionKeyShare []byte
 }
 
 type KeyperDecryptionTrigger struct {
-	EpochID int64
+	EpochID []byte
 }
 
 type KeyperMetaInf struct {

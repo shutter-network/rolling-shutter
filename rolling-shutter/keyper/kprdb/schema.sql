@@ -1,19 +1,19 @@
--- schema-version: 1 --
+-- schema-version: 2 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
 CREATE SCHEMA IF NOT EXISTS keyper;
 CREATE TABLE IF NOT EXISTS keyper.decryption_trigger (
-       epoch_id bigint PRIMARY KEY
+       epoch_id bytea PRIMARY KEY
 );
 CREATE TABLE IF NOT EXISTS keyper.decryption_key_share (
-       epoch_id bigint,
+       epoch_id bytea,
        keyper_index bigint,
        decryption_key_share bytea,
        PRIMARY KEY (epoch_id, keyper_index)
 );
 CREATE TABLE IF NOT EXISTS keyper.decryption_key (
-       epoch_id bigint PRIMARY KEY,
+       epoch_id bytea PRIMARY KEY,
        keyper_index bigint,
        decryption_key bytea
 );

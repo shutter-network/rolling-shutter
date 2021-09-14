@@ -12,7 +12,7 @@ SELECT epoch_id, keyper_index, decryption_key FROM keyper.decryption_key
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetDecryptionKey(ctx context.Context, epochID int64) (KeyperDecryptionKey, error) {
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperDecryptionKey, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i KeyperDecryptionKey
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
