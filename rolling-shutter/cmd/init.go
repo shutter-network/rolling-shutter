@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/go-amino"
@@ -25,7 +24,6 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 
 	"github.com/shutter-network/shutter/shuttermint/app"
-	"github.com/shutter-network/shutter/shuttermint/sandbox"
 )
 
 var (
@@ -50,6 +48,7 @@ func init() {
 	initCmd.PersistentFlags().IntVar(&index, "index", 0, "keyper index")
 	initCmd.PersistentFlags().Float64Var(&blockTime, "blocktime", 1.0, "block time in seconds")
 	initCmd.PersistentFlags().StringSliceVar(&genesisKeypers, "genesis-keyper", nil, "genesis keyper address")
+	initCmd.MarkPersistentFlagRequired("genesis-keyper")
 	initCmd.MarkPersistentFlagRequired("root")
 }
 
@@ -72,13 +71,9 @@ func initFiles(_ *cobra.Command, _ []string) error {
 
 	for _, a := range genesisKeypers {
 		if !common.IsHexAddress(a) {
-			return errors.New("--genesis-validator argument is not an address")
+			return errors.Errorf("--genesis-keyper argument '%s' is not an address", a)
 		}
 		keypers = append(keypers, common.HexToAddress(a))
-	}
-
-	if len(genesisKeypers) == 0 {
-		keypers = append(keypers, crypto.PubkeyToAddress(sandbox.GanacheKey(sandbox.NumGanacheKeys()-1).PublicKey))
 	}
 
 	config := cfg.DefaultConfig()
