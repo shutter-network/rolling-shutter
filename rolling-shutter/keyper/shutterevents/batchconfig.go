@@ -53,23 +53,13 @@ func BatchConfigFromMessage(m *shmsg.BatchConfig) (BatchConfig, error) {
 		return BatchConfig{}, err
 	}
 
-	if len(m.ConfigContractAddress) != common.AddressLength {
-		return BatchConfig{}, errors.Errorf(
-			"config contract address has invalid length (%d instead of %d)",
-			len(m.ConfigContractAddress),
-			common.AddressLength,
-		)
-	}
-	configContractAddress := common.BytesToAddress(m.ConfigContractAddress)
-
 	bc := BatchConfig{
-		StartBatchIndex:       m.StartBatchIndex,
-		Keypers:               keypers,
-		Threshold:             m.Threshold,
-		ConfigContractAddress: configContractAddress,
-		ConfigIndex:           m.ConfigIndex,
-		Started:               m.Started,
-		ValidatorsUpdated:     m.ValidatorsUpdated,
+		StartBatchIndex:   m.StartBatchIndex,
+		Keypers:           keypers,
+		Threshold:         m.Threshold,
+		ConfigIndex:       m.ConfigIndex,
+		Started:           m.Started,
+		ValidatorsUpdated: m.ValidatorsUpdated,
 	}
 	return bc, nil
 }

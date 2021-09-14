@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/rpc/client/http"
 
@@ -16,8 +17,8 @@ import (
 var bootstrapFlags struct {
 	ShuttermintURL   string
 	BatchConfigIndex int
-	ContractsPath    string
 	SigningKey       string
+	Keypers          []string
 }
 
 var bootstrapCmd = &cobra.Command{
@@ -29,8 +30,8 @@ its validator set according to the keyper set defined in the batch config. The
 private key must correspond to the initial validator address as defined in the
 chain's genesis config.`,
 	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		bootstrap()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return bootstrap()
 	},
 }
 
@@ -46,18 +47,9 @@ func init() {
 		&bootstrapFlags.BatchConfigIndex,
 		"index",
 		"i",
-		-1,
+		1,
 		"index of the batch config to bootstrap with (use latest if negative)",
 	)
-
-	bootstrapCmd.PersistentFlags().StringVarP(
-		&bootstrapFlags.ContractsPath,
-		"contracts",
-		"c",
-		"",
-		"read config contract address from the given contracts.json file",
-	)
-	bootstrapCmd.MarkPersistentFlagRequired("contracts")
 
 	bootstrapCmd.PersistentFlags().StringVarP(
 		&bootstrapFlags.SigningKey,
@@ -67,9 +59,21 @@ func init() {
 		"private key of the keyper to send the message with",
 	)
 	bootstrapCmd.MarkPersistentFlagRequired("signing-key")
+
+	bootstrapCmd.PersistentFlags().StringSliceVarP(
+		&bootstrapFlags.Keypers,
+		"keyper",
+		"K",
+		nil,
+		"keyper address")
+	bootstrapCmd.MarkPersistentFlagRequired("keyper")
 }
 
-func bootstrap() {
+func twothirds(numKeypers int) int {
+	return (2*numKeypers + 2) / 3
+}
+
+func bootstrap() error {
 	shmcl, err := http.New(bootstrapFlags.ShuttermintURL, "/websocket")
 	if err != nil {
 		log.Fatalf("Error connecting to Shuttermint node: %v", err)
@@ -81,8 +85,16 @@ func bootstrap() {
 	}
 
 	batchConfigIndex := uint64(bootstrapFlags.BatchConfigIndex)
+
 	keypers := []common.Address{}
-	threshold := uint64(2)
+	for _, a := range bootstrapFlags.Keypers {
+		if !common.IsHexAddress(a) {
+			return errors.Errorf("--keyper argument '%s' is not an address", a)
+		}
+		keypers = append(keypers, common.HexToAddress(a))
+	}
+
+	threshold := uint64(twothirds(len(keypers)))
 
 	ms := fx.NewRPCMessageSender(shmcl, signingKey)
 	startBatchIndex := uint64(0)
@@ -97,13 +109,13 @@ func bootstrap() {
 
 	err = ms.SendMessage(context.Background(), batchConfigMsg)
 	if err != nil {
-		log.Fatalf("Failed to send batch config message: %v", err)
+		return errors.Errorf("Failed to send batch config message: %v", err)
 	}
 
 	batchConfigStartedMsg := shmsg.NewBatchConfigStarted(batchConfigIndex)
 	err = ms.SendMessage(context.Background(), batchConfigStartedMsg)
 	if err != nil {
-		log.Fatalf("Failed to send start message: %v", err)
+		return errors.Errorf("Failed to send start message: %v", err)
 	}
 
 	log.Println("Submitted bootstrapping transaction")
@@ -111,4 +123,5 @@ func bootstrap() {
 	log.Printf("StartBatchIndex: %d", startBatchIndex)
 	log.Printf("Threshold: %d", threshold)
 	log.Printf("Num Keypers: %d", len(keypers))
+	return nil
 }

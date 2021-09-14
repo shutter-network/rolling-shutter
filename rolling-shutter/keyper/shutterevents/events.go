@@ -158,14 +158,13 @@ func makeApology(ev abcitypes.Event, height int64) (*Apology, error) {
 // the main chain. The keypers use the corresponding shmsg.BatchConfig message to vote on new
 // configs. This struct is sent as an event, when a new batch config has enough votes.
 type BatchConfig struct {
-	Height                int64
-	Keypers               []common.Address
-	StartBatchIndex       uint64
-	Threshold             uint64
-	ConfigIndex           uint64
-	ConfigContractAddress common.Address
-	Started               bool
-	ValidatorsUpdated     bool
+	Height            int64
+	Keypers           []common.Address
+	StartBatchIndex   uint64
+	Threshold         uint64
+	ConfigIndex       uint64
+	Started           bool
+	ValidatorsUpdated bool
 }
 
 func (bc BatchConfig) MakeABCIEvent() abcitypes.Event {
