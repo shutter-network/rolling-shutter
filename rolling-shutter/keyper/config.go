@@ -5,18 +5,15 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -60,42 +57,7 @@ ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 `
 
-var tmpl *template.Template
-
-func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
-	id, _ := peer.IDFromPublicKey(privkey.GetPublic())
-	return id.Pretty()
-}
-
-func p2pKey(privkey p2pcrypto.PrivKey) string {
-	d, _ := p2pcrypto.MarshalPrivateKey(privkey)
-	return p2pcrypto.ConfigEncodeKey(d)
-}
-
-func QuoteList(lst []multiaddr.Multiaddr) string {
-	var strlist []string
-	for _, x := range lst {
-		// We use json.Marshal here, not sure if it's the right thing to do, since we're
-		// writing TOML
-		d, _ := json.Marshal(x.String())
-		strlist = append(strlist, string(d))
-	}
-
-	return strings.Join(strlist, ", ")
-}
-
-func init() {
-	var err error
-	tmpl, err = template.New("keyper").Funcs(template.FuncMap{
-		"FromECDSA":    crypto.FromECDSA,
-		"QuoteList":    QuoteList,
-		"P2PKey":       p2pKey,
-		"P2PKeyPublic": p2pKeyPublic,
-	}).Parse(configTemplate)
-	if err != nil {
-		panic(err)
-	}
-}
+var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)
 
 func stringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PrivateKey{}) {

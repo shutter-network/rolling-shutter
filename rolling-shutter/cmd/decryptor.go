@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -37,6 +39,15 @@ var initDecryptorDBCmd = &cobra.Command{
 	},
 }
 
+var generateDecryptorConfigCmd = &cobra.Command{
+	Use:   "generate-config",
+	Short: "Generate a decryptor configuration file",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return generateDecryptorConfig()
+	},
+}
+
 type DecryptorConfig struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
@@ -47,6 +58,10 @@ type DecryptorConfig struct {
 func init() {
 	decryptorCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	decryptorCmd.AddCommand(initDecryptorDBCmd)
+	decryptorCmd.AddCommand(generateDecryptorConfigCmd)
+
+	generateDecryptorConfigCmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
+	generateDecryptorConfigCmd.MarkPersistentFlagRequired("output")
 }
 
 func initDecryptorDB() error {
@@ -113,6 +128,42 @@ func readDecryptorConfig() (DecryptorConfig, error) {
 	}
 
 	return config, nil
+}
+
+var decryptorTemplate = medley.MustBuildTemplate(
+	"decryptor",
+	`# Shutter decryptor config for /p2p/{{ .P2PKey | P2PKeyPublic}}
+
+# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
+# It it's empty, we use the standard PG* environment variables
+DatabaseURL     = "{{ .DatabaseURL }}"
+
+# p2p configuration
+ListenAddress   = "{{ .ListenAddress }}"
+PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
+
+# Secret Keys
+P2PKey          = "{{ .P2PKey | P2PKey}}"
+`)
+
+func generateDecryptorConfig() error {
+	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	config := DecryptorConfig{
+		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		PeerMultiaddrs: nil,
+		DatabaseURL:    "",
+		P2PKey:         p2pkey,
+	}
+	buf := &bytes.Buffer{}
+	err = decryptorTemplate.Execute(buf, config)
+	if err != nil {
+		return err
+	}
+	return medley.SecureSpit(outputFile, buf.Bytes())
 }
 
 func decryptorMain() error {
