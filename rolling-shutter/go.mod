@@ -70,9 +70,9 @@ require (
 	gotest.tools/v3 v3.0.3
 )
 
-// The exclude directive for tendermint/tm-db is needed because this version is
-// incompatible with tendermint 0.34.13 and it prevents us from
-// running get get -u=patch:
+// The exclude directive for tendermint/tm-db is needed because this
+// version is incompatible with tendermint 0.34.13 and it prevents us
+// from running 'go get -u=patch':
 // ,----
 // | % go get -u=patch
 // | # github.com/tendermint/tendermint/abci/example/kvstore
