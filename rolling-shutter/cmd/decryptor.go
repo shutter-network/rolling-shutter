@@ -103,7 +103,7 @@ func readDecryptorConfig() (DecryptorConfig, error) {
 		&config,
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook(),
+				medley.MultiaddrHook,
 				medley.P2PKeyHook,
 			),
 		),

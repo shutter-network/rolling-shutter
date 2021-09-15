@@ -203,7 +203,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.P2PKeyHook,
 				mapstructure.StringToTimeDurationHookFunc(),
 				mapstructure.StringToSliceHookFunc(","),
-				medley.MultiaddrHook(),
+				medley.MultiaddrHook,
 			),
 		),
 	)
