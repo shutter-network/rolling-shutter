@@ -15,7 +15,6 @@ build:
 	@VERSION=`git describe --tags --always --abbrev=4 --dirty --match 'rolling-shutter/v*' | sed -e s#^rolling-shutter/##`; \
 	echo "Building ${EXECUTABLE} $${VERSION}"; \
 	${GO} build ${GOFLAGS} -o ${EXECUTABLE} -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=$${VERSION}"; \
-	${GO} build ${GOFLAGS} -o ${BINDIR} -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=$${VERSION}" ./sandbox/testclient
 
 wasm:
 	GOARCH=wasm GOOS=js ${GO} build ${GOFLAGS} -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/main_wasm.go
