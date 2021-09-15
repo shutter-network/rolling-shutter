@@ -15,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -31,12 +33,13 @@ type Config struct {
 	SigningKey     *ecdsa.PrivateKey
 	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
 	EncryptionKey  *ecies.PrivateKey
+	P2PKey         p2pcrypto.PrivKey
 	DKGPhaseLength uint64 // in shuttermint blocks
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 }
 
-const configTemplate = `# Shutter keyper configuration for {{ .Address }}
+const configTemplate = `# Shutter keyper configuration for {{ .Address }}, /p2p/{{ .P2PKey | P2PKeyPublic}}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 DBDir			= "{{ .DBDir }}"
@@ -54,9 +57,20 @@ PeerMultiaddrs	= [{{ .PeerMultiaddrs | QuoteList}}]
 EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
 SigningKey	= "{{ .SigningKey | FromECDSA | printf "%x" }}"
 ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
+P2PKey          = "{{ .P2PKey | P2PKey}}"
 `
 
 var tmpl *template.Template
+
+func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
+	id, _ := peer.IDFromPublicKey(privkey.GetPublic())
+	return id.Pretty()
+}
+
+func p2pKey(privkey p2pcrypto.PrivKey) string {
+	d, _ := p2pcrypto.MarshalPrivateKey(privkey)
+	return p2pcrypto.ConfigEncodeKey(d)
+}
 
 func QuoteList(lst []multiaddr.Multiaddr) string {
 	var strlist []string
@@ -73,8 +87,10 @@ func QuoteList(lst []multiaddr.Multiaddr) string {
 func init() {
 	var err error
 	tmpl, err = template.New("keyper").Funcs(template.FuncMap{
-		"FromECDSA": crypto.FromECDSA,
-		"QuoteList": QuoteList,
+		"FromECDSA":    crypto.FromECDSA,
+		"QuoteList":    QuoteList,
+		"P2PKey":       p2pKey,
+		"P2PKeyPublic": p2pKeyPublic,
 	}).Parse(configTemplate)
 	if err != nil {
 		panic(err)
@@ -162,9 +178,15 @@ func (config *Config) GenerateNewKeys() error {
 		return err
 	}
 
+	p2pkey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return err
+	}
+
 	config.SigningKey = signingKey
 	config.ValidatorKey = validatorKey
 	config.EncryptionKey = encryptionKey
+	config.P2PKey = p2pkey
 	return nil
 }
 
@@ -178,6 +200,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				stringToEcdsaPrivateKey,
 				stringToEciesPrivateKey,
 				stringToAddress,
+				medley.P2PKeyHook,
 				mapstructure.StringToTimeDurationHookFunc(),
 				mapstructure.StringToSliceHookFunc(","),
 				medley.MultiaddrHook(),

@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -49,6 +51,7 @@ type P2P struct {
 	errgroup     *errgroup.Group
 	errgroupctx  context.Context
 	cancel       context.CancelFunc
+	privkey      crypto.PrivKey
 }
 
 func NewP2P() *P2P {
@@ -60,6 +63,12 @@ func NewP2P() *P2P {
 	p.cancel = cancel
 	p.errgroup, p.errgroupctx = errgroup.WithContext(ctx)
 	return &p
+}
+
+func NewP2PWithKey(privkey crypto.PrivKey) *P2P {
+	p := NewP2P()
+	p.privkey = privkey
+	return p
 }
 
 func (p *P2P) Close() error {
@@ -77,9 +86,17 @@ func (p *P2P) CreateHost(ctx context.Context, listenAddress multiaddr.Multiaddr)
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
+	if p.privkey == nil {
+		privkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+		if err != nil {
+			return err
+		}
+		p.privkey = privkey
+	}
 	p.ListenAddress = listenAddress
+
 	// create a new libp2p Host
-	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(listenAddress))
+	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(listenAddress), libp2p.Identity(p.privkey))
 	if err != nil {
 		return err
 	}

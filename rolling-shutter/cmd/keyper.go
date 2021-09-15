@@ -139,7 +139,7 @@ func keyperMain() error {
 		return err
 	}
 
-	if err := keyper.InitP2p(ctx, kc.ListenAddress, kc.PeerMultiaddrs); err != nil {
+	if err := keyper.InitP2p(ctx, kc.ListenAddress, kc.PeerMultiaddrs, kc.P2PKey); err != nil {
 		return err
 	}
 
