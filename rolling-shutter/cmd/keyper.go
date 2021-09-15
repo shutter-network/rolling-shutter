@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -15,6 +15,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
 var outputFile string
@@ -179,12 +180,10 @@ func mustMultiaddr(s string) multiaddr.Multiaddr {
 }
 
 func exampleConfig() (*keyper.Config, error) {
-	listenAddress := mustMultiaddr("/ip4/127.0.0.1/tcp/2000")
-
 	cfg := &keyper.Config{
 		ShuttermintURL: "http://localhost:26657",
 		DKGPhaseLength: 30,
-		ListenAddress:  listenAddress,
+		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{
 			mustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
 			mustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
@@ -203,15 +202,9 @@ func generateKeyperConfig() error {
 		return err
 	}
 
-	file, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return errors.Wrap(err, "failed to create keyper config file")
-	}
-	if err = cfg.WriteTOML(file); err != nil {
+	buf := &bytes.Buffer{}
+	if err = cfg.WriteTOML(buf); err != nil {
 		return errors.Wrap(err, "failed to write keyper config file")
 	}
-	if err = file.Close(); err != nil {
-		return errors.Wrap(err, "failed to close keyper config file")
-	}
-	return nil
+	return medley.SecureSpit(outputFile, buf.Bytes())
 }
