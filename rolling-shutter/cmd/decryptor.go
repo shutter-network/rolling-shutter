@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/mitchellh/mapstructure"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -39,6 +41,7 @@ type DecryptorConfig struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 	DatabaseURL    string
+	P2PKey         crypto.PrivKey
 }
 
 func init() {
@@ -96,7 +99,15 @@ func readDecryptorConfig() (DecryptorConfig, error) {
 		return config, err // Config file was found but another error was produced
 	}
 
-	err = viper.Unmarshal(&config, viper.DecodeHook(medley.MultiaddrHook()))
+	err = viper.Unmarshal(
+		&config,
+		viper.DecodeHook(
+			mapstructure.ComposeDecodeHookFunc(
+				medley.MultiaddrHook(),
+				medley.P2PKeyHook,
+			),
+		),
+	)
 	if err != nil {
 		return config, err
 	}
@@ -122,7 +133,7 @@ func decryptorMain() error {
 		return err
 	}
 
-	p := p2p.NewP2P()
+	p := p2p.NewP2PWithKey(config.P2PKey)
 	if err := p.CreateHost(ctx, config.ListenAddress); err != nil {
 		return err
 	}
