@@ -1,4 +1,4 @@
-package cmd
+package decryptor
 
 import (
 	"bytes"
@@ -21,34 +21,50 @@ import (
 
 var (
 	outputFile       string
+	cfgFile          string
 	gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
 )
 
-var decryptorCmd = &cobra.Command{
-	Use:   "decryptor",
-	Short: "Run a decryptor node",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return decryptorMain()
-	},
+func Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "decryptor",
+		Short: "Run a decryptor node",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return main()
+		},
+	}
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	cmd.AddCommand(initDBCmd())
+	cmd.AddCommand(generateConfigCmd())
+	return cmd
 }
 
-var initDecryptorDBCmd = &cobra.Command{
-	Use:   "initdb",
-	Short: "Initialize the database of the decryptor",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return initDecryptorDB()
-	},
+func initDBCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "initdb",
+		Short: "Initialize the database of the decryptor",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return initDB()
+		},
+	}
+	return cmd
 }
 
-var generateDecryptorConfigCmd = &cobra.Command{
-	Use:   "generate-config",
-	Short: "Generate a decryptor configuration file",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return generateDecryptorConfig()
-	},
+func generateConfigCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "generate-config",
+		Short: "Generate a decryptor configuration file",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return generateConfig()
+		},
+	}
+	cmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
+	cmd.MarkPersistentFlagRequired("output")
+
+	return cmd
 }
 
 type DecryptorConfig struct {
@@ -58,19 +74,10 @@ type DecryptorConfig struct {
 	P2PKey         crypto.PrivKey
 }
 
-func init() {
-	decryptorCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
-	decryptorCmd.AddCommand(initDecryptorDBCmd)
-	decryptorCmd.AddCommand(generateDecryptorConfigCmd)
-
-	generateDecryptorConfigCmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
-	generateDecryptorConfigCmd.MarkPersistentFlagRequired("output")
-}
-
-func initDecryptorDB() error {
+func initDB() error {
 	ctx := context.Background()
 
-	config, err := readDecryptorConfig()
+	config, err := readConfig()
 	if err != nil {
 		return err
 	}
@@ -91,7 +98,7 @@ func initDecryptorDB() error {
 	return nil
 }
 
-func readDecryptorConfig() (DecryptorConfig, error) {
+func readConfig() (DecryptorConfig, error) {
 	viper.SetEnvPrefix("DECRYPTOR")
 	viper.BindEnv("ListenAddress")
 	viper.BindEnv("PeerMultiaddrs")
@@ -157,7 +164,7 @@ func mustMultiaddr(s string) multiaddr.Multiaddr {
 	return a
 }
 
-func generateDecryptorConfig() error {
+func generateConfig() error {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return err
@@ -177,10 +184,10 @@ func generateDecryptorConfig() error {
 	return medley.SecureSpit(outputFile, buf.Bytes())
 }
 
-func decryptorMain() error {
+func main() error {
 	ctx := context.Background()
 
-	config, err := readDecryptorConfig()
+	config, err := readConfig()
 	if err != nil {
 		return err
 	}
