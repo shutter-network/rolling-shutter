@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/shutter-network/shutter/shuttermint/cmd/bootstrap"
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
@@ -65,7 +66,7 @@ func init() {
 	rootCmd.AddCommand(keyperCmd)
 	rootCmd.AddCommand(showCmd)
 	rootCmd.AddCommand(txsearchCmd)
-	rootCmd.AddCommand(bootstrapCmd)
+	rootCmd.AddCommand(bootstrap.Cmd())
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(decryptorCmd)
 	rootCmd.AddCommand(completionCmd)
