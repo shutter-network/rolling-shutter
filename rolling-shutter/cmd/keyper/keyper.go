@@ -1,4 +1,4 @@
-package cmd
+package keyper
 
 import (
 	"bytes"
@@ -18,44 +18,52 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
-var outputFile string
+var (
+	cfgFile    string
+	outputFile string
+)
 
-// keyperCmd represents the keyper command.
-var keyperCmd = &cobra.Command{
-	Use:   "keyper",
-	Short: "Run a Shutter keyper node",
-	Long: `This command runs a keyper node. It will connect to both an Ethereum and a
+func initDBCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "initdb",
+		Short: "Initialize the database of the keyper",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return initDB()
+		},
+	}
+	return cmd
+}
+
+func generateConfigCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "generate-config",
+		Short: "Generate a keyper configuration file",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return generateConfig()
+		},
+	}
+	cmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
+	cmd.MarkPersistentFlagRequired("output")
+	return cmd
+}
+
+func Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "keyper",
+		Short: "Run a Shutter keyper node",
+		Long: `This command runs a keyper node. It will connect to both an Ethereum and a
 Shuttermint node which have to be started separately in advance.`,
-	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return keyperMain()
-	},
-}
-
-var initKeyperDBCmd = &cobra.Command{
-	Use:   "initdb",
-	Short: "Initialize the database of the keyper",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return initKeyperDB()
-	},
-}
-
-var generateConfigCmd = &cobra.Command{
-	Use:   "generate-config",
-	Short: "Generate a keyper configuration file",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return generateKeyperConfig()
-	},
-}
-
-func init() {
-	keyperCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
-	keyperCmd.AddCommand(initKeyperDBCmd)
-	generateConfigCmd.PersistentFlags().StringVar(&outputFile, "output", "", "output file")
-	generateConfigCmd.MarkPersistentFlagRequired("output")
-	keyperCmd.AddCommand(generateConfigCmd)
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return keyperMain()
+		},
+	}
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	cmd.AddCommand(initDBCmd())
+	cmd.AddCommand(generateConfigCmd())
+	return cmd
 }
 
 func readKeyperConfig() (keyper.Config, error) {
@@ -147,7 +155,7 @@ func keyperMain() error {
 	return errors.Errorf("keyper command not implemented")
 }
 
-func initKeyperDB() error {
+func initDB() error {
 	ctx := context.Background()
 
 	kc, err := readKeyperConfig()
@@ -196,7 +204,7 @@ func exampleConfig() (*keyper.Config, error) {
 	return cfg, nil
 }
 
-func generateKeyperConfig() error {
+func generateConfig() error {
 	cfg, err := exampleConfig()
 	if err != nil {
 		return err

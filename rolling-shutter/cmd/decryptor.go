@@ -19,7 +19,10 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
-var gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
+var (
+	outputFile       string
+	gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
+)
 
 var decryptorCmd = &cobra.Command{
 	Use:   "decryptor",
@@ -145,6 +148,14 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 # Secret Keys
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 `)
+
+func mustMultiaddr(s string) multiaddr.Multiaddr {
+	a, err := multiaddr.NewMultiaddr(s)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
 
 func generateDecryptorConfig() error {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
