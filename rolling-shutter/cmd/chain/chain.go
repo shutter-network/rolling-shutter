@@ -1,4 +1,4 @@
-package cmd
+package chain
 
 import (
 	"fmt"
@@ -23,19 +23,21 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 )
 
-var chainCmd = &cobra.Command{
-	Use:   "chain",
-	Short: "Run a node for Shutter's Tendermint chain",
-	Long:  `This command runs a node that will connect to Shutter's Tendermint chain.`,
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		chainMain()
-	},
-}
+var cfgFile string
 
-func init() {
-	chainCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (required)")
-	chainCmd.MarkPersistentFlagRequired("config")
+func Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "chain",
+		Short: "Run a node for Shutter's Tendermint chain",
+		Long:  `This command runs a node that will connect to Shutter's Tendermint chain.`,
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			chainMain()
+		},
+	}
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (required)")
+	cmd.MarkPersistentFlagRequired("config")
+	return cmd
 }
 
 func chainMain() {
