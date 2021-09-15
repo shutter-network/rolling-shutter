@@ -5,9 +5,11 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,8 +45,10 @@ DBDir			= "{{ .DBDir }}"
 # It it's empty, we use the standard PG* environment variables
 DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
+
+# p2p configuration
 ListenAddress	= "{{ .ListenAddress }}"
-PeerMultiaddrs	= "{{ .PeerMultiaddrs }}"
+PeerMultiaddrs	= [{{ .PeerMultiaddrs | QuoteList}}]
 
 # Secret Keys
 EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
@@ -54,10 +58,23 @@ ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
 
 var tmpl *template.Template
 
+func QuoteList(lst []multiaddr.Multiaddr) string {
+	var strlist []string
+	for _, x := range lst {
+		// We use json.Marshal here, not sure if it's the right thing to do, since we're
+		// writing TOML
+		d, _ := json.Marshal(x.String())
+		strlist = append(strlist, string(d))
+	}
+
+	return strings.Join(strlist, ", ")
+}
+
 func init() {
 	var err error
 	tmpl, err = template.New("keyper").Funcs(template.FuncMap{
 		"FromECDSA": crypto.FromECDSA,
+		"QuoteList": QuoteList,
 	}).Parse(configTemplate)
 	if err != nil {
 		panic(err)

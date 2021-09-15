@@ -168,7 +168,7 @@ func (p *P2P) ConnectToPeers(ctx context.Context, peerMultiaddrs []multiaddr.Mul
 func (p *P2P) ConnectToPeer(ctx context.Context, address multiaddr.Multiaddr) error {
 	peerAddr, err := peer.AddrInfoFromP2pAddr(address)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "ConnectToPeer %s", address)
 	}
 	err = p.host.Connect(ctx, *peerAddr)
 	if err != nil {

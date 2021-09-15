@@ -170,12 +170,35 @@ func initKeyperDB() error {
 	return nil
 }
 
-func generateKeyperConfig() error {
-	cfg := keyper.Config{
+func mustMultiaddr(s string) multiaddr.Multiaddr {
+	a, err := multiaddr.NewMultiaddr(s)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
+
+func exampleConfig() (*keyper.Config, error) {
+	listenAddress := mustMultiaddr("/ip4/127.0.0.1/tcp/2000")
+
+	cfg := &keyper.Config{
 		ShuttermintURL: "http://localhost:26657",
 		DKGPhaseLength: 30,
+		ListenAddress:  listenAddress,
+		PeerMultiaddrs: []multiaddr.Multiaddr{
+			mustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
+			mustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+		},
 	}
 	err := cfg.GenerateNewKeys()
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func generateKeyperConfig() error {
+	cfg, err := exampleConfig()
 	if err != nil {
 		return err
 	}
