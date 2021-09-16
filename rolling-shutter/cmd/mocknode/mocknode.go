@@ -103,9 +103,10 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 
 # Mock messages
-Rate                   = {{ .Rate }}
-SendDecryptionTriggers = {{ .SendDecryptionTriggers }}
-SendCipherBatches      = {{ .SendCipherBatches }}
+Rate                    = {{ .Rate }}
+SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
+SendCipherBatches       = {{ .SendCipherBatches }}
+SendDecryptionKeys      = {{ .SendDecryptionKeys }}
 `)
 
 func mustMultiaddr(s string) multiaddr.Multiaddr {
@@ -130,6 +131,7 @@ func generateConfig() error {
 		Rate:                   1.0,
 		SendDecryptionTriggers: true,
 		SendCipherBatches:      true,
+		SendDecryptionKeys:     true,
 	}
 	buf := &bytes.Buffer{}
 	err = mockNodeTemplate.Execute(buf, config)

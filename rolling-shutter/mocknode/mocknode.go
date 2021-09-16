@@ -8,13 +8,19 @@ import (
 
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/bn256"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [1]string{"cipherBatch"}
+var gossipTopicNames = [3]string{
+	"decryptionTrigger",
+	"cipherBatch",
+	"decryptionKey",
+}
 
 type MockNode struct {
 	Config Config
@@ -30,6 +36,7 @@ type Config struct {
 	Rate                   float64
 	SendDecryptionTriggers bool
 	SendCipherBatches      bool
+	SendDecryptionKeys     bool
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
@@ -108,6 +115,11 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 			return err
 		}
 	}
+	if m.Config.SendDecryptionKeys {
+		if err := m.sendDecryptionKey(ctx, epochID); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -130,4 +142,18 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 		Data:       data,
 	}
 	return m.p2p.TopicGossips["cipherBatch"].Publish(ctx, msg.String())
+}
+
+func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
+	log.Printf("sending decryption key for epoch %d", epochID)
+	_, g1, err := bn256.RandomG1(rand.Reader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate random decryption key")
+	}
+	msg := shmsg.DecryptionKey{
+		InstanceID: 0,
+		EpochID:    epochID,
+		Key:        g1.Marshal(),
+	}
+	return m.p2p.TopicGossips["decryptionKey"].Publish(ctx, msg.String())
 }
