@@ -2,6 +2,7 @@ package mocknode
 
 import (
 	"context"
+	"crypto/rand"
 	"log"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 var gossipTopicNames = [1]string{"cipherBatch"}
@@ -70,7 +72,7 @@ func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
 		case msg := <-messages:
-			log.Println("received message", msg.Message, msg.SenderID)
+			log.Printf("received message from %s: %s", msg.SenderID, msg.Message)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -80,16 +82,37 @@ func (m *MockNode) listen(ctx context.Context) error {
 func (m *MockNode) sendMessages(ctx context.Context) error {
 	sleepDuration := time.Duration(1000/m.Config.Rate) * time.Millisecond
 
+	epochID := uint64(0)
 	for {
 		select {
 		case <-time.After(sleepDuration):
-			log.Println("sending message")
-			err := m.p2p.TopicGossips["cipherBatch"].Publish(ctx, "test cipher batch")
-			if err != nil {
+			if err := m.sendMessagesForEpoch(ctx, epochID); err != nil {
 				return err
 			}
+			epochID++
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
+}
+
+func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
+	if m.Config.SendCipherBatches {
+		if err := m.sendCipherBatchMessage(ctx, epochID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
+	log.Printf("sending cipher batch for epoch %d", epochID)
+	data := make([]byte, 8)
+	rand.Read(data)
+	msg := shmsg.CipherBatch{
+		InstanceID: 0,
+		EpochID:    epochID,
+		Data:       data,
+	}
+	return m.p2p.TopicGossips["cipherBatch"].Publish(ctx, msg.String())
 }
