@@ -71,7 +71,6 @@ func init() {
 	rootCmd.AddCommand(showCmd)
 	rootCmd.AddCommand(txsearchCmd)
 	rootCmd.AddCommand(bootstrap.Cmd())
-	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(decryptor.Cmd())
 	rootCmd.AddCommand(completion.Cmd())
 }

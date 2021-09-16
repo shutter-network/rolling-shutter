@@ -35,8 +35,9 @@ func Cmd() *cobra.Command {
 			chainMain()
 		},
 	}
-	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (required)")
-	cmd.MarkPersistentFlagRequired("config")
+	cmd.Flags().StringVar(&cfgFile, "config", "", "config file (required)")
+	cmd.MarkFlagRequired("config")
+	cmd.AddCommand(initCmd())
 	return cmd
 }
 
