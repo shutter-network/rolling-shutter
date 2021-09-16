@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shuttermint/mocknode"
+	"github.com/shutter-network/shutter/shuttermint/mocknode"
 )
 
 var (
@@ -56,6 +56,7 @@ func readConfig() (mocknode.Config, error) {
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
 	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("Rate", 1.0)
 
 	config := mocknode.Config{}
 
@@ -102,7 +103,7 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 
 # Mock messages
-Rate = {{ .Rate }}
+Rate              = {{ .Rate }}
 SendCipherBatches = {{ .SendCipherBatches }}
 `)
 
@@ -125,7 +126,7 @@ func generateConfig() error {
 		PeerMultiaddrs: nil,
 		P2PKey:         p2pkey,
 
-		Rate:              0.1,
+		Rate:              1.0,
 		SendCipherBatches: true,
 	}
 	buf := &bytes.Buffer{}
