@@ -33,6 +33,7 @@ type Config struct {
 	PeerMultiaddrs []multiaddr.Multiaddr
 	P2PKey         crypto.PrivKey
 
+	InstanceID             uint64
 	Rate                   float64
 	SendDecryptionTriggers bool
 	SendCipherBatches      bool
@@ -126,7 +127,7 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) error {
 	log.Printf("sending decryption trigger for epoch %d", epochID)
 	msg := shmsg.DecryptionTrigger{
-		InstanceID: 0,
+		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 	}
 	return m.p2p.TopicGossips["decryptionTrigger"].Publish(ctx, msg.String())
@@ -137,7 +138,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 	data := make([]byte, 8)
 	rand.Read(data)
 	msg := shmsg.CipherBatch{
-		InstanceID: 0,
+		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 		Data:       data,
 	}
@@ -151,7 +152,7 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 		return errors.Wrapf(err, "failed to generate random decryption key")
 	}
 	msg := shmsg.DecryptionKey{
-		InstanceID: 0,
+		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 		Key:        g1.Marshal(),
 	}

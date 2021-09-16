@@ -103,6 +103,7 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 
 # Mock messages
+InstanceID              = {{ .InstanceID }}
 Rate                    = {{ .Rate }}
 SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
 SendCipherBatches       = {{ .SendCipherBatches }}
@@ -128,6 +129,7 @@ func generateConfig() error {
 		PeerMultiaddrs: nil,
 		P2PKey:         p2pkey,
 
+		InstanceID:             0,
 		Rate:                   1.0,
 		SendDecryptionTriggers: true,
 		SendCipherBatches:      true,
