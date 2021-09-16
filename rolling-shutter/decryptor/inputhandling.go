@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -40,7 +41,7 @@ func (d *Decryptor) handleInput(ctx context.Context, value interface{}) error {
 
 func (d *Decryptor) handleDecryptionKeyInput(ctx context.Context, key *shmsg.DecryptionKey) error {
 	tag, err := d.db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
-		EpochID: int64(key.EpochID),
+		EpochID: medley.Uint64EpochIDToBytes(key.EpochID),
 		Key:     key.Key,
 	})
 	if err != nil {
@@ -49,12 +50,12 @@ func (d *Decryptor) handleDecryptionKeyInput(ctx context.Context, key *shmsg.Dec
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple keys for same epoch %d", key.EpochID)
 	}
-	return d.handleEpoch(ctx, int64(key.EpochID))
+	return d.handleEpoch(ctx, key.EpochID)
 }
 
 func (d *Decryptor) handleCipherBatchInput(ctx context.Context, cipherBatch *shmsg.CipherBatch) error {
 	tag, err := d.db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
-		EpochID: int64(cipherBatch.EpochID),
+		EpochID: medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
 		Data:    cipherBatch.Data,
 	})
 	if err != nil {
@@ -63,19 +64,20 @@ func (d *Decryptor) handleCipherBatchInput(ctx context.Context, cipherBatch *shm
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
 	}
-	return d.handleEpoch(ctx, int64(cipherBatch.EpochID))
+	return d.handleEpoch(ctx, cipherBatch.EpochID)
 }
 
 // handleEpoch produces, store, and output a signature if we have both the cipher batch and key for given epoch.
-func (d *Decryptor) handleEpoch(ctx context.Context, epochID int64) error {
-	cipherBatch, err := d.db.GetCipherBatch(ctx, epochID)
+func (d *Decryptor) handleEpoch(ctx context.Context, epochID uint64) error {
+	epochIDBytes := medley.Uint64EpochIDToBytes(epochID)
+	cipherBatch, err := d.db.GetCipherBatch(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	key, err := d.db.GetDecryptionKey(ctx, epochID)
+	key, err := d.db.GetDecryptionKey(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil
 	} else if err != nil {
@@ -99,7 +101,7 @@ func (d *Decryptor) handleEpoch(ctx context.Context, epochID int64) error {
 	// TODO: handle instanceID and signer bitfield
 	aggregatedSignature := &shmsg.AggregatedDecryptionSignature{
 		InstanceID:          0,
-		EpochID:             uint64(signature.EpochID),
+		EpochID:             medley.BytesEpochIDToUint64(signature.EpochID),
 		SignedHash:          signature.SignedHash,
 		AggregatedSignature: signature.Signature,
 		SignerBitfield:      []byte(""),

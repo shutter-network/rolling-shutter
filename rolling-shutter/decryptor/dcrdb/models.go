@@ -5,17 +5,17 @@ package dcrdb
 import ()
 
 type DecryptorCipherBatch struct {
-	EpochID int64
+	EpochID []byte
 	Data    []byte
 }
 
 type DecryptorDecryptionKey struct {
-	EpochID int64
+	EpochID []byte
 	Key     []byte
 }
 
 type DecryptorDecryptionSignature struct {
-	EpochID     int64
+	EpochID     []byte
 	SignedHash  []byte
 	SignerIndex int64
 	Signature   []byte
