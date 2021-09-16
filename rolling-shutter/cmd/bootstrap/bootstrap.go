@@ -1,4 +1,4 @@
-package cmd
+package bootstrap
 
 import (
 	"context"
@@ -21,29 +21,29 @@ var bootstrapFlags struct {
 	Keypers          []string
 }
 
-var bootstrapCmd = &cobra.Command{
-	Use:   "bootstrap",
-	Short: "Bootstrap Shuttermint by submitting the initial batch config",
-	Long: `This command sends a batch config to the Shuttermint chain in a message signed
+func Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bootstrap",
+		Short: "Bootstrap Shuttermint by submitting the initial batch config",
+		Long: `This command sends a batch config to the Shuttermint chain in a message signed
 with the given private key. This will instruct a newly created chain to update
 its validator set according to the keyper set defined in the batch config. The
 private key must correspond to the initial validator address as defined in the
 chain's genesis config.`,
-	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrap()
-	},
-}
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return bootstrap()
+		},
+	}
 
-func init() {
-	bootstrapCmd.PersistentFlags().StringVarP(
+	cmd.PersistentFlags().StringVarP(
 		&bootstrapFlags.ShuttermintURL,
 		"shuttermint-url",
 		"s",
 		"http://localhost:26657",
 		"Shuttermint RPC URL",
 	)
-	bootstrapCmd.PersistentFlags().IntVarP(
+	cmd.PersistentFlags().IntVarP(
 		&bootstrapFlags.BatchConfigIndex,
 		"index",
 		"i",
@@ -51,22 +51,23 @@ func init() {
 		"index of the batch config to bootstrap with (use latest if negative)",
 	)
 
-	bootstrapCmd.PersistentFlags().StringVarP(
+	cmd.PersistentFlags().StringVarP(
 		&bootstrapFlags.SigningKey,
 		"signing-key",
 		"k",
 		"",
 		"private key of the keyper to send the message with",
 	)
-	bootstrapCmd.MarkPersistentFlagRequired("signing-key")
+	cmd.MarkPersistentFlagRequired("signing-key")
 
-	bootstrapCmd.PersistentFlags().StringSliceVarP(
+	cmd.PersistentFlags().StringSliceVarP(
 		&bootstrapFlags.Keypers,
 		"keyper",
 		"K",
 		nil,
 		"keyper address")
-	bootstrapCmd.MarkPersistentFlagRequired("keyper")
+	cmd.MarkPersistentFlagRequired("keyper")
+	return cmd
 }
 
 func twothirds(numKeypers int) int {

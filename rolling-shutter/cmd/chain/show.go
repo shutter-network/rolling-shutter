@@ -1,4 +1,4 @@
-package cmd
+package chain
 
 import (
 	"context"
@@ -16,32 +16,32 @@ var showFlags struct {
 	Height         int64
 }
 
-var showCmd = &cobra.Command{
-	Use:   "show",
-	Short: "Show the internal state of a Shuttermint node",
-	Long: `This command queries transactions from a running shuttermint node and rebuilds the
+func showCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "show",
+		Short: "Show the internal state of a Shuttermint node",
+		Long: `This command queries transactions from a running shuttermint node and rebuilds the
 internal shutter state object according to the results. It then prints the result to stdout.`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		showMain()
-	},
-}
-
-func init() {
-	showCmd.PersistentFlags().StringVarP(
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			showMain()
+		},
+	}
+	cmd.PersistentFlags().StringVarP(
 		&showFlags.ShuttermintURL,
 		"shuttermint-url",
 		"s",
 		"http://localhost:26657",
 		"Shuttermint RPC URL",
 	)
-	showCmd.PersistentFlags().Int64VarP(
+	cmd.PersistentFlags().Int64VarP(
 		&showFlags.Height,
 		"height",
 		"",
 		-1,
 		"target height",
 	)
+	return cmd
 }
 
 func showShutter(shuttermintURL string, height int64) {

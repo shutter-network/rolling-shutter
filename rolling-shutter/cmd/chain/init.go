@@ -1,4 +1,4 @@
-package cmd
+package chain
 
 // This has been copied from tendermint's own init command
 
@@ -35,21 +35,21 @@ var (
 	genesisKeypers         = []string{}
 )
 
-var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Create a config file for a Shuttermint node",
-	Args:  cobra.NoArgs,
-	RunE:  initFiles,
-}
-
-func init() {
-	initCmd.PersistentFlags().StringVar(&rootDir, "root", "", "root directory")
-	initCmd.PersistentFlags().BoolVar(&devMode, "dev", false, "turn on devmode (disables validator set changes)")
-	initCmd.PersistentFlags().IntVar(&index, "index", 0, "keyper index")
-	initCmd.PersistentFlags().Float64Var(&blockTime, "blocktime", 1.0, "block time in seconds")
-	initCmd.PersistentFlags().StringSliceVar(&genesisKeypers, "genesis-keyper", nil, "genesis keyper address")
-	initCmd.MarkPersistentFlagRequired("genesis-keyper")
-	initCmd.MarkPersistentFlagRequired("root")
+func initCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Create a config file for a Shuttermint node",
+		Args:  cobra.NoArgs,
+		RunE:  initFiles,
+	}
+	cmd.PersistentFlags().StringVar(&rootDir, "root", "", "root directory")
+	cmd.PersistentFlags().BoolVar(&devMode, "dev", false, "turn on devmode (disables validator set changes)")
+	cmd.PersistentFlags().IntVar(&index, "index", 0, "keyper index")
+	cmd.PersistentFlags().Float64Var(&blockTime, "blocktime", 1.0, "block time in seconds")
+	cmd.PersistentFlags().StringSliceVar(&genesisKeypers, "genesis-keyper", nil, "genesis keyper address")
+	cmd.MarkPersistentFlagRequired("genesis-keyper")
+	cmd.MarkPersistentFlagRequired("root")
+	return cmd
 }
 
 func scaleToBlockTime(config *cfg.Config, blockTime float64) {
