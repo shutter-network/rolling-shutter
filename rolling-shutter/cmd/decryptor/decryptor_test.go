@@ -1,4 +1,4 @@
-package keyper
+package decryptor
 
 import (
 	"bytes"
@@ -8,12 +8,10 @@ import (
 	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/shutter/shlib/shtest"
-	"github.com/shutter-network/shutter/shuttermint/keyper"
 	"github.com/shutter-network/shutter/shuttermint/medley/comparer"
 )
 
-func tomlRoundtrip(t *testing.T, cfg *keyper.Config) *keyper.Config {
+func tomlRoundtrip(t *testing.T, cfg *DecryptorConfig) *DecryptorConfig {
 	t.Helper()
 	var buf bytes.Buffer
 	err := cfg.WriteTOML(&buf)
@@ -27,7 +25,7 @@ func tomlRoundtrip(t *testing.T, cfg *keyper.Config) *keyper.Config {
 	err = v.ReadConfig(&buf)
 	assert.NilError(t, err)
 
-	cfg2 := &keyper.Config{}
+	cfg2 := &DecryptorConfig{}
 	err = cfg2.Unmarshal(v)
 	assert.NilError(t, err)
 	return cfg2
@@ -37,9 +35,5 @@ func TestGeneratedConfigValid(t *testing.T) {
 	cfg, err := exampleConfig()
 	assert.NilError(t, err)
 	cfg2 := tomlRoundtrip(t, cfg)
-	assert.DeepEqual(t, cfg, cfg2,
-		shtest.BigIntComparer,
-		comparer.P2PPrivKeyComparer,
-		comparer.EciesPrivateKeyComparer,
-	)
+	assert.DeepEqual(t, cfg, cfg2, comparer.P2PPrivKeyComparer)
 }

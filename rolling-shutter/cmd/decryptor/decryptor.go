@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"io"
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -74,6 +75,24 @@ type DecryptorConfig struct {
 	P2PKey         crypto.PrivKey
 }
 
+// WriteTOML writes a toml configuration file with the given config.
+func (config *DecryptorConfig) WriteTOML(w io.Writer) error {
+	return decryptorTemplate.Execute(w, config)
+}
+
+// Unmarshal unmarshals a DecryptorConfig from the the given Viper object.
+func (config *DecryptorConfig) Unmarshal(v *viper.Viper) error {
+	return v.Unmarshal(
+		config,
+		viper.DecodeHook(
+			mapstructure.ComposeDecodeHookFunc(
+				medley.MultiaddrHook,
+				medley.P2PKeyHook,
+			),
+		),
+	)
+}
+
 func initDB() error {
 	ctx := context.Background()
 
@@ -124,15 +143,7 @@ func readConfig() (DecryptorConfig, error) {
 		return config, err // Config file was found but another error was produced
 	}
 
-	err = viper.Unmarshal(
-		&config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.P2PKeyHook,
-			),
-		),
-	)
+	err = config.Unmarshal(viper.GetViper())
 	if err != nil {
 		return config, err
 	}
@@ -164,20 +175,26 @@ func mustMultiaddr(s string) multiaddr.Multiaddr {
 	return a
 }
 
-func generateConfig() error {
+func exampleConfig() (*DecryptorConfig, error) {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return &DecryptorConfig{
+		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		PeerMultiaddrs: []multiaddr.Multiaddr{},
+		DatabaseURL:    "",
+		P2PKey:         p2pkey,
+	}, nil
+}
+
+func generateConfig() error {
+	config, err := exampleConfig()
 	if err != nil {
 		return err
 	}
-
-	config := DecryptorConfig{
-		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
-		PeerMultiaddrs: nil,
-		DatabaseURL:    "",
-		P2PKey:         p2pkey,
-	}
 	buf := &bytes.Buffer{}
-	err = decryptorTemplate.Execute(buf, config)
+	err = config.WriteTOML(buf)
 	if err != nil {
 		return err
 	}
