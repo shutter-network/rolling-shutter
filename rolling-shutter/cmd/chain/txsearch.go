@@ -1,4 +1,4 @@
-package cmd
+package chain
 
 import (
 	"context"
@@ -18,39 +18,40 @@ var txsearchFlags struct {
 	FromHeight, ToHeight int64
 }
 
-var txsearchCmd = &cobra.Command{
-	Use:   "txsearch",
-	Short: "Search for shuttermint transactions",
-	Long: `This command queries transactions from a running shuttermint node and prints them to
+func txsearchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "txsearch",
+		Short: "Search for shuttermint transactions",
+		Long: `This command queries transactions from a running shuttermint node and prints them to
 	stdout.`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		txsearchMain()
-	},
-}
-
-func init() {
-	txsearchCmd.PersistentFlags().StringVarP(
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			txsearchMain()
+		},
+	}
+	cmd.PersistentFlags().StringVarP(
 		&txsearchFlags.ShuttermintURL,
 		"shuttermint-url",
 		"s",
 		"http://localhost:26657",
 		"Shuttermint RPC URL",
 	)
-	txsearchCmd.PersistentFlags().Int64VarP(
+	cmd.PersistentFlags().Int64VarP(
 		&txsearchFlags.FromHeight,
 		"from-height",
 		"",
 		0,
 		"search txs from this height",
 	)
-	txsearchCmd.PersistentFlags().Int64VarP(
+	cmd.PersistentFlags().Int64VarP(
 		&txsearchFlags.ToHeight,
 		"to-height",
 		"",
 		-1,
 		"search txs till this height",
 	)
+
+	return cmd
 }
 
 func txsearchShutter(shuttermintURL string, fromHeight, toHeight int64) {

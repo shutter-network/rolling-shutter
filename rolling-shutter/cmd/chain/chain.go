@@ -39,6 +39,7 @@ func Cmd() *cobra.Command {
 	cmd.MarkFlagRequired("config")
 	cmd.AddCommand(initCmd())
 	cmd.AddCommand(showCmd())
+	cmd.AddCommand(txsearchCmd())
 	return cmd
 }
 

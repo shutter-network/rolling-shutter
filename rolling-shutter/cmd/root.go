@@ -58,7 +58,6 @@ func Cmd() *cobra.Command {
 	)
 	cmd.AddCommand(chain.Cmd())
 	cmd.AddCommand(keyper.Cmd())
-	cmd.AddCommand(txsearchCmd)
 	cmd.AddCommand(bootstrap.Cmd())
 	cmd.AddCommand(decryptor.Cmd())
 	cmd.AddCommand(completion.Cmd())
