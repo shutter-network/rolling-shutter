@@ -27,8 +27,9 @@ type Config struct {
 	PeerMultiaddrs []multiaddr.Multiaddr
 	P2PKey         crypto.PrivKey
 
-	Rate              float64
-	SendCipherBatches bool
+	Rate                   float64
+	SendDecryptionTriggers bool
+	SendCipherBatches      bool
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
@@ -97,12 +98,26 @@ func (m *MockNode) sendMessages(ctx context.Context) error {
 }
 
 func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
+	if m.Config.SendDecryptionTriggers {
+		if err := m.sendDecryptionTrigger(ctx, epochID); err != nil {
+			return err
+		}
+	}
 	if m.Config.SendCipherBatches {
 		if err := m.sendCipherBatchMessage(ctx, epochID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) error {
+	log.Printf("sending decryption trigger for epoch %d", epochID)
+	msg := shmsg.DecryptionTrigger{
+		InstanceID: 0,
+		EpochID:    epochID,
+	}
+	return m.p2p.TopicGossips["decryptionTrigger"].Publish(ctx, msg.String())
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
