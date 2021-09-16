@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	crypto "github.com/libp2p/go-libp2p-crypto"
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/bn256"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/p2p"
@@ -136,7 +136,10 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
 	log.Printf("sending cipher batch for epoch %d", epochID)
 	data := make([]byte, 8)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate random batch data")
+	}
 	msg := shmsg.CipherBatch{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
