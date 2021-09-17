@@ -13,14 +13,19 @@ import (
 var gossipTopicNames = [2]string{"decryptionTrigger", "decryptionKey"}
 
 func InitP2p(ctx context.Context, listenAddress multiaddr.Multiaddr, peerMultiaddrs []multiaddr.Multiaddr, p2pkey crypto.PrivKey) error {
-	p := p2p.NewP2PWithKey(p2pkey)
-	if err := p.CreateHost(ctx, listenAddress); err != nil {
+	p2pConfig := p2p.Config{
+		ListenAddr:     listenAddress,
+		PeerMultiaddrs: peerMultiaddrs,
+		PrivKey:        p2pkey,
+	}
+	p := p2p.NewP2P(p2pConfig)
+	if err := p.CreateHost(ctx); err != nil {
 		return err
 	}
 	if err := p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
 		return err
 	}
-	if err := p.ConnectToPeers(ctx, peerMultiaddrs); err != nil {
+	if err := p.ConnectToPeers(ctx); err != nil {
 		return err
 	}
 	return nil

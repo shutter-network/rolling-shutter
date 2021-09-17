@@ -27,15 +27,20 @@ type MockNode struct {
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
-	m.p2p = p2p.NewP2PWithKey(m.Config.P2PKey)
+	p2pConfig := p2p.Config{
+		ListenAddr:     m.Config.ListenAddress,
+		PeerMultiaddrs: m.Config.PeerMultiaddrs,
+		PrivKey:        m.Config.P2PKey,
+	}
+	m.p2p = p2p.NewP2P(p2pConfig)
 
-	if err := m.p2p.CreateHost(ctx, m.Config.ListenAddress); err != nil {
+	if err := m.p2p.CreateHost(ctx); err != nil {
 		return err
 	}
 	if err := m.p2p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
 		return err
 	}
-	if err := m.p2p.ConnectToPeers(ctx, m.Config.PeerMultiaddrs); err != nil {
+	if err := m.p2p.ConnectToPeers(ctx); err != nil {
 		return err
 	}
 

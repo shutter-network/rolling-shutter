@@ -219,14 +219,19 @@ func main() error {
 		return err
 	}
 
-	p := p2p.NewP2PWithKey(config.P2PKey)
-	if err := p.CreateHost(ctx, config.ListenAddress); err != nil {
+	p2pConfig := p2p.Config{
+		ListenAddr:     config.ListenAddress,
+		PeerMultiaddrs: config.PeerMultiaddrs,
+		PrivKey:        config.P2PKey,
+	}
+	p := p2p.NewP2P(p2pConfig)
+	if err := p.CreateHost(ctx); err != nil {
 		return err
 	}
 	if err := p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
 		return err
 	}
-	if err := p.ConnectToPeers(ctx, config.PeerMultiaddrs); err != nil {
+	if err := p.ConnectToPeers(ctx); err != nil {
 		return err
 	}
 

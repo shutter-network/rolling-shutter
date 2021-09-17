@@ -17,8 +17,7 @@ import (
 )
 
 type P2P struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
+	Config Config
 
 	TopicGossips map[string]*TopicGossip
 	host         host.Host
@@ -26,24 +25,28 @@ type P2P struct {
 	errgroup     *errgroup.Group
 	errgroupctx  context.Context
 	cancel       context.CancelFunc
-	privkey      crypto.PrivKey
 }
 
-func NewP2P() *P2P {
-	p := P2P{}
-	p.TopicGossips = make(map[string]*TopicGossip)
-	p.PeerMultiaddrs = []multiaddr.Multiaddr{}
+type Config struct {
+	ListenAddr     multiaddr.Multiaddr
+	PeerMultiaddrs []multiaddr.Multiaddr
+	PrivKey        crypto.PrivKey
+}
 
+func NewP2P(config Config) *P2P {
 	ctx, cancel := context.WithCancel(context.Background())
-	p.cancel = cancel
-	p.errgroup, p.errgroupctx = errgroup.WithContext(ctx)
-	return &p
-}
+	errgroup, errgroupctx := errgroup.WithContext(ctx)
 
-func NewP2PWithKey(privkey crypto.PrivKey) *P2P {
-	p := NewP2P()
-	p.privkey = privkey
-	return p
+	p := P2P{
+		Config:       config,
+		TopicGossips: make(map[string]*TopicGossip),
+		host:         nil,
+		pubSub:       nil,
+		errgroup:     errgroup,
+		errgroupctx:  errgroupctx,
+		cancel:       cancel,
+	}
+	return &p
 }
 
 func (p *P2P) Close() error {
@@ -56,22 +59,21 @@ func (p *P2P) Close() error {
 	return p.host.Close()
 }
 
-func (p *P2P) CreateHost(ctx context.Context, listenAddress multiaddr.Multiaddr) error {
+func (p *P2P) CreateHost(ctx context.Context) error {
 	var err error
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
-	if p.privkey == nil {
-		privkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	privKey := p.Config.PrivKey
+	if privKey == nil {
+		privKey, _, err = crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
 			return err
 		}
-		p.privkey = privkey
 	}
-	p.ListenAddress = listenAddress
 
 	// create a new libp2p Host
-	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(listenAddress), libp2p.Identity(p.privkey))
+	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(p.Config.ListenAddr), libp2p.Identity(privKey))
 	if err != nil {
 		return err
 	}
@@ -147,8 +149,8 @@ func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
 	return nil
 }
 
-func (p *P2P) ConnectToPeers(ctx context.Context, peerMultiaddrs []multiaddr.Multiaddr) error {
-	for _, address := range peerMultiaddrs {
+func (p *P2P) ConnectToPeers(ctx context.Context) error {
+	for _, address := range p.Config.PeerMultiaddrs {
 		err := p.ConnectToPeer(ctx, address)
 		if err != nil {
 			return err
@@ -166,7 +168,6 @@ func (p *P2P) ConnectToPeer(ctx context.Context, address multiaddr.Multiaddr) er
 	if err != nil {
 		return err
 	}
-	p.PeerMultiaddrs = append(p.PeerMultiaddrs, address)
 	return nil
 }
 
