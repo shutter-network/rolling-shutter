@@ -225,15 +225,6 @@ func main() error {
 		PrivKey:        config.P2PKey,
 	}
 	p := p2p.NewP2P(p2pConfig)
-	if err := p.CreateHost(ctx); err != nil {
-		return err
-	}
-	if err := p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
-		return err
-	}
-	if err := p.ConnectToPeers(ctx); err != nil {
-		return err
-	}
 
-	return nil
+	return p.Run(ctx, gossipTopicNames[:])
 }

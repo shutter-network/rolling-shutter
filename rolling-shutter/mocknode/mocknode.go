@@ -34,17 +34,10 @@ func (m *MockNode) Run(ctx context.Context) error {
 	}
 	m.p2p = p2p.NewP2P(p2pConfig)
 
-	if err := m.p2p.CreateHost(ctx); err != nil {
-		return err
-	}
-	if err := m.p2p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
-		return err
-	}
-	if err := m.p2p.ConnectToPeers(ctx); err != nil {
-		return err
-	}
-
 	g, errctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return m.p2p.Run(errctx, gossipTopicNames[:])
+	})
 	g.Go(func() error {
 		return m.listen(errctx)
 	})
@@ -55,23 +48,9 @@ func (m *MockNode) Run(ctx context.Context) error {
 }
 
 func (m *MockNode) listen(ctx context.Context) error {
-	messages := make(chan *p2p.Message)
-	for _, topic := range m.p2p.TopicGossips {
-		go func(t *p2p.TopicGossip) {
-			for {
-				select {
-				case msg := <-t.Messages:
-					messages <- msg
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(topic)
-	}
-
 	for {
 		select {
-		case msg := <-messages:
+		case msg := <-m.p2p.TopicGossipMessages:
 			log.Printf("received message from %s: %s", msg.SenderID, msg.Message)
 		case <-ctx.Done():
 			return ctx.Err()

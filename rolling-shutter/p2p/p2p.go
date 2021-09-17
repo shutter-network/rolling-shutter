@@ -19,12 +19,10 @@ import (
 type P2P struct {
 	Config Config
 
-	TopicGossips map[string]*TopicGossip
-	host         host.Host
-	pubSub       *pubsub.PubSub
-	errgroup     *errgroup.Group
-	errgroupctx  context.Context
-	cancel       context.CancelFunc
+	host                host.Host
+	pubSub              *pubsub.PubSub
+	TopicGossips        map[string]*TopicGossip
+	TopicGossipMessages chan *Message
 }
 
 type Config struct {
@@ -34,32 +32,67 @@ type Config struct {
 }
 
 func NewP2P(config Config) *P2P {
-	ctx, cancel := context.WithCancel(context.Background())
-	errgroup, errgroupctx := errgroup.WithContext(ctx)
-
 	p := P2P{
-		Config:       config,
-		TopicGossips: make(map[string]*TopicGossip),
-		host:         nil,
-		pubSub:       nil,
-		errgroup:     errgroup,
-		errgroupctx:  errgroupctx,
-		cancel:       cancel,
+		Config:              config,
+		host:                nil,
+		pubSub:              nil,
+		TopicGossips:        make(map[string]*TopicGossip),
+		TopicGossipMessages: make(chan *Message, 1),
 	}
 	return &p
 }
 
-func (p *P2P) Close() error {
-	if p.host == nil {
-		return nil
+func (p *P2P) Run(ctx context.Context, topicNames []string) error {
+	if err := p.createHost(ctx); err != nil {
+		return err
 	}
-	p.cancel()
-	_ = p.errgroup.Wait()
+	if err := p.joinTopics(topicNames); err != nil {
+		return err
+	}
+	if err := p.ConnectToPeers(ctx); err != nil {
+		return err
+	}
 
-	return p.host.Close()
+	// listen to gossip on all topics
+	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
+	errorgroup.Go(func() error {
+		return p.listenTopicGossip(errorgroupctx)
+	})
+
+	return errorgroup.Wait()
 }
 
-func (p *P2P) CreateHost(ctx context.Context) error {
+func (p *P2P) listenTopicGossip(ctx context.Context) error {
+	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
+	for _, topicGossip := range p.TopicGossips {
+		// we can't use the loop variable directly in the goroutines below, but need to create a
+		// new variable
+		tg := topicGossip
+
+		errorgroup.Go(func() error {
+			return tg.readLoop(errorgroupctx)
+		})
+
+		// gather messages from all topics in TopicGossipMessages channel
+		errorgroup.Go(func() error {
+			for {
+				select {
+				case msg := <-tg.Messages:
+					select {
+					case p.TopicGossipMessages <- msg:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+	}
+	return errorgroup.Wait()
+}
+
+func (p *P2P) createHost(ctx context.Context) error {
 	var err error
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
@@ -106,9 +139,9 @@ func (p *P2P) P2PAddress() string {
 	return addrs[0].String()
 }
 
-func (p *P2P) JoinTopics(ctx context.Context, topicNames []string) error {
+func (p *P2P) joinTopics(topicNames []string) error {
 	for _, topicName := range topicNames {
-		if err := p.JoinTopic(ctx, topicName); err != nil {
+		if err := p.joinTopic(topicName); err != nil {
 			return err
 		}
 	}
@@ -116,7 +149,7 @@ func (p *P2P) JoinTopics(ctx context.Context, topicNames []string) error {
 }
 
 // JoinTopic tries to subscribe to the PubSub topic.
-func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
+func (p *P2P) joinTopic(topicName string) error {
 	if _, ok := p.TopicGossips[topicName]; ok {
 		return errors.New("Cannot join new topic if already joined")
 	}
@@ -140,11 +173,6 @@ func (p *P2P) JoinTopic(ctx context.Context, topicName string) error {
 		topicName:    topicName,
 		Messages:     make(chan *Message, MessagesBufSize),
 	}
-
-	// start reading messages from the subscription in a loop
-	p.errgroup.Go(func() error {
-		return topicGossip.readLoop(p.errgroupctx)
-	})
 	p.TopicGossips[topicName] = topicGossip
 	return nil
 }

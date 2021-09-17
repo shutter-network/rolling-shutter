@@ -19,14 +19,7 @@ func InitP2p(ctx context.Context, listenAddress multiaddr.Multiaddr, peerMultiad
 		PrivKey:        p2pkey,
 	}
 	p := p2p.NewP2P(p2pConfig)
-	if err := p.CreateHost(ctx); err != nil {
-		return err
-	}
-	if err := p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
-		return err
-	}
-	if err := p.ConnectToPeers(ctx); err != nil {
-		return err
-	}
+	// FIXME: manage goroutine
+	go p.Run(ctx, gossipTopicNames[:]) // nolint
 	return nil
 }
