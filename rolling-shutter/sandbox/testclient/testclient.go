@@ -98,7 +98,7 @@ func subscribe(cl client.Client) {
 		panic(err)
 	}
 
-	var tx types.Tx = types.Tx(base64.RawURLEncoding.EncodeToString(signedMessage))
+	tx := types.Tx(base64.RawURLEncoding.EncodeToString(signedMessage))
 	res, err := cl.BroadcastTxCommit(context.Background(), tx)
 
 	fmt.Println("Msg:", base64.RawURLEncoding.EncodeToString(signedMessage))

@@ -112,7 +112,7 @@ func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message)
 	if err != nil {
 		return err
 	}
-	var tx tmtypes.Tx = tmtypes.Tx(base64.RawURLEncoding.EncodeToString(signedMessage))
+	tx := tmtypes.Tx(base64.RawURLEncoding.EncodeToString(signedMessage))
 	res, err := ms.rpcclient.BroadcastTxCommit(ctx, tx)
 	if err != nil {
 		return err
