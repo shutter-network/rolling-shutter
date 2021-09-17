@@ -7,8 +7,6 @@ import (
 	"time"
 
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
@@ -26,18 +24,6 @@ type MockNode struct {
 	Config Config
 
 	p2p *p2p.P2P
-}
-
-type Config struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
-	P2PKey         crypto.PrivKey
-
-	InstanceID             uint64
-	Rate                   float64
-	SendDecryptionTriggers bool
-	SendCipherBatches      bool
-	SendDecryptionKeys     bool
 }
 
 func (m *MockNode) Run(ctx context.Context) error {

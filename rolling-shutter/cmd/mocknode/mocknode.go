@@ -6,8 +6,8 @@ import (
 	"crypto/rand"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -75,15 +75,7 @@ func readConfig() (mocknode.Config, error) {
 		return config, err // Config file was found but another error was produced
 	}
 
-	err = viper.Unmarshal(
-		&config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.P2PKeyHook,
-			),
-		),
-	)
+	err = config.Unmarshal(viper.GetViper())
 	if err != nil {
 		return config, err
 	}
@@ -91,42 +83,19 @@ func readConfig() (mocknode.Config, error) {
 	return config, nil
 }
 
-var mockNodeTemplate = medley.MustBuildTemplate(
-	"mocknode",
-	`# Shutter mock node config for /p2p/{{ .P2PKey | P2PKeyPublic}}
-
-# p2p configuration
-ListenAddress   = "{{ .ListenAddress }}"
-PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
-
-# Secret Keys
-P2PKey          = "{{ .P2PKey | P2PKey}}"
-
-# Mock messages
-InstanceID              = {{ .InstanceID }}
-Rate                    = {{ .Rate }}
-SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
-SendCipherBatches       = {{ .SendCipherBatches }}
-SendDecryptionKeys      = {{ .SendDecryptionKeys }}
-`)
-
-func mustMultiaddr(s string) multiaddr.Multiaddr {
-	a, err := multiaddr.NewMultiaddr(s)
+func exampleConfig() (*mocknode.Config, error) {
+	listenAddress, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrap(err, "invalid default listen address")
 	}
-	return a
-}
-
-func generateConfig() error {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "failed to generate random p2p key")
 	}
 
 	config := mocknode.Config{
-		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
-		PeerMultiaddrs: nil,
+		ListenAddress:  listenAddress,
+		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		P2PKey:         p2pkey,
 
 		InstanceID:             0,
@@ -135,8 +104,16 @@ func generateConfig() error {
 		SendCipherBatches:      true,
 		SendDecryptionKeys:     true,
 	}
+	return &config, nil
+}
+
+func generateConfig() error {
+	config, err := exampleConfig()
+	if err != nil {
+		return err
+	}
 	buf := &bytes.Buffer{}
-	err = mockNodeTemplate.Execute(buf, config)
+	err = config.WriteTOML(buf)
 	if err != nil {
 		return err
 	}
