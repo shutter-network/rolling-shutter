@@ -8,10 +8,11 @@ import (
 	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
+	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/medley/comparer"
 )
 
-func tomlRoundtrip(t *testing.T, cfg *DecryptorConfig) *DecryptorConfig {
+func tomlRoundtrip(t *testing.T, cfg *decryptor.Config) *decryptor.Config {
 	t.Helper()
 	var buf bytes.Buffer
 	err := cfg.WriteTOML(&buf)
@@ -25,7 +26,7 @@ func tomlRoundtrip(t *testing.T, cfg *DecryptorConfig) *DecryptorConfig {
 	err = v.ReadConfig(&buf)
 	assert.NilError(t, err)
 
-	cfg2 := &DecryptorConfig{}
+	cfg2 := &decryptor.Config{}
 	err = cfg2.Unmarshal(v)
 	assert.NilError(t, err)
 	return cfg2
