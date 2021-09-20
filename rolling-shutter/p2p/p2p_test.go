@@ -89,6 +89,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		case <-time.After(5 * time.Millisecond):
 		}
 	}
+	assert.Equal(t, topicName, message.Topic, "received message with wrong topic")
 	assert.Equal(t, testMessage, message.Message, "received wrong message")
 	assert.Equal(t, p2ps[1].HostID(), message.SenderID, "received message with wrong sender")
 }
