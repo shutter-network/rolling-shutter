@@ -15,10 +15,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [3]string{
+var gossipTopicNames = [4]string{
 	"decryptionTrigger",
 	"cipherBatch",
 	"decryptionKey",
+	"decryptionSignature",
 }
 
 type MockNode struct {
