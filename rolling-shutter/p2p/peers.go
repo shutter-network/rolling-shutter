@@ -49,6 +49,10 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 			log.Println("ignoring address from config without transport", m)
 			continue
 		}
+		// don't connect to yourself
+		if addrInfo.ID == p.host.ID() {
+			continue
+		}
 		candidates[addrInfo.ID] = addrInfo
 	}
 
