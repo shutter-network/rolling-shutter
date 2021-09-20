@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
@@ -19,17 +20,35 @@ var CreateKeyperTables string
 // schemaVersion is used to check that we use the right schema.
 var schemaVersion = shdb.MustFindSchemaVersion(CreateKeyperTables, "kprdb/schema.sql")
 
-// InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
-func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	_, err := dbpool.Exec(ctx, CreateKeyperTables)
+func initKeyperDB(ctx context.Context, tx pgx.Tx, q *Queries) error {
+	_, err := tx.Exec(ctx, CreateKeyperTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
 	}
-	err = New(dbpool).InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+
+	err = q.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+	if err != nil {
+		return errors.Wrap(err, "failed to set schema version in meta_inf table")
+	}
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
 	return nil
+}
+
+// InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
+func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	tx, err := dbpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to start tx")
+	}
+	q := New(dbpool).WithTx(tx)
+	err = initKeyperDB(ctx, tx, q)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // ValidateKeyperDB checks that the database schema is compatible.
