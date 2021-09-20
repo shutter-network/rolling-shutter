@@ -12,21 +12,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func TestInvalidInputTypesIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
-	defer closedb()
-
-	_, err := handleInput(ctx, db, 5)
-	if err == nil {
-		t.Errorf("no error when receiving invalid type")
-	}
-}
-
 func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -40,7 +25,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 		EpochID: 100,
 		Key:     []byte("hello"),
 	}
-	msgs, err := handleInput(ctx, db, m)
+	msgs, err := handleDecryptionKeyInput(ctx, db, m)
 	assert.NilError(t, err)
 
 	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -54,7 +39,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 		EpochID: 100,
 		Key:     []byte("hello2"),
 	}
-	msgs, err = handleInput(ctx, db, m2)
+	msgs, err = handleDecryptionKeyInput(ctx, db, m2)
 	assert.NilError(t, err)
 
 	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -77,7 +62,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 		EpochID: 100,
 		Data:    []byte("hello"),
 	}
-	msgs, err := handleInput(ctx, db, m)
+	msgs, err := handleCipherBatchInput(ctx, db, m)
 	assert.NilError(t, err)
 
 	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -91,7 +76,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 		EpochID: 100,
 		Data:    []byte("hello2"),
 	}
-	msgs, err = handleInput(ctx, db, m2)
+	msgs, err = handleCipherBatchInput(ctx, db, m2)
 	assert.NilError(t, err)
 
 	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -114,7 +99,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 		EpochID: 123,
 		Data:    []byte("hello"),
 	}
-	msgs, err := handleInput(ctx, db, cipherBatchMsg)
+	msgs, err := handleCipherBatchInput(ctx, db, cipherBatchMsg)
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
@@ -122,7 +107,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 		EpochID: 123,
 		Key:     []byte("hello"),
 	}
-	msgs, err = handleInput(ctx, db, keyMsg)
+	msgs, err = handleDecryptionKeyInput(ctx, db, keyMsg)
 	assert.NilError(t, err)
 
 	// TODO: handle signer index

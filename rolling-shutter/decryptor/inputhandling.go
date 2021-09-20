@@ -5,25 +5,11 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
-
-// handleInput handles an input message. The result is an updated db (passed in as a parameter) and
-// a set of messages to be broadcast to peers (returned).
-func handleInput(ctx context.Context, db *dcrdb.Queries, value interface{}) ([]interface{}, error) {
-	switch v := value.(type) {
-	case *shmsg.DecryptionKey:
-		return handleDecryptionKeyInput(ctx, db, v)
-	case *shmsg.CipherBatch:
-		return handleCipherBatchInput(ctx, db, v)
-	default:
-		return nil, errors.Errorf("received input of invalid type: %T", v)
-	}
-}
 
 func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg.DecryptionKey) ([]interface{}, error) {
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
