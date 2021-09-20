@@ -21,8 +21,7 @@ func TestInvalidInputTypesIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := NewDecryptor(db)
-	err := d.handleInput(ctx, 5)
+	_, err := handleInput(ctx, db, 5)
 	if err == nil {
 		t.Errorf("no error when receiving invalid type")
 	}
@@ -37,16 +36,16 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := NewDecryptor(db)
 	m := &shmsg.DecryptionKey{
 		EpochID: 100,
 		Key:     []byte("hello"),
 	}
-	err := d.handleInput(ctx, m)
+	msgs, err := handleInput(ctx, db, m)
 	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
 
+	assert.Check(t, len(msgs) == 0)
 	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	if err != nil {
 		t.Fatalf("error retrieving decryption key: %v", err)
@@ -63,10 +62,11 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 		EpochID: 100,
 		Key:     []byte("hello2"),
 	}
-	err = d.handleInput(ctx, m2)
+	msgs, err = handleInput(ctx, db, m2)
 	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
+	assert.Check(t, len(msgs) == 0)
 	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	if err != nil {
 		t.Fatalf("error retrieving decryption key: %v", err)
@@ -85,16 +85,16 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := NewDecryptor(db)
 	m := &shmsg.CipherBatch{
 		EpochID: 100,
 		Data:    []byte("hello"),
 	}
-	err := d.handleInput(ctx, m)
+	msgs, err := handleInput(ctx, db, m)
 	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
 
+	assert.Check(t, len(msgs) == 0)
 	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	if err != nil {
 		t.Fatalf("error retrieving cipher batch: %v", err)
@@ -111,10 +111,11 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 		EpochID: 100,
 		Data:    []byte("hello2"),
 	}
-	err = d.handleInput(ctx, m2)
+	msgs, err = handleInput(ctx, db, m2)
 	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
+	assert.Check(t, len(msgs) == 0)
 	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	if err != nil {
 		t.Fatalf("error retrieving data: %v", err)
@@ -133,25 +134,23 @@ func TestHandleEpochIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := Decryptor{
-		db:            db,
-		inputChannel:  make(<-chan interface{}),
-		outputChannel: make(chan interface{}, 2),
-	}
-
 	cipherBatchMsg := &shmsg.CipherBatch{
 		EpochID: 123,
 		Data:    []byte("hello"),
 	}
-	if err := d.handleInput(ctx, cipherBatchMsg); err != nil {
+	msgs, err := handleInput(ctx, db, cipherBatchMsg)
+	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
+	assert.Check(t, len(msgs) == 0)
 
+	assert.Check(t, len(msgs) == 0)
 	keyMsg := &shmsg.DecryptionKey{
 		EpochID: 123,
 		Key:     []byte("hello"),
 	}
-	if err := d.handleInput(ctx, keyMsg); err != nil {
+	msgs, err = handleInput(ctx, db, keyMsg)
+	if err != nil {
 		t.Fatalf("error handling input: %v", err)
 	}
 
@@ -165,25 +164,21 @@ func TestHandleEpochIntegration(t *testing.T) {
 		t.Fatalf("error retrieving cipher batch: %v", err)
 	}
 
-	select {
-	case outputMessage := <-d.outputChannel:
-		msg, ok := outputMessage.(*shmsg.AggregatedDecryptionSignature)
-		if !ok {
-			t.Errorf("wrong type")
-		}
-		assert.Equal(
-			t,
-			medley.BytesEpochIDToUint64(storedDecryptionKey.EpochID),
-			msg.EpochID,
-			"stored and output epoch id do not match",
-		)
-		if !bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash) {
-			t.Errorf("stored and output signed hash do not match")
-		}
-		if !bytes.Equal(storedDecryptionKey.Signature, msg.AggregatedSignature) {
-			t.Errorf("stored and output aggregated signature do not match")
-		}
-	default:
-		t.Errorf("no message sent")
+	assert.Check(t, len(msgs) == 1)
+	msg, ok := msgs[0].(*shmsg.AggregatedDecryptionSignature)
+	if !ok {
+		t.Errorf("wrong type")
+	}
+	assert.Equal(
+		t,
+		medley.BytesEpochIDToUint64(storedDecryptionKey.EpochID),
+		msg.EpochID,
+		"stored and output epoch id do not match",
+	)
+	if !bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash) {
+		t.Errorf("stored and output signed hash do not match")
+	}
+	if !bytes.Equal(storedDecryptionKey.Signature, msg.AggregatedSignature) {
+		t.Errorf("stored and output aggregated signature do not match")
 	}
 }
