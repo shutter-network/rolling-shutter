@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -16,9 +17,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// messagesBufSize is the number of incoming messages to buffer for all of the rooms.
+const messagesBufSize = 128
+
 type P2P struct {
 	Config Config
 
+	mux            sync.Mutex
 	host           host.Host
 	pubSub         *pubsub.PubSub
 	gossipRooms    map[string]*gossipRoom
@@ -37,63 +42,50 @@ func NewP2P(config Config) *P2P {
 		host:           nil,
 		pubSub:         nil,
 		gossipRooms:    make(map[string]*gossipRoom),
-		GossipMessages: make(chan *Message, 1),
+		GossipMessages: make(chan *Message, messagesBufSize),
 	}
 	return &p
 }
 
 func (p *P2P) Run(ctx context.Context, topicNames []string) error {
-	if err := p.createHost(ctx); err != nil {
-		return err
-	}
-	if err := p.joinTopics(topicNames); err != nil {
-		return err
-	}
+	defer func() {
+		close(p.GossipMessages)
+	}()
 
-	// listen to gossip on all topics
 	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
-	errorgroup.Go(func() error {
-		return p.listenToAllRooms(errorgroupctx)
-	})
-	errorgroup.Go(func() error {
-		return p.managePeers(errorgroupctx)
-	})
-
-	return errorgroup.Wait()
-}
-
-func (p *P2P) listenToAllRooms(ctx context.Context) error {
-	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
-	for _, room := range p.gossipRooms {
-		// we can't use the loop variable directly in the goroutines below, but need to create a
-		// new variable
-		room := room
+	err := func() error {
+		p.mux.Lock()
+		defer p.mux.Unlock()
+		if err := p.createHost(ctx); err != nil {
+			return err
+		}
+		if err := p.joinTopics(topicNames); err != nil {
+			return err
+		}
+		// listen to gossip on all topics
+		for _, room := range p.gossipRooms {
+			room := room
+			errorgroup.Go(func() error {
+				return room.readLoop(errorgroupctx, p.GossipMessages)
+			})
+		}
 
 		errorgroup.Go(func() error {
-			return room.readLoop(errorgroupctx)
+			return p.managePeers(errorgroupctx)
 		})
-
-		// gather messages from all topics in TopicGossipMessages channel
-		errorgroup.Go(func() error {
-			for {
-				select {
-				case msg := <-room.Messages:
-					select {
-					case p.GossipMessages <- msg:
-					case <-ctx.Done():
-						return ctx.Err()
-					}
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		})
+		return nil
+	}()
+	if err != nil {
+		return err
 	}
 	return errorgroup.Wait()
 }
 
 func (p *P2P) Publish(ctx context.Context, topic string, message string) error {
+	p.mux.Lock()
 	room, ok := p.gossipRooms[topic]
+	p.mux.Unlock()
+
 	if !ok {
 		log.Printf("dropping message to not (yet) subscribed topic %s", topic)
 		return nil
@@ -120,7 +112,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 		return err
 	}
 	// print the node's PeerInfo in multiaddr format
-	log.Println("libp2p node address:", p.P2PAddress())
+	log.Println("libp2p node address:", p.p2pAddress())
 
 	// create a new PubSub service using the GossipSub router
 	pubSub, err := pubsub.NewGossipSub(ctx, p.host)
@@ -132,8 +124,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 	return nil
 }
 
-// P2PAddress returns the node's PeerInfo in multiaddr format.
-func (p *P2P) P2PAddress() string {
+func (p *P2P) p2pAddress() string {
 	if p.host == nil {
 		return "<not connected yet>"
 	}
@@ -146,6 +137,13 @@ func (p *P2P) P2PAddress() string {
 		return fmt.Sprintf("<error: %s>", err)
 	}
 	return addrs[0].String()
+}
+
+// P2PAddress returns the node's PeerInfo in multiaddr format.
+func (p *P2P) P2PAddress() string {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	return p.p2pAddress()
 }
 
 func (p *P2P) joinTopics(topicNames []string) error {
@@ -176,16 +174,17 @@ func (p *P2P) joinTopic(topicName string) error {
 
 	p.gossipRooms[topicName] = &gossipRoom{
 		pubSub:       p.pubSub,
-		Topic:        topic,
+		topic:        topic,
 		subscription: sub,
-		Self:         p.host.ID(),
+		self:         p.host.ID(),
 		topicName:    topicName,
-		Messages:     make(chan *Message, MessagesBufSize),
 	}
 	return nil
 }
 
 func (p *P2P) GetMultiaddr() (multiaddr.Multiaddr, error) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 	peerInfo := peer.AddrInfo{
 		ID:    p.host.ID(),
 		Addrs: p.host.Addrs(),
@@ -198,5 +197,7 @@ func (p *P2P) GetMultiaddr() (multiaddr.Multiaddr, error) {
 }
 
 func (p *P2P) HostID() string {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 	return p.host.ID().Pretty()
 }
