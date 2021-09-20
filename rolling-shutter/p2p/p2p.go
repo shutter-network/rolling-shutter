@@ -81,7 +81,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string) error {
 	return errorgroup.Wait()
 }
 
-func (p *P2P) Publish(ctx context.Context, topic string, message string) error {
+func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
 	p.mux.Lock()
 	room, ok := p.gossipRooms[topic]
 	p.mux.Unlock()
