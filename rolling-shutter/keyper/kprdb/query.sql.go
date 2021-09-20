@@ -5,7 +5,70 @@ package kprdb
 
 import (
 	"context"
+	"time"
+
+	"github.com/jackc/pgtype"
 )
+
+const countBatchConfigs = `-- name: CountBatchConfigs :one
+SELECT count(*) FROM keyper.tendermint_batch_config
+`
+
+func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countBatchConfigs)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getBatchConfig = `-- name: GetBatchConfig :one
+SELECT config_index, height, keypers, threshold
+FROM keyper.tendermint_batch_config
+WHERE config_index = $1
+`
+
+func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (KeyperTendermintBatchConfig, error) {
+	row := q.db.QueryRow(ctx, getBatchConfig, configIndex)
+	var i KeyperTendermintBatchConfig
+	err := row.Scan(
+		&i.ConfigIndex,
+		&i.Height,
+		&i.Keypers,
+		&i.Threshold,
+	)
+	return i, err
+}
+
+const getBatchConfigs = `-- name: GetBatchConfigs :many
+SELECT config_index, height, keypers, threshold
+FROM keyper.tendermint_batch_config
+ORDER BY config_index
+`
+
+func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchConfig, error) {
+	rows, err := q.db.Query(ctx, getBatchConfigs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperTendermintBatchConfig
+	for rows.Next() {
+		var i KeyperTendermintBatchConfig
+		if err := rows.Scan(
+			&i.ConfigIndex,
+			&i.Height,
+			&i.Keypers,
+			&i.Threshold,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, keyper_index, decryption_key FROM keyper.decryption_key
@@ -16,6 +79,25 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperD
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i KeyperDecryptionKey
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
+	return i, err
+}
+
+const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
+SELECT config_index, height, keypers, threshold
+FROM keyper.tendermint_batch_config
+ORDER BY config_index DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestBatchConfig(ctx context.Context) (KeyperTendermintBatchConfig, error) {
+	row := q.db.QueryRow(ctx, getLatestBatchConfig)
+	var i KeyperTendermintBatchConfig
+	err := row.Scan(
+		&i.ConfigIndex,
+		&i.Height,
+		&i.Keypers,
+		&i.Threshold,
+	)
 	return i, err
 }
 
@@ -30,6 +112,28 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (KeyperMetaInf, error
 	return i, err
 }
 
+const insertBatchConfig = `-- name: InsertBatchConfig :exec
+INSERT INTO keyper.tendermint_batch_config (config_index, height, keypers, threshold)
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertBatchConfigParams struct {
+	ConfigIndex int32
+	Height      int64
+	Keypers     []string
+	Threshold   int32
+}
+
+func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigParams) error {
+	_, err := q.db.Exec(ctx, insertBatchConfig,
+		arg.ConfigIndex,
+		arg.Height,
+		arg.Keypers,
+		arg.Threshold,
+	)
+	return err
+}
+
 const insertMeta = `-- name: InsertMeta :exec
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2)
 `
@@ -41,5 +145,64 @@ type InsertMetaParams struct {
 
 func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
+}
+
+const insertPureDKG = `-- name: InsertPureDKG :exec
+INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
+`
+
+type InsertPureDKGParams struct {
+	Eon     pgtype.Numeric
+	Puredkg []byte
+}
+
+func (q *Queries) InsertPureDKG(ctx context.Context, arg InsertPureDKGParams) error {
+	_, err := q.db.Exec(ctx, insertPureDKG, arg.Eon, arg.Puredkg)
+	return err
+}
+
+const tMGetSyncMeta = `-- name: TMGetSyncMeta :one
+SELECT current_block, last_committed_height, sync_timestamp
+FROM keyper.tendermint_sync_meta
+ORDER BY current_block DESC, last_committed_height DESC
+LIMIT 1
+`
+
+func (q *Queries) TMGetSyncMeta(ctx context.Context) (KeyperTendermintSyncMetum, error) {
+	row := q.db.QueryRow(ctx, tMGetSyncMeta)
+	var i KeyperTendermintSyncMetum
+	err := row.Scan(&i.CurrentBlock, &i.LastCommittedHeight, &i.SyncTimestamp)
+	return i, err
+}
+
+const tMSetSyncMeta = `-- name: TMSetSyncMeta :exec
+INSERT INTO keyper.tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
+VALUES ($1, $2, $3)
+`
+
+type TMSetSyncMetaParams struct {
+	CurrentBlock        int64
+	LastCommittedHeight int64
+	SyncTimestamp       time.Time
+}
+
+func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) error {
+	_, err := q.db.Exec(ctx, tMSetSyncMeta, arg.CurrentBlock, arg.LastCommittedHeight, arg.SyncTimestamp)
+	return err
+}
+
+const updatePureDKG = `-- name: UpdatePureDKG :exec
+UPDATE keyper.puredkg
+SET puredkg=$2 WHERE eon=$1
+`
+
+type UpdatePureDKGParams struct {
+	Eon     pgtype.Numeric
+	Puredkg []byte
+}
+
+func (q *Queries) UpdatePureDKG(ctx context.Context, arg UpdatePureDKGParams) error {
+	_, err := q.db.Exec(ctx, updatePureDKG, arg.Eon, arg.Puredkg)
 	return err
 }

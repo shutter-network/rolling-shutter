@@ -5,6 +5,7 @@ package kprdb
 import (
 	"context"
 	_ "embed"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -30,8 +31,13 @@ func initKeyperDB(ctx context.Context, tx pgx.Tx, q *Queries) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
+	err = q.TMSetSyncMeta(ctx, TMSetSyncMetaParams{
+		CurrentBlock:        -1,
+		LastCommittedHeight: -1,
+		SyncTimestamp:       time.Now(),
+	})
 	if err != nil {
-		return errors.Wrap(err, "failed to set schema version in meta_inf table")
+		return errors.Wrap(err, "failed to set current block")
 	}
 	return nil
 }

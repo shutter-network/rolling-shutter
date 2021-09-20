@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/tendermint/tendermint/rpc/client"
+	"github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
@@ -145,6 +147,16 @@ func keyperMain() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+
+	var cl client.Client
+	cl, err = http.New(kc.ShuttermintURL, "/websocket")
+	if err != nil {
+		return err
+	}
+	err = keyper.SyncAppWithDB(ctx, kc, cl, dbpool)
+	if err != nil {
+		return err
+	}
 
 	if err := kprdb.ValidateKeyperDB(ctx, dbpool); err != nil {
 		return err
