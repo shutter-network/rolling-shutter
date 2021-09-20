@@ -71,7 +71,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		}
 
 		select {
-		case message = <-p2ps[0].TopicGossipMessages:
+		case message = <-p2ps[0].GossipMessages:
 			log.Println("got", message)
 			if message == nil {
 				t.Fatalf("channel closed unexpectedly")

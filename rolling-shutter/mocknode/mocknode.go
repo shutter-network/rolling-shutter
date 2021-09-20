@@ -50,7 +50,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
-		case msg := <-m.p2p.TopicGossipMessages:
+		case msg := <-m.p2p.GossipMessages:
 			log.Printf("received message from %s: %s", msg.SenderID, msg.Message)
 		case <-ctx.Done():
 			return ctx.Err()
