@@ -30,6 +30,7 @@ require (
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-noise v0.2.2 // indirect
+	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-pubsub v0.5.4
 	github.com/libp2p/go-tcp-transport v0.2.8 // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect
