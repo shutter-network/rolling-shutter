@@ -92,6 +92,15 @@ func (p *P2P) listenTopicGossip(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
+func (p *P2P) Publish(ctx context.Context, topic string, message string) error {
+	topicGossip, ok := p.TopicGossips[topic]
+	if !ok {
+		log.Printf("dropping message to not (yet) subscribed topic %s", topic)
+		return nil
+	}
+	return topicGossip.Publish(ctx, message)
+}
+
 func (p *P2P) createHost(ctx context.Context) error {
 	var err error
 	if p.host != nil {

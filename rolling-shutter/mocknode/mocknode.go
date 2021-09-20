@@ -100,7 +100,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 	}
-	return m.p2p.TopicGossips["decryptionTrigger"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "decryptionTrigger", msg.String())
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
@@ -115,7 +115,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 		EpochID:    epochID,
 		Data:       data,
 	}
-	return m.p2p.TopicGossips["cipherBatch"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "cipherBatch", msg.String())
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
@@ -129,5 +129,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 		EpochID:    epochID,
 		Key:        g1.Marshal(),
 	}
-	return m.p2p.TopicGossips["decryptionKey"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "decryptionKey", msg.String())
 }
