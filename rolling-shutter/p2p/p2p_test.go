@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,6 +47,9 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
 	testMessage := "test message"
 
+	runctx, stopRun := context.WithCancel(ctx)
+
+	waitGroup := sync.WaitGroup{}
 	p2ps := []*P2P{}
 	for i := 0; i < numPeers; i++ {
 		p := NewP2P(Config{
@@ -54,13 +58,17 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 			PrivKey:        privKeys[i],
 		})
 		p2ps = append(p2ps, p)
-
+		waitGroup.Add(1)
 		go func() {
-			err := p.Run(ctx, gossipTopicNames)
-			assert.NilError(t, err)
+			defer waitGroup.Done()
+			err := p.Run(runctx, gossipTopicNames)
+			assert.Assert(t, err == context.Canceled)
 		}()
 	}
-
+	defer func() {
+		stopRun()
+		waitGroup.Wait()
+	}()
 	// The following loop publishes the same message over and over. Even though we did call
 	// ConnectToPeer, libp2p takes some time until the peer receives the first message.
 	var message *Message
