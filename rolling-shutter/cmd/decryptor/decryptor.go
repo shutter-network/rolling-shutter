@@ -16,13 +16,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
 var (
-	outputFile       string
-	cfgFile          string
-	gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
+	outputFile string
+	cfgFile    string
 )
 
 func Cmd() *cobra.Command {
@@ -167,22 +165,6 @@ func main() error {
 		return err
 	}
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to database")
-	}
-	defer dbpool.Close()
-	err = dcrdb.ValidateDecryptorDB(ctx, dbpool)
-	if err != nil {
-		return err
-	}
-
-	p2pConfig := p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-	}
-	p := p2p.NewP2P(p2pConfig)
-
-	return p.Run(ctx, gossipTopicNames[:])
+	d := decryptor.NewDecryptor(config)
+	return d.Run(ctx)
 }
