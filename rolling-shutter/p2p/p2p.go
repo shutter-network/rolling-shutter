@@ -49,14 +49,14 @@ func (p *P2P) Run(ctx context.Context, topicNames []string) error {
 	if err := p.joinTopics(topicNames); err != nil {
 		return err
 	}
-	if err := p.ConnectToPeers(ctx); err != nil {
-		return err
-	}
 
 	// listen to gossip on all topics
 	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
 	errorgroup.Go(func() error {
 		return p.listenTopicGossip(errorgroupctx)
+	})
+	errorgroup.Go(func() error {
+		return p.managePeers(errorgroupctx)
 	})
 
 	return errorgroup.Wait()
@@ -175,32 +175,6 @@ func (p *P2P) joinTopic(topicName string) error {
 	}
 	p.TopicGossips[topicName] = topicGossip
 	return nil
-}
-
-func (p *P2P) ConnectToPeers(ctx context.Context) error {
-	for _, address := range p.Config.PeerMultiaddrs {
-		err := p.ConnectToPeer(ctx, address)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *P2P) ConnectToPeer(ctx context.Context, address multiaddr.Multiaddr) error {
-	peerAddr, err := peer.AddrInfoFromP2pAddr(address)
-	if err != nil {
-		return errors.Wrapf(err, "ConnectToPeer %s", address)
-	}
-	err = p.host.Connect(ctx, *peerAddr)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (p *P2P) ConnectedPeers() []peer.ID {
-	return p.host.Network().Peers()
 }
 
 func (p *P2P) GetMultiaddr() (multiaddr.Multiaddr, error) {
