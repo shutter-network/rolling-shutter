@@ -4,26 +4,23 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"io"
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/mitchellh/mapstructure"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
 var (
-	outputFile       string
-	cfgFile          string
-	gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "signature"}
+	outputFile string
+	cfgFile    string
 )
 
 func Cmd() *cobra.Command {
@@ -68,31 +65,6 @@ func generateConfigCmd() *cobra.Command {
 	return cmd
 }
 
-type DecryptorConfig struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
-	DatabaseURL    string
-	P2PKey         crypto.PrivKey
-}
-
-// WriteTOML writes a toml configuration file with the given config.
-func (config *DecryptorConfig) WriteTOML(w io.Writer) error {
-	return decryptorTemplate.Execute(w, config)
-}
-
-// Unmarshal unmarshals a DecryptorConfig from the the given Viper object.
-func (config *DecryptorConfig) Unmarshal(v *viper.Viper) error {
-	return v.Unmarshal(
-		config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.P2PKeyHook,
-			),
-		),
-	)
-}
-
 func initDB() error {
 	ctx := context.Background()
 
@@ -117,7 +89,7 @@ func initDB() error {
 	return nil
 }
 
-func readConfig() (DecryptorConfig, error) {
+func readConfig() (decryptor.Config, error) {
 	viper.SetEnvPrefix("DECRYPTOR")
 	viper.BindEnv("ListenAddress")
 	viper.BindEnv("PeerMultiaddrs")
@@ -126,7 +98,7 @@ func readConfig() (DecryptorConfig, error) {
 	viper.SetDefault("ListenAddress", defaultListenAddress)
 	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
 
-	config := DecryptorConfig{}
+	config := decryptor.Config{}
 
 	viper.AddConfigPath("$HOME/.config/shutter")
 	viper.SetConfigName("decryptor")
@@ -151,22 +123,6 @@ func readConfig() (DecryptorConfig, error) {
 	return config, nil
 }
 
-var decryptorTemplate = medley.MustBuildTemplate(
-	"decryptor",
-	`# Shutter decryptor config for /p2p/{{ .P2PKey | P2PKeyPublic}}
-
-# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
-# It it's empty, we use the standard PG* environment variables
-DatabaseURL     = "{{ .DatabaseURL }}"
-
-# p2p configuration
-ListenAddress   = "{{ .ListenAddress }}"
-PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
-
-# Secret Keys
-P2PKey          = "{{ .P2PKey | P2PKey}}"
-`)
-
 func mustMultiaddr(s string) multiaddr.Multiaddr {
 	a, err := multiaddr.NewMultiaddr(s)
 	if err != nil {
@@ -175,12 +131,12 @@ func mustMultiaddr(s string) multiaddr.Multiaddr {
 	return a
 }
 
-func exampleConfig() (*DecryptorConfig, error) {
+func exampleConfig() (*decryptor.Config, error) {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-	return &DecryptorConfig{
+	return &decryptor.Config{
 		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "",
@@ -209,22 +165,6 @@ func main() error {
 		return err
 	}
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to database")
-	}
-	defer dbpool.Close()
-	err = dcrdb.ValidateDecryptorDB(ctx, dbpool)
-	if err != nil {
-		return err
-	}
-
-	p2pConfig := p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-	}
-	p := p2p.NewP2P(p2pConfig)
-
-	return p.Run(ctx, gossipTopicNames[:])
+	d := decryptor.New(config)
+	return d.Run(ctx)
 }

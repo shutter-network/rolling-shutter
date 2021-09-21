@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -45,7 +46,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	}
 
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
-	testMessage := "test message"
+	testMessage := []byte("test message")
 
 	runctx, stopRun := context.WithCancel(ctx)
 
@@ -89,6 +90,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		case <-time.After(5 * time.Millisecond):
 		}
 	}
-	assert.Equal(t, testMessage, message.Message, "received wrong message")
+	assert.Equal(t, topicName, message.Topic, "received message with wrong topic")
+	assert.Check(t, bytes.Equal(testMessage, message.Message), "received wrong message")
 	assert.Equal(t, p2ps[1].HostID(), message.SenderID, "received message with wrong sender")
 }

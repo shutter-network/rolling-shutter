@@ -12,22 +12,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func TestInvalidInputTypesIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
-	defer closedb()
-
-	d := NewDecryptor(db)
-	err := d.handleInput(ctx, 5)
-	if err == nil {
-		t.Errorf("no error when receiving invalid type")
-	}
-}
-
 func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -37,43 +21,32 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := NewDecryptor(db)
 	m := &shmsg.DecryptionKey{
 		EpochID: 100,
 		Key:     []byte("hello"),
 	}
-	err := d.handleInput(ctx, m)
-	if err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err := handleDecryptionKeyInput(ctx, db, m)
+	assert.NilError(t, err)
 
 	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
-	if err != nil {
-		t.Fatalf("error retrieving decryption key: %v", err)
-	}
+	assert.NilError(t, err)
+	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.EpochID)
+	assert.Check(t, bytes.Equal(mStored.Key, m.Key))
 
-	if medley.BytesEpochIDToUint64(mStored.EpochID) != m.EpochID {
-		t.Errorf("wrong epoch id")
-	}
-	if !bytes.Equal(mStored.Key, m.Key) {
-		t.Errorf("wrong key")
-	}
+	assert.Check(t, len(msgs) == 0)
 
 	m2 := &shmsg.DecryptionKey{
 		EpochID: 100,
 		Key:     []byte("hello2"),
 	}
-	err = d.handleInput(ctx, m2)
-	if err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err = handleDecryptionKeyInput(ctx, db, m2)
+	assert.NilError(t, err)
+
 	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
-	if err != nil {
-		t.Fatalf("error retrieving decryption key: %v", err)
-	}
-	if !bytes.Equal(m2Stored.Key, m.Key) {
-		t.Errorf("inserting another decryption key changed existing one")
-	}
+	assert.NilError(t, err)
+	assert.Check(t, bytes.Equal(m2Stored.Key, m.Key))
+
+	assert.Check(t, len(msgs) == 0)
 }
 
 func TestInsertCipherBatchIntegration(t *testing.T) {
@@ -85,43 +58,32 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := NewDecryptor(db)
 	m := &shmsg.CipherBatch{
 		EpochID: 100,
 		Data:    []byte("hello"),
 	}
-	err := d.handleInput(ctx, m)
-	if err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err := handleCipherBatchInput(ctx, db, m)
+	assert.NilError(t, err)
 
 	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
-	if err != nil {
-		t.Fatalf("error retrieving cipher batch: %v", err)
-	}
+	assert.NilError(t, err)
+	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.EpochID)
+	assert.Check(t, bytes.Equal(mStored.Data, m.Data))
 
-	if medley.BytesEpochIDToUint64(mStored.EpochID) != m.EpochID {
-		t.Errorf("wrong epoch id")
-	}
-	if !bytes.Equal(mStored.Data, m.Data) {
-		t.Errorf("wrong data")
-	}
+	assert.Check(t, len(msgs) == 0)
 
 	m2 := &shmsg.CipherBatch{
 		EpochID: 100,
 		Data:    []byte("hello2"),
 	}
-	err = d.handleInput(ctx, m2)
-	if err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err = handleCipherBatchInput(ctx, db, m2)
+	assert.NilError(t, err)
+
 	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
-	if err != nil {
-		t.Fatalf("error retrieving data: %v", err)
-	}
-	if !bytes.Equal(m2Stored.Data, m.Data) {
-		t.Errorf("inserting data twice changed existing one")
-	}
+	assert.NilError(t, err)
+	assert.Check(t, bytes.Equal(m2Stored.Data, m.Data))
+
+	assert.Check(t, len(msgs) == 0)
 }
 
 func TestHandleEpochIntegration(t *testing.T) {
@@ -133,27 +95,20 @@ func TestHandleEpochIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
-	d := Decryptor{
-		db:            db,
-		inputChannel:  make(<-chan interface{}),
-		outputChannel: make(chan interface{}, 2),
-	}
-
 	cipherBatchMsg := &shmsg.CipherBatch{
 		EpochID: 123,
 		Data:    []byte("hello"),
 	}
-	if err := d.handleInput(ctx, cipherBatchMsg); err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err := handleCipherBatchInput(ctx, db, cipherBatchMsg)
+	assert.NilError(t, err)
+	assert.Check(t, len(msgs) == 0)
 
 	keyMsg := &shmsg.DecryptionKey{
 		EpochID: 123,
 		Key:     []byte("hello"),
 	}
-	if err := d.handleInput(ctx, keyMsg); err != nil {
-		t.Fatalf("error handling input: %v", err)
-	}
+	msgs, err = handleDecryptionKeyInput(ctx, db, keyMsg)
+	assert.NilError(t, err)
 
 	// TODO: handle signer index
 	storedDecryptionKey,
@@ -161,29 +116,16 @@ func TestHandleEpochIntegration(t *testing.T) {
 		EpochID:     medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
 		SignerIndex: 0,
 	})
-	if err != nil {
-		t.Fatalf("error retrieving cipher batch: %v", err)
-	}
+	assert.NilError(t, err)
 
-	select {
-	case outputMessage := <-d.outputChannel:
-		msg, ok := outputMessage.(*shmsg.AggregatedDecryptionSignature)
-		if !ok {
-			t.Errorf("wrong type")
-		}
-		assert.Equal(
-			t,
-			medley.BytesEpochIDToUint64(storedDecryptionKey.EpochID),
-			msg.EpochID,
-			"stored and output epoch id do not match",
-		)
-		if !bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash) {
-			t.Errorf("stored and output signed hash do not match")
-		}
-		if !bytes.Equal(storedDecryptionKey.Signature, msg.AggregatedSignature) {
-			t.Errorf("stored and output aggregated signature do not match")
-		}
-	default:
-		t.Errorf("no message sent")
-	}
+	assert.Check(t, len(msgs) == 1)
+	msg, ok := msgs[0].(*shmsg.AggregatedDecryptionSignature)
+	assert.Check(t, ok, "wrong message type")
+	assert.Equal(
+		t,
+		medley.BytesEpochIDToUint64(storedDecryptionKey.EpochID),
+		msg.EpochID,
+	)
+	assert.Check(t, bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash))
+	assert.Check(t, bytes.Equal(storedDecryptionKey.Signature, msg.AggregatedSignature))
 }

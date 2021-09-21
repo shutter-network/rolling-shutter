@@ -9,15 +9,17 @@ import (
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [3]string{
+var gossipTopicNames = [4]string{
 	"decryptionTrigger",
 	"cipherBatch",
 	"decryptionKey",
+	"decryptionSignature",
 }
 
 type MockNode struct {
@@ -51,7 +53,7 @@ func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
 		case msg := <-m.p2p.GossipMessages:
-			log.Printf("received message from %s: %s", msg.SenderID, msg.Message)
+			log.Printf("received message on topic %s from %s: %X", msg.Topic, msg.SenderID, msg.Message)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -96,11 +98,15 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 
 func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) error {
 	log.Printf("sending decryption trigger for epoch %d", epochID)
-	msg := shmsg.DecryptionTrigger{
+	msg := &shmsg.DecryptionTrigger{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 	}
-	return m.p2p.Publish(ctx, "decryptionTrigger", msg.String())
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return m.p2p.Publish(ctx, "decryptionTrigger", msgBytes)
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
@@ -110,12 +116,16 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate random batch data")
 	}
-	msg := shmsg.CipherBatch{
+	msg := &shmsg.CipherBatch{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 		Data:       data,
 	}
-	return m.p2p.Publish(ctx, "cipherBatch", msg.String())
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return m.p2p.Publish(ctx, "cipherBatch", msgBytes)
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
@@ -124,10 +134,14 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate random decryption key")
 	}
-	msg := shmsg.DecryptionKey{
+	msg := &shmsg.DecryptionKey{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 		Key:        g1.Marshal(),
 	}
-	return m.p2p.Publish(ctx, "decryptionKey", msg.String())
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return m.p2p.Publish(ctx, "decryptionKey", msgBytes)
 }

@@ -21,13 +21,15 @@ type gossipRoom struct {
 
 // Message gets converted to/from JSON and sent in the body of pubsub messages.
 type Message struct {
-	Message  string
+	Topic    string
+	Message  []byte
 	SenderID string
 }
 
 // Publish sends a message to the pubsub topic.
-func (room *gossipRoom) Publish(ctx context.Context, message string) error {
+func (room *gossipRoom) Publish(ctx context.Context, message []byte) error {
 	m := Message{
+		Topic:    room.topicName,
 		Message:  message,
 		SenderID: room.self.Pretty(),
 	}
