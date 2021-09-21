@@ -10,6 +10,14 @@ import (
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 )
 
+// P2PMessage can be send via the p2p protocol.
+type P2PMessage interface {
+	ImplementsP2PMessage()
+}
+
+func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
+}
+
 // NewBatchConfig creates a new BatchConfig message.
 func NewBatchConfig(
 	startBatchIndex uint64,

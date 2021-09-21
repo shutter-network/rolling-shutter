@@ -11,7 +11,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg.DecryptionKey) ([]interface{}, error) {
+func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
 		EpochID: medley.Uint64EpochIDToBytes(key.EpochID),
 		Key:     key.Key,
@@ -26,7 +26,7 @@ func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg
 	return handleEpoch(ctx, db, key.EpochID)
 }
 
-func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch *shmsg.CipherBatch) ([]interface{}, error) {
+func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch *shmsg.CipherBatch) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
 		EpochID: medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
 		Data:    cipherBatch.Data,
@@ -42,7 +42,7 @@ func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch 
 }
 
 // handleEpoch produces, store, and output a signature if we have both the cipher batch and key for given epoch.
-func handleEpoch(ctx context.Context, db *dcrdb.Queries, epochID uint64) ([]interface{}, error) {
+func handleEpoch(ctx context.Context, db *dcrdb.Queries, epochID uint64) ([]shmsg.P2PMessage, error) {
 	epochIDBytes := medley.Uint64EpochIDToBytes(epochID)
 	cipherBatch, err := db.GetCipherBatch(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
@@ -73,7 +73,7 @@ func handleEpoch(ctx context.Context, db *dcrdb.Queries, epochID uint64) ([]inte
 		return nil, nil
 	}
 
-	msgs := []interface{}{}
+	msgs := []shmsg.P2PMessage{}
 	// TODO: handle instanceID and signer bitfield
 	msgs = append(msgs, &shmsg.AggregatedDecryptionSignature{
 		InstanceID:          0,

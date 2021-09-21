@@ -84,7 +84,7 @@ func (d *Decryptor) handleMessages(ctx context.Context) error {
 }
 
 func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
-	var msgsOut []interface{}
+	var msgsOut []shmsg.P2PMessage
 	var err error
 
 	switch msg.Topic {
@@ -117,7 +117,7 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 	return nil
 }
 
-func (d *Decryptor) sendMessage(ctx context.Context, msg interface{}) error {
+func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
 	var err error
 	var topic string
 	var msgBytes []byte
