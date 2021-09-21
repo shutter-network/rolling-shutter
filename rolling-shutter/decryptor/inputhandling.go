@@ -21,6 +21,7 @@ func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple keys for same epoch %d", key.EpochID)
+		return nil, nil
 	}
 	return handleEpoch(ctx, db, key.EpochID)
 }
@@ -35,6 +36,7 @@ func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch 
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
+		return nil, nil
 	}
 	return handleEpoch(ctx, db, cipherBatch.EpochID)
 }
@@ -68,6 +70,7 @@ func handleEpoch(ctx context.Context, db *dcrdb.Queries, epochID uint64) ([]inte
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple signatures with same (epoch id, signer index): (%d, %d)",
 			signature.EpochID, signature.SignerIndex)
+		return nil, nil
 	}
 
 	msgs := []interface{}{}
