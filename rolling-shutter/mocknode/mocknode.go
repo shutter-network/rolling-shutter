@@ -27,19 +27,17 @@ type MockNode struct {
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
-	m.p2p = p2p.NewP2PWithKey(m.Config.P2PKey)
-
-	if err := m.p2p.CreateHost(ctx, m.Config.ListenAddress); err != nil {
-		return err
+	p2pConfig := p2p.Config{
+		ListenAddr:     m.Config.ListenAddress,
+		PeerMultiaddrs: m.Config.PeerMultiaddrs,
+		PrivKey:        m.Config.P2PKey,
 	}
-	if err := m.p2p.JoinTopics(ctx, gossipTopicNames[:]); err != nil {
-		return err
-	}
-	if err := m.p2p.ConnectToPeers(ctx, m.Config.PeerMultiaddrs); err != nil {
-		return err
-	}
+	m.p2p = p2p.NewP2P(p2pConfig)
 
 	g, errctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return m.p2p.Run(errctx, gossipTopicNames[:])
+	})
 	g.Go(func() error {
 		return m.listen(errctx)
 	})
@@ -50,23 +48,9 @@ func (m *MockNode) Run(ctx context.Context) error {
 }
 
 func (m *MockNode) listen(ctx context.Context) error {
-	messages := make(chan *p2p.Message)
-	for _, topic := range m.p2p.TopicGossips {
-		go func(t *p2p.TopicGossip) {
-			for {
-				select {
-				case msg := <-t.Messages:
-					messages <- msg
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(topic)
-	}
-
 	for {
 		select {
-		case msg := <-messages:
+		case msg := <-m.p2p.GossipMessages:
 			log.Printf("received message from %s: %s", msg.SenderID, msg.Message)
 		case <-ctx.Done():
 			return ctx.Err()
@@ -116,7 +100,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 	}
-	return m.p2p.TopicGossips["decryptionTrigger"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "decryptionTrigger", msg.String())
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
@@ -131,7 +115,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 		EpochID:    epochID,
 		Data:       data,
 	}
-	return m.p2p.TopicGossips["cipherBatch"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "cipherBatch", msg.String())
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
@@ -145,5 +129,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 		EpochID:    epochID,
 		Key:        g1.Marshal(),
 	}
-	return m.p2p.TopicGossips["decryptionKey"].Publish(ctx, msg.String())
+	return m.p2p.Publish(ctx, "decryptionKey", msg.String())
 }

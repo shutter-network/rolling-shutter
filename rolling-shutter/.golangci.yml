@@ -141,13 +141,12 @@ linters:
     - maligned
     - thelper
     - godot
+    - godox
 
   # don't enable:
   # - asciicheck
   # - gochecknoglobals
   # - gocognit
-  # - godot
-  # - godox
   # - goerr113
   # - maligned
   # - nestif
