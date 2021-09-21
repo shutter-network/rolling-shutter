@@ -11,11 +11,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
 var (
@@ -148,11 +150,17 @@ func keyperMain() error {
 		return err
 	}
 
-	if err := keyper.InitP2p(ctx, kc.ListenAddress, kc.PeerMultiaddrs, kc.P2PKey); err != nil {
-		return err
-	}
+	p := p2p.NewP2P(p2p.Config{
+		ListenAddr:     kc.ListenAddress,
+		PeerMultiaddrs: kc.PeerMultiaddrs,
+		PrivKey:        kc.P2PKey,
+	})
 
-	return errors.Errorf("keyper command not implemented")
+	group, ctx := errgroup.WithContext(ctx)
+	group.Go(func() error {
+		return p.Run(ctx, keyper.GossipTopicNames)
+	})
+	return group.Wait()
 }
 
 func initDB() error {
