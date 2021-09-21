@@ -165,6 +165,6 @@ func main() error {
 		return err
 	}
 
-	d := decryptor.NewDecryptor(config)
+	d := decryptor.New(config)
 	return d.Run(ctx)
 }

@@ -26,7 +26,7 @@ type Decryptor struct {
 	outputChannel chan interface{}
 }
 
-func NewDecryptor(config Config) *Decryptor {
+func New(config Config) *Decryptor {
 	p2pConfig := p2p.Config{
 		ListenAddr:     config.ListenAddress,
 		PeerMultiaddrs: config.PeerMultiaddrs,
