@@ -36,7 +36,7 @@ type Config struct {
 	PrivKey        crypto.PrivKey
 }
 
-func NewP2P(config Config) *P2P {
+func New(config Config) *P2P {
 	p := P2P{
 		Config:         config,
 		host:           nil,

@@ -29,7 +29,7 @@ func New(config Config) *Decryptor {
 		PeerMultiaddrs: config.PeerMultiaddrs,
 		PrivKey:        config.P2PKey,
 	}
-	p := p2p.NewP2P(p2pConfig)
+	p := p2p.New(p2pConfig)
 
 	return &Decryptor{
 		Config: config,

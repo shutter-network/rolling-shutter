@@ -53,7 +53,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 	p2ps := []*P2P{}
 	for i := 0; i < numPeers; i++ {
-		p := NewP2P(Config{
+		p := New(Config{
 			ListenAddr:     listenAddrs[i],
 			PeerMultiaddrs: nodeAddrs,
 			PrivKey:        privKeys[i],

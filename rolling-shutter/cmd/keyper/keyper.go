@@ -150,7 +150,7 @@ func keyperMain() error {
 		return err
 	}
 
-	p := p2p.NewP2P(p2p.Config{
+	p := p2p.New(p2p.Config{
 		ListenAddr:     kc.ListenAddress,
 		PeerMultiaddrs: kc.PeerMultiaddrs,
 		PrivKey:        kc.P2PKey,

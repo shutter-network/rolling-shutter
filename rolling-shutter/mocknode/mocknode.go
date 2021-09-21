@@ -34,7 +34,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 		PeerMultiaddrs: m.Config.PeerMultiaddrs,
 		PrivKey:        m.Config.P2PKey,
 	}
-	m.p2p = p2p.NewP2P(p2pConfig)
+	m.p2p = p2p.New(p2pConfig)
 
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
