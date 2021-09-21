@@ -21,9 +21,6 @@ type Decryptor struct {
 
 	p2p *p2p.P2P
 	db  *dcrdb.Queries
-
-	inputChannel  <-chan interface{}
-	outputChannel chan interface{}
 }
 
 func New(config Config) *Decryptor {
@@ -39,9 +36,6 @@ func New(config Config) *Decryptor {
 
 		p2p: p,
 		db:  nil,
-
-		inputChannel:  make(<-chan interface{}),
-		outputChannel: make(chan interface{}),
 	}
 }
 
