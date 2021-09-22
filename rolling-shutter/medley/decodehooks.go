@@ -1,10 +1,13 @@
 package medley
 
 import (
+	"encoding/hex"
 	"reflect"
 
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	multiaddr "github.com/multiformats/go-multiaddr"
+
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
 // MultiaddrHook is a mapstructure decode hook for multiaddrs.
@@ -36,4 +39,25 @@ func P2PKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, 
 		return nil, err
 	}
 	return privkey, nil
+}
+
+func BLSSecretKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+
+	if t != reflect.TypeOf((*shbls.SecretKey)(nil)).Elem() {
+		return data, nil
+	}
+
+	b, err := hex.DecodeString(data.(string))
+	if err != nil {
+		return nil, err
+	}
+
+	key := new(shbls.SecretKey)
+	if err := key.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return key, nil
 }

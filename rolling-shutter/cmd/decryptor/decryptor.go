@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
@@ -136,11 +137,16 @@ func exampleConfig() (*decryptor.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	signingKey, _, err := shbls.RandomKeyPair(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
 	return &decryptor.Config{
 		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "",
 		P2PKey:         p2pkey,
+		SigningKey:     signingKey,
 	}, nil
 }
 

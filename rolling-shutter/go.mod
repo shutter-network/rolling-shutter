@@ -45,7 +45,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/shirou/gopsutil v3.21.8+incompatible // indirect
-	github.com/shutter-network/shutter/shlib v0.1.6
+	github.com/shutter-network/shutter/shlib v0.1.7
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
@@ -57,7 +57,7 @@ require (
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20210913180222-943fd674d43e // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210921065528-437939a70204 // indirect
