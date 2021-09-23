@@ -53,10 +53,41 @@ func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
 		case msg := <-m.p2p.GossipMessages:
-			log.Printf("received message on topic %s from %s: %X", msg.Topic, msg.SenderID, msg.Message)
+			m.handleMessage(msg)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
+	switch plainMsg.Topic {
+	case "decryptionSignature":
+		msg := shmsg.AggregatedDecryptionSignature{}
+		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
+			log.Printf(
+				"received invalid message on topic %s from %s: %X",
+				plainMsg.Topic,
+				plainMsg.SenderID,
+				plainMsg.Message,
+			)
+		}
+		log.Printf(
+			"received decryption signature from %s for instance %d and epoch %d: signed hash %X, bitfield %X, sig %X",
+			plainMsg.SenderID,
+			msg.InstanceID,
+			msg.EpochID,
+			msg.SignedHash,
+			msg.SignerBitfield,
+			msg.AggregatedSignature,
+		)
+	default:
+		log.Printf(
+			"received message on topic %s from %s: %X",
+			plainMsg.Topic,
+			plainMsg.SenderID,
+			plainMsg.Message,
+		)
 	}
 }
 
