@@ -123,7 +123,7 @@ func TestDecryptionSignature(t *testing.T) {
 }
 
 func TestEonStarted(t *testing.T) {
-	ev := &shutterevents.EonStarted{Eon: eon, BatchIndex: 9999}
+	ev := &shutterevents.EonStarted{Eon: eon, BatchIndex: 9999, ConfigIndex: 567}
 	roundtrip(t, ev)
 }
 

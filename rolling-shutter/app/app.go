@@ -369,10 +369,11 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 		events = append(events, bc.MakeABCIEvent())
 		if app.ShouldStartDKG(bc) {
 			dkg := app.StartDKG(bc)
-			batchIndex := app.LastConfig().StartBatchIndex
+			lastConfig := app.LastConfig()
 			events = append(events, shutterevents.EonStarted{
-				Eon:        dkg.Eon,
-				BatchIndex: batchIndex,
+				Eon:         dkg.Eon,
+				BatchIndex:  lastConfig.StartBatchIndex,
+				ConfigIndex: lastConfig.ConfigIndex,
 			}.MakeABCIEvent())
 		}
 	}
@@ -472,8 +473,9 @@ func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender co
 		Code: 0,
 		Events: []abcitypes.Event{
 			shutterevents.EonStarted{
-				Eon:        dkg.Eon,
-				BatchIndex: startBatchIndex,
+				Eon:         dkg.Eon,
+				BatchIndex:  startBatchIndex,
+				ConfigIndex: config.ConfigIndex,
 			}.MakeABCIEvent(),
 		},
 	}
