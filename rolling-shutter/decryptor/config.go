@@ -21,6 +21,8 @@ type Config struct {
 
 	P2PKey     crypto.PrivKey
 	SigningKey *shbls.SecretKey
+
+	InstanceID uint64
 }
 
 var configTemplate = `# Shutter decryptor config for /p2p/{{ .P2PKey | P2PKeyPublic}}
@@ -36,6 +38,9 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 # Secret Keys
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
+
+# ID shared by all shutter participants for common instance
+InstanceID = "{{ .InstanceID }}"
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("decryptor", configTemplate)

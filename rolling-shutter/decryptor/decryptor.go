@@ -20,8 +20,9 @@ var gossipTopicNames = [3]string{"cipherBatch", "decryptionKey", "decryptionSign
 type Decryptor struct {
 	Config Config
 
-	p2p *p2p.P2P
-	db  *dcrdb.Queries
+	p2p        *p2p.P2P
+	db         *dcrdb.Queries
+	instanceID uint64
 }
 
 func New(config Config) *Decryptor {
@@ -35,8 +36,9 @@ func New(config Config) *Decryptor {
 	return &Decryptor{
 		Config: config,
 
-		p2p: p,
-		db:  nil,
+		p2p:        p,
+		db:         nil,
+		instanceID: config.InstanceID,
 	}
 }
 
@@ -125,6 +127,7 @@ func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error
 	switch msgTyped := msg.(type) {
 	case *shmsg.AggregatedDecryptionSignature:
 		topic = "decryptionSignature"
+		msgTyped.InstanceID = d.instanceID
 		msgBytes, err = proto.Marshal(msgTyped)
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal decryption signature message")
