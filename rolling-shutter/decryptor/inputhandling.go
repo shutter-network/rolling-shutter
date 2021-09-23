@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -68,25 +68,45 @@ func handleEpoch(
 		return nil, err
 	}
 
-	key, err := db.GetDecryptionKey(ctx, epochIDBytes)
+	decryptionKeyDB, err := db.GetDecryptionKey(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
 
-	signature, err := signBatch(ctx, cipherBatch, key)
+	log.Printf("decrypting batch for epoch %d", epochID)
+
+	decryptionKey := new(shcrypto.EpochSecretKey)
+	err = decryptionKey.GobDecode(decryptionKeyDB.Key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "invalid decryption key for epoch %d in db", epochID)
 	}
 
-	tag, err := db.InsertDecryptionSignature(ctx, dcrdb.InsertDecryptionSignatureParams(signature))
+	decryptedBatch := decryptCipherBatch(cipherBatch.Data, decryptionKey)
+	signingData := decryptionSigningData{
+		instanceID:     0,
+		epochID:        epochID,
+		cipherBatch:    cipherBatch.Data,
+		decryptedBatch: decryptedBatch,
+	}
+	signedHash := signingData.hash().Bytes()
+	signatureBytes := signingData.sign(config.SigningKey).Marshal()
+	signerIndex := int64(0) // TODO: find this value
+
+	insertParams := dcrdb.InsertDecryptionSignatureParams{
+		EpochID:     epochIDBytes,
+		SignedHash:  signedHash,
+		SignerIndex: signerIndex,
+		Signature:   signatureBytes,
+	}
+	tag, err := db.InsertDecryptionSignature(ctx, insertParams)
 	if err != nil {
 		return nil, err
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple signatures with same (epoch id, signer index): (%d, %d)",
-			signature.EpochID, signature.SignerIndex)
+			epochID, signerIndex)
 		return nil, nil
 	}
 
@@ -94,23 +114,10 @@ func handleEpoch(
 	// TODO: handle instanceID and signer bitfield
 	msgs = append(msgs, &shmsg.AggregatedDecryptionSignature{
 		InstanceID:          0,
-		EpochID:             medley.BytesEpochIDToUint64(signature.EpochID),
-		SignedHash:          signature.SignedHash,
-		AggregatedSignature: signature.Signature,
-		SignerBitfield:      []byte(""),
+		EpochID:             epochID,
+		SignedHash:          signedHash,
+		AggregatedSignature: signatureBytes,
+		SignerBitfield:      []byte(""), // TODO
 	})
 	return msgs, nil
-}
-
-func signBatch(
-	_ context.Context, cipherBatch dcrdb.DecryptorCipherBatch, _ dcrdb.DecryptorDecryptionKey) (
-	dcrdb.DecryptorDecryptionSignature,
-	error) { //nolint //The error is always nil only because it is placeholder
-	// TODO: handle signer index
-	return dcrdb.DecryptorDecryptionSignature{
-		EpochID:     cipherBatch.EpochID,
-		SignedHash:  []byte("Placeholder"),
-		SignerIndex: 0,
-		Signature:   []byte("Placeholder"),
-	}, nil
 }

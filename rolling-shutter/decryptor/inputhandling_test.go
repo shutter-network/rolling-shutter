@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"testing"
 
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
@@ -127,9 +129,14 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
+	_, keyG1, err := bn256.RandomG1(rand.Reader)
+	assert.NilError(t, err)
+	key := (*shcrypto.EpochSecretKey)(keyG1)
+	keyEncoded, err := key.GobEncode()
+	assert.NilError(t, err)
 	keyMsg := &shmsg.DecryptionKey{
 		EpochID: 123,
-		Key:     []byte("hello"),
+		Key:     keyEncoded,
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)
