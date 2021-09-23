@@ -1,6 +1,7 @@
 package medley
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"text/template"
@@ -9,6 +10,8 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	multiaddr "github.com/multiformats/go-multiaddr"
+
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
 func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
@@ -19,6 +22,11 @@ func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
 func p2pKey(privkey p2pcrypto.PrivKey) string {
 	d, _ := p2pcrypto.MarshalPrivateKey(privkey)
 	return p2pcrypto.ConfigEncodeKey(d)
+}
+
+func blsSecretKey(secretKey *shbls.SecretKey) string {
+	b := secretKey.Marshal()
+	return hex.EncodeToString(b)
 }
 
 func quoteList(lst []multiaddr.Multiaddr) string {
@@ -39,6 +47,7 @@ func MustBuildTemplate(name, content string) *template.Template {
 		"QuoteList":    quoteList,
 		"P2PKey":       p2pKey,
 		"P2PKeyPublic": p2pKeyPublic,
+		"BLSSecretKey": blsSecretKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)

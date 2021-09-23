@@ -9,14 +9,18 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
 type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
-	DatabaseURL    string
-	P2PKey         crypto.PrivKey
+
+	DatabaseURL string
+
+	P2PKey     crypto.PrivKey
+	SigningKey *shbls.SecretKey
 }
 
 var configTemplate = `# Shutter decryptor config for /p2p/{{ .P2PKey | P2PKeyPublic}}
@@ -31,6 +35,7 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 
 # Secret Keys
 P2PKey          = "{{ .P2PKey | P2PKey}}"
+SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("decryptor", configTemplate)
@@ -48,6 +53,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
+				medley.BLSSecretKeyHook,
 			),
 		),
 	)

@@ -87,13 +87,13 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 		if err := proto.Unmarshal(msg.Message, &decryptionKeyMsg); err != nil {
 			return errors.Wrap(err, "failed to unmarshal decryption key message")
 		}
-		msgsOut, err = handleDecryptionKeyInput(ctx, d.db, &decryptionKeyMsg)
+		msgsOut, err = handleDecryptionKeyInput(ctx, d.Config, d.db, &decryptionKeyMsg)
 	case "cipherBatch":
 		cipherBatchMsg := shmsg.CipherBatch{}
 		if err := proto.Unmarshal(msg.Message, &cipherBatchMsg); err != nil {
 			return errors.Wrap(err, "failed to unmarshal cipher batch message")
 		}
-		msgsOut, err = handleCipherBatchInput(ctx, d.db, &cipherBatchMsg)
+		msgsOut, err = handleCipherBatchInput(ctx, d.Config, d.db, &cipherBatchMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
 		return nil

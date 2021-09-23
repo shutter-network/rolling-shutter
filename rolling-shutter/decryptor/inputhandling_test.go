@@ -3,14 +3,37 @@ package decryptor
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"testing"
 
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	crypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
+
+func newTestConfig(t *testing.T) Config {
+	t.Helper()
+
+	p2pKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	assert.NilError(t, err)
+	signingKey, _, err := shbls.RandomKeyPair(rand.Reader)
+	assert.NilError(t, err)
+	return Config{
+		ListenAddress:  nil,
+		PeerMultiaddrs: nil,
+
+		DatabaseURL: "",
+
+		P2PKey:     p2pKey,
+		SigningKey: signingKey,
+	}
+}
 
 func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	if testing.Short() {
@@ -20,12 +43,13 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
+	config := newTestConfig(t)
 
 	m := &shmsg.DecryptionKey{
 		EpochID: 100,
 		Key:     []byte("hello"),
 	}
-	msgs, err := handleDecryptionKeyInput(ctx, db, m)
+	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
 	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -39,7 +63,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 		EpochID: 100,
 		Key:     []byte("hello2"),
 	}
-	msgs, err = handleDecryptionKeyInput(ctx, db, m2)
+	msgs, err = handleDecryptionKeyInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
 	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -57,12 +81,13 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
+	config := newTestConfig(t)
 
 	m := &shmsg.CipherBatch{
 		EpochID: 100,
 		Data:    []byte("hello"),
 	}
-	msgs, err := handleCipherBatchInput(ctx, db, m)
+	msgs, err := handleCipherBatchInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
 	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -76,7 +101,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 		EpochID: 100,
 		Data:    []byte("hello2"),
 	}
-	msgs, err = handleCipherBatchInput(ctx, db, m2)
+	msgs, err = handleCipherBatchInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
 	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
@@ -94,20 +119,26 @@ func TestHandleEpochIntegration(t *testing.T) {
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
+	config := newTestConfig(t)
 
 	cipherBatchMsg := &shmsg.CipherBatch{
 		EpochID: 123,
 		Data:    []byte("hello"),
 	}
-	msgs, err := handleCipherBatchInput(ctx, db, cipherBatchMsg)
+	msgs, err := handleCipherBatchInput(ctx, config, db, cipherBatchMsg)
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
+	_, keyG1, err := bn256.RandomG1(rand.Reader)
+	assert.NilError(t, err)
+	key := (*shcrypto.EpochSecretKey)(keyG1)
+	keyEncoded, err := key.GobEncode()
+	assert.NilError(t, err)
 	keyMsg := &shmsg.DecryptionKey{
 		EpochID: 123,
-		Key:     []byte("hello"),
+		Key:     keyEncoded,
 	}
-	msgs, err = handleDecryptionKeyInput(ctx, db, keyMsg)
+	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)
 
 	// TODO: handle signer index
