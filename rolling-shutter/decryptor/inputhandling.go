@@ -6,12 +6,19 @@ import (
 
 	"github.com/jackc/pgx/v4"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
+func handleDecryptionKeyInput(
+	ctx context.Context,
+	config Config,
+	db *dcrdb.Queries,
+	key *shmsg.DecryptionKey,
+) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
 		EpochID: medley.Uint64EpochIDToBytes(key.EpochID),
 		Key:     key.Key,
@@ -23,10 +30,15 @@ func handleDecryptionKeyInput(ctx context.Context, db *dcrdb.Queries, key *shmsg
 		log.Printf("attempted to store multiple keys for same epoch %d", key.EpochID)
 		return nil, nil
 	}
-	return handleEpoch(ctx, db, key.EpochID)
+	return handleEpoch(ctx, config, db, key.EpochID)
 }
 
-func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch *shmsg.CipherBatch) ([]shmsg.P2PMessage, error) {
+func handleCipherBatchInput(
+	ctx context.Context,
+	config Config,
+	db *dcrdb.Queries,
+	cipherBatch *shmsg.CipherBatch,
+) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
 		EpochID: medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
 		Data:    cipherBatch.Data,
@@ -38,11 +50,16 @@ func handleCipherBatchInput(ctx context.Context, db *dcrdb.Queries, cipherBatch 
 		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
 		return nil, nil
 	}
-	return handleEpoch(ctx, db, cipherBatch.EpochID)
+	return handleEpoch(ctx, config, db, cipherBatch.EpochID)
 }
 
 // handleEpoch produces, store, and output a signature if we have both the cipher batch and key for given epoch.
-func handleEpoch(ctx context.Context, db *dcrdb.Queries, epochID uint64) ([]shmsg.P2PMessage, error) {
+func handleEpoch(
+	ctx context.Context,
+	config Config,
+	db *dcrdb.Queries,
+	epochID uint64,
+) ([]shmsg.P2PMessage, error) {
 	epochIDBytes := medley.Uint64EpochIDToBytes(epochID)
 	cipherBatch, err := db.GetCipherBatch(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
