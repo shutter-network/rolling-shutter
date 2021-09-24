@@ -128,8 +128,6 @@ func main() error {
 		return err
 	}
 
-	mockNode := mocknode.MockNode{
-		Config: config,
-	}
+	mockNode := mocknode.New(config)
 	return mockNode.Run(ctx)
 }

@@ -27,16 +27,30 @@ type MockNode struct {
 	Config Config
 
 	p2p *p2p.P2P
+
+	plainTxsSent  map[uint64][][]byte
+	cipherTxsSent map[uint64][][]byte
+}
+
+func New(config Config) *MockNode {
+	p2pConfig := p2p.Config{
+		ListenAddr:     config.ListenAddress,
+		PeerMultiaddrs: config.PeerMultiaddrs,
+		PrivKey:        config.P2PKey,
+	}
+	p := p2p.New(p2pConfig)
+
+	return &MockNode{
+		Config: config,
+
+		p2p: p,
+
+		plainTxsSent:  make(map[uint64][][]byte),
+		cipherTxsSent: make(map[uint64][][]byte),
+	}
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
-	p2pConfig := p2p.Config{
-		ListenAddr:     m.Config.ListenAddress,
-		PeerMultiaddrs: m.Config.PeerMultiaddrs,
-		PrivKey:        m.Config.P2PKey,
-	}
-	m.p2p = p2p.New(p2pConfig)
-
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		return m.p2p.Run(errctx, gossipTopicNames[:])
@@ -134,22 +148,22 @@ func computeKeys(epochID uint64) (*shcrypto.EonPublicKey, *shcrypto.EpochSecretK
 	return eonPublicKey, epochSecretKey, nil
 }
 
-func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, error) {
+func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
 	_, err := rand.Read(message[3:])
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate random batch data")
+		return nil, nil, errors.Wrap(err, "failed to generate random batch data")
 	}
 
 	sigma, err := shcrypto.RandomSigma(rand.Reader)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate random sigma")
+		return nil, nil, errors.Wrap(err, "failed to generate random sigma")
 	}
 
 	epochIDG1 := shcrypto.ComputeEpochID(epochID)
 	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
 
-	return encryptedMessage.Marshal(), nil
+	return message, encryptedMessage.Marshal(), nil
 }
 
 func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
@@ -190,27 +204,40 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, eonPublicKey *shcrypto.EonPublicKey) error {
+	if _, ok := m.plainTxsSent[epochID]; ok {
+		return errors.Errorf("cipher batch for epoch %d already sent", epochID)
+	}
 	log.Printf("sending cipher batch for epoch %d", epochID)
 
-	txs := [][]byte{}
+	plainTxs := [][]byte{}
+	cipherTxs := [][]byte{}
 	for i := 0; i < 3; i++ {
-		tx, err := encryptRandomMessage(epochID, eonPublicKey)
+		plainTx, cipherTx, err := encryptRandomMessage(epochID, eonPublicKey)
 		if err != nil {
 			return err
 		}
-		txs = append(txs, tx)
+		plainTxs = append(plainTxs, plainTx)
+		cipherTxs = append(cipherTxs, cipherTx)
 	}
 
 	msg := &shmsg.CipherBatch{
 		InstanceID:   m.Config.InstanceID,
 		EpochID:      epochID,
-		Transactions: txs,
+		Transactions: cipherTxs,
 	}
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, "cipherBatch", msgBytes)
+
+	if err := m.p2p.Publish(ctx, "cipherBatch", msgBytes); err != nil {
+		return err
+	}
+
+	m.plainTxsSent[epochID] = plainTxs
+	m.cipherTxsSent[epochID] = cipherTxs
+
+	return nil
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64, epochSecretKey *shcrypto.EpochSecretKey) error {
