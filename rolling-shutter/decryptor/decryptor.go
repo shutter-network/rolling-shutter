@@ -135,23 +135,20 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 }
 
 func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
-	var err error
-	var topic string
-	var msgBytes []byte
-
+	// TODO: This whole block must be removed, we must not modify the given Message.
 	switch msgTyped := msg.(type) {
 	case *shmsg.AggregatedDecryptionSignature:
-		topic = "decryptionSignature"
 		msgTyped.InstanceID = d.instanceID
-		msgBytes, err = proto.Marshal(msgTyped)
-		if err != nil {
-			return errors.Wrap(err, "failed to marshal decryption signature message")
-		}
 	default:
 		return errors.Errorf("received output message of unknown type: %T", msgTyped)
 	}
 
-	return d.p2p.Publish(ctx, topic, msgBytes)
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal p2p message")
+	}
+
+	return d.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
 
 func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
