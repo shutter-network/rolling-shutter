@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
 var (
@@ -124,14 +125,6 @@ func readConfig() (decryptor.Config, error) {
 	return config, nil
 }
 
-func mustMultiaddr(s string) multiaddr.Multiaddr {
-	a, err := multiaddr.NewMultiaddr(s)
-	if err != nil {
-		panic(err)
-	}
-	return a
-}
-
 func exampleConfig() (*decryptor.Config, error) {
 	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -142,7 +135,7 @@ func exampleConfig() (*decryptor.Config, error) {
 		return nil, err
 	}
 	return &decryptor.Config{
-		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "",
 		P2PKey:         p2pkey,

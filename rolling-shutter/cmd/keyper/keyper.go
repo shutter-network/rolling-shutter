@@ -199,22 +199,14 @@ func initDB() error {
 	return nil
 }
 
-func mustMultiaddr(s string) multiaddr.Multiaddr {
-	a, err := multiaddr.NewMultiaddr(s)
-	if err != nil {
-		panic(err)
-	}
-	return a
-}
-
 func exampleConfig() (*keyper.Config, error) {
 	cfg := &keyper.Config{
 		ShuttermintURL: "http://localhost:26657",
 		DKGPhaseLength: 30,
-		ListenAddress:  mustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{
-			mustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
-			mustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
+			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
 		},
 	}
 	err := cfg.GenerateNewKeys()
