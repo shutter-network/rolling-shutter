@@ -10,11 +10,11 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
-type decryptionSigningData struct {
-	instanceID     uint64
-	epochID        uint64
-	cipherBatch    [][]byte
-	decryptedBatch [][]byte
+type DecryptionSigningData struct {
+	InstanceID     uint64
+	EpochID        uint64
+	CipherBatch    [][]byte
+	DecryptedBatch [][]byte
 }
 
 // hashChain computes a hash over the given slice. The empty slice is mapped to the zero hash. A
@@ -27,32 +27,32 @@ func hashChain(data [][]byte) common.Hash {
 	return common.BytesToHash(h)
 }
 
-// hash computes the hash over the whole struct, which is the data that should be signed.
-func (d decryptionSigningData) hash() common.Hash {
+// Hash computes the Hash over the whole struct, which is the data that should be signed.
+func (d DecryptionSigningData) Hash() common.Hash {
 	s := crypto.NewKeccakState()
 	b := make([]byte, 8)
 
-	binary.BigEndian.PutUint64(b, d.instanceID)
+	binary.BigEndian.PutUint64(b, d.InstanceID)
 	s.Write(b)
 
-	binary.BigEndian.PutUint64(b, d.epochID)
+	binary.BigEndian.PutUint64(b, d.EpochID)
 	s.Write(b)
 
-	s.Write(hashChain(d.cipherBatch).Bytes())
-	s.Write(hashChain(d.decryptedBatch).Bytes())
+	s.Write(hashChain(d.CipherBatch).Bytes())
+	s.Write(hashChain(d.DecryptedBatch).Bytes())
 
 	h := s.Sum([]byte{})
 	return common.BytesToHash(h)
 }
 
-// sign signs the data in the struct with the given secret key.
-func (d decryptionSigningData) sign(secretKey *shbls.SecretKey) *shbls.Signature {
-	return shbls.Sign(d.hash().Bytes(), secretKey)
+// Sign signs the data in the struct with the given secret key.
+func (d DecryptionSigningData) Sign(secretKey *shbls.SecretKey) *shbls.Signature {
+	return shbls.Sign(d.Hash().Bytes(), secretKey)
 }
 
-// verify checks that the given public key created the given signature over the data in the struct.
-func (d decryptionSigningData) verify(signature *shbls.Signature, publicKey *shbls.PublicKey) bool {
-	return shbls.Verify(signature, publicKey, d.hash().Bytes())
+// Verify checks that the given public key created the given signature over the data in the struct.
+func (d DecryptionSigningData) Verify(signature *shbls.Signature, publicKey *shbls.PublicKey) bool {
+	return shbls.Verify(signature, publicKey, d.Hash().Bytes())
 }
 
 func decryptCipherBatch(cipherBatch [][]byte, key *shcrypto.EpochSecretKey) [][]byte {

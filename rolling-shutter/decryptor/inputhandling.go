@@ -84,14 +84,14 @@ func handleEpoch(
 	}
 
 	decryptedBatch := decryptCipherBatch(cipherBatch.Transactions, decryptionKey)
-	signingData := decryptionSigningData{
-		instanceID:     0,
-		epochID:        epochID,
-		cipherBatch:    cipherBatch.Transactions,
-		decryptedBatch: decryptedBatch,
+	signingData := DecryptionSigningData{
+		InstanceID:     0,
+		EpochID:        epochID,
+		CipherBatch:    cipherBatch.Transactions,
+		DecryptedBatch: decryptedBatch,
 	}
-	signedHash := signingData.hash().Bytes()
-	signatureBytes := signingData.sign(config.SigningKey).Marshal()
+	signedHash := signingData.Hash().Bytes()
+	signatureBytes := signingData.Sign(config.SigningKey).Marshal()
 	signerIndex := int64(0) // TODO: find this value
 
 	insertParams := dcrdb.InsertDecryptionSignatureParams{

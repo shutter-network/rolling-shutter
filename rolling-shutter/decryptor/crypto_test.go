@@ -32,27 +32,27 @@ func TestHashChain(t *testing.T) {
 }
 
 func TestSigning(t *testing.T) {
-	d := decryptionSigningData{
-		instanceID:     1,
-		epochID:        2,
-		cipherBatch:    [][]byte{[]byte("ctx1"), []byte("ctx2")},
-		decryptedBatch: [][]byte{[]byte("dtx1"), []byte("dtx2")},
+	d := DecryptionSigningData{
+		InstanceID:     1,
+		EpochID:        2,
+		CipherBatch:    [][]byte{[]byte("ctx1"), []byte("ctx2")},
+		DecryptedBatch: [][]byte{[]byte("dtx1"), []byte("dtx2")},
 	}
 	secretKey, publicKey, err := shbls.RandomKeyPair(rand.Reader)
 	assert.NilError(t, err)
 
-	sig := d.sign(secretKey)
-	assert.Check(t, d.verify(sig, publicKey))
+	sig := d.Sign(secretKey)
+	assert.Check(t, d.Verify(sig, publicKey))
 
-	modD := decryptionSigningData{
-		instanceID:     1,
-		epochID:        2,
-		cipherBatch:    [][]byte{},
-		decryptedBatch: [][]byte{},
+	modD := DecryptionSigningData{
+		InstanceID:     1,
+		EpochID:        2,
+		CipherBatch:    [][]byte{},
+		DecryptedBatch: [][]byte{},
 	}
-	assert.Check(t, d.hash() != modD.hash())
+	assert.Check(t, d.Hash() != modD.Hash())
 
-	modSig := modD.sign(secretKey)
-	assert.Check(t, modD.verify(modSig, publicKey))
-	assert.Check(t, !d.verify(modSig, publicKey))
+	modSig := modD.Sign(secretKey)
+	assert.Check(t, modD.Verify(modSig, publicKey))
+	assert.Check(t, !d.Verify(modSig, publicKey))
 }
