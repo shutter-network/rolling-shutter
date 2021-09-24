@@ -9,6 +9,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
@@ -22,6 +23,8 @@ type Config struct {
 	SendDecryptionTriggers bool
 	SendCipherBatches      bool
 	SendDecryptionKeys     bool
+
+	DecryptorPublicKey *shbls.PublicKey // a public key to verify received decryption signatures against
 }
 
 var configTemplate = `# Shutter mock node config for /p2p/{{ .P2PKey | P2PKeyPublic}}
@@ -39,6 +42,8 @@ Rate                    = {{ .Rate }}
 SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
 SendCipherBatches       = {{ .SendCipherBatches }}
 SendDecryptionKeys      = {{ .SendDecryptionKeys }}
+
+DecryptorPublicKey = "{{ .DecryptorPublicKey | BLSPublicKey }}"
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)
@@ -51,6 +56,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
+				medley.BLSPublicKeyHook,
 			),
 		),
 	)

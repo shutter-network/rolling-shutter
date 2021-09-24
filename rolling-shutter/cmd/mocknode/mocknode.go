@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/mocknode"
 )
@@ -93,6 +94,11 @@ func exampleConfig() (*mocknode.Config, error) {
 		return nil, errors.Wrap(err, "failed to generate random p2p key")
 	}
 
+	_, decryptorPublicKey, err := shbls.RandomKeyPair(rand.Reader)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate random decryptor public key")
+	}
+
 	config := mocknode.Config{
 		ListenAddress:  listenAddress,
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
@@ -103,6 +109,8 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendDecryptionTriggers: true,
 		SendCipherBatches:      true,
 		SendDecryptionKeys:     true,
+
+		DecryptorPublicKey: decryptorPublicKey,
 	}
 	return &config, nil
 }
@@ -128,8 +136,6 @@ func main() error {
 		return err
 	}
 
-	mockNode := mocknode.MockNode{
-		Config: config,
-	}
+	mockNode := mocknode.New(config)
 	return mockNode.Run(ctx)
 }

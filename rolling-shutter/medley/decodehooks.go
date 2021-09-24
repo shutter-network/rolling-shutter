@@ -61,3 +61,24 @@ func BLSSecretKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interfa
 	}
 	return key, nil
 }
+
+func BLSPublicKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+
+	if t != reflect.TypeOf((*shbls.PublicKey)(nil)).Elem() {
+		return data, nil
+	}
+
+	b, err := hex.DecodeString(data.(string))
+	if err != nil {
+		return nil, err
+	}
+
+	key := new(shbls.PublicKey)
+	if err := key.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return key, nil
+}

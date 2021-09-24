@@ -1,10 +1,12 @@
 package mocknode
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"log"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,6 +14,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -26,17 +30,33 @@ var gossipTopicNames = [4]string{
 type MockNode struct {
 	Config Config
 
+	mux sync.Mutex
+
 	p2p *p2p.P2P
+
+	plainTxsSent  map[uint64][][]byte
+	cipherTxsSent map[uint64][][]byte
+}
+
+func New(config Config) *MockNode {
+	p2pConfig := p2p.Config{
+		ListenAddr:     config.ListenAddress,
+		PeerMultiaddrs: config.PeerMultiaddrs,
+		PrivKey:        config.P2PKey,
+	}
+	p := p2p.New(p2pConfig)
+
+	return &MockNode{
+		Config: config,
+
+		p2p: p,
+
+		plainTxsSent:  make(map[uint64][][]byte),
+		cipherTxsSent: make(map[uint64][][]byte),
+	}
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
-	p2pConfig := p2p.Config{
-		ListenAddr:     m.Config.ListenAddress,
-		PeerMultiaddrs: m.Config.PeerMultiaddrs,
-		PrivKey:        m.Config.P2PKey,
-	}
-	m.p2p = p2p.New(p2pConfig)
-
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		return m.p2p.Run(errctx, gossipTopicNames[:])
@@ -73,21 +93,61 @@ func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 				plainMsg.Message,
 			)
 		}
-		log.Printf(
-			"received decryption signature from %s for instance %d and epoch %d: signed hash %X, bitfield %X, sig %X",
-			plainMsg.SenderID,
-			msg.InstanceID,
-			msg.EpochID,
-			msg.SignedHash,
-			msg.SignerBitfield,
-			msg.AggregatedSignature,
-		)
+		m.handleDecryptionSignature(&msg, plainMsg.SenderID)
 	default:
 		log.Printf(
 			"received message on topic %s from %s: %X",
 			plainMsg.Topic,
 			plainMsg.SenderID,
 			plainMsg.Message,
+		)
+	}
+}
+
+func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSignature, senderID string) {
+	sig := new(shbls.Signature)
+	err := sig.Unmarshal(msg.AggregatedSignature)
+	if err != nil {
+		log.Printf(
+			"received inunmarshalable decryption signature in epoch %d from %s: %+v",
+			msg.EpochID,
+			senderID,
+			msg,
+		)
+		return
+	}
+
+	validSignature := shbls.Verify(
+		sig,
+		m.Config.DecryptorPublicKey,
+		msg.SignedHash,
+	)
+
+	var expectedCipherBatch [][]byte
+	var expectedDecryptedBatch [][]byte
+	func() {
+		m.mux.Lock()
+		defer m.mux.Unlock()
+		expectedCipherBatch = m.cipherTxsSent[msg.EpochID]
+		expectedDecryptedBatch = m.plainTxsSent[msg.EpochID]
+	}()
+	expectedSigningData := decryptor.DecryptionSigningData{
+		InstanceID:     m.Config.InstanceID,
+		EpochID:        msg.EpochID,
+		CipherBatch:    expectedCipherBatch,
+		DecryptedBatch: expectedDecryptedBatch,
+	}
+	correctSignedHash := bytes.Equal(msg.SignedHash, expectedSigningData.Hash().Bytes())
+
+	if validSignature && correctSignedHash {
+		log.Printf("received valid decryption signature for epoch %d", msg.EpochID)
+	} else {
+		log.Printf(
+			"received invalid decryption signature for epoch %d.\nValid signature: %t\nCorrect signed hash: %t\n%+v",
+			msg.EpochID,
+			validSignature,
+			correctSignedHash,
+			msg,
 		)
 	}
 }
@@ -134,22 +194,22 @@ func computeKeys(epochID uint64) (*shcrypto.EonPublicKey, *shcrypto.EpochSecretK
 	return eonPublicKey, epochSecretKey, nil
 }
 
-func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, error) {
+func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
 	_, err := rand.Read(message[3:])
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate random batch data")
+		return nil, nil, errors.Wrap(err, "failed to generate random batch data")
 	}
 
 	sigma, err := shcrypto.RandomSigma(rand.Reader)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate random sigma")
+		return nil, nil, errors.Wrap(err, "failed to generate random sigma")
 	}
 
 	epochIDG1 := shcrypto.ComputeEpochID(epochID)
 	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
 
-	return encryptedMessage.Marshal(), nil
+	return message, encryptedMessage.Marshal(), nil
 }
 
 func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
@@ -190,27 +250,42 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, eonPublicKey *shcrypto.EonPublicKey) error {
+	if _, ok := m.plainTxsSent[epochID]; ok {
+		return errors.Errorf("cipher batch for epoch %d already sent", epochID)
+	}
 	log.Printf("sending cipher batch for epoch %d", epochID)
 
-	txs := [][]byte{}
+	plainTxs := [][]byte{}
+	cipherTxs := [][]byte{}
 	for i := 0; i < 3; i++ {
-		tx, err := encryptRandomMessage(epochID, eonPublicKey)
+		plainTx, cipherTx, err := encryptRandomMessage(epochID, eonPublicKey)
 		if err != nil {
 			return err
 		}
-		txs = append(txs, tx)
+		plainTxs = append(plainTxs, plainTx)
+		cipherTxs = append(cipherTxs, cipherTx)
 	}
 
 	msg := &shmsg.CipherBatch{
 		InstanceID:   m.Config.InstanceID,
 		EpochID:      epochID,
-		Transactions: txs,
+		Transactions: cipherTxs,
 	}
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, "cipherBatch", msgBytes)
+
+	if err := m.p2p.Publish(ctx, "cipherBatch", msgBytes); err != nil {
+		return err
+	}
+
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	m.plainTxsSent[epochID] = plainTxs
+	m.cipherTxsSent[epochID] = cipherTxs
+
+	return nil
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64, epochSecretKey *shcrypto.EpochSecretKey) error {

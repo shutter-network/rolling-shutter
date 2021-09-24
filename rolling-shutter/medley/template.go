@@ -29,6 +29,11 @@ func blsSecretKey(secretKey *shbls.SecretKey) string {
 	return hex.EncodeToString(b)
 }
 
+func blsPublicKey(publicKey *shbls.PublicKey) string {
+	b := publicKey.Marshal()
+	return hex.EncodeToString(b)
+}
+
 func quoteList(lst []multiaddr.Multiaddr) string {
 	var strlist []string
 	for _, x := range lst {
@@ -48,6 +53,7 @@ func MustBuildTemplate(name, content string) *template.Template {
 		"P2PKey":       p2pKey,
 		"P2PKeyPublic": p2pKeyPublic,
 		"BLSSecretKey": blsSecretKey,
+		"BLSPublicKey": blsPublicKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)
