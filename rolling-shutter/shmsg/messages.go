@@ -15,6 +15,12 @@ type P2PMessage interface {
 	ImplementsP2PMessage()
 }
 
+func (*DecryptionKey) ImplementsP2PMessage() {
+}
+
+func (*CipherBatch) ImplementsP2PMessage() {
+}
+
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 }
 

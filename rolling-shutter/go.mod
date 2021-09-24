@@ -31,7 +31,6 @@ require (
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-noise v0.2.2 // indirect
-	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.2.10 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.5.4
 	github.com/libp2p/go-tcp-transport v0.2.8 // indirect

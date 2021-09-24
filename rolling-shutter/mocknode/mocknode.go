@@ -59,7 +59,7 @@ func New(config Config) *MockNode {
 func (m *MockNode) Run(ctx context.Context) error {
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:])
+		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]p2p.MessageValidator))
 	})
 	g.Go(func() error {
 		return m.listen(errctx)

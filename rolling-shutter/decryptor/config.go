@@ -40,7 +40,7 @@ P2PKey          = "{{ .P2PKey | P2PKey}}"
 SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
 
 # ID shared by all shutter participants for common instance
-InstanceID = "{{ .InstanceID }}"
+InstanceID = {{ .InstanceID }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("decryptor", configTemplate)

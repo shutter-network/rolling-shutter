@@ -92,7 +92,7 @@ func Run(ctx context.Context, config Config) error {
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames)
+		return kpr.p2p.Run(ctx, GossipTopicNames, make(map[string]p2p.MessageValidator))
 	})
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)
