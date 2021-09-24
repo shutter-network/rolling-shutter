@@ -36,8 +36,6 @@ type Config struct {
 	PrivKey        crypto.PrivKey
 }
 
-type MessageValidator func(context.Context, peer.ID, *pubsub.Message) bool
-
 func New(config Config) *P2P {
 	p := P2P{
 		Config:         config,
@@ -49,7 +47,7 @@ func New(config Config) *P2P {
 	return &p
 }
 
-func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[string]MessageValidator) error {
+func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[string]pubsub.Validator) error {
 	defer func() {
 		close(p.GossipMessages)
 	}()
@@ -63,7 +61,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[
 		}
 
 		for topicName, validator := range topicValidators {
-			if err := p.pubSub.RegisterTopicValidator(topicName, (func(context.Context, peer.ID, *pubsub.Message) bool)(validator)); err != nil {
+			if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
 				return err
 			}
 		}

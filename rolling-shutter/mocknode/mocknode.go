@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -59,7 +60,7 @@ func New(config Config) *MockNode {
 func (m *MockNode) Run(ctx context.Context) error {
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]p2p.MessageValidator))
+		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
 	})
 	g.Go(func() error {
 		return m.listen(errctx)

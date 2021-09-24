@@ -154,8 +154,8 @@ func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error
 	return d.p2p.Publish(ctx, topic, msgBytes)
 }
 
-func (d *Decryptor) makeMessagesValidators() map[string]p2p.MessageValidator {
-	validators := make(map[string]p2p.MessageValidator)
+func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
+	validators := make(map[string]pubsub.Validator)
 	instanceIDValidator := makeInstanceIDValidator(d.instanceID)
 	for _, topicName := range gossipTopicNames {
 		validators[topicName] = instanceIDValidator
@@ -164,7 +164,7 @@ func (d *Decryptor) makeMessagesValidators() map[string]p2p.MessageValidator {
 	return validators
 }
 
-func makeInstanceIDValidator(instanceID uint64) p2p.MessageValidator {
+func makeInstanceIDValidator(instanceID uint64) pubsub.Validator {
 	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
 		p2pMessage := new(p2p.Message)
 		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {

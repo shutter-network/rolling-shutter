@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
@@ -92,7 +93,7 @@ func Run(ctx context.Context, config Config) error {
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames, make(map[string]p2p.MessageValidator))
+		return kpr.p2p.Run(ctx, GossipTopicNames, make(map[string]pubsub.Validator))
 	})
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)

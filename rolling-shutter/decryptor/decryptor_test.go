@@ -35,7 +35,7 @@ func TestMessageValidators(t *testing.T) {
 	}
 
 	validators := d.makeMessagesValidators()
-	var emptyValidator p2p.MessageValidator
+	var emptyValidator pubsub.Validator
 
 	for topic, validator := range validators {
 		assert.Equal(t, reflect.TypeOf(validator), reflect.TypeOf(emptyValidator))
