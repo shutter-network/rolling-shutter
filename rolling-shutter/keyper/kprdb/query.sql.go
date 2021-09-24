@@ -82,6 +82,30 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperD
 	return i, err
 }
 
+const getEncryptionKeys = `-- name: GetEncryptionKeys :many
+SELECT address, encryption_public_key from keyper.tendermint_encryption_key
+`
+
+func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncryptionKey, error) {
+	rows, err := q.db.Query(ctx, getEncryptionKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperTendermintEncryptionKey
+	for rows.Next() {
+		var i KeyperTendermintEncryptionKey
+		if err := rows.Scan(&i.Address, &i.EncryptionPublicKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
 SELECT config_index, height, keypers, threshold
 FROM keyper.tendermint_batch_config
@@ -131,6 +155,20 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Keypers,
 		arg.Threshold,
 	)
+	return err
+}
+
+const insertEncryptionKey = `-- name: InsertEncryptionKey :exec
+INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2)
+`
+
+type InsertEncryptionKeyParams struct {
+	Address             string
+	EncryptionPublicKey []byte
+}
+
+func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionKeyParams) error {
+	_, err := q.db.Exec(ctx, insertEncryptionKey, arg.Address, arg.EncryptionPublicKey)
 	return err
 }
 

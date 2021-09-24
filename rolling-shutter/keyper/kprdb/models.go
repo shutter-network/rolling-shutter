@@ -42,6 +42,11 @@ type KeyperTendermintBatchConfig struct {
 	Threshold   int32
 }
 
+type KeyperTendermintEncryptionKey struct {
+	Address             string
+	EncryptionPublicKey []byte
+}
+
 type KeyperTendermintSyncMetum struct {
 	CurrentBlock        int64
 	LastCommittedHeight int64

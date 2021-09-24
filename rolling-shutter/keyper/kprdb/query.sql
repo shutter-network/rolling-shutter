@@ -47,3 +47,9 @@ INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2);
 -- name: UpdatePureDKG :exec
 UPDATE keyper.puredkg
 SET puredkg=$2 WHERE eon=$1;
+
+-- name: InsertEncryptionKey :exec
+INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
+
+-- name: GetEncryptionKeys :many
+SELECT * from keyper.tendermint_encryption_key;
