@@ -1,6 +1,7 @@
 package mocknode
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"log"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -121,15 +123,32 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 		msg.SignedHash,
 	)
 
-	if !validSignature {
+	var expectedCipherBatch [][]byte
+	var expectedDecryptedBatch [][]byte
+	func() {
+		m.mux.Lock()
+		defer m.mux.Unlock()
+		expectedCipherBatch = m.cipherTxsSent[msg.EpochID]
+		expectedDecryptedBatch = m.plainTxsSent[msg.EpochID]
+	}()
+	expectedSigningData := decryptor.DecryptionSigningData{
+		InstanceID:     m.Config.InstanceID,
+		EpochID:        msg.EpochID,
+		CipherBatch:    expectedCipherBatch,
+		DecryptedBatch: expectedDecryptedBatch,
+	}
+	correctSignedHash := bytes.Equal(msg.SignedHash, expectedSigningData.Hash().Bytes())
+
+	if validSignature && correctSignedHash {
+		log.Printf("received valid decryption signature for epoch %d", msg.EpochID)
+	} else {
 		log.Printf(
-			"received invalid decryption signature in epoch %d from %s: %+v",
+			"received invalid decryption signature for epoch %d.\nValid signature: %t\nCorrect signed hash: %t\n%+v",
 			msg.EpochID,
-			senderID,
+			validSignature,
+			correctSignedHash,
 			msg,
 		)
-	} else {
-		log.Printf("received valid decryption signature in epoch %d", msg.EpochID)
 	}
 }
 
