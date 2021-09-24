@@ -1,4 +1,4 @@
--- schema-version: 2 --
+-- schema-version: 3 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS decryptor;
 
 CREATE TABLE IF NOT EXISTS decryptor.cipher_batch (
        epoch_id bytea PRIMARY KEY,
-       data bytea
+       transactions bytea[]
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryption_key (
        epoch_id bytea PRIMARY KEY,

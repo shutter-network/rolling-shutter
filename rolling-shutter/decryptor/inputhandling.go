@@ -40,8 +40,8 @@ func handleCipherBatchInput(
 	cipherBatch *shmsg.CipherBatch,
 ) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
-		EpochID: medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
-		Data:    cipherBatch.Data,
+		EpochID:      medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
+		Transactions: cipherBatch.Transactions,
 	})
 	if err != nil {
 		return nil, err
@@ -83,11 +83,11 @@ func handleEpoch(
 		return nil, errors.Wrapf(err, "invalid decryption key for epoch %d in db", epochID)
 	}
 
-	decryptedBatch := decryptCipherBatch(cipherBatch.Data, decryptionKey)
+	decryptedBatch := decryptCipherBatch(cipherBatch.Transactions, decryptionKey)
 	signingData := decryptionSigningData{
 		instanceID:     0,
 		epochID:        epochID,
-		cipherBatch:    cipherBatch.Data,
+		cipherBatch:    cipherBatch.Transactions,
 		decryptedBatch: decryptedBatch,
 	}
 	signedHash := signingData.hash().Bytes()

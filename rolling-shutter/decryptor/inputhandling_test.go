@@ -84,8 +84,8 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	config := newTestConfig(t)
 
 	m := &shmsg.CipherBatch{
-		EpochID: 100,
-		Data:    []byte("hello"),
+		EpochID:      100,
+		Transactions: [][]byte{[]byte("tx1"), []byte("tx2")},
 	}
 	msgs, err := handleCipherBatchInput(ctx, config, db, m)
 	assert.NilError(t, err)
@@ -93,20 +93,19 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	assert.NilError(t, err)
 	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.EpochID)
-	assert.Check(t, bytes.Equal(mStored.Data, m.Data))
-
+	assert.DeepEqual(t, mStored.Transactions, m.Transactions)
 	assert.Check(t, len(msgs) == 0)
 
 	m2 := &shmsg.CipherBatch{
-		EpochID: 100,
-		Data:    []byte("hello2"),
+		EpochID:      100,
+		Transactions: [][]byte{[]byte("tx3")},
 	}
 	msgs, err = handleCipherBatchInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
 	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
 	assert.NilError(t, err)
-	assert.Check(t, bytes.Equal(m2Stored.Data, m.Data))
+	assert.DeepEqual(t, m2Stored.Transactions, m.Transactions)
 
 	assert.Check(t, len(msgs) == 0)
 }
@@ -122,8 +121,8 @@ func TestHandleEpochIntegration(t *testing.T) {
 	config := newTestConfig(t)
 
 	cipherBatchMsg := &shmsg.CipherBatch{
-		EpochID: 123,
-		Data:    []byte("hello"),
+		EpochID:      123,
+		Transactions: [][]byte{[]byte("tx1")},
 	}
 	msgs, err := handleCipherBatchInput(ctx, config, db, cipherBatchMsg)
 	assert.NilError(t, err)

@@ -13,8 +13,18 @@ import (
 type decryptionSigningData struct {
 	instanceID     uint64
 	epochID        uint64
-	cipherBatch    []byte
-	decryptedBatch []byte
+	cipherBatch    [][]byte
+	decryptedBatch [][]byte
+}
+
+// hashChain computes a hash over the given slice. The empty slice is mapped to the zero hash. A
+// non-empty slice is mapped to `keccak256(data[-1], hashChain(data[:-1]))``.
+func hashChain(data [][]byte) common.Hash {
+	h := make([]byte, 32)
+	for _, d := range data {
+		h = crypto.Keccak256(d, h)
+	}
+	return common.BytesToHash(h)
 }
 
 // hash computes the hash over the whole struct, which is the data that should be signed.
@@ -28,13 +38,8 @@ func (d decryptionSigningData) hash() common.Hash {
 	binary.BigEndian.PutUint64(b, d.epochID)
 	s.Write(b)
 
-	binary.BigEndian.PutUint64(b, uint64(len(d.cipherBatch)))
-	s.Write(b)
-	s.Write(d.cipherBatch)
-
-	binary.BigEndian.PutUint64(b, uint64(len(d.decryptedBatch)))
-	s.Write(b)
-	s.Write(d.decryptedBatch)
+	s.Write(hashChain(d.cipherBatch).Bytes())
+	s.Write(hashChain(d.decryptedBatch).Bytes())
 
 	h := s.Sum([]byte{})
 	return common.BytesToHash(h)
@@ -50,17 +55,24 @@ func (d decryptionSigningData) verify(signature *shbls.Signature, publicKey *shb
 	return shbls.Verify(signature, publicKey, d.hash().Bytes())
 }
 
-func decryptCipherBatch(cipherBatch []byte, key *shcrypto.EpochSecretKey) []byte {
-	// TODO: cipher batches contain many txs that should be decrypted individually. For now, we
-	// just pretend it's a single one.
-	encryptedMessage := shcrypto.EncryptedMessage{}
-	if err := encryptedMessage.Unmarshal(cipherBatch); err != nil {
-		return []byte{}
+func decryptCipherBatch(cipherBatch [][]byte, key *shcrypto.EpochSecretKey) [][]byte {
+	decryptedBatch := make([][]byte, len(cipherBatch))
+
+	for i, tx := range cipherBatch {
+		encryptedMessage := shcrypto.EncryptedMessage{}
+		if err := encryptedMessage.Unmarshal(tx); err != nil {
+			decryptedBatch[i] = []byte{}
+			continue
+		}
+
+		decryptedTx, err := encryptedMessage.Decrypt(key)
+		if err != nil {
+			decryptedBatch[i] = []byte{}
+			continue
+		}
+
+		decryptedBatch[i] = decryptedTx
 	}
 
-	decryptedBatch, err := encryptedMessage.Decrypt(key)
-	if err != nil {
-		return []byte{}
-	}
 	return decryptedBatch
 }

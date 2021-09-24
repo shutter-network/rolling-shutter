@@ -192,15 +192,19 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, eonPublicKey *shcrypto.EonPublicKey) error {
 	log.Printf("sending cipher batch for epoch %d", epochID)
 
-	cipherBatch, err := encryptRandomMessage(epochID, eonPublicKey)
-	if err != nil {
-		return err
+	txs := [][]byte{}
+	for i := 0; i < 3; i++ {
+		tx, err := encryptRandomMessage(epochID, eonPublicKey)
+		if err != nil {
+			return err
+		}
+		txs = append(txs, tx)
 	}
 
 	msg := &shmsg.CipherBatch{
-		InstanceID: m.Config.InstanceID,
-		EpochID:    epochID,
-		Data:       cipherBatch,
+		InstanceID:   m.Config.InstanceID,
+		EpochID:      epochID,
+		Transactions: txs,
 	}
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {

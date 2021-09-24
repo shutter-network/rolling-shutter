@@ -4,7 +4,7 @@ WHERE epoch_id = $1;
 
 -- name: InsertCipherBatch :execresult
 INSERT INTO decryptor.cipher_batch (
-    epoch_id, data
+    epoch_id, transactions
 ) VALUES (
     $1, $2
 )

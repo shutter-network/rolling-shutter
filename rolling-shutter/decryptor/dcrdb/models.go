@@ -5,8 +5,8 @@ package dcrdb
 import ()
 
 type DecryptorCipherBatch struct {
-	EpochID []byte
-	Data    []byte
+	EpochID      []byte
+	Transactions [][]byte
 }
 
 type DecryptorDecryptionKey struct {

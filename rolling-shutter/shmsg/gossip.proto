@@ -17,7 +17,7 @@ message DecryptionKey {
 message CipherBatch {
     uint64 instanceID = 1;
     uint64 epochID = 2;
-    bytes data = 3;
+    repeated bytes transactions = 3;
 }
 
 message AggregatedDecryptionSignature {

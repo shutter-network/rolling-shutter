@@ -10,14 +10,14 @@ import (
 )
 
 const getCipherBatch = `-- name: GetCipherBatch :one
-SELECT epoch_id, data FROM decryptor.cipher_batch
+SELECT epoch_id, transactions FROM decryptor.cipher_batch
 WHERE epoch_id = $1
 `
 
 func (q *Queries) GetCipherBatch(ctx context.Context, epochID []byte) (DecryptorCipherBatch, error) {
 	row := q.db.QueryRow(ctx, getCipherBatch, epochID)
 	var i DecryptorCipherBatch
-	err := row.Scan(&i.EpochID, &i.Data)
+	err := row.Scan(&i.EpochID, &i.Transactions)
 	return i, err
 }
 
@@ -68,7 +68,7 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (DecryptorMetaInf, er
 
 const insertCipherBatch = `-- name: InsertCipherBatch :execresult
 INSERT INTO decryptor.cipher_batch (
-    epoch_id, data
+    epoch_id, transactions
 ) VALUES (
     $1, $2
 )
@@ -76,12 +76,12 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertCipherBatchParams struct {
-	EpochID []byte
-	Data    []byte
+	EpochID      []byte
+	Transactions [][]byte
 }
 
 func (q *Queries) InsertCipherBatch(ctx context.Context, arg InsertCipherBatchParams) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, insertCipherBatch, arg.EpochID, arg.Data)
+	return q.db.Exec(ctx, insertCipherBatch, arg.EpochID, arg.Transactions)
 }
 
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
