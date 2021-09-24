@@ -21,17 +21,17 @@ var CreateKeyperTables string
 // schemaVersion is used to check that we use the right schema.
 var schemaVersion = shdb.MustFindSchemaVersion(CreateKeyperTables, "kprdb/schema.sql")
 
-func initKeyperDB(ctx context.Context, tx pgx.Tx, q *Queries) error {
+func initKeyperDB(ctx context.Context, tx pgx.Tx, queries *Queries) error {
 	_, err := tx.Exec(ctx, CreateKeyperTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
 	}
 
-	err = q.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+	err = queries.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
-	err = q.TMSetSyncMeta(ctx, TMSetSyncMetaParams{
+	err = queries.TMSetSyncMeta(ctx, TMSetSyncMetaParams{
 		CurrentBlock:        -1,
 		LastCommittedHeight: -1,
 		SyncTimestamp:       time.Now(),
@@ -48,8 +48,8 @@ func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start tx")
 	}
-	q := New(dbpool).WithTx(tx)
-	err = initKeyperDB(ctx, tx, q)
+	queries := New(dbpool).WithTx(tx)
+	err = initKeyperDB(ctx, tx, queries)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
