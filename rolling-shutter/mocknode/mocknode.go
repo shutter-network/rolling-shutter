@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"log"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,6 +27,8 @@ var gossipTopicNames = [4]string{
 
 type MockNode struct {
 	Config Config
+
+	mux sync.Mutex
 
 	p2p *p2p.P2P
 
@@ -258,6 +261,8 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, e
 		return err
 	}
 
+	m.mux.Lock()
+	defer m.mux.Unlock()
 	m.plainTxsSent[epochID] = plainTxs
 	m.cipherTxsSent[epochID] = cipherTxs
 
