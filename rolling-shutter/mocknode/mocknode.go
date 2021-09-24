@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -87,15 +88,7 @@ func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 				plainMsg.Message,
 			)
 		}
-		log.Printf(
-			"received decryption signature from %s for instance %d and epoch %d: signed hash %X, bitfield %X, sig %X",
-			plainMsg.SenderID,
-			msg.InstanceID,
-			msg.EpochID,
-			msg.SignedHash,
-			msg.SignerBitfield,
-			msg.AggregatedSignature,
-		)
+		m.handleDecryptionSignature(&msg, plainMsg.SenderID)
 	default:
 		log.Printf(
 			"received message on topic %s from %s: %X",
@@ -103,6 +96,37 @@ func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 			plainMsg.SenderID,
 			plainMsg.Message,
 		)
+	}
+}
+
+func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSignature, senderID string) {
+	sig := new(shbls.Signature)
+	err := sig.Unmarshal(msg.AggregatedSignature)
+	if err != nil {
+		log.Printf(
+			"received inunmarshalable decryption signature in epoch %d from %s: %+v",
+			msg.EpochID,
+			senderID,
+			msg,
+		)
+		return
+	}
+
+	validSignature := shbls.Verify(
+		sig,
+		m.Config.DecryptorPublicKey,
+		msg.SignedHash,
+	)
+
+	if !validSignature {
+		log.Printf(
+			"received invalid decryption signature in epoch %d from %s: %+v",
+			msg.EpochID,
+			senderID,
+			msg,
+		)
+	} else {
+		log.Printf("received valid decryption signature in epoch %d", msg.EpochID)
 	}
 }
 

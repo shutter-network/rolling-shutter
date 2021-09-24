@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -40,6 +41,11 @@ func New(config Config) *Decryptor {
 }
 
 func (d *Decryptor) Run(ctx context.Context) error {
+	log.Printf(
+		"starting keyper with signing public key %X",
+		shbls.SecretToPublicKey(d.Config.SigningKey).Marshal(),
+	)
+
 	dbpool, err := pgxpool.Connect(ctx, d.Config.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
