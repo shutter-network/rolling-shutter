@@ -13,6 +13,7 @@ import (
 // P2PMessage can be send via the p2p protocol.
 type P2PMessage interface {
 	ImplementsP2PMessage()
+	GetInstanceID() uint64
 }
 
 func (*DecryptionKey) ImplementsP2PMessage() {

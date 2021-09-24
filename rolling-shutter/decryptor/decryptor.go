@@ -105,7 +105,7 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 	var msgsOut []shmsg.P2PMessage
 	var err error
 
-	unmarshalled, err := unMarshalP2PMessage(msg)
+	unmarshalled, err := unmarshalP2PMessage(msg)
 	if topicError, ok := err.(*unhandledTopicError); ok {
 		log.Println(topicError.Error())
 	} else if err != nil {
@@ -170,24 +170,15 @@ func makeInstanceIDValidator(instanceID uint64) pubsub.Validator {
 		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 			return false
 		}
-		unMarshalledMessage, err := unMarshalP2PMessage(p2pMessage)
+		msg, err := unmarshalP2PMessage(p2pMessage)
 		if err != nil {
 			return false
 		}
-		switch m := unMarshalledMessage.(type) {
-		case *shmsg.DecryptionKey:
-			return m.InstanceID == instanceID
-		case *shmsg.CipherBatch:
-			return m.InstanceID == instanceID
-		case *shmsg.AggregatedDecryptionSignature:
-			return m.InstanceID == instanceID
-		default:
-			panic(fmt.Sprintf("Unmarshalled received message of unknown type: %T", unMarshalledMessage))
-		}
+		return msg.GetInstanceID() == instanceID
 	}
 }
 
-func unMarshalP2PMessage(msg *p2p.Message) (shmsg.P2PMessage, error) {
+func unmarshalP2PMessage(msg *p2p.Message) (shmsg.P2PMessage, error) {
 	if msg == nil {
 		return nil, nil
 	}
