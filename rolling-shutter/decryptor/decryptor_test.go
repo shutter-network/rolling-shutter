@@ -3,13 +3,11 @@ package decryptor
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 
@@ -20,73 +18,83 @@ import (
 func TestMessageValidators(t *testing.T) {
 	ctx := context.Background()
 	var peerID peer.ID
-	validID := uint64(1)
-	wrongID := uint64(0)
-	cfg := Config{
-		InstanceID: validID,
-	}
-	d := New(cfg)
-
-	validMessage := shmsg.DecryptionKey{
-		InstanceID: validID,
-	}
-	wrongMessage := shmsg.DecryptionKey{
-		InstanceID: wrongID,
-	}
-
+	d := New(Config{
+		InstanceID: 123,
+	})
 	validators := d.makeMessagesValidators()
-	var emptyValidator pubsub.Validator
-
-	for topic, validator := range validators {
-		assert.Equal(t, reflect.TypeOf(validator), reflect.TypeOf(emptyValidator))
-
-		validPubsubMessage, err := makePubSubMessage(&validMessage, topic)
+	tests := []struct {
+		valid bool
+		msg   shmsg.P2PMessage
+	}{
+		{
+			valid: true,
+			msg: &shmsg.DecryptionKey{
+				InstanceID: d.instanceID,
+			},
+		},
+		{
+			valid: true,
+			msg: &shmsg.AggregatedDecryptionSignature{
+				InstanceID: d.instanceID,
+			},
+		},
+		{
+			valid: true,
+			msg: &shmsg.CipherBatch{
+				InstanceID: d.instanceID,
+			},
+		},
+		{
+			valid: false,
+			msg: &shmsg.DecryptionKey{
+				InstanceID: d.instanceID + 1,
+			},
+		},
+		{
+			valid: false,
+			msg: &shmsg.AggregatedDecryptionSignature{
+				InstanceID: d.instanceID - 1,
+			},
+		},
+		{
+			valid: false,
+			msg: &shmsg.CipherBatch{
+				InstanceID: d.instanceID + 2,
+			},
+		},
+	}
+	for _, tc := range tests {
+		pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
 		if err != nil {
-			t.Fatalf("Error while making valid message")
+			t.Fatalf("Error in makePubSubMessage: %s", err)
 		}
-
-		wrongPubsubMessage, err := makePubSubMessage(&wrongMessage, topic)
-		if err != nil {
-			t.Fatalf("Error while making valid message")
-		}
-
-		assert.Check(t, validator(ctx, peerID, validPubsubMessage))
-		assert.Equal(t, validator(ctx, peerID, wrongPubsubMessage), false)
+		validate := validators[pubsubMessage.GetTopic()]
+		assert.Assert(t, validate != nil)
+		assert.Equal(t, validate(ctx, peerID, pubsubMessage), tc.valid,
+			"validate failed valid=%t msg=%+v", tc.valid, tc.msg)
 	}
 }
 
 // makePubSubMessage makes a pubsub.Message corresponding to the type received by gossip validators.
 func makePubSubMessage(message shmsg.P2PMessage, topic string) (*pubsub.Message, error) {
-	var messageBytes []byte
-	var err error
-
-	switch m := message.(type) {
-	case *shmsg.DecryptionKey:
-		messageBytes, err = proto.Marshal(m)
-	case *shmsg.CipherBatch:
-		messageBytes, err = proto.Marshal(m)
-	case *shmsg.AggregatedDecryptionSignature:
-		messageBytes, err = proto.Marshal(m)
-	default:
-		return nil, errors.Errorf("received message of unexpected type: %s", message)
-	}
+	messageBytes, err := proto.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
 
-	P2PMessage := p2p.Message{
+	b, err := json.Marshal(&p2p.Message{
 		Topic:    topic,
 		Message:  messageBytes,
 		SenderID: "",
-	}
-	b, err := json.Marshal(&P2PMessage)
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	pubsubMessage := pubsub.Message{
 		Message: &pb.Message{
-			Data: b,
+			Data:  b,
+			Topic: &topic,
 		},
 		ReceivedFrom:  "",
 		ValidatorData: nil,
