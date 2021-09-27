@@ -53,3 +53,16 @@ INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VA
 
 -- name: GetEncryptionKeys :many
 SELECT * from keyper.tendermint_encryption_key;
+
+-- name: ScheduleShutterMessage :one
+INSERT INTO keyper.tendermint_outgoing_messages (msg)
+VALUES ($1)
+RETURNING id;
+
+-- name: GetNextShutterMessage :one
+SELECT * from keyper.tendermint_outgoing_messages
+ORDER BY id
+LIMIT 1;
+
+-- name: DeleteShutterMessage :exec
+DELETE FROM keyper.tendermint_outgoing_messages where id=$1;

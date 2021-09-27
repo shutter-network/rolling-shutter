@@ -47,6 +47,11 @@ type KeyperTendermintEncryptionKey struct {
 	EncryptionPublicKey []byte
 }
 
+type KeyperTendermintOutgoingMessage struct {
+	ID  int32
+	Msg []byte
+}
+
 type KeyperTendermintSyncMetum struct {
 	CurrentBlock        int64
 	LastCommittedHeight int64

@@ -21,6 +21,15 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const deleteShutterMessage = `-- name: DeleteShutterMessage :exec
+DELETE FROM keyper.tendermint_outgoing_messages where id=$1
+`
+
+func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteShutterMessage, id)
+	return err
+}
+
 const getBatchConfig = `-- name: GetBatchConfig :one
 SELECT config_index, height, keypers, threshold
 FROM keyper.tendermint_batch_config
@@ -136,6 +145,19 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (KeyperMetaInf, error
 	return i, err
 }
 
+const getNextShutterMessage = `-- name: GetNextShutterMessage :one
+SELECT id, msg from keyper.tendermint_outgoing_messages
+ORDER BY id
+LIMIT 1
+`
+
+func (q *Queries) GetNextShutterMessage(ctx context.Context) (KeyperTendermintOutgoingMessage, error) {
+	row := q.db.QueryRow(ctx, getNextShutterMessage)
+	var i KeyperTendermintOutgoingMessage
+	err := row.Scan(&i.ID, &i.Msg)
+	return i, err
+}
+
 const insertBatchConfig = `-- name: InsertBatchConfig :exec
 INSERT INTO keyper.tendermint_batch_config (config_index, height, keypers, threshold)
 VALUES ($1, $2, $3, $4)
@@ -198,6 +220,19 @@ type InsertPureDKGParams struct {
 func (q *Queries) InsertPureDKG(ctx context.Context, arg InsertPureDKGParams) error {
 	_, err := q.db.Exec(ctx, insertPureDKG, arg.Eon, arg.Puredkg)
 	return err
+}
+
+const scheduleShutterMessage = `-- name: ScheduleShutterMessage :one
+INSERT INTO keyper.tendermint_outgoing_messages (msg)
+VALUES ($1)
+RETURNING id
+`
+
+func (q *Queries) ScheduleShutterMessage(ctx context.Context, msg []byte) (int32, error) {
+	row := q.db.QueryRow(ctx, scheduleShutterMessage, msg)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const tMGetSyncMeta = `-- name: TMGetSyncMeta :one

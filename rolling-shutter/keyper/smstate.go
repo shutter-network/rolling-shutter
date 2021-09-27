@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
@@ -79,26 +80,42 @@ func (*ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queri
 	return nil
 }
 
-func (st *ShuttermintState) sendShuttermintMessage(description string, msg *shmsg.Message) {
-	// TODO
-	_ = description
-	_ = msg
-	log.Printf("SEND SHUTTERMINT MESSAGE: %s", description)
+func (st *ShuttermintState) scheduleShutterMessage(
+	ctx context.Context,
+	queries *kprdb.Queries,
+	description string,
+	msg *shmsg.Message) error {
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	msgid, err := queries.ScheduleShutterMessage(ctx, data)
+	if err != nil {
+		return err
+	}
+	log.Printf("SEND SHUTTERMINT MESSAGE: %d %s", msgid, description)
+	return nil
 }
 
-func (st *ShuttermintState) handleBatchConfig(ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig) error {
+func (st *ShuttermintState) handleBatchConfig(
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig) error {
 	if !st.isKeyper {
 		if !e.IsKeyper(st.config.Address()) {
 			return nil
 		}
 		st.isKeyper = true
-		st.sendShuttermintMessage(
+		err := st.scheduleShutterMessage(
+			ctx,
+			queries,
 			"check-in",
 			shmsg.NewCheckIn(
 				st.config.ValidatorKey.Public().(ed25519.PublicKey),
 				&st.config.EncryptionKey.PublicKey,
 			),
 		)
+		if err != nil {
+			return err
+		}
 	}
 	keypers := []string{}
 	for _, k := range e.Keypers {

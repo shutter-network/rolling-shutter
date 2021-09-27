@@ -17,6 +17,7 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
+	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
@@ -130,7 +131,7 @@ func readKeyperConfig() (keyper.Config, error) {
 func keyperMain() error {
 	ctx := context.Background()
 
-	kc, err := readKeyperConfig()
+	config, err := readKeyperConfig()
 	if err != nil {
 		return errors.WithMessage(err, "Please check your configuration")
 	}
@@ -138,34 +139,41 @@ func keyperMain() error {
 	log.Printf(
 		"Starting keyper version %s with signing key %s, using %s for Shuttermint",
 		shversion.Version(),
-		kc.Address().Hex(),
-		kc.ShuttermintURL,
+		config.Address().Hex(),
+		config.ShuttermintURL,
 	)
 
-	dbpool, err := pgxpool.Connect(ctx, kc.DatabaseURL)
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
 
-	var cl client.Client
-	cl, err = http.New(kc.ShuttermintURL, "/websocket")
-	if err != nil {
-		return err
-	}
-	err = keyper.SyncAppWithDB(ctx, kc, cl, dbpool)
-	if err != nil {
-		return err
-	}
-
 	if err := kprdb.ValidateKeyperDB(ctx, dbpool); err != nil {
 		return err
 	}
 
+	var cl client.Client
+	cl, err = http.New(config.ShuttermintURL, "/websocket")
+	if err != nil {
+		return err
+	}
+
+	shuttermintState := keyper.NewShuttermintState(config)
+	err = keyper.SyncAppWithDB(ctx, cl, dbpool, shuttermintState)
+	if err != nil {
+		return err
+	}
+	messageSender := fx.NewRPCMessageSender(cl, config.SigningKey)
+	err = keyper.SendShutterMessages(ctx, kprdb.New(dbpool), &messageSender)
+	if err != nil {
+		return err
+	}
+
 	p := p2p.New(p2p.Config{
-		ListenAddr:     kc.ListenAddress,
-		PeerMultiaddrs: kc.PeerMultiaddrs,
-		PrivKey:        kc.P2PKey,
+		ListenAddr:     config.ListenAddress,
+		PeerMultiaddrs: config.PeerMultiaddrs,
+		PrivKey:        config.P2PKey,
 	})
 
 	group, ctx := errgroup.WithContext(ctx)

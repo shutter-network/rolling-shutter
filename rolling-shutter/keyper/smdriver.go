@@ -36,11 +36,15 @@ func getLastCommittedHeight(ctx context.Context, shmcl client.Client) (int64, er
 }
 
 // SyncAppWithDB queries the shutter tendermint app for events and inserts them into our database.
-func SyncAppWithDB(ctx context.Context, config Config, shmcl client.Client, dbpool *pgxpool.Pool) error {
+func SyncAppWithDB(
+	ctx context.Context,
+	shmcl client.Client,
+	dbpool *pgxpool.Pool,
+	shuttermintState *ShuttermintState) error {
 	a := ShuttermintDriver{
 		shmcl:            shmcl,
 		dbpool:           dbpool,
-		shuttermintState: NewShuttermintState(config),
+		shuttermintState: shuttermintState,
 	}
 	return a.sync(ctx)
 }
