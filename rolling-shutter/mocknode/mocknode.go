@@ -17,15 +17,16 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 var gossipTopicNames = [4]string{
 	"decryptionTrigger",
-	"cipherBatch",
-	"decryptionKey",
-	"decryptionSignature",
+	dcrtopics.CipherBatch,
+	dcrtopics.DecryptionKey,
+	dcrtopics.DecryptionSignature,
 }
 
 type MockNode struct {
@@ -277,7 +278,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, e
 		return err
 	}
 
-	if err := m.p2p.Publish(ctx, "cipherBatch", msgBytes); err != nil {
+	if err := m.p2p.Publish(ctx, dcrtopics.CipherBatch, msgBytes); err != nil {
 		return err
 	}
 
@@ -306,5 +307,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64, epochS
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, "decryptionKey", msgBytes)
+	return m.p2p.Publish(ctx, dcrtopics.DecryptionKey, msgBytes)
 }

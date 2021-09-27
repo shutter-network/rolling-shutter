@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 )
 
 // P2PMessage can be send via the p2p protocol.
@@ -23,21 +24,21 @@ func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
 func (*DecryptionKey) Topic() string {
-	return "decryptionKey"
+	return dcrtopics.DecryptionKey
 }
 
 func (*CipherBatch) ImplementsP2PMessage() {
 }
 
 func (*CipherBatch) Topic() string {
-	return "cipherBatch"
+	return dcrtopics.CipherBatch
 }
 
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 }
 
 func (*AggregatedDecryptionSignature) Topic() string {
-	return "decryptionSignature"
+	return dcrtopics.DecryptionSignature
 }
 
 // NewBatchConfig creates a new BatchConfig message.

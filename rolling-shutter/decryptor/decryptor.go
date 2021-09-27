@@ -15,17 +15,12 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-const (
-	cipherBatchTopic         = "cipherBatch"
-	decryptionKeyTopic       = "decryptionKey"
-	decryptionSignatureTopic = "decryptionSignature"
-)
-
-var gossipTopicNames = [3]string{cipherBatchTopic, decryptionKeyTopic, decryptionSignatureTopic}
+var gossipTopicNames = [3]string{dcrtopics.CipherBatch, dcrtopics.DecryptionKey, dcrtopics.DecryptionSignature}
 
 type Decryptor struct {
 	Config Config
@@ -180,19 +175,19 @@ func unmarshalP2PMessage(msg *p2p.Message) (shmsg.P2PMessage, error) {
 		return nil, nil
 	}
 	switch msg.Topic {
-	case decryptionKeyTopic:
+	case dcrtopics.DecryptionKey:
 		decryptionKeyMsg := shmsg.DecryptionKey{}
 		if err := proto.Unmarshal(msg.Message, &decryptionKeyMsg); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption key message")
 		}
 		return &decryptionKeyMsg, nil
-	case cipherBatchTopic:
+	case dcrtopics.CipherBatch:
 		cipherBatchMsg := shmsg.CipherBatch{}
 		if err := proto.Unmarshal(msg.Message, &cipherBatchMsg); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal cipher batch message")
 		}
 		return &cipherBatchMsg, nil
-	case decryptionSignatureTopic:
+	case dcrtopics.DecryptionSignature:
 		decryptionSignature := shmsg.AggregatedDecryptionSignature{}
 		if err := proto.Unmarshal(msg.Message, &decryptionSignature); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption signature message")
