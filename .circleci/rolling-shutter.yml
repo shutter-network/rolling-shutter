@@ -7,14 +7,24 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v1-{{ checksum "go.sum" }}
-      - run: make install-sqlc
+            - rs-generate-v2-{{ checksum "go.sum" }}
+      - run:
+          name: "Download and install protoc"
+          command: |
+            if [[ -e ~/bin/protoc ]]; then
+              echo "protoc already installed"
+            else
+              curl -o /tmp/protoc.zip -sSL https://github.com/protocolbuffers/protobuf/releases/download/v3.18.0/protoc-3.18.0-linux-x86_64.zip
+              unzip -d ~ /tmp/protoc.zip bin/protoc
+            fi
+      - run: make install-protoc-gen-go install-sqlc
       - run: make generate
       - save_cache:
-          key: rs-generate-v1-{{ checksum "go.sum" }}
+          key: rs-generate-v2-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
+            - "~/bin"
       - run: git diff --exit-code
 
   rs-build:

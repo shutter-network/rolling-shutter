@@ -1,5 +1,7 @@
 package shmsg
 
+//go:generate protoc gossip.proto shmsg.proto --go_out=./
+
 /* Extend the protocol buffer group types with easy marshaling/unmarshaling to the native group
    types
 */
