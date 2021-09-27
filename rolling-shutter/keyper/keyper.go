@@ -13,13 +13,13 @@ import (
 	"github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
-var GossipTopicNames = []string{"decryptionTrigger", dcrtopics.DecryptionKey}
+var GossipTopicNames = []string{kprtopics.DecryptionTrigger, kprtopics.DecryptionKey}
 
 type keyper struct {
 	config            Config
