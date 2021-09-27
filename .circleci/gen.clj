@@ -19,7 +19,7 @@
   [{:keys [head base] :as opts}]
   (merge {}
          (when (or (not (empty? (System/getenv "CIRCLE_TAG")))
-                   (= head base))
+                   (= "main" (System/getenv "CIRCLE_BRANCH")))
            {:build-all? true})))
 
 (defn get-yml-files
