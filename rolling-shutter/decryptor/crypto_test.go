@@ -3,11 +3,13 @@ package decryptor
 import (
 	"bytes"
 	"crypto/rand"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"gotest.tools/v3/assert"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
@@ -55,4 +57,31 @@ func TestSigning(t *testing.T) {
 	modSig := modD.Sign(secretKey)
 	assert.Check(t, modD.Verify(modSig, publicKey))
 	assert.Check(t, !d.Verify(modSig, publicKey))
+}
+
+func TestValidateDecryptionKey(t *testing.T) {
+	p, err := shcrypto.RandomPolynomial(rand.Reader, 0)
+	assert.NilError(t, err)
+	eonPublicKey := shcrypto.ComputeEonPublicKey([]*shcrypto.Gammas{p.Gammas()})
+
+	epochIndex := uint64(64)
+	epochID := shcrypto.ComputeEpochID(epochIndex)
+
+	v := p.EvalForKeyper(0)
+	eonSecretKeyShare := shcrypto.ComputeEonSecretKeyShare([]*big.Int{v})
+	epochSecretKeyShare := shcrypto.ComputeEpochSecretKeyShare(eonSecretKeyShare, epochID)
+	epochSecretKey, err := shcrypto.ComputeEpochSecretKey(
+		[]int{0},
+		[]*shcrypto.EpochSecretKeyShare{epochSecretKeyShare},
+		1,
+	)
+	assert.NilError(t, err)
+
+	ok, err := checkEpochSecretKey(epochSecretKey, eonPublicKey, epochIndex)
+	assert.NilError(t, err)
+	assert.Check(t, ok)
+
+	ok, err = checkEpochSecretKey(epochSecretKey, eonPublicKey, epochIndex+1)
+	assert.NilError(t, err)
+	assert.Check(t, !ok)
 }
