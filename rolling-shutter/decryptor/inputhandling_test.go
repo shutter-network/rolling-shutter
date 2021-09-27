@@ -35,6 +35,14 @@ func newTestConfig(t *testing.T) Config {
 	}
 }
 
+func randomDecryptionKey(t *testing.T) *shcrypto.EpochSecretKey {
+	t.Helper()
+
+	_, keyG1, err := bn256.RandomG1(rand.Reader)
+	assert.NilError(t, err)
+	return (*shcrypto.EpochSecretKey)(keyG1)
+}
+
 func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -45,9 +53,11 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
+	keyEncoded, err := randomDecryptionKey(t).GobEncode()
+	assert.NilError(t, err)
 	m := &shmsg.DecryptionKey{
 		EpochID: 100,
-		Key:     []byte("hello"),
+		Key:     keyEncoded,
 	}
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
@@ -59,9 +69,11 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	assert.Check(t, len(msgs) == 0)
 
+	keyEncoded2, err := randomDecryptionKey(t).GobEncode()
+	assert.NilError(t, err)
 	m2 := &shmsg.DecryptionKey{
 		EpochID: 100,
-		Key:     []byte("hello2"),
+		Key:     keyEncoded2,
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, m2)
 	assert.NilError(t, err)
@@ -71,6 +83,13 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	assert.Check(t, bytes.Equal(m2Stored.Key, m.Key))
 
 	assert.Check(t, len(msgs) == 0)
+
+	m3 := &shmsg.DecryptionKey{
+		EpochID: 100,
+		Key:     []byte("invalidKey"),
+	}
+	_, err = handleDecryptionKeyInput(ctx, config, db, m3)
+	assert.Check(t, err != nil)
 }
 
 func TestInsertCipherBatchIntegration(t *testing.T) {
@@ -128,10 +147,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
-	_, keyG1, err := bn256.RandomG1(rand.Reader)
-	assert.NilError(t, err)
-	key := (*shcrypto.EpochSecretKey)(keyG1)
-	keyEncoded, err := key.GobEncode()
+	keyEncoded, err := randomDecryptionKey(t).GobEncode()
 	assert.NilError(t, err)
 	keyMsg := &shmsg.DecryptionKey{
 		EpochID: 123,
