@@ -1,6 +1,8 @@
 package shdb
 
 import (
+	"bytes"
+	"encoding/gob"
 	"log"
 	"regexp"
 
@@ -8,6 +10,8 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
+
+	"github.com/shutter-network/shutter/shlib/puredkg"
 )
 
 const SchemaVersionKey = "schema-version"
@@ -46,4 +50,23 @@ func DecodeAddress(data string) (common.Address, error) {
 		return common.Address{}, errors.Errorf("not an address: %s", data)
 	}
 	return common.HexToAddress(data), nil
+}
+
+func EncodePureDKG(p *puredkg.PureDKG) ([]byte, error) {
+	buff := bytes.Buffer{}
+	err := gob.NewEncoder(&buff).Encode(p)
+	if err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
+func DecodePureDKG(data []byte) (*puredkg.PureDKG, error) {
+	buf := bytes.NewBuffer(data)
+	p := &puredkg.PureDKG{}
+	err := gob.NewDecoder(buf).Decode(p)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }

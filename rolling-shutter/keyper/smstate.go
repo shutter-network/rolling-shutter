@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgtype"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
@@ -17,6 +18,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
+type ActiveDKG struct {
+	pure  *puredkg.PureDKG
+	dirty bool
+}
+
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
 // stored in the database, and what we have here is kind of a cache.
 type ShuttermintState struct {
@@ -24,12 +30,14 @@ type ShuttermintState struct {
 	synchronized   bool // are we synchronized
 	isKeyper       bool
 	encryptionKeys map[common.Address]*ecies.PublicKey
+	dkg            map[uint64]*ActiveDKG
 }
 
 func NewShuttermintState(config Config) *ShuttermintState {
 	return &ShuttermintState{
 		config:         config,
 		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
+		dkg:            make(map[uint64]*ActiveDKG),
 	}
 }
 
@@ -74,9 +82,31 @@ func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *kpr
 	return nil
 }
 
-func (*ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queries) error {
-	_ = ctx
-	_ = queries
+func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queries) error {
+	for eon, a := range st.dkg {
+		if !a.dirty {
+			continue
+		}
+		log.Printf("Storing dirty puredkg for eon %d", eon)
+		pureBytes, err := shdb.EncodePureDKG(a.pure)
+		if err != nil {
+			return err
+		}
+
+		eonnum := pgtype.Numeric{}
+		err = eonnum.Set(eon)
+		if err != nil {
+			return err
+		}
+		err = queries.InsertPureDKG(ctx, kprdb.InsertPureDKGParams{
+			Eon:     eonnum,
+			Puredkg: pureBytes,
+		})
+		if err != nil {
+			return err
+		}
+		a.dirty = false
+	}
 	return nil
 }
 
@@ -144,7 +174,12 @@ func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb
 	if !ok {
 		return nil
 	}
-	_ = puredkg.NewPureDKG(e.Eon, uint64(len(bc.Keypers)), uint64(bc.Threshold), keyperIndex)
+
+	pure := puredkg.NewPureDKG(e.Eon, uint64(len(bc.Keypers)), uint64(bc.Threshold), keyperIndex)
+	st.dkg[e.Eon] = &ActiveDKG{
+		pure:  &pure,
+		dirty: true,
+	}
 	return nil
 }
 
