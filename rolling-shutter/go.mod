@@ -32,6 +32,7 @@ require (
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-noise v0.2.2 // indirect
 	github.com/libp2p/go-libp2p-peer v0.2.0
+	github.com/libp2p/go-libp2p-peerstore v0.2.10 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.5.4
 	github.com/libp2p/go-tcp-transport v0.2.8 // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect
@@ -39,6 +40,7 @@ require (
 	github.com/mimoo/StrobeGo v0.0.0-20210601165009-122bf33a46e0 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.4.2
+	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multihash v0.0.16 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
@@ -60,12 +62,12 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/net v0.0.0-20210913180222-943fd674d43e // indirect
+	golang.org/x/net v0.0.0-20210924151903-3ad01bbaa167 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210921065528-437939a70204 // indirect
+	golang.org/x/sys v0.0.0-20210927052749-1cf2251ac284 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.1.5
-	google.golang.org/genproto v0.0.0-20210909211513-a8c4777a87af // indirect
+	golang.org/x/tools v0.1.6
+	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0 // indirect
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.62.1 // indirect
 	gotest.tools v2.2.0+incompatible
