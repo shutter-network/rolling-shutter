@@ -25,7 +25,6 @@ import (
 // Config contains validated configuration parameters for the keyper client.
 type Config struct {
 	ShuttermintURL string
-	DBDir          string
 	DatabaseURL    string
 	SigningKey     *ecdsa.PrivateKey
 	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
@@ -39,10 +38,9 @@ type Config struct {
 const configTemplate = `# Shutter keyper configuration for {{ .Address }}, /p2p/{{ .P2PKey | P2PKeyPublic}}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
-DBDir			= "{{ .DBDir }}"
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
-# It it's empty, we use the standard PG* environment variables
+# If it's empty, we use the standard PG* environment variables
 DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
 

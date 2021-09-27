@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -113,15 +112,6 @@ func readKeyperConfig() (keyper.Config, error) {
 
 	if err != nil {
 		return config, err
-	}
-
-	if !filepath.IsAbs(config.DBDir) {
-		r := filepath.Dir(viper.ConfigFileUsed())
-		dbdir, err := filepath.Abs(filepath.Join(r, config.DBDir))
-		if err != nil {
-			return config, err
-		}
-		config.DBDir = dbdir
 	}
 
 	return config, err
