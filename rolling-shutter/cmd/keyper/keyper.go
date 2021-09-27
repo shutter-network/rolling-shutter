@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/tendermint/tendermint/rpc/client"
-	"github.com/tendermint/tendermint/rpc/client/http"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
 	"github.com/shutter-network/shutter/shuttermint/keyper"
-	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
@@ -129,8 +128,6 @@ func readKeyperConfig() (keyper.Config, error) {
 }
 
 func keyperMain() error {
-	ctx := context.Background()
-
 	config, err := readKeyperConfig()
 	if err != nil {
 		return errors.WithMessage(err, "Please check your configuration")
@@ -143,44 +140,22 @@ func keyperMain() error {
 		config.ShuttermintURL,
 	)
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to database")
-	}
-	defer dbpool.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-termChan
+		log.Printf("Received %s signal, shutting down", sig)
+		cancel()
+	}()
 
-	if err := kprdb.ValidateKeyperDB(ctx, dbpool); err != nil {
-		return err
+	err = keyper.Run(ctx, config)
+	if err == context.Canceled {
+		log.Printf("Bye.")
+		return nil
 	}
-
-	var cl client.Client
-	cl, err = http.New(config.ShuttermintURL, "/websocket")
-	if err != nil {
-		return err
-	}
-
-	shuttermintState := keyper.NewShuttermintState(config)
-	err = keyper.SyncAppWithDB(ctx, cl, dbpool, shuttermintState)
-	if err != nil {
-		return err
-	}
-	messageSender := fx.NewRPCMessageSender(cl, config.SigningKey)
-	err = keyper.SendShutterMessages(ctx, kprdb.New(dbpool), &messageSender)
-	if err != nil {
-		return err
-	}
-
-	p := p2p.New(p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-	})
-
-	group, ctx := errgroup.WithContext(ctx)
-	group.Go(func() error {
-		return p.Run(ctx, keyper.GossipTopicNames)
-	})
-	return group.Wait()
+	return err
 }
 
 func initDB() error {
