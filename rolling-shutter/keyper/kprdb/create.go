@@ -59,12 +59,12 @@ func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 
 // ValidateKeyperDB checks that the database schema is compatible.
 func ValidateKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	m, err := New(dbpool).GetMeta(ctx, shdb.SchemaVersionKey)
+	val, err := New(dbpool).GetMeta(ctx, shdb.SchemaVersionKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to get schema version from meta_inf table")
 	}
-	if m.Value != schemaVersion {
-		return errors.Errorf("database has wrong schema version: expected %s, got %s", schemaVersion, m.Value)
+	if val != schemaVersion {
+		return errors.Errorf("database has wrong schema version: expected %s, got %s", schemaVersion, val)
 	}
 	return nil
 }

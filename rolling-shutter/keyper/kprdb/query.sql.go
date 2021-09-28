@@ -135,14 +135,14 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (KeyperTendermintBat
 }
 
 const getMeta = `-- name: GetMeta :one
-SELECT key, value FROM keyper.meta_inf WHERE key = $1
+SELECT value FROM keyper.meta_inf WHERE key = $1
 `
 
-func (q *Queries) GetMeta(ctx context.Context, key string) (KeyperMetaInf, error) {
+func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
 	row := q.db.QueryRow(ctx, getMeta, key)
-	var i KeyperMetaInf
-	err := row.Scan(&i.Key, &i.Value)
-	return i, err
+	var value string
+	err := row.Scan(&value)
+	return value, err
 }
 
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one

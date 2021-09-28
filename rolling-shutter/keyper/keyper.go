@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
@@ -27,6 +28,31 @@ type keyper struct {
 	p2p               *p2p.P2P
 }
 
+// linkConfigToDB ensures that we use a database compatible with the given config. On first use
+// it stores the config's ethereum address into the database. On subsequent uses it compares the
+// stored value and raises an error if it doesn't match.
+func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) error {
+	const addressKey = "ethereum address"
+	cfgAddress := config.Address().Hex()
+	queries := kprdb.New(dbpool)
+	dbAddr, err := queries.GetMeta(ctx, addressKey)
+	if err == pgx.ErrNoRows {
+		return queries.InsertMeta(ctx, kprdb.InsertMetaParams{
+			Key:   addressKey,
+			Value: cfgAddress,
+		})
+	} else if err != nil {
+		return err
+	}
+
+	if dbAddr != cfgAddress {
+		return errors.Errorf(
+			"database linked to wrong address %s, config address is %s",
+			dbAddr, cfgAddress)
+	}
+	return nil
+}
+
 func Run(ctx context.Context, config Config) error {
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
 	if err != nil {
@@ -38,7 +64,10 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-
+	err = linkConfigToDB(ctx, config, dbpool)
+	if err != nil {
+		return err
+	}
 	shuttermintClient, err := http.New(config.ShuttermintURL, "/websocket")
 	if err != nil {
 		return err

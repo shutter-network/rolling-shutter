@@ -6,7 +6,7 @@ WHERE epoch_id = $1;
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2);
 
 -- name: GetMeta :one
-SELECT * FROM keyper.meta_inf WHERE key = $1;
+SELECT value FROM keyper.meta_inf WHERE key = $1;
 
 -- name: InsertBatchConfig :exec
 INSERT INTO keyper.tendermint_batch_config (config_index, height, keypers, threshold)
