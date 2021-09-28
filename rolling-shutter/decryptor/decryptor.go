@@ -130,14 +130,6 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 }
 
 func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
-	// TODO: This whole block must be removed, we must not modify the given Message.
-	switch msgTyped := msg.(type) {
-	case *shmsg.AggregatedDecryptionSignature:
-		msgTyped.InstanceID = d.instanceID
-	default:
-		return errors.Errorf("received output message of unknown type: %T", msgTyped)
-	}
-
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")
