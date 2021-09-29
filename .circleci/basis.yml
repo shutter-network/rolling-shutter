@@ -11,9 +11,9 @@ commands:
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
 
 executors:
-  py37:
+  py:
     docker:
-      - image: cimg/python:3.7.11@sha256:5280078dacde9c6093da25c5544d224483e89ac17b19404b8c348d00b7289bdf
+      - image: cimg/python:3.9.7-node@sha256:f014580897eea0a92ef30b79aefd2fd58c09853e4d1bcd1e0578a9c67681d183
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   node14:
@@ -47,20 +47,24 @@ executors:
 
 jobs:
   pre-commit:
-    executor: py37
+    executor: py
     working_directory: ~/src
     steps:
       - checkout
+      - run:
+          name: Configure nodeenv
+          command: |
+            cp .circleci/.nodeenvrc ~
       - install-go
       - restore_cache:
           keys:
             - go-mod-v2-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
-          key: pre-commit-cache-v3-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v5-{{ checksum ".pre-commit-config.yaml" }}
       - run: pip install --user pre-commit
       - run: pre-commit install-hooks
       - save_cache:
-          key: pre-commit-cache-v3-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v5-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local
