@@ -37,7 +37,18 @@ repos:
           ["prettier@2.3.2", "prettier-plugin-solidity@1.0.0-beta.16"]
         args: ["--plugin=prettier-plugin-solidity"]
         exclude: "^contracts/openzeppelin/.*|wasm_exec.js$"
-
+        types_or:
+          [
+            "yaml",
+            "markdown",
+            "solidity",
+            "makefile",
+            "gitignore",
+            "toml",
+            "json",
+            "javascript",
+            "proto",
+          ]
   - repo: https://github.com/schmir-at-bb/gci
     rev: "9283498f6ee8b0be960df5bf6bca058422eb971b"
     hooks:
