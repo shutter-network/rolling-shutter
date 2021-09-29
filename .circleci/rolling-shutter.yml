@@ -38,7 +38,15 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-build-<< parameters.go-version >>-v1-{{ checksum "go.sum" }}
+            - go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - run: go get -d ./
+      - save_cache:
+          key: go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          paths:
+            - ~/go/pkg/mod
+      - restore_cache:
+          keys:
+            - rs-build-<< parameters.go-version >>-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: make build wasm
       - run:
           name: "Run unit tests with gotestsum"
@@ -58,9 +66,8 @@ jobs:
       - store_test_results:
           path: report
       - save_cache:
-          key: rs-build-<< parameters.go-version >>-v1-{{ checksum "go.sum" }}
+          key: rs-build-<< parameters.go-version >>-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
-            - "~/go/pkg/mod"
             - "~/.cache/go-build"
 
   publish-release:
@@ -90,17 +97,28 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-lint-v1-{{ checksum "go.sum" }}
+            - go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - restore_cache:
+          keys:
+            - rs-lint-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run:
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.1
+          name: "Install golangci-lint"
+          command: |
+            if [[ -e ~/bin/golangci-lint ]]; then
+              echo "golangci-lint already installed"
+            else
+              mkdir -p ~/bin
+              curl -sSL -o /tmp/golangci-lint.tgz https://github.com/golangci/golangci-lint/releases/download/v1.42.1/golangci-lint-1.42.1-linux-amd64.tar.gz
+              tar -C ~/bin --strip-components=1 -xf /tmp/golangci-lint.tgz
+            fi
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v1-{{ checksum "go.sum" }}
+          key: rs-lint-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
-            - "~/go/pkg/mod"
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
+            - "~/bin/golangci-lint"
 workflows:
   rolling-shutter:
     jobs:

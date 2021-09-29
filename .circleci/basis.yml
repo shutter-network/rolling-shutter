@@ -53,6 +53,9 @@ jobs:
       - checkout
       - install-go
       - restore_cache:
+          keys:
+            - go-mod-v2-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
+      - restore_cache:
           key: pre-commit-cache-v3-{{ checksum ".pre-commit-config.yaml" }}
       - run: pip install --user pre-commit
       - run: pre-commit install-hooks
