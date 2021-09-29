@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
@@ -14,10 +15,11 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 )
 
-var GossipTopicNames = []string{"decryptionTrigger", "decryptionKey"}
+var GossipTopicNames = []string{kprtopics.DecryptionTrigger, kprtopics.DecryptionKey}
 
 type keyper struct {
 	config            Config
@@ -92,7 +94,7 @@ func Run(ctx context.Context, config Config) error {
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames)
+		return kpr.p2p.Run(ctx, GossipTopicNames, make(map[string]pubsub.Validator))
 	})
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)

@@ -47,7 +47,7 @@ func New(config Config) *P2P {
 	return &p
 }
 
-func (p *P2P) Run(ctx context.Context, topicNames []string) error {
+func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[string]pubsub.Validator) error {
 	defer func() {
 		close(p.GossipMessages)
 	}()
@@ -59,9 +59,17 @@ func (p *P2P) Run(ctx context.Context, topicNames []string) error {
 		if err := p.createHost(ctx); err != nil {
 			return err
 		}
+
+		for topicName, validator := range topicValidators {
+			if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
+				return err
+			}
+		}
+
 		if err := p.joinTopics(topicNames); err != nil {
 			return err
 		}
+
 		// listen to gossip on all topics
 		for _, room := range p.gossipRooms {
 			room := room

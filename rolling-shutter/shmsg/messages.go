@@ -6,16 +6,39 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 )
 
 // P2PMessage can be send via the p2p protocol.
 type P2PMessage interface {
+	protoreflect.ProtoMessage
 	ImplementsP2PMessage()
+	GetInstanceID() uint64
+	Topic() string
+}
+
+func (*DecryptionKey) ImplementsP2PMessage() {
+}
+
+func (*DecryptionKey) Topic() string {
+	return dcrtopics.DecryptionKey
+}
+
+func (*CipherBatch) ImplementsP2PMessage() {
+}
+
+func (*CipherBatch) Topic() string {
+	return dcrtopics.CipherBatch
 }
 
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
+}
+
+func (*AggregatedDecryptionSignature) Topic() string {
+	return dcrtopics.DecryptionSignature
 }
 
 // NewBatchConfig creates a new BatchConfig message.

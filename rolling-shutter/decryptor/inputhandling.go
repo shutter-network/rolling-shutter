@@ -124,9 +124,9 @@ func handleEpoch(
 	}
 
 	msgs := []shmsg.P2PMessage{}
-	// TODO: handle instanceID and signer bitfield
+	// TODO: handle signer bitfield
 	msgs = append(msgs, &shmsg.AggregatedDecryptionSignature{
-		InstanceID:          0,
+		InstanceID:          config.InstanceID,
 		EpochID:             epochID,
 		SignedHash:          signedHash,
 		AggregatedSignature: signatureBytes,

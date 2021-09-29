@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -16,15 +17,17 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 var gossipTopicNames = [4]string{
-	"decryptionTrigger",
-	"cipherBatch",
-	"decryptionKey",
-	"decryptionSignature",
+	kprtopics.DecryptionTrigger,
+	dcrtopics.CipherBatch,
+	dcrtopics.DecryptionKey,
+	dcrtopics.DecryptionSignature,
 }
 
 type MockNode struct {
@@ -59,7 +62,7 @@ func New(config Config) *MockNode {
 func (m *MockNode) Run(ctx context.Context) error {
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:])
+		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
 	})
 	g.Go(func() error {
 		return m.listen(errctx)
@@ -246,7 +249,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, "decryptionTrigger", msgBytes)
+	return m.p2p.Publish(ctx, kprtopics.DecryptionTrigger, msgBytes)
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, eonPublicKey *shcrypto.EonPublicKey) error {
@@ -276,7 +279,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64, e
 		return err
 	}
 
-	if err := m.p2p.Publish(ctx, "cipherBatch", msgBytes); err != nil {
+	if err := m.p2p.Publish(ctx, dcrtopics.CipherBatch, msgBytes); err != nil {
 		return err
 	}
 
@@ -305,5 +308,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64, epochS
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, "decryptionKey", msgBytes)
+	return m.p2p.Publish(ctx, dcrtopics.DecryptionKey, msgBytes)
 }

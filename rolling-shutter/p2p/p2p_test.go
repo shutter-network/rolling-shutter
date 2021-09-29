@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"gotest.tools/assert"
 )
@@ -62,7 +63,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			err := p.Run(runctx, gossipTopicNames)
+			err := p.Run(runctx, gossipTopicNames, make(map[string]pubsub.Validator))
 			assert.Assert(t, err == context.Canceled)
 		}()
 	}
