@@ -6,8 +6,6 @@ package kprdb
 import (
 	"context"
 	"time"
-
-	"github.com/jackc/pgtype"
 )
 
 const countBatchConfigs = `-- name: CountBatchConfigs :one
@@ -22,7 +20,7 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 }
 
 const deleteShutterMessage = `-- name: DeleteShutterMessage :exec
-DELETE FROM keyper.tendermint_outgoing_messages where id=$1
+DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1
 `
 
 func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
@@ -92,7 +90,7 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperD
 }
 
 const getEncryptionKeys = `-- name: GetEncryptionKeys :many
-SELECT address, encryption_public_key from keyper.tendermint_encryption_key
+SELECT address, encryption_public_key FROM keyper.tendermint_encryption_key
 `
 
 func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncryptionKey, error) {
@@ -113,6 +111,20 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncr
 		return nil, err
 	}
 	return items, nil
+}
+
+const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
+SELECT last_committed_height
+FROM keyper.tendermint_sync_meta
+ORDER BY current_block DESC, last_committed_height DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLastCommittedHeight(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastCommittedHeight)
+	var last_committed_height int64
+	err := row.Scan(&last_committed_height)
+	return last_committed_height, err
 }
 
 const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
@@ -146,7 +158,7 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
 }
 
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one
-SELECT id, msg from keyper.tendermint_outgoing_messages
+SELECT id, description, msg from keyper.tendermint_outgoing_messages
 ORDER BY id
 LIMIT 1
 `
@@ -154,7 +166,7 @@ LIMIT 1
 func (q *Queries) GetNextShutterMessage(ctx context.Context) (KeyperTendermintOutgoingMessage, error) {
 	row := q.db.QueryRow(ctx, getNextShutterMessage)
 	var i KeyperTendermintOutgoingMessage
-	err := row.Scan(&i.ID, &i.Msg)
+	err := row.Scan(&i.ID, &i.Description, &i.Msg)
 	return i, err
 }
 
@@ -194,6 +206,28 @@ func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionK
 	return err
 }
 
+const insertEon = `-- name: InsertEon :exec
+INSERT INTO keyper.eons (eon, height, batch_index, config_index)
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertEonParams struct {
+	Eon         int64
+	Height      int64
+	BatchIndex  []byte
+	ConfigIndex int64
+}
+
+func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
+	_, err := q.db.Exec(ctx, insertEon,
+		arg.Eon,
+		arg.Height,
+		arg.BatchIndex,
+		arg.ConfigIndex,
+	)
+	return err
+}
+
 const insertMeta = `-- name: InsertMeta :exec
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2)
 `
@@ -208,12 +242,28 @@ func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	return err
 }
 
+const insertPolyEval = `-- name: InsertPolyEval :exec
+INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
+VALUES ($1, $2, $3)
+`
+
+type InsertPolyEvalParams struct {
+	Eon             int64
+	ReceiverAddress string
+	Eval            []byte
+}
+
+func (q *Queries) InsertPolyEval(ctx context.Context, arg InsertPolyEvalParams) error {
+	_, err := q.db.Exec(ctx, insertPolyEval, arg.Eon, arg.ReceiverAddress, arg.Eval)
+	return err
+}
+
 const insertPureDKG = `-- name: InsertPureDKG :exec
 INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
 `
 
 type InsertPureDKGParams struct {
-	Eon     pgtype.Numeric
+	Eon     int64
 	Puredkg []byte
 }
 
@@ -222,14 +272,65 @@ func (q *Queries) InsertPureDKG(ctx context.Context, arg InsertPureDKGParams) er
 	return err
 }
 
+const polyEvalsWithEncryptionKeys = `-- name: PolyEvalsWithEncryptionKeys :many
+SELECT ev.eon, ev.receiver_address, ev.eval,
+       k.encryption_public_key,
+       eons.height
+FROM keyper.poly_evals ev
+INNER JOIN keyper.tendermint_encryption_key k
+      ON ev.receiver_address = k.address
+INNER JOIN keyper.eons eons
+      ON ev.eon = eons.eon
+ORDER BY ev.eon
+`
+
+type PolyEvalsWithEncryptionKeysRow struct {
+	Eon                 int64
+	ReceiverAddress     string
+	Eval                []byte
+	EncryptionPublicKey []byte
+	Height              int64
+}
+
+func (q *Queries) PolyEvalsWithEncryptionKeys(ctx context.Context) ([]PolyEvalsWithEncryptionKeysRow, error) {
+	rows, err := q.db.Query(ctx, polyEvalsWithEncryptionKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PolyEvalsWithEncryptionKeysRow
+	for rows.Next() {
+		var i PolyEvalsWithEncryptionKeysRow
+		if err := rows.Scan(
+			&i.Eon,
+			&i.ReceiverAddress,
+			&i.Eval,
+			&i.EncryptionPublicKey,
+			&i.Height,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const scheduleShutterMessage = `-- name: ScheduleShutterMessage :one
-INSERT INTO keyper.tendermint_outgoing_messages (msg)
-VALUES ($1)
+INSERT INTO keyper.tendermint_outgoing_messages (description, msg)
+VALUES ($1, $2)
 RETURNING id
 `
 
-func (q *Queries) ScheduleShutterMessage(ctx context.Context, msg []byte) (int32, error) {
-	row := q.db.QueryRow(ctx, scheduleShutterMessage, msg)
+type ScheduleShutterMessageParams struct {
+	Description string
+	Msg         []byte
+}
+
+func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutterMessageParams) (int32, error) {
+	row := q.db.QueryRow(ctx, scheduleShutterMessage, arg.Description, arg.Msg)
 	var id int32
 	err := row.Scan(&id)
 	return id, err
@@ -271,7 +372,7 @@ SET puredkg=$2 WHERE eon=$1
 `
 
 type UpdatePureDKGParams struct {
-	Eon     pgtype.Numeric
+	Eon     int64
 	Puredkg []byte
 }
 

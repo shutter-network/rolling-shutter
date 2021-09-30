@@ -3,24 +3,27 @@ package keyper
 import (
 	"context"
 	"crypto/ed25519"
+	"fmt"
 	"log"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/jackc/pgtype"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/shutterevents"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 type ActiveDKG struct {
-	pure  *puredkg.PureDKG
-	dirty bool
+	pure        *puredkg.PureDKG
+	startHeight int64
+	dirty       bool
+	keypers     []common.Address
 }
 
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
@@ -31,6 +34,7 @@ type ShuttermintState struct {
 	isKeyper       bool
 	encryptionKeys map[common.Address]*ecies.PublicKey
 	dkg            map[uint64]*ActiveDKG
+	phaseLength    PhaseLength
 }
 
 func NewShuttermintState(config Config) *ShuttermintState {
@@ -38,6 +42,7 @@ func NewShuttermintState(config Config) *ShuttermintState {
 		config:         config,
 		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
 		dkg:            make(map[uint64]*ActiveDKG),
+		phaseLength:    NewConstantPhaseLength(int64(config.DKGPhaseLength)),
 	}
 }
 
@@ -82,7 +87,22 @@ func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *kpr
 	return nil
 }
 
+func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Queries) error {
+	evals, err := queries.PolyEvalsWithEncryptionKeys(ctx)
+	if err != nil {
+		return err
+	}
+	for _, eval := range evals {
+		fmt.Printf("SEND POLY EVALS: %#v", eval)
+	}
+	return nil
+}
+
 func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queries) error {
+	err := st.sendPolyEvals(ctx, queries)
+	if err != nil {
+		return err
+	}
 	for eon, a := range st.dkg {
 		if !a.dirty {
 			continue
@@ -93,13 +113,8 @@ func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Qu
 			return err
 		}
 
-		eonnum := pgtype.Numeric{}
-		err = eonnum.Set(eon)
-		if err != nil {
-			return err
-		}
 		err = queries.InsertPureDKG(ctx, kprdb.InsertPureDKGParams{
-			Eon:     eonnum,
+			Eon:     int64(eon),
 			Puredkg: pureBytes,
 		})
 		if err != nil {
@@ -119,11 +134,14 @@ func (st *ShuttermintState) scheduleShutterMessage(
 	if err != nil {
 		return err
 	}
-	msgid, err := queries.ScheduleShutterMessage(ctx, data)
+	msgid, err := queries.ScheduleShutterMessage(ctx, kprdb.ScheduleShutterMessageParams{
+		Description: description,
+		Msg:         data,
+	})
 	if err != nil {
 		return err
 	}
-	log.Printf("SEND SHUTTERMINT MESSAGE: %d %s", msgid, description)
+	log.Printf("scheduled shuttermint message: id=%d %s", msgid, description)
 	return nil
 }
 
@@ -166,19 +184,79 @@ func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb
 	if !st.isKeyper {
 		return nil
 	}
-	bc, err := queries.GetBatchConfig(ctx, int32(e.ConfigIndex))
+	err := queries.InsertEon(ctx, kprdb.InsertEonParams{
+		Eon:         int64(e.Eon),
+		Height:      e.Height,
+		BatchIndex:  shdb.EncodeUint64(e.BatchIndex),
+		ConfigIndex: int64(e.ConfigIndex),
+	})
 	if err != nil {
 		return err
 	}
-	keyperIndex, ok := bc.KeyperIndex(st.config.Address())
-	if !ok {
+	batchConfig, err := queries.GetBatchConfig(ctx, int32(e.ConfigIndex))
+	if err != nil {
+		return err
+	}
+
+	keypers := []common.Address{}
+	for _, k := range batchConfig.Keypers {
+		a, err := shdb.DecodeAddress(k)
+		if err != nil {
+			return err
+		}
+		keypers = append(keypers, a)
+	}
+
+	keyperIndex, err := medley.FindAddressIndex(keypers, st.config.Address())
+	if err != nil {
 		return nil
 	}
 
-	pure := puredkg.NewPureDKG(e.Eon, uint64(len(bc.Keypers)), uint64(bc.Threshold), keyperIndex)
+	lastCommittedHeight, err := queries.GetLastCommittedHeight(ctx)
+	if err != nil {
+		return err
+	}
+
+	phase := st.phaseLength.getPhaseAtHeight(lastCommittedHeight+1, e.Height)
+	if phase > puredkg.Dealing {
+		log.Printf("Missed the dealing phase of eon %d", e.Eon)
+		return nil
+	}
+	if phase == puredkg.Off {
+		panic("phase is off")
+	}
+
+	pure := puredkg.NewPureDKG(e.Eon, uint64(len(batchConfig.Keypers)), uint64(batchConfig.Threshold), uint64(keyperIndex))
 	st.dkg[e.Eon] = &ActiveDKG{
-		pure:  &pure,
-		dirty: true,
+		pure:        &pure,
+		dirty:       true,
+		startHeight: e.Height,
+		keypers:     keypers,
+	}
+	commitment, polyEvals, err := pure.StartPhase1Dealing()
+	if err != nil {
+		log.Fatalf("Aborting due to unexpected error: %+v", err)
+	}
+
+	err = st.scheduleShutterMessage(
+		ctx,
+		queries,
+		fmt.Sprintf("poly commitment, eon=%d", e.Eon),
+		shmsg.NewPolyCommitment(e.Eon, commitment.Gammas),
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, eval := range polyEvals {
+		err = queries.InsertPolyEval(ctx, kprdb.InsertPolyEvalParams{
+			Eon:             int64(e.Eon),
+			ReceiverAddress: batchConfig.Keypers[eval.Receiver],
+			Eval:            shdb.EncodeBigint(eval.Eval),
+		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -192,6 +270,35 @@ func (st *ShuttermintState) handleCheckIn(ctx context.Context, queries *kprdb.Qu
 	return err
 }
 
+func (st *ShuttermintState) handlePolyCommitment(_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment) error {
+	dkg, ok := st.dkg[e.Eon]
+	if !ok {
+		log.Printf("PolyCommitment for non existent eon received: eon=%d commitment=%#v", e.Eon, e)
+		return nil
+	}
+	senderIndex, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
+	if err != nil {
+		log.Printf(
+			"Received PolyCommitment from non keyper address: eon=%d sender=%s",
+			e.Eon,
+			e.Sender.Hex(),
+		)
+		return nil
+	}
+
+	err = dkg.pure.HandlePolyCommitmentMsg(puredkg.PolyCommitmentMsg{
+		Eon:    e.Eon,
+		Sender: uint64(senderIndex),
+		Gammas: e.Gammas,
+	})
+	if err != nil {
+		log.Printf("Error handling PolyCommitment: %s", err)
+		return nil
+	}
+	dkg.dirty = true
+	return nil
+}
+
 func (st *ShuttermintState) HandleEvent(ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
 	var err error
 	switch e := event.(type) {
@@ -203,9 +310,8 @@ func (st *ShuttermintState) HandleEvent(ctx context.Context, queries *kprdb.Quer
 	//	//err = shutter.applyDecryptionSignature(*e)
 	case *shutterevents.EonStarted:
 		err = st.handleEonStarted(ctx, queries, e)
-		// err = shutter.applyEonStarted(*e)
-	// case *shutterevents.PolyCommitment:
-	//	//err = shutter.applyPolyCommitment(*e)
+	case *shutterevents.PolyCommitment:
+		err = st.handlePolyCommitment(ctx, queries, e)
 	// case *shutterevents.PolyEval:
 	//	//err = shutter.applyPolyEval(*e)
 	// case *shutterevents.Accusation:
@@ -216,7 +322,7 @@ func (st *ShuttermintState) HandleEvent(ctx context.Context, queries *kprdb.Quer
 	//	//err = shutter.applyEpochSecretKeyShare(*e)
 
 	default:
-		log.Printf("storeEvent not yet implemented for %s", reflect.TypeOf(event))
+		log.Printf("handleEvent not yet implemented for %s", reflect.TypeOf(event))
 	}
 	return err
 }

@@ -1,4 +1,4 @@
--- schema-version: 5 --
+-- schema-version: 6 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -40,7 +40,7 @@ CREATE TABLE keyper.tendermint_sync_meta (
 -- implemented in go, without any database access.  When new events come in, we feed those to the
 -- go object and store it afterwards in the puredkg table.
 CREATE TABLE keyper.puredkg (
-       eon numeric PRIMARY KEY,
+       eon bigint PRIMARY KEY,
        puredkg BYTEA NOT NULL
 );
 
@@ -58,5 +58,20 @@ CREATE TABLE keyper.tendermint_encryption_key(
 
 CREATE TABLE keyper.tendermint_outgoing_messages(
        id SERIAL PRIMARY KEY,
+       description TEXT NOT NULL,
        msg BYTEA NOT NULL
+);
+
+CREATE TABLE keyper.eons(
+       eon bigint PRIMARY KEY,
+       height bigint NOT NULL,
+       batch_index BYTEA NOT NULL,
+       config_index bigint NOT NULL
+);
+
+CREATE TABLE keyper.poly_evals(
+       eon bigint NOT NULL,
+       receiver_address TEXT NOT NULL,
+       eval BYTEA NOT NULL,
+       PRIMARY KEY (eon, receiver_address)
 );

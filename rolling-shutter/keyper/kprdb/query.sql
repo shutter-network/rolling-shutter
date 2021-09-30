@@ -41,6 +41,12 @@ FROM keyper.tendermint_sync_meta
 ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1;
 
+-- name: GetLastCommittedHeight :one
+SELECT last_committed_height
+FROM keyper.tendermint_sync_meta
+ORDER BY current_block DESC, last_committed_height DESC
+LIMIT 1;
+
 -- name: InsertPureDKG :exec
 INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2);
 
@@ -52,11 +58,11 @@ SET puredkg=$2 WHERE eon=$1;
 INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
 
 -- name: GetEncryptionKeys :many
-SELECT * from keyper.tendermint_encryption_key;
+SELECT * FROM keyper.tendermint_encryption_key;
 
 -- name: ScheduleShutterMessage :one
-INSERT INTO keyper.tendermint_outgoing_messages (msg)
-VALUES ($1)
+INSERT INTO keyper.tendermint_outgoing_messages (description, msg)
+VALUES ($1, $2)
 RETURNING id;
 
 -- name: GetNextShutterMessage :one
@@ -65,4 +71,23 @@ ORDER BY id
 LIMIT 1;
 
 -- name: DeleteShutterMessage :exec
-DELETE FROM keyper.tendermint_outgoing_messages where id=$1;
+DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1;
+
+-- name: InsertEon :exec
+INSERT INTO keyper.eons (eon, height, batch_index, config_index)
+VALUES ($1, $2, $3, $4);
+
+-- name: InsertPolyEval :exec
+INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
+VALUES ($1, $2, $3);
+
+-- name: PolyEvalsWithEncryptionKeys :many
+SELECT ev.eon, ev.receiver_address, ev.eval,
+       k.encryption_public_key,
+       eons.height
+FROM keyper.poly_evals ev
+INNER JOIN keyper.tendermint_encryption_key k
+      ON ev.receiver_address = k.address
+INNER JOIN keyper.eons eons
+      ON ev.eon = eons.eon
+ORDER BY ev.eon;

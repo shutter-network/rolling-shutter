@@ -29,7 +29,7 @@ func SendShutterMessages(
 		if err != nil {
 			return err // XXX retry
 		}
-		log.Printf("SEND MESSAGE: %#v", outgoing)
+		log.Printf("send shutter message: %d %s", outgoing.ID, outgoing.Description)
 		err = queries.DeleteShutterMessage(ctx, outgoing.ID)
 		if err != nil {
 			return err

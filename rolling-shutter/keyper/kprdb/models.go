@@ -5,8 +5,6 @@ package kprdb
 import (
 	"database/sql"
 	"time"
-
-	"github.com/jackc/pgtype"
 )
 
 type KeyperDecryptionKey struct {
@@ -25,13 +23,26 @@ type KeyperDecryptionTrigger struct {
 	EpochID []byte
 }
 
+type KeyperEon struct {
+	Eon         int64
+	Height      int64
+	BatchIndex  []byte
+	ConfigIndex int64
+}
+
 type KeyperMetaInf struct {
 	Key   string
 	Value string
 }
 
+type KeyperPolyEval struct {
+	Eon             int64
+	ReceiverAddress string
+	Eval            []byte
+}
+
 type KeyperPuredkg struct {
-	Eon     pgtype.Numeric
+	Eon     int64
 	Puredkg []byte
 }
 
@@ -48,8 +59,9 @@ type KeyperTendermintEncryptionKey struct {
 }
 
 type KeyperTendermintOutgoingMessage struct {
-	ID  int32
-	Msg []byte
+	ID          int32
+	Description string
+	Msg         []byte
 }
 
 type KeyperTendermintSyncMetum struct {
