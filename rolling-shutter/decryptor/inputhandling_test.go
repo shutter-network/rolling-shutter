@@ -53,43 +53,35 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
-	keyEncoded, err := randomDecryptionKey(t).GobEncode()
-	assert.NilError(t, err)
-	m := &shmsg.DecryptionKey{
-		EpochID: 100,
-		Key:     keyEncoded,
+	m := &decryptionKey{
+		epochID: 100,
+		key:     randomDecryptionKey(t),
 	}
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
-	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
+	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.epochID))
 	assert.NilError(t, err)
-	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.EpochID)
-	assert.Check(t, bytes.Equal(mStored.Key, m.Key))
+	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.epochID)
+	keyBytes, _ := m.key.GobEncode()
+	assert.Check(t, bytes.Equal(mStored.Key, keyBytes))
 
 	assert.Check(t, len(msgs) == 0)
 
-	keyEncoded2, err := randomDecryptionKey(t).GobEncode()
 	assert.NilError(t, err)
-	m2 := &shmsg.DecryptionKey{
-		EpochID: 100,
-		Key:     keyEncoded2,
+	m2 := &decryptionKey{
+		epochID: 100,
+		key:     randomDecryptionKey(t),
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
-	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
+	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.epochID))
 	assert.NilError(t, err)
-	assert.Check(t, bytes.Equal(m2Stored.Key, m.Key))
+	// We check that the key in the database is still the first key not the second
+	assert.Check(t, bytes.Equal(m2Stored.Key, keyBytes))
 
 	assert.Check(t, len(msgs) == 0)
-
-	m3 := &shmsg.DecryptionKey{
-		EpochID: 100,
-		Key:     []byte("invalidKey"),
-	}
-	_, err = handleDecryptionKeyInput(ctx, config, db, m3)
-	assert.Check(t, err != nil)
 }
 
 func TestInsertCipherBatchIntegration(t *testing.T) {
@@ -102,7 +94,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
-	m := &shmsg.CipherBatch{
+	m := &cipherBatch{
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx1"), []byte("tx2")},
 	}
@@ -115,7 +107,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	assert.DeepEqual(t, mStored.Transactions, m.Transactions)
 	assert.Check(t, len(msgs) == 0)
 
-	m2 := &shmsg.CipherBatch{
+	m2 := &cipherBatch{
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx3")},
 	}
@@ -139,7 +131,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
-	cipherBatchMsg := &shmsg.CipherBatch{
+	cipherBatchMsg := &cipherBatch{
 		EpochID:      123,
 		Transactions: [][]byte{[]byte("tx1")},
 	}
@@ -147,11 +139,10 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
-	keyEncoded, err := randomDecryptionKey(t).GobEncode()
 	assert.NilError(t, err)
-	keyMsg := &shmsg.DecryptionKey{
-		EpochID: 123,
-		Key:     keyEncoded,
+	keyMsg := &decryptionKey{
+		epochID: 123,
+		key:     randomDecryptionKey(t),
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)

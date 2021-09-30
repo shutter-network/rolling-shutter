@@ -3,7 +3,6 @@ package decryptor
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -25,9 +24,8 @@ var gossipTopicNames = [3]string{dcrtopics.CipherBatch, dcrtopics.DecryptionKey,
 type Decryptor struct {
 	Config Config
 
-	p2p        *p2p.P2P
-	db         *dcrdb.Queries
-	instanceID uint64
+	p2p *p2p.P2P
+	db  *dcrdb.Queries
 }
 
 func New(config Config) *Decryptor {
@@ -41,9 +39,8 @@ func New(config Config) *Decryptor {
 	return &Decryptor{
 		Config: config,
 
-		p2p:        p,
-		db:         nil,
-		instanceID: config.InstanceID,
+		p2p: p,
+		db:  nil,
 	}
 }
 
@@ -108,9 +105,9 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 	}
 
 	switch typedMsg := unmarshalled.(type) {
-	case *shmsg.DecryptionKey:
+	case *decryptionKey:
 		msgsOut, err = handleDecryptionKeyInput(ctx, d.Config, d.db, typedMsg)
-	case *shmsg.CipherBatch:
+	case *cipherBatch:
 		msgsOut, err = handleCipherBatchInput(ctx, d.Config, d.db, typedMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
@@ -140,7 +137,7 @@ func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error
 
 func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 	validators := make(map[string]pubsub.Validator)
-	instanceIDValidator := makeInstanceIDValidator(d.instanceID)
+	instanceIDValidator := d.makeInstanceIDValidator()
 	for _, topicName := range gossipTopicNames {
 		validators[topicName] = instanceIDValidator
 	}
@@ -148,7 +145,7 @@ func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 	return validators
 }
 
-func makeInstanceIDValidator(instanceID uint64) pubsub.Validator {
+func (d *Decryptor) makeInstanceIDValidator() pubsub.Validator {
 	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
 		p2pMessage := new(p2p.Message)
 		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
@@ -158,43 +155,6 @@ func makeInstanceIDValidator(instanceID uint64) pubsub.Validator {
 		if err != nil {
 			return false
 		}
-		return msg.GetInstanceID() == instanceID
+		return msg.GetInstanceID() == d.Config.InstanceID
 	}
-}
-
-func unmarshalP2PMessage(msg *p2p.Message) (shmsg.P2PMessage, error) {
-	if msg == nil {
-		return nil, nil
-	}
-	switch msg.Topic {
-	case dcrtopics.DecryptionKey:
-		decryptionKeyMsg := shmsg.DecryptionKey{}
-		if err := proto.Unmarshal(msg.Message, &decryptionKeyMsg); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal decryption key message")
-		}
-		return &decryptionKeyMsg, nil
-	case dcrtopics.CipherBatch:
-		cipherBatchMsg := shmsg.CipherBatch{}
-		if err := proto.Unmarshal(msg.Message, &cipherBatchMsg); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal cipher batch message")
-		}
-		return &cipherBatchMsg, nil
-	case dcrtopics.DecryptionSignature:
-		decryptionSignature := shmsg.AggregatedDecryptionSignature{}
-		if err := proto.Unmarshal(msg.Message, &decryptionSignature); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal decryption signature message")
-		}
-		return &decryptionSignature, nil
-	default:
-		return nil, &unhandledTopicError{msg.Topic, "unhandled topic from message"}
-	}
-}
-
-type unhandledTopicError struct {
-	topic string
-	msg   string
-}
-
-func (e *unhandledTopicError) Error() string {
-	return fmt.Sprintf("%s: %s", e.msg, e.topic)
 }

@@ -22,6 +22,9 @@ func TestMessageValidators(t *testing.T) {
 		InstanceID: 123,
 	})
 	validators := d.makeMessagesValidators()
+	validDecryptionKey := make([]byte, 64)
+	validSignature := make([]byte, 128)
+	validHash := make([]byte, 64)
 	tests := []struct {
 		valid bool
 		msg   shmsg.P2PMessage
@@ -29,37 +32,40 @@ func TestMessageValidators(t *testing.T) {
 		{
 			valid: true,
 			msg: &shmsg.DecryptionKey{
-				InstanceID: d.instanceID,
+				InstanceID: d.Config.InstanceID,
+				Key:        validDecryptionKey,
 			},
 		},
 		{
 			valid: true,
 			msg: &shmsg.AggregatedDecryptionSignature{
-				InstanceID: d.instanceID,
+				InstanceID:          d.Config.InstanceID,
+				AggregatedSignature: validSignature,
+				SignedHash:          validHash,
 			},
 		},
 		{
 			valid: true,
 			msg: &shmsg.CipherBatch{
-				InstanceID: d.instanceID,
+				InstanceID: d.Config.InstanceID,
 			},
 		},
 		{
 			valid: false,
 			msg: &shmsg.DecryptionKey{
-				InstanceID: d.instanceID + 1,
+				InstanceID: d.Config.InstanceID + 1,
 			},
 		},
 		{
 			valid: false,
 			msg: &shmsg.AggregatedDecryptionSignature{
-				InstanceID: d.instanceID - 1,
+				InstanceID: d.Config.InstanceID - 1,
 			},
 		},
 		{
 			valid: false,
 			msg: &shmsg.CipherBatch{
-				InstanceID: d.instanceID + 2,
+				InstanceID: d.Config.InstanceID + 2,
 			},
 		},
 	}
@@ -71,7 +77,7 @@ func TestMessageValidators(t *testing.T) {
 		validate := validators[pubsubMessage.GetTopic()]
 		assert.Assert(t, validate != nil)
 		assert.Equal(t, validate(ctx, peerID, pubsubMessage), tc.valid,
-			"validate failed valid=%t msg=%+v", tc.valid, tc.msg)
+			"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 	}
 }
 

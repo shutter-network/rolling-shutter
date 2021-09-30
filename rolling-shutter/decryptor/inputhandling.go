@@ -17,40 +17,29 @@ func handleDecryptionKeyInput(
 	ctx context.Context,
 	config Config,
 	db *dcrdb.Queries,
-	key *shmsg.DecryptionKey,
+	key *decryptionKey,
 ) ([]shmsg.P2PMessage, error) {
-	decryptionKey := new(shcrypto.EpochSecretKey)
-	err := decryptionKey.GobDecode(key.Key)
-	if err != nil {
-		return nil, errors.Wrapf(err, "received invalid decryption key for epoch %d", key.EpochID)
-	}
 
-	// TODO: verify epoch secret key against eon public key stored in db. We don't know the eon
-	// public key yet, so this is commented out.
-	// eonPublicKey := getEonPublicKeyFromDB(ctx, db, key.EpochID)
-	// if err = checkEpochSecretKey(decryptionKey, eonPublicKey, key.EpochID); err != nil {
-	// 	return nil, errors.Wrapf(err, "received decryption key does not match eon public key for epoch %d", key.EpochID)
-	// }
-
+	keyBytes, _ := key.key.GobEncode()
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
-		EpochID: medley.Uint64EpochIDToBytes(key.EpochID),
-		Key:     key.Key,
+		EpochID: medley.Uint64EpochIDToBytes(key.epochID),
+		Key:     keyBytes,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to store multiple keys for same epoch %d", key.EpochID)
+		log.Printf("attempted to store multiple keys for same epoch %d", key.epochID)
 		return nil, nil
 	}
-	return handleEpoch(ctx, config, db, key.EpochID)
+	return handleEpoch(ctx, config, db, key.epochID)
 }
 
 func handleCipherBatchInput(
 	ctx context.Context,
 	config Config,
 	db *dcrdb.Queries,
-	cipherBatch *shmsg.CipherBatch,
+	cipherBatch *cipherBatch,
 ) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
 		EpochID:      medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
@@ -98,7 +87,7 @@ func handleEpoch(
 
 	decryptedBatch := decryptCipherBatch(cipherBatch.Transactions, decryptionKey)
 	signingData := DecryptionSigningData{
-		InstanceID:     0,
+		InstanceID:     config.InstanceID,
 		EpochID:        epochID,
 		CipherBatch:    cipherBatch.Transactions,
 		DecryptedBatch: decryptedBatch,
