@@ -79,15 +79,24 @@ SELECT
     member.start_epoch_id,
     member.index,
     member.address,
-    decryptor_identity.bls_public_key
+    identity.bls_public_key
 FROM (
-    SELECT start_epoch_id, index, address FROM decryptor.decryptor_set_member
-    WHERE start_epoch_id <= $1
-    ORDER BY start_epoch_id DESC
-    FETCH FIRST ROW WITH TIES
+    SELECT
+        start_epoch_id,
+        index,
+        address
+    FROM decryptor.decryptor_set_member
+    WHERE start_epoch_id = (
+        SELECT
+            m.start_epoch_id
+        FROM decryptor.decryptor_set_member AS m
+        WHERE m.start_epoch_id <= $1
+        ORDER BY m.start_epoch_id DESC
+        LIMIT 1
+    )
 ) AS member
-INNER JOIN decryptor.decryptor_identity
-ON member.address=decryptor.decryptor_identity.address
+LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+ON member.address = identity.address
 ORDER BY index
 `
 
