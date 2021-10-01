@@ -34,6 +34,50 @@ INSERT INTO decryptor.decryption_signature (
 )
 ON CONFLICT DO NOTHING;
 
+-- name: InsertDecryptorIdentity :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, bls_public_key
+) VALUES (
+    $1, $2
+);
+
+-- name: InsertDecryptorSetMember :exec
+INSERT INTO decryptor.decryptor_set_member (
+    start_epoch_id, index, address
+) VALUES (
+    $1, $2, $3
+);
+
+-- name: GetDecryptorSet :many
+SELECT
+    member.start_epoch_id,
+    member.index,
+    member.address,
+    identity.bls_public_key
+FROM (
+    SELECT
+        start_epoch_id,
+        index,
+        address
+    FROM decryptor.decryptor_set_member
+    WHERE start_epoch_id = (
+        SELECT
+            m.start_epoch_id
+        FROM decryptor.decryptor_set_member AS m
+        WHERE m.start_epoch_id <= $1
+        ORDER BY m.start_epoch_id DESC
+        LIMIT 1
+    )
+) AS member
+LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+ON member.address = identity.address
+ORDER BY index;
+
+-- name: GetDecryptorIndex :one
+SELECT index
+FROM decryptor.decryptor_set_member
+WHERE start_epoch_id <= $1 AND address = $2;
+
 -- name: InsertMeta :exec
 INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);
 

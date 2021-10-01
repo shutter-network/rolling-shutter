@@ -5,6 +5,7 @@ package dcrdb
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -53,6 +54,82 @@ func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionS
 		&i.Signature,
 	)
 	return i, err
+}
+
+const getDecryptorIndex = `-- name: GetDecryptorIndex :one
+SELECT index
+FROM decryptor.decryptor_set_member
+WHERE start_epoch_id <= $1 AND address = $2
+`
+
+type GetDecryptorIndexParams struct {
+	StartEpochID []byte
+	Address      sql.NullString
+}
+
+func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexParams) (int32, error) {
+	row := q.db.QueryRow(ctx, getDecryptorIndex, arg.StartEpochID, arg.Address)
+	var index int32
+	err := row.Scan(&index)
+	return index, err
+}
+
+const getDecryptorSet = `-- name: GetDecryptorSet :many
+SELECT
+    member.start_epoch_id,
+    member.index,
+    member.address,
+    identity.bls_public_key
+FROM (
+    SELECT
+        start_epoch_id,
+        index,
+        address
+    FROM decryptor.decryptor_set_member
+    WHERE start_epoch_id = (
+        SELECT
+            m.start_epoch_id
+        FROM decryptor.decryptor_set_member AS m
+        WHERE m.start_epoch_id <= $1
+        ORDER BY m.start_epoch_id DESC
+        LIMIT 1
+    )
+) AS member
+LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+ON member.address = identity.address
+ORDER BY index
+`
+
+type GetDecryptorSetRow struct {
+	StartEpochID []byte
+	Index        int32
+	Address      sql.NullString
+	BlsPublicKey []byte
+}
+
+func (q *Queries) GetDecryptorSet(ctx context.Context, startEpochID []byte) ([]GetDecryptorSetRow, error) {
+	rows, err := q.db.Query(ctx, getDecryptorSet, startEpochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDecryptorSetRow
+	for rows.Next() {
+		var i GetDecryptorSetRow
+		if err := rows.Scan(
+			&i.StartEpochID,
+			&i.Index,
+			&i.Address,
+			&i.BlsPublicKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getMeta = `-- name: GetMeta :one
@@ -125,6 +202,43 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 		arg.SignerIndex,
 		arg.Signature,
 	)
+}
+
+const insertDecryptorIdentity = `-- name: InsertDecryptorIdentity :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, bls_public_key
+) VALUES (
+    $1, $2
+)
+`
+
+type InsertDecryptorIdentityParams struct {
+	Address      string
+	BlsPublicKey []byte
+}
+
+func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecryptorIdentityParams) error {
+	_, err := q.db.Exec(ctx, insertDecryptorIdentity, arg.Address, arg.BlsPublicKey)
+	return err
+}
+
+const insertDecryptorSetMember = `-- name: InsertDecryptorSetMember :exec
+INSERT INTO decryptor.decryptor_set_member (
+    start_epoch_id, index, address
+) VALUES (
+    $1, $2, $3
+)
+`
+
+type InsertDecryptorSetMemberParams struct {
+	StartEpochID []byte
+	Index        int32
+	Address      sql.NullString
+}
+
+func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryptorSetMemberParams) error {
+	_, err := q.db.Exec(ctx, insertDecryptorSetMember, arg.StartEpochID, arg.Index, arg.Address)
+	return err
 }
 
 const insertMeta = `-- name: InsertMeta :exec
