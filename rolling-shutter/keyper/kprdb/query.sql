@@ -48,7 +48,8 @@ ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1;
 
 -- name: InsertPureDKG :exec
-INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2);
+INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
+ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg;
 
 -- name: UpdatePureDKG :exec
 UPDATE keyper.puredkg

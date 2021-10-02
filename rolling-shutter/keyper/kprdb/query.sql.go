@@ -260,6 +260,7 @@ func (q *Queries) InsertPolyEval(ctx context.Context, arg InsertPolyEvalParams) 
 
 const insertPureDKG = `-- name: InsertPureDKG :exec
 INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
+ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg
 `
 
 type InsertPureDKGParams struct {
