@@ -3,6 +3,7 @@ package keyper
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -17,6 +18,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 var GossipTopicNames = []string{kprtopics.DecryptionTrigger, kprtopics.DecryptionKey}
@@ -61,6 +63,7 @@ func Run(ctx context.Context, config Config) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
 	err = kprdb.ValidateKeyperDB(ctx, dbpool)
 	if err != nil {

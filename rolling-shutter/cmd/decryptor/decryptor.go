@@ -18,6 +18,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 var (
@@ -86,7 +87,7 @@ func initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Println("database successfully initialized")
+	log.Printf("Database initialized (%s)", shdb.ConnectionInfo(dbpool))
 
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -58,6 +59,7 @@ func (d *Decryptor) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
 	err = dcrdb.ValidateDecryptorDB(ctx, dbpool)
 	if err != nil {

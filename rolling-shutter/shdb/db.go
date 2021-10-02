@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"math/big"
 	"regexp"
@@ -11,12 +12,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 )
 
 const SchemaVersionKey = "schema-version"
+
+// ConnectionInfo returns a string describing the current database connection.
+func ConnectionInfo(dbpool *pgxpool.Pool) string {
+	cc := dbpool.Config().ConnConfig
+	return fmt.Sprintf("host=%s, user=%s, db=%s", cc.Host, cc.User, cc.Database)
+}
 
 // MustFindSchemaVersion extracts the expected schema version from schema.sql files that should
 // contain a header like:
