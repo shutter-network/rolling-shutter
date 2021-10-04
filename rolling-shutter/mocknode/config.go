@@ -25,6 +25,8 @@ type Config struct {
 	SendDecryptionKeys     bool
 
 	DecryptorPublicKey *shbls.PublicKey // a public key to verify received decryption signatures against
+	EonKeySeed         int64            // a seed value used to generate the eon key
+
 }
 
 var configTemplate = `# Shutter mock node config for /p2p/{{ .P2PKey | P2PKeyPublic}}
@@ -44,6 +46,7 @@ SendCipherBatches       = {{ .SendCipherBatches }}
 SendDecryptionKeys      = {{ .SendDecryptionKeys }}
 
 DecryptorPublicKey = "{{ .DecryptorPublicKey | BLSPublicKey }}"
+EonKeySeed         = {{ .EonKeySeed }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)

@@ -111,6 +111,7 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendDecryptionKeys:     true,
 
 		DecryptorPublicKey: decryptorPublicKey,
+		EonKeySeed:         0,
 	}
 	return &config, nil
 }
