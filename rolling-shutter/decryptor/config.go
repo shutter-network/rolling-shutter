@@ -22,6 +22,8 @@ type Config struct {
 	P2PKey     crypto.PrivKey
 	SigningKey *shbls.SecretKey
 
+	RequiredSignatures uint
+
 	InstanceID uint64
 }
 
@@ -39,6 +41,9 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
 
+# Number of individual signatures required to form an accepted aggregated signature
+requiredSignatures = {{.RequiredSignatures}}
+
 # ID shared by all shutter participants for common instance
 InstanceID = {{ .InstanceID }}
 `
@@ -50,7 +55,7 @@ func (config *Config) WriteTOML(w io.Writer) error {
 	return tmpl.Execute(w, config)
 }
 
-// Unmarshal unmarshals a DecryptorConfig from the the given Viper object.
+// Unmarshal unmarshals a DecryptorConfig from the given Viper object.
 func (config *Config) Unmarshal(v *viper.Viper) error {
 	return v.Unmarshal(
 		config,

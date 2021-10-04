@@ -16,9 +16,9 @@ CREATE TABLE IF NOT EXISTS decryptor.decryption_key (
 CREATE TABLE IF NOT EXISTS decryptor.decryption_signature (
        epoch_id bytea,
        signed_hash bytea,
-       signer_index bigint,
+       signers_bitfield bytea,
        signature bytea,
-       PRIMARY KEY (epoch_id, signer_index)
+       PRIMARY KEY (epoch_id, signers_bitfield)
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
        address text PRIMARY KEY,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
        start_epoch_id bytea,
        index int,
-       address text,
+       address text NOT NULL,
        PRIMARY KEY (start_epoch_id, index)
 );
 CREATE TABLE IF NOT EXISTS decryptor.keyper_set(

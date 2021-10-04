@@ -22,13 +22,17 @@ INSERT INTO decryptor.decryption_key (
 )
 ON CONFLICT DO NOTHING;
 
+-- name: GetDecryptionSignatures :many
+SELECT * FROM decryptor.decryption_signature
+WHERE epoch_id = $1;
+
 -- name: GetDecryptionSignature :one
 SELECT * FROM decryptor.decryption_signature
-WHERE epoch_id = $1 AND signer_index = $2;
+WHERE epoch_id = $1 AND signers_bitfield = $2;
 
 -- name: InsertDecryptionSignature :execresult
 INSERT INTO decryptor.decryption_signature (
-    epoch_id, signed_hash, signer_index, signature
+    epoch_id, signed_hash, signers_bitfield, signature
 ) VALUES (
     $1, $2, $3, $4
 )
@@ -77,6 +81,16 @@ ORDER BY index;
 SELECT index
 FROM decryptor.decryptor_set_member
 WHERE start_epoch_id <= $1 AND address = $2;
+
+-- name: GetDecryptor :one
+SELECT * FROM decryptor.decryptor_set_member
+WHERE index = $1 ORDER BY start_epoch_id DESC LIMIT 1;
+
+-- name: GetDecryptorKey :one
+SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
+    SELECT address from decryptor.decryptor_set_member
+    WHERE index = $1 AND start_epoch_id <= $2 ORDER BY start_epoch_id DESC LIMIT 1
+);
 
 -- name: InsertEonPublicKey :exec
 INSERT INTO decryptor.eon_public_key (

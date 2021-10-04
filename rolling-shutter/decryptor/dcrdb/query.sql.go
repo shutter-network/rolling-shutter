@@ -5,7 +5,6 @@ package dcrdb
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -35,24 +34,66 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 }
 
 const getDecryptionSignature = `-- name: GetDecryptionSignature :one
-SELECT epoch_id, signed_hash, signer_index, signature FROM decryptor.decryption_signature
-WHERE epoch_id = $1 AND signer_index = $2
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.decryption_signature
+WHERE epoch_id = $1 AND signers_bitfield = $2
 `
 
 type GetDecryptionSignatureParams struct {
-	EpochID     []byte
-	SignerIndex int64
+	EpochID         []byte
+	SignersBitfield []byte
 }
 
 func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionSignatureParams) (DecryptorDecryptionSignature, error) {
-	row := q.db.QueryRow(ctx, getDecryptionSignature, arg.EpochID, arg.SignerIndex)
+	row := q.db.QueryRow(ctx, getDecryptionSignature, arg.EpochID, arg.SignersBitfield)
 	var i DecryptorDecryptionSignature
 	err := row.Scan(
 		&i.EpochID,
 		&i.SignedHash,
-		&i.SignerIndex,
+		&i.SignersBitfield,
 		&i.Signature,
 	)
+	return i, err
+}
+
+const getDecryptionSignatures = `-- name: GetDecryptionSignatures :many
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.decryption_signature
+WHERE epoch_id = $1
+`
+
+func (q *Queries) GetDecryptionSignatures(ctx context.Context, epochID []byte) ([]DecryptorDecryptionSignature, error) {
+	rows, err := q.db.Query(ctx, getDecryptionSignatures, epochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DecryptorDecryptionSignature
+	for rows.Next() {
+		var i DecryptorDecryptionSignature
+		if err := rows.Scan(
+			&i.EpochID,
+			&i.SignedHash,
+			&i.SignersBitfield,
+			&i.Signature,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDecryptor = `-- name: GetDecryptor :one
+SELECT start_epoch_id, index, address FROM decryptor.decryptor_set_member
+WHERE index = $1 ORDER BY start_epoch_id DESC LIMIT 1
+`
+
+func (q *Queries) GetDecryptor(ctx context.Context, index int32) (DecryptorDecryptorSetMember, error) {
+	row := q.db.QueryRow(ctx, getDecryptor, index)
+	var i DecryptorDecryptorSetMember
+	err := row.Scan(&i.StartEpochID, &i.Index, &i.Address)
 	return i, err
 }
 
@@ -64,7 +105,7 @@ WHERE start_epoch_id <= $1 AND address = $2
 
 type GetDecryptorIndexParams struct {
 	StartEpochID []byte
-	Address      sql.NullString
+	Address      string
 }
 
 func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexParams) (int32, error) {
@@ -72,6 +113,25 @@ func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexPa
 	var index int32
 	err := row.Scan(&index)
 	return index, err
+}
+
+const getDecryptorKey = `-- name: GetDecryptorKey :one
+SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
+    SELECT address from decryptor.decryptor_set_member
+    WHERE index = $1 AND start_epoch_id <= $2 ORDER BY start_epoch_id DESC LIMIT 1
+)
+`
+
+type GetDecryptorKeyParams struct {
+	Index        int32
+	StartEpochID []byte
+}
+
+func (q *Queries) GetDecryptorKey(ctx context.Context, arg GetDecryptorKeyParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getDecryptorKey, arg.Index, arg.StartEpochID)
+	var bls_public_key []byte
+	err := row.Scan(&bls_public_key)
+	return bls_public_key, err
 }
 
 const getDecryptorSet = `-- name: GetDecryptorSet :many
@@ -103,7 +163,7 @@ ORDER BY index
 type GetDecryptorSetRow struct {
 	StartEpochID []byte
 	Index        int32
-	Address      sql.NullString
+	Address      string
 	BlsPublicKey []byte
 }
 
@@ -196,7 +256,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 
 const insertDecryptionSignature = `-- name: InsertDecryptionSignature :execresult
 INSERT INTO decryptor.decryption_signature (
-    epoch_id, signed_hash, signer_index, signature
+    epoch_id, signed_hash, signers_bitfield, signature
 ) VALUES (
     $1, $2, $3, $4
 )
@@ -204,17 +264,17 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionSignatureParams struct {
-	EpochID     []byte
-	SignedHash  []byte
-	SignerIndex int64
-	Signature   []byte
+	EpochID         []byte
+	SignedHash      []byte
+	SignersBitfield []byte
+	Signature       []byte
 }
 
 func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecryptionSignatureParams) (pgconn.CommandTag, error) {
 	return q.db.Exec(ctx, insertDecryptionSignature,
 		arg.EpochID,
 		arg.SignedHash,
-		arg.SignerIndex,
+		arg.SignersBitfield,
 		arg.Signature,
 	)
 }
@@ -248,7 +308,7 @@ INSERT INTO decryptor.decryptor_set_member (
 type InsertDecryptorSetMemberParams struct {
 	StartEpochID []byte
 	Index        int32
-	Address      sql.NullString
+	Address      string
 }
 
 func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryptorSetMemberParams) error {
