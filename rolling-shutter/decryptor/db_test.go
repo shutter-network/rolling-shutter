@@ -1,10 +1,12 @@
 package decryptor
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"testing"
 
+	"github.com/jackc/pgx/v4"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
@@ -80,4 +82,39 @@ func TestGetDecryptorSet(t *testing.T) {
 			BlsPublicKey: keys[2],
 		},
 	})
+}
+
+func TestEonPublicKey(t *testing.T) {
+	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
+	key1 := []byte("key1")
+	key2 := []byte("key2")
+
+	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
+		StartEpochID: medley.Uint64EpochIDToBytes(uint64(10)),
+		EonPublicKey: key1,
+	})
+	assert.NilError(t, err)
+	err = db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
+		StartEpochID: medley.Uint64EpochIDToBytes(uint64(20)),
+		EonPublicKey: key2,
+	})
+	assert.NilError(t, err)
+
+	epochIDs := []uint64{5, 9, 10, 15, 19, 20, 21, 25}
+	keys := [][]byte{nil, nil, key1, key1, key1, key2, key2, key2}
+
+	for i := 0; i < len(epochIDs); i++ {
+		epochIDBytes := medley.Uint64EpochIDToBytes(epochIDs[i])
+		expectedKey := keys[i]
+		key, err := db.GetEonPublicKey(ctx, epochIDBytes)
+		if expectedKey == nil {
+			assert.Check(t, err == pgx.ErrNoRows)
+		} else {
+			assert.NilError(t, err)
+			assert.Check(t, bytes.Equal(key, expectedKey))
+		}
+	}
 }
