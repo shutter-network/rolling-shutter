@@ -112,6 +112,16 @@ INSERT INTO decryptor.keyper_set (
     $1, $2, $3
 );
 
+-- name: GetKeyperSet :one
+SELECT (
+    start_epoch_id,
+    keypers,
+    threshold
+) FROM decryptor.keyper_set
+WHERE start_epoch_id <= $1
+ORDER BY start_epoch_id DESC
+LIMIT 1;
+
 -- name: InsertMeta :exec
 INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);
 
