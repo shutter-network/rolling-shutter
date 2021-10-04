@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/rpc/client"
@@ -24,13 +23,15 @@ type ShuttermintDriver struct {
 	shuttermintState *ShuttermintState
 }
 
+var errEmptyBlockchain = errors.New("empty shuttermint blockchain")
+
 func getLastCommittedHeight(ctx context.Context, shmcl client.Client) (int64, error) {
 	latestBlock, err := shmcl.Block(ctx, nil)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get last committed height of shuttermint chain")
 	}
 	if latestBlock.Block == nil || latestBlock.Block.LastCommit == nil {
-		return 0, errors.Errorf("empty blockchain: %+v", latestBlock)
+		return 0, errEmptyBlockchain
 	}
 	return latestBlock.Block.LastCommit.Height, nil
 }
@@ -58,6 +59,10 @@ func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
 	currentBlock := oldMeta.CurrentBlock
 
 	lastCommittedHeight, err := getLastCommittedHeight(ctx, smdrv.shmcl)
+	if errors.Is(err, errEmptyBlockchain) {
+		log.Printf("shuttermint blockchain still empty")
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -158,15 +163,25 @@ func (smdrv *ShuttermintDriver) innerHandleTransactions(
 		return err
 	}
 	for _, tx := range txs {
+		err = smdrv.shuttermintState.shiftPhases(ctx, queries, tx.Height)
+		if err != nil {
+			return err
+		}
+
 		events := makeEvents(tx.Height, tx.TxResult.GetEvents())
 		for _, ev := range events {
-			pretty.Println("=>", ev)
 			err = smdrv.shuttermintState.HandleEvent(ctx, queries, ev)
 			if err != nil {
 				return err
 			}
 		}
 	}
+
+	err = smdrv.shuttermintState.shiftPhases(ctx, queries, newCurrentBlock)
+	if err != nil {
+		return err
+	}
+
 	return smdrv.shuttermintState.StoreAppState(ctx, queries)
 }
 

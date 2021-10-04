@@ -19,6 +19,23 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const deletePolyEval = `-- name: DeletePolyEval :exec
+
+DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2
+`
+
+type DeletePolyEvalParams struct {
+	Eon             int64
+	ReceiverAddress string
+}
+
+// PolyEvalsWithEncryptionKeys could probably already delete the entries from the poly_evals table.
+// I wasn't able to make this work, because of bugs in sqlc
+func (q *Queries) DeletePolyEval(ctx context.Context, arg DeletePolyEvalParams) error {
+	_, err := q.db.Exec(ctx, deletePolyEval, arg.Eon, arg.ReceiverAddress)
+	return err
+}
+
 const deleteShutterMessage = `-- name: DeleteShutterMessage :exec
 DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1
 `

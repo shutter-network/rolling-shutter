@@ -28,6 +28,12 @@ type Accusation struct {
 	Accused []common.Address
 }
 
+func (acc *Accusation) String() string {
+	return fmt.Sprintf(
+		"Accusation{Height: %d, Eon: %d, Sender: %s, Accused: %s}",
+		acc.Height, acc.Eon, acc.Sender, acc.Accused)
+}
+
 func (acc Accusation) MakeABCIEvent() abcitypes.Event {
 	return abcitypes.Event{
 		Type: evtype.Accusation,
@@ -94,6 +100,12 @@ type Apology struct {
 	Sender   common.Address
 	Accusers []common.Address
 	PolyEval []*big.Int
+}
+
+func (msg *Apology) String() string {
+	return fmt.Sprintf(
+		"Apology{Height: %d, Eon: %d, Sender: %s, Accusers: %s}",
+		msg.Height, msg.Eon, msg.Sender, msg.Accusers)
 }
 
 func (msg Apology) MakeABCIEvent() abcitypes.Event {
@@ -361,6 +373,15 @@ type PolyCommitment struct {
 	Gammas *shcrypto.Gammas
 }
 
+func (msg *PolyCommitment) String() string {
+	return fmt.Sprintf(
+		"PolyCommitment{Height=%d, Eon=%d, Sender=%s}",
+		msg.Height,
+		msg.Eon,
+		msg.Sender,
+	)
+}
+
 func (msg PolyCommitment) MakeABCIEvent() abcitypes.Event {
 	return abcitypes.Event{
 		Type: evtype.PolyCommitment,
@@ -407,6 +428,15 @@ type PolyEval struct {
 	Eon            uint64
 	Receivers      []common.Address
 	EncryptedEvals [][]byte
+}
+
+func (msg *PolyEval) String() string {
+	return fmt.Sprintf(
+		"PolyEval{Height: %d, Sender: %s, Eon: %d, Receivers: %s}",
+		msg.Height,
+		msg.Sender,
+		msg.Eon,
+		msg.Receivers)
 }
 
 func (msg PolyEval) MakeABCIEvent() abcitypes.Event {

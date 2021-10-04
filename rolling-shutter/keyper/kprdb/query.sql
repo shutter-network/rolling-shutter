@@ -92,3 +92,9 @@ INNER JOIN keyper.tendermint_encryption_key k
 INNER JOIN keyper.eons eons
       ON ev.eon = eons.eon
 ORDER BY ev.eon;
+
+-- PolyEvalsWithEncryptionKeys could probably already delete the entries from the poly_evals table.
+-- I wasn't able to make this work, because of bugs in sqlc
+
+-- name: DeletePolyEval :exec
+DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2;

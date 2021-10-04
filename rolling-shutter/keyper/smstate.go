@@ -3,8 +3,10 @@ package keyper
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
 	"fmt"
 	"log"
+	"math/big"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,6 +26,10 @@ type ActiveDKG struct {
 	startHeight int64
 	dirty       bool
 	keypers     []common.Address
+}
+
+func (dkg *ActiveDKG) markDirty() {
+	dkg.dirty = true
 }
 
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
@@ -92,10 +98,61 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 	if err != nil {
 		return err
 	}
-	for _, eval := range evals {
-		fmt.Printf("SEND POLY EVALS: %#v", eval)
+
+	var receivers []common.Address
+	var encryptedEvals [][]byte
+	currentEon := int64(-1)
+
+	send := func() error {
+		if len(encryptedEvals) == 0 {
+			return nil
+		}
+		defer func() {
+			receivers = nil
+			encryptedEvals = nil
+		}()
+		return st.scheduleShutterMessage(
+			ctx,
+			queries,
+			fmt.Sprintf("poly eval eon=%d", currentEon),
+			shmsg.NewPolyEval(uint64(currentEon), receivers, encryptedEvals),
+		)
 	}
-	return nil
+
+	for _, eval := range evals {
+		if eval.Eon != currentEon {
+			err = send()
+			if err != nil {
+				return err
+			}
+			currentEon = eval.Eon
+		}
+
+		fmt.Printf("SEND POLY EVALS: eon=%d receiver=%s\n", eval.Eon, eval.ReceiverAddress)
+		receiver, err := shdb.DecodeAddress(eval.ReceiverAddress)
+		if err != nil {
+			return err
+		}
+		pubkey, ok := st.encryptionKeys[receiver]
+		if !ok {
+			panic("key not loaded into ShuttermintState")
+		}
+		encrypted, err := ecies.Encrypt(rand.Reader, pubkey, eval.Eval, nil, nil)
+		if err != nil {
+			return err
+		}
+		receivers = append(receivers, receiver)
+		encryptedEvals = append(encryptedEvals, encrypted)
+
+		err = queries.DeletePolyEval(ctx, kprdb.DeletePolyEvalParams{
+			Eon:             eval.Eon,
+			ReceiverAddress: eval.ReceiverAddress,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return send()
 }
 
 func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queries) error {
@@ -103,11 +160,11 @@ func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Qu
 	if err != nil {
 		return err
 	}
+
 	for eon, a := range st.dkg {
 		if !a.dirty {
 			continue
 		}
-		log.Printf("Storing dirty puredkg for eon %d", eon)
 		pureBytes, err := shdb.EncodePureDKG(a.pure)
 		if err != nil {
 			return err
@@ -180,7 +237,8 @@ func (st *ShuttermintState) handleBatchConfig(
 	)
 }
 
-func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted) error {
+func (st *ShuttermintState) handleEonStarted(
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted) error {
 	if !st.isKeyper {
 		return nil
 	}
@@ -226,23 +284,34 @@ func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb
 		panic("phase is off")
 	}
 
-	pure := puredkg.NewPureDKG(e.Eon, uint64(len(batchConfig.Keypers)), uint64(batchConfig.Threshold), uint64(keyperIndex))
+	pure := puredkg.NewPureDKG(
+		e.Eon,
+		uint64(len(batchConfig.Keypers)),
+		uint64(batchConfig.Threshold),
+		uint64(keyperIndex),
+	)
 	st.dkg[e.Eon] = &ActiveDKG{
 		pure:        &pure,
 		dirty:       true,
 		startHeight: e.Height,
 		keypers:     keypers,
 	}
+	return st.shiftPhase(ctx, queries, e.Height, e.Eon, st.dkg[e.Eon])
+}
+
+func (st *ShuttermintState) startPhase1Dealing(
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	pure := dkg.pure
 	commitment, polyEvals, err := pure.StartPhase1Dealing()
 	if err != nil {
 		log.Fatalf("Aborting due to unexpected error: %+v", err)
 	}
-
+	dkg.markDirty()
 	err = st.scheduleShutterMessage(
 		ctx,
 		queries,
-		fmt.Sprintf("poly commitment, eon=%d", e.Eon),
-		shmsg.NewPolyCommitment(e.Eon, commitment.Gammas),
+		fmt.Sprintf("poly commitment, eon=%d", eon),
+		shmsg.NewPolyCommitment(eon, commitment.Gammas),
 	)
 	if err != nil {
 		return err
@@ -250,8 +319,8 @@ func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb
 
 	for _, eval := range polyEvals {
 		err = queries.InsertPolyEval(ctx, kprdb.InsertPolyEvalParams{
-			Eon:             int64(e.Eon),
-			ReceiverAddress: batchConfig.Keypers[eval.Receiver],
+			Eon:             int64(eon),
+			ReceiverAddress: shdb.EncodeAddress(dkg.keypers[eval.Receiver]),
 			Eval:            shdb.EncodeBigint(eval.Eval),
 		})
 		if err != nil {
@@ -261,7 +330,125 @@ func (st *ShuttermintState) handleEonStarted(ctx context.Context, queries *kprdb
 	return nil
 }
 
-func (st *ShuttermintState) handleCheckIn(ctx context.Context, queries *kprdb.Queries, e *shutterevents.CheckIn) error {
+func (st *ShuttermintState) startPhase2Accusing(
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	accusations := dkg.pure.StartPhase2Accusing()
+	dkg.markDirty()
+	if len(accusations) > 0 {
+		var accused []common.Address
+		for _, a := range accusations {
+			accused = append(accused, dkg.keypers[a.Accused])
+		}
+		err := st.scheduleShutterMessage(
+			ctx,
+			queries,
+			fmt.Sprintf("accusations, eon=%d, count=%d", eon, len(accusations)),
+			shmsg.NewAccusation(eon, accused),
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Printf("No one to accuse in eon %d", eon)
+	}
+
+	return nil
+}
+
+func (st *ShuttermintState) startPhase3Apologizing(
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	apologies := dkg.pure.StartPhase3Apologizing()
+	dkg.markDirty()
+	if len(apologies) > 0 {
+		var accusers []common.Address
+		var polyEvals []*big.Int
+
+		for _, a := range apologies {
+			accusers = append(accusers, dkg.keypers[a.Accuser])
+			polyEvals = append(polyEvals, a.Eval)
+		}
+
+		err := st.scheduleShutterMessage(
+			ctx, queries,
+			fmt.Sprintf("apologies, eon=%d, count=%d", eon, len(apologies)),
+			shmsg.NewApology(eon, accusers, polyEvals),
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Printf("No apologies needed in eon %d", eon)
+	}
+
+	return nil
+}
+
+func (st *ShuttermintState) finalizeDKG(
+	_ context.Context, _ *kprdb.Queries, eon uint64, dkg *ActiveDKG) error { //nolint:unparam
+	dkg.pure.Finalize()
+	dkg.markDirty()
+
+	dkgresult, err := dkg.pure.ComputeResult()
+	if err != nil {
+		log.Printf("Error: DKG process failed for eon %d: %s", eon, err)
+		// st.scheduleShutterMessage(
+		//	ctx, queries,
+		//	"requesting DKG restart",
+		//	// shmsg.NewEonStartVote(dkg.StartBatchIndex),
+		//	shmsg.NewEonStartVote(dkg.StartBatchIndex),
+		// )
+		return nil
+	}
+	log.Printf("Success: DKG process succeeded for eon %d", eon)
+	_ = dkgresult
+	return nil
+}
+
+func (st *ShuttermintState) shiftPhase(
+	ctx context.Context, queries *kprdb.Queries, height int64, eon uint64, dkg *ActiveDKG) error {
+	phase := st.phaseLength.getPhaseAtHeight(height, dkg.startHeight)
+	for currentPhase := dkg.pure.Phase; currentPhase < phase; currentPhase = dkg.pure.Phase {
+		log.Printf(
+			"Phase transition eon=%d, height=%d %s->%s",
+			eon, height, currentPhase, currentPhase+1,
+		)
+
+		var err error
+		switch currentPhase {
+		case puredkg.Off:
+			err = st.startPhase1Dealing(ctx, queries, eon, dkg)
+		case puredkg.Dealing:
+			err = st.startPhase2Accusing(ctx, queries, eon, dkg)
+		case puredkg.Accusing:
+			err = st.startPhase3Apologizing(ctx, queries, eon, dkg)
+		case puredkg.Apologizing:
+			err = st.finalizeDKG(ctx, queries, eon, dkg)
+		case puredkg.Finalized:
+			panic("internal error, currentPhase is Finalized")
+		}
+		if err != nil {
+			return err
+		}
+		if dkg.pure.Phase == currentPhase {
+			panic("phase did not change")
+		}
+	}
+	return nil
+}
+
+func (st *ShuttermintState) shiftPhases(
+	ctx context.Context, queries *kprdb.Queries, height int64) error {
+	for eon, dkg := range st.dkg {
+		err := st.shiftPhase(ctx, queries, height, eon, dkg)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (st *ShuttermintState) handleCheckIn(
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.CheckIn) error {
 	st.encryptionKeys[e.Sender] = e.EncryptionPublicKey
 	err := queries.InsertEncryptionKey(ctx, kprdb.InsertEncryptionKeyParams{
 		Address:             shdb.EncodeAddress(e.Sender),
@@ -270,16 +457,17 @@ func (st *ShuttermintState) handleCheckIn(ctx context.Context, queries *kprdb.Qu
 	return err
 }
 
-func (st *ShuttermintState) handlePolyCommitment(_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment) error {
+func (st *ShuttermintState) handlePolyCommitment(
+	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
-		log.Printf("PolyCommitment for non existent eon received: eon=%d commitment=%#v", e.Eon, e)
+		log.Printf("PolyCommitment for non existent eon received: eon=%d commitment=%#v",
+			e.Eon, e)
 		return nil
 	}
 	senderIndex, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
-		log.Printf(
-			"Received PolyCommitment from non keyper address: eon=%d sender=%s",
+		log.Printf("Received PolyCommitment from non keyper address: eon=%d sender=%s",
 			e.Eon,
 			e.Sender.Hex(),
 		)
@@ -295,11 +483,90 @@ func (st *ShuttermintState) handlePolyCommitment(_ context.Context, _ *kprdb.Que
 		log.Printf("Error handling PolyCommitment: %s", err)
 		return nil
 	}
-	dkg.dirty = true
+	dkg.markDirty()
 	return nil
 }
 
-func (st *ShuttermintState) HandleEvent(ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
+func (st *ShuttermintState) decryptPolyEval(encrypted []byte) ([]byte, error) {
+	return st.config.EncryptionKey.Decrypt(encrypted, []byte(""), []byte(""))
+}
+
+func (st *ShuttermintState) handlePolyEval(
+	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyEval) error {
+	myAddress := st.config.Address()
+	if e.Sender == myAddress {
+		return nil
+	}
+
+	dkg, ok := st.dkg[e.Eon]
+	if !ok {
+		log.Printf("PolyEval for non existent eon received: %s", e)
+		return nil
+	}
+	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
+	if err != nil {
+		return nil
+	}
+	keyperIndex, err := medley.FindAddressIndex(dkg.keypers, myAddress)
+	if err != nil {
+		return err
+	}
+
+	myIndex, err := medley.FindAddressIndex(e.Receivers, myAddress)
+	if err != nil {
+		return nil
+	}
+	encrypted := e.EncryptedEvals[myIndex]
+
+	evalBytes, err := st.decryptPolyEval(encrypted)
+	if err != nil {
+		log.Printf("Could not decrypt poly eval: %s", err)
+		return nil
+	}
+
+	err = dkg.pure.HandlePolyEvalMsg(
+		puredkg.PolyEvalMsg{
+			Eon:      e.Eon,
+			Sender:   uint64(sender),
+			Receiver: uint64(keyperIndex),
+			Eval:     new(big.Int).SetBytes(evalBytes),
+		},
+	)
+	if err != nil {
+		log.Printf("HandlePolyEvalMsg failed: %s", err)
+		return nil
+	}
+	log.Printf("Got poly eval message: eon=%d, keyper=#%d (%s)", e.Eon, sender, e.Sender)
+	dkg.markDirty()
+	return nil
+}
+
+func (st *ShuttermintState) handleAccusation(
+	_ context.Context, _ *kprdb.Queries, e *shutterevents.Accusation) error { //nolint:unparam
+	dkg, ok := st.dkg[e.Eon]
+	if !ok {
+		log.Printf("Accusation for non existent eon received: %s", e)
+		return nil
+	}
+	_ = dkg
+	// dkg.pure.HandleAccusationMsg()
+	return nil
+}
+
+func (st *ShuttermintState) handleApology(
+	_ context.Context, _ *kprdb.Queries, e *shutterevents.Apology) error { //nolint:unparam
+	dkg, ok := st.dkg[e.Eon]
+	if !ok {
+		log.Printf("Apology for non existent eon received: %s", e)
+		return nil
+	}
+	_ = dkg
+
+	return nil
+}
+
+func (st *ShuttermintState) HandleEvent(
+	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
 	var err error
 	switch e := event.(type) {
 	case *shutterevents.CheckIn:
@@ -312,17 +579,19 @@ func (st *ShuttermintState) HandleEvent(ctx context.Context, queries *kprdb.Quer
 		err = st.handleEonStarted(ctx, queries, e)
 	case *shutterevents.PolyCommitment:
 		err = st.handlePolyCommitment(ctx, queries, e)
-	// case *shutterevents.PolyEval:
-	//	//err = shutter.applyPolyEval(*e)
-	// case *shutterevents.Accusation:
-	//	//err = shutter.applyAccusation(*e)
-	// case *shutterevents.Apology:
-	//	//err = shutter.applyApology(*e)
+	case *shutterevents.PolyEval:
+		err = st.handlePolyEval(ctx, queries, e)
+	case *shutterevents.Accusation:
+		err = st.handleAccusation(ctx, queries, e)
+	case *shutterevents.Apology:
+		err = st.handleApology(ctx, queries, e)
 	// case *shutterevents.EpochSecretKeyShare:
 	//	//err = shutter.applyEpochSecretKeyShare(*e)
 
 	default:
-		log.Printf("handleEvent not yet implemented for %s", reflect.TypeOf(event))
+		log.Printf("handleEvent not yet implemented for %s: %s",
+			reflect.TypeOf(event), event)
 	}
+
 	return err
 }
