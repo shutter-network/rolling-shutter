@@ -111,6 +111,7 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendDecryptionKeys:     true,
 
 		DecryptorPublicKey: decryptorPublicKey,
+		EonKeySeed:         0,
 	}
 	return &config, nil
 }
@@ -136,6 +137,10 @@ func main() error {
 		return err
 	}
 
-	mockNode := mocknode.New(config)
+	mockNode, err := mocknode.New(config)
+	if err != nil {
+		return err
+	}
+
 	return mockNode.Run(ctx)
 }

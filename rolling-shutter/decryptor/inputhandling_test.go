@@ -6,11 +6,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
@@ -35,14 +33,6 @@ func newTestConfig(t *testing.T) Config {
 	}
 }
 
-func randomDecryptionKey(t *testing.T) *shcrypto.EpochSecretKey {
-	t.Helper()
-
-	_, keyG1, err := bn256.RandomG1(rand.Reader)
-	assert.NilError(t, err)
-	return (*shcrypto.EpochSecretKey)(keyG1)
-}
-
 func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -52,10 +42,18 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
+	tkg := medley.NewTestKeyGenerator(t)
 
+	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
+		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+	})
+	assert.NilError(t, err)
+
+	// send an epoch secret key and check that it's stored in the db
 	m := &decryptionKey{
-		epochID: 100,
-		key:     randomDecryptionKey(t),
+		epochID: 0,
+		key:     tkg.EpochSecretKey(0),
 	}
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
@@ -68,20 +66,13 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	assert.Check(t, len(msgs) == 0)
 
-	assert.NilError(t, err)
+	// send a wrong epoch secret key (e.g., one for a wrong epoch) and check that there's an error
 	m2 := &decryptionKey{
-		epochID: 100,
-		key:     randomDecryptionKey(t),
+		epochID: 1,
+		key:     tkg.EpochSecretKey(2),
 	}
-	msgs, err = handleDecryptionKeyInput(ctx, config, db, m2)
-	assert.NilError(t, err)
-
-	m2Stored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.epochID))
-	assert.NilError(t, err)
-	// We check that the key in the database is still the first key not the second
-	assert.Check(t, bytes.Equal(m2Stored.Key, keyBytes))
-
-	assert.Check(t, len(msgs) == 0)
+	_, err = handleDecryptionKeyInput(ctx, config, db, m2)
+	assert.Check(t, err != nil)
 }
 
 func TestInsertCipherBatchIntegration(t *testing.T) {
@@ -130,19 +121,25 @@ func TestHandleEpochIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
+	tkg := medley.NewTestKeyGenerator(t)
+
+	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
+		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+	})
+	assert.NilError(t, err)
 
 	cipherBatchMsg := &cipherBatch{
-		EpochID:      123,
+		EpochID:      0,
 		Transactions: [][]byte{[]byte("tx1")},
 	}
 	msgs, err := handleCipherBatchInput(ctx, config, db, cipherBatchMsg)
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
-	assert.NilError(t, err)
 	keyMsg := &decryptionKey{
-		epochID: 123,
-		key:     randomDecryptionKey(t),
+		epochID: 0,
+		key:     tkg.EpochSecretKey(0),
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)

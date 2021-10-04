@@ -19,6 +19,28 @@ func handleDecryptionKeyInput(
 	db *dcrdb.Queries,
 	key *decryptionKey,
 ) ([]shmsg.P2PMessage, error) {
+	eonPublicKeyBytes, err := db.GetEonPublicKey(ctx, medley.Uint64EpochIDToBytes(key.epochID))
+	if err == pgx.ErrNoRows {
+		return nil, errors.Errorf(
+			"received decryption key for epoch %d for which we don't have an eon public key",
+			key.epochID,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	eonPublicKey := new(shcrypto.EonPublicKey)
+	err = eonPublicKey.Unmarshal(eonPublicKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := checkEpochSecretKey(key.key, eonPublicKey, key.epochID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.Errorf("received decryption key does not match eon public key for epoch %d", key.epochID)
+	}
 
 	keyBytes, _ := key.key.GobEncode()
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
