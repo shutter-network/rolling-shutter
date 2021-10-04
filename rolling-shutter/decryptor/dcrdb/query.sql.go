@@ -132,6 +132,21 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, startEpochID []byte) ([]G
 	return items, nil
 }
 
+const getEonPublicKey = `-- name: GetEonPublicKey :one
+SELECT eon_public_key
+FROM decryptor.eon_public_key
+WHERE start_epoch_id <= $1
+ORDER BY start_epoch_id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetEonPublicKey(ctx context.Context, startEpochID []byte) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getEonPublicKey, startEpochID)
+	var eon_public_key []byte
+	err := row.Scan(&eon_public_key)
+	return eon_public_key, err
+}
+
 const getMeta = `-- name: GetMeta :one
 SELECT key, value FROM decryptor.meta_inf WHERE key = $1
 `
@@ -238,6 +253,25 @@ type InsertDecryptorSetMemberParams struct {
 
 func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryptorSetMemberParams) error {
 	_, err := q.db.Exec(ctx, insertDecryptorSetMember, arg.StartEpochID, arg.Index, arg.Address)
+	return err
+}
+
+const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
+INSERT INTO decryptor.eon_public_key (
+    start_epoch_id,
+    eon_public_key
+) VALUES (
+    $1, $2
+)
+`
+
+type InsertEonPublicKeyParams struct {
+	StartEpochID []byte
+	EonPublicKey []byte
+}
+
+func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) error {
+	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.StartEpochID, arg.EonPublicKey)
 	return err
 }
 

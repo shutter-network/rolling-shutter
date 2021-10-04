@@ -1,4 +1,4 @@
--- schema-version: 4 --
+-- schema-version: 5 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
        index int,
        address text,
        PRIMARY KEY (start_epoch_id, index)
+);
+CREATE TABLE IF NOT EXISTS decryptor.eon_public_key (
+       start_epoch_id bytea PRIMARY KEY,
+       eon_public_key bytea
 );
 CREATE TABLE decryptor.meta_inf(
        key text PRIMARY KEY,

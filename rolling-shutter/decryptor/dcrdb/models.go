@@ -34,6 +34,11 @@ type DecryptorDecryptorSetMember struct {
 	Address      sql.NullString
 }
 
+type DecryptorEonPublicKey struct {
+	StartEpochID []byte
+	EonPublicKey []byte
+}
+
 type DecryptorMetaInf struct {
 	Key   string
 	Value string
