@@ -3,7 +3,6 @@ package decryptor
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/jackc/pgx/v4"
@@ -41,7 +40,7 @@ func TestGetDecryptorSet(t *testing.T) {
 			err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
 				StartEpochID: medley.Uint64EpochIDToBytes(uint64(startEpochs[i][j])),
 				Index:        int32(setIndices[i][j]),
-				Address:      sql.NullString{String: addresses[i], Valid: true},
+				Address:      addresses[i],
 			})
 			assert.NilError(t, err)
 		}
@@ -54,13 +53,13 @@ func TestGetDecryptorSet(t *testing.T) {
 		{
 			StartEpochID: medley.Uint64EpochIDToBytes(uint64(0)),
 			Index:        0,
-			Address:      sql.NullString{String: addresses[0], Valid: true},
+			Address:      addresses[0],
 			BlsPublicKey: keys[0],
 		},
 		{
 			StartEpochID: medley.Uint64EpochIDToBytes(uint64(0)),
 			Index:        1,
-			Address:      sql.NullString{String: addresses[1], Valid: true},
+			Address:      addresses[1],
 			BlsPublicKey: keys[1],
 		},
 	})
@@ -72,13 +71,13 @@ func TestGetDecryptorSet(t *testing.T) {
 		{
 			StartEpochID: medley.Uint64EpochIDToBytes(uint64(100)),
 			Index:        0,
-			Address:      sql.NullString{String: addresses[0], Valid: true},
+			Address:      addresses[0],
 			BlsPublicKey: keys[0],
 		},
 		{
 			StartEpochID: medley.Uint64EpochIDToBytes(uint64(100)),
 			Index:        1,
-			Address:      sql.NullString{String: addresses[2], Valid: true},
+			Address:      addresses[2],
 			BlsPublicKey: keys[2],
 		},
 	})

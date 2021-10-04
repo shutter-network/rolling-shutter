@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
@@ -30,6 +31,8 @@ func newTestConfig(t *testing.T) Config {
 
 		P2PKey:     p2pKey,
 		SigningKey: signingKey,
+
+		InstanceID: 123,
 	}
 }
 
@@ -52,8 +55,9 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	// send an epoch secret key and check that it's stored in the db
 	m := &decryptionKey{
-		epochID: 0,
-		key:     tkg.EpochSecretKey(0),
+		instanceID: config.InstanceID,
+		epochID:    0,
+		key:        tkg.EpochSecretKey(0),
 	}
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
@@ -68,8 +72,9 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	// send a wrong epoch secret key (e.g., one for a wrong epoch) and check that there's an error
 	m2 := &decryptionKey{
-		epochID: 1,
-		key:     tkg.EpochSecretKey(2),
+		instanceID: config.InstanceID,
+		epochID:    1,
+		key:        tkg.EpochSecretKey(2),
 	}
 	_, err = handleDecryptionKeyInput(ctx, config, db, m2)
 	assert.Check(t, err != nil)
@@ -86,6 +91,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	config := newTestConfig(t)
 
 	m := &cipherBatch{
+		InstanceID:   config.InstanceID,
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx1"), []byte("tx2")},
 	}
@@ -99,6 +105,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 0)
 
 	m2 := &cipherBatch{
+		InstanceID:   config.InstanceID,
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx3")},
 	}
@@ -110,6 +117,106 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	assert.DeepEqual(t, m2Stored.Transactions, m.Transactions)
 
 	assert.Check(t, len(msgs) == 0)
+}
+
+func TestHandleSignatureIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
+	config := newTestConfig(t)
+	configTwoRequiredSignatures := config
+	configTwoRequiredSignatures.RequiredSignatures = 2
+
+	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
+	assert.NilError(t, err)
+
+	err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
+		StartEpochID: []byte{0},
+		Index:        1,
+		Address:      "0xdeadbeef",
+	})
+	assert.NilError(t, err)
+	err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
+		StartEpochID: []byte{0},
+		Index:        2,
+		Address:      "0xabcdefabcdef",
+	})
+	assert.NilError(t, err)
+
+	err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+		Address:      "0xdeadbeef",
+		BlsPublicKey: shbls.SecretToPublicKey(config.SigningKey).Marshal(),
+	})
+	assert.NilError(t, err)
+	err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+		Address:      "0xabcdefabcdef",
+		BlsPublicKey: shbls.SecretToPublicKey(signingKey2).Marshal(),
+	})
+	assert.NilError(t, err)
+
+	bitfield := []byte{1}
+	bitfield2 := []byte{2}
+	hash := common.BytesToHash([]byte("Hello"))
+	signature := &decryptionSignature{
+		epochID:        0,
+		instanceID:     config.InstanceID,
+		signedHash:     hash,
+		signature:      shbls.Sign(hash.Bytes(), config.SigningKey),
+		SignerBitfield: bitfield,
+	}
+	signature2 := &decryptionSignature{
+		epochID:        0,
+		instanceID:     config.InstanceID,
+		signedHash:     hash,
+		signature:      shbls.Sign(hash.Bytes(), signingKey2),
+		SignerBitfield: bitfield2,
+	}
+
+	// The tests are not fully independent since database is not wiped in between each one.
+	tests := []struct {
+		config  Config
+		inputs  []*decryptionSignature
+		outputs []*shmsg.AggregatedDecryptionSignature
+	}{
+		{
+			config:  config,
+			inputs:  []*decryptionSignature{signature},
+			outputs: []*shmsg.AggregatedDecryptionSignature{{InstanceID: config.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: bitfield}},
+		},
+		{
+			config:  configTwoRequiredSignatures,
+			inputs:  []*decryptionSignature{signature},
+			outputs: []*shmsg.AggregatedDecryptionSignature{nil},
+		},
+		{
+			config:  configTwoRequiredSignatures,
+			inputs:  []*decryptionSignature{signature, signature2},
+			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: []byte{3}}},
+		},
+	}
+
+	for _, test := range tests {
+		for i, input := range test.inputs {
+			msgs, err := handleSignatureInput(ctx, test.config, db, input)
+			assert.NilError(t, err)
+			isOutputNill := test.outputs[i] == nil
+			if isOutputNill {
+				assert.Check(t, len(msgs) == 0)
+			} else {
+				assert.Check(t, len(msgs) == 1)
+				msg, ok := msgs[0].(*shmsg.AggregatedDecryptionSignature)
+				assert.Check(t, ok, "wrong message type")
+				assert.Equal(t, msg.InstanceID, test.outputs[i].InstanceID)
+				assert.Check(t, bytes.Equal(msg.SignedHash, test.outputs[i].SignedHash))
+				assert.Check(t, bytes.Equal(msg.SignerBitfield, test.outputs[i].SignerBitfield))
+			}
+		}
+	}
 }
 
 func TestHandleEpochIntegration(t *testing.T) {
@@ -130,6 +237,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	cipherBatchMsg := &cipherBatch{
+		InstanceID:   config.InstanceID,
 		EpochID:      0,
 		Transactions: [][]byte{[]byte("tx1")},
 	}
@@ -138,8 +246,9 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 0)
 
 	keyMsg := &decryptionKey{
-		epochID: 0,
-		key:     tkg.EpochSecretKey(0),
+		instanceID: config.InstanceID,
+		epochID:    0,
+		key:        tkg.EpochSecretKey(0),
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)
@@ -147,8 +256,8 @@ func TestHandleEpochIntegration(t *testing.T) {
 	// TODO: handle signer index
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
-		EpochID:     medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
-		SignerIndex: 0,
+		EpochID:         medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
+		SignersBitfield: make([]byte, 0),
 	})
 	assert.NilError(t, err)
 

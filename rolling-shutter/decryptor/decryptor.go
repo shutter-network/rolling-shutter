@@ -111,6 +111,8 @@ func (d *Decryptor) handleMessage(ctx context.Context, msg *p2p.Message) error {
 		msgsOut, err = handleDecryptionKeyInput(ctx, d.Config, d.db, typedMsg)
 	case *cipherBatch:
 		msgsOut, err = handleCipherBatchInput(ctx, d.Config, d.db, typedMsg)
+	case *decryptionSignature:
+		msgsOut, err = handleSignatureInput(ctx, d.Config, d.db, typedMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
 		return nil
