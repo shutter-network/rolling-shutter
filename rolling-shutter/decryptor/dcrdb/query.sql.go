@@ -275,6 +275,27 @@ func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKey
 	return err
 }
 
+const insertKeyperSet = `-- name: InsertKeyperSet :exec
+INSERT INTO decryptor.keyper_set (
+    start_epoch_id,
+    keypers,
+    threshold
+) VALUES (
+    $1, $2, $3
+)
+`
+
+type InsertKeyperSetParams struct {
+	StartEpochID []byte
+	Keypers      []string
+	Threshold    int32
+}
+
+func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams) error {
+	_, err := q.db.Exec(ctx, insertKeyperSet, arg.StartEpochID, arg.Keypers, arg.Threshold)
+	return err
+}
+
 const insertMeta = `-- name: InsertMeta :exec
 INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2)
 `
