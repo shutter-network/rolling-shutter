@@ -39,6 +39,12 @@ type DecryptorEonPublicKey struct {
 	EonPublicKey []byte
 }
 
+type DecryptorKeyperSet struct {
+	StartEpochID []byte
+	Keypers      []string
+	Threshold    int32
+}
+
 type DecryptorMetaInf struct {
 	Key   string
 	Value string
