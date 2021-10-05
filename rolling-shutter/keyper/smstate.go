@@ -548,8 +548,35 @@ func (st *ShuttermintState) handleAccusation(
 		log.Printf("Accusation for non existent eon received: %s", e)
 		return nil
 	}
-	_ = dkg
-	// dkg.pure.HandleAccusationMsg()
+
+	if dkg.pure.Phase != puredkg.Accusing {
+		log.Printf("Warning: received accusation in wrong phase %s: %+v", dkg.pure.Phase, e)
+		return nil
+	}
+	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
+	if err != nil {
+		log.Printf("Error: cannot handle accusation. bad sender: %s", e.Sender)
+		return nil
+	}
+
+	for _, accused := range e.Accused {
+		accusedIndex, err := medley.FindAddressIndex(dkg.keypers, accused)
+		if err != nil {
+			log.Printf("Error: accused address is not a keyper: %s", accused)
+			continue
+		}
+		err = dkg.pure.HandleAccusationMsg(
+			puredkg.AccusationMsg{
+				Eon:     e.Eon,
+				Accuser: uint64(sender),
+				Accused: uint64(accusedIndex),
+			},
+		)
+		if err != nil {
+			log.Printf("Error: cannot handle accusation: %+v", err)
+		}
+	}
+	dkg.markDirty()
 	return nil
 }
 
@@ -560,8 +587,34 @@ func (st *ShuttermintState) handleApology(
 		log.Printf("Apology for non existent eon received: %s", e)
 		return nil
 	}
-	_ = dkg
+	if dkg.pure.Phase != puredkg.Apologizing {
+		log.Printf("Warning: received apology in wrong phase %s: %+v", dkg.pure.Phase, e)
+		return nil
+	}
+	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
+	if err != nil {
+		log.Printf("Error: cannot handle apology. bad sender: %s", e.Sender)
+		return nil
+	}
 
+	for j, accuser := range e.Accusers {
+		accuserIndex, err := medley.FindAddressIndex(dkg.keypers, accuser)
+		if err != nil {
+			log.Printf("Error in syncApologies: %+v", err)
+			continue
+		}
+		err = dkg.pure.HandleApologyMsg(
+			puredkg.ApologyMsg{
+				Eon:     e.Eon,
+				Accuser: uint64(accuserIndex),
+				Accused: uint64(sender),
+				Eval:    e.PolyEval[j],
+			})
+		if err != nil {
+			log.Printf("Error: cannot handle apology: %+v", err)
+		}
+	}
+	dkg.markDirty()
 	return nil
 }
 
