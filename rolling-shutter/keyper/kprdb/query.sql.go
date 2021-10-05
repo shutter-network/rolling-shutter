@@ -131,6 +131,22 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncr
 	return items, nil
 }
 
+const getEon = `-- name: GetEon :one
+SELECT eon, height, batch_index, config_index FROM keyper.eons WHERE eon=$1
+`
+
+func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
+	row := q.db.QueryRow(ctx, getEon, eon)
+	var i KeyperEon
+	err := row.Scan(
+		&i.Eon,
+		&i.Height,
+		&i.BatchIndex,
+		&i.ConfigIndex,
+	)
+	return i, err
+}
+
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM keyper.tendermint_sync_meta
@@ -377,6 +393,30 @@ func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutte
 	return id, err
 }
 
+const selectPureDKG = `-- name: SelectPureDKG :many
+SELECT eon, puredkg FROM keyper.puredkg
+`
+
+func (q *Queries) SelectPureDKG(ctx context.Context) ([]KeyperPuredkg, error) {
+	rows, err := q.db.Query(ctx, selectPureDKG)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperPuredkg
+	for rows.Next() {
+		var i KeyperPuredkg
+		if err := rows.Scan(&i.Eon, &i.Puredkg); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const tMGetSyncMeta = `-- name: TMGetSyncMeta :one
 SELECT current_block, last_committed_height, sync_timestamp
 FROM keyper.tendermint_sync_meta
@@ -404,20 +444,5 @@ type TMSetSyncMetaParams struct {
 
 func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) error {
 	_, err := q.db.Exec(ctx, tMSetSyncMeta, arg.CurrentBlock, arg.LastCommittedHeight, arg.SyncTimestamp)
-	return err
-}
-
-const updatePureDKG = `-- name: UpdatePureDKG :exec
-UPDATE keyper.puredkg
-SET puredkg=$2 WHERE eon=$1
-`
-
-type UpdatePureDKGParams struct {
-	Eon     int64
-	Puredkg []byte
-}
-
-func (q *Queries) UpdatePureDKG(ctx context.Context, arg UpdatePureDKGParams) error {
-	_, err := q.db.Exec(ctx, updatePureDKG, arg.Eon, arg.Puredkg)
 	return err
 }

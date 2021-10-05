@@ -150,7 +150,7 @@ func (smdrv *ShuttermintDriver) innerHandleTransactions(
 			"wrong current block stored in database: stored=%d expected=%d",
 			oldMeta.CurrentBlock, oldCurrentBlock)
 	}
-	err = smdrv.shuttermintState.LoadAppState(ctx, queries)
+	err = smdrv.shuttermintState.Load(ctx, queries)
 	if err != nil {
 		return err
 	}
@@ -177,12 +177,16 @@ func (smdrv *ShuttermintDriver) innerHandleTransactions(
 		}
 	}
 
+	// XXX We should move the following call into the BeforeSaveHook
 	err = smdrv.shuttermintState.shiftPhases(ctx, queries, newCurrentBlock)
 	if err != nil {
 		return err
 	}
-
-	return smdrv.shuttermintState.StoreAppState(ctx, queries)
+	err = smdrv.shuttermintState.BeforeSaveHook(ctx, queries)
+	if err != nil {
+		return err
+	}
+	return smdrv.shuttermintState.Save(ctx, queries)
 }
 
 func (smdrv *ShuttermintDriver) handleTransactions(

@@ -58,7 +58,7 @@ func (st *ShuttermintState) Invalidate() {
 	*st = *NewShuttermintState(st.config)
 }
 
-func (st *ShuttermintState) LoadAppState(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) Load(ctx context.Context, queries *kprdb.Queries) error {
 	if st.synchronized {
 		return nil
 	}
@@ -71,7 +71,52 @@ func (st *ShuttermintState) LoadAppState(ctx context.Context, queries *kprdb.Que
 	if err != nil {
 		return err
 	}
+	err = st.loadDKG(ctx, queries)
+	if err != nil {
+		return err
+	}
+
 	st.synchronized = true
+	return nil
+}
+
+func (st *ShuttermintState) loadDKG(ctx context.Context, queries *kprdb.Queries) error {
+	dkgs, err := queries.SelectPureDKG(ctx)
+	if err != nil {
+		return err
+	}
+	for _, dkg := range dkgs {
+		pure, err := shdb.DecodePureDKG(dkg.Puredkg)
+		if err != nil {
+			return err
+		}
+
+		keyperEon, err := queries.GetEon(ctx, dkg.Eon)
+		if err != nil {
+			return err
+		}
+
+		batchConfig, err := queries.GetBatchConfig(ctx, int32(keyperEon.ConfigIndex))
+		if err != nil {
+			return err
+		}
+
+		keypers := []common.Address{}
+		for _, k := range batchConfig.Keypers {
+			a, err := shdb.DecodeAddress(k)
+			if err != nil {
+				return err
+			}
+			keypers = append(keypers, a)
+		}
+
+		st.dkg[uint64(dkg.Eon)] = &ActiveDKG{
+			pure:        pure,
+			startHeight: keyperEon.Height,
+			dirty:       false,
+			keypers:     keypers,
+		}
+	}
 	return nil
 }
 
@@ -90,6 +135,32 @@ func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *kpr
 			return err
 		}
 		st.encryptionKeys[addr] = p
+	}
+	return nil
+}
+
+func (st *ShuttermintState) BeforeSaveHook(ctx context.Context, queries *kprdb.Queries) error {
+	return st.sendPolyEvals(ctx, queries)
+}
+
+func (st *ShuttermintState) Save(ctx context.Context, queries *kprdb.Queries) error {
+	for eon, a := range st.dkg {
+		if !a.dirty {
+			continue
+		}
+		pureBytes, err := shdb.EncodePureDKG(a.pure)
+		if err != nil {
+			return err
+		}
+
+		err = queries.InsertPureDKG(ctx, kprdb.InsertPureDKGParams{
+			Eon:     int64(eon),
+			Puredkg: pureBytes,
+		})
+		if err != nil {
+			return err
+		}
+		a.dirty = false
 	}
 	return nil
 }
@@ -154,33 +225,6 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 		}
 	}
 	return send()
-}
-
-func (st *ShuttermintState) StoreAppState(ctx context.Context, queries *kprdb.Queries) error {
-	err := st.sendPolyEvals(ctx, queries)
-	if err != nil {
-		return err
-	}
-
-	for eon, a := range st.dkg {
-		if !a.dirty {
-			continue
-		}
-		pureBytes, err := shdb.EncodePureDKG(a.pure)
-		if err != nil {
-			return err
-		}
-
-		err = queries.InsertPureDKG(ctx, kprdb.InsertPureDKGParams{
-			Eon:     int64(eon),
-			Puredkg: pureBytes,
-		})
-		if err != nil {
-			return err
-		}
-		a.dirty = false
-	}
-	return nil
 }
 
 func (st *ShuttermintState) scheduleShutterMessage(
@@ -291,13 +335,14 @@ func (st *ShuttermintState) handleEonStarted(
 		uint64(batchConfig.Threshold),
 		uint64(keyperIndex),
 	)
-	st.dkg[e.Eon] = &ActiveDKG{
+	dkg := &ActiveDKG{
 		pure:        &pure,
 		dirty:       true,
 		startHeight: e.Height,
 		keypers:     keypers,
 	}
-	return st.shiftPhase(ctx, queries, e.Height, e.Eon, st.dkg[e.Eon])
+	st.dkg[e.Eon] = dkg
+	return st.shiftPhase(ctx, queries, e.Height, e.Eon, dkg)
 }
 
 func (st *ShuttermintState) startPhase1Dealing(

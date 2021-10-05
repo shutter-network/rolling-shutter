@@ -51,9 +51,9 @@ LIMIT 1;
 INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
 ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg;
 
--- name: UpdatePureDKG :exec
-UPDATE keyper.puredkg
-SET puredkg=$2 WHERE eon=$1;
+-- name: SelectPureDKG :many
+SELECT * FROM keyper.puredkg;
+
 
 -- name: InsertEncryptionKey :exec
 INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
@@ -77,6 +77,9 @@ DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1;
 -- name: InsertEon :exec
 INSERT INTO keyper.eons (eon, height, batch_index, config_index)
 VALUES ($1, $2, $3, $4);
+
+-- name: GetEon :one
+SELECT * FROM keyper.eons WHERE eon=$1;
 
 -- name: InsertPolyEval :exec
 INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
