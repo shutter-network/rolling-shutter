@@ -7,7 +7,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v2-{{ checksum "go.sum" }}
+            - rs-generate-v3-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - run:
           name: "Download and install protoc"
           command: |
@@ -20,7 +20,7 @@ jobs:
       - run: make install-protoc-gen-go install-sqlc
       - run: make generate
       - save_cache:
-          key: rs-generate-v2-{{ checksum "go.sum" }}
+          key: rs-generate-v3-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
