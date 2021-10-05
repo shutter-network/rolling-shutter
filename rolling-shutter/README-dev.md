@@ -22,7 +22,7 @@ Run `make test` to run the tests
 ## Linting
 
 Run `make lint` to run `golangci-lint`. Run `make lint-changes` to run
-`golangci-lint` and show newly introduces linter warnings.
+`golangci-lint` and show newly introduced linter warnings.
 
 ## Code generation
 
