@@ -323,7 +323,6 @@ func (st *ShuttermintState) handleEonStarted(
 	phase := st.phaseLength.getPhaseAtHeight(lastCommittedHeight+1, e.Height)
 	if phase > puredkg.Dealing {
 		log.Printf("Missed the dealing phase of eon %d", e.Eon)
-		return nil
 	}
 	if phase == puredkg.Off {
 		panic("phase is off")
@@ -454,12 +453,18 @@ func (st *ShuttermintState) finalizeDKG(
 	if err != nil {
 		log.Printf("Error: DKG process failed for eon %d: %s", eon, err)
 		dkgerror = sql.NullString{String: err.Error(), Valid: true}
-		// st.scheduleShutterMessage(
-		//	ctx, queries,
-		//	"requesting DKG restart",
-		//	// shmsg.NewEonStartVote(dkg.StartBatchIndex),
-		//	shmsg.NewEonStartVote(dkg.StartBatchIndex),
-		// )
+		keyperEon, err := queries.GetEon(ctx, int64(eon))
+		if err != nil {
+			return err
+		}
+		err = st.scheduleShutterMessage(
+			ctx, queries,
+			"requesting DKG restart",
+			shmsg.NewEonStartVote(shdb.DecodeUint64(keyperEon.BatchIndex)),
+		)
+		if err != nil {
+			return err
+		}
 	} else {
 		log.Printf("Success: DKG process succeeded for eon %d", eon)
 		pureResult, err = shdb.EncodePureDKGResult(&dkgresult)
