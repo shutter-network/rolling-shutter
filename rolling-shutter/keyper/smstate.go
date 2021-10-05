@@ -585,9 +585,6 @@ func (st *ShuttermintState) HandleEvent(
 		err = st.handleAccusation(ctx, queries, e)
 	case *shutterevents.Apology:
 		err = st.handleApology(ctx, queries, e)
-	// case *shutterevents.EpochSecretKeyShare:
-	//	//err = shutter.applyEpochSecretKeyShare(*e)
-
 	default:
 		log.Printf("handleEvent not yet implemented for %s: %s",
 			reflect.TypeOf(event), event)

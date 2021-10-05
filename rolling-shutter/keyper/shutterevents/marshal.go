@@ -64,24 +64,6 @@ func decodeBytes(val []byte) ([]byte, error) {
 	return hexutil.Decode(string(val))
 }
 
-func encodeEpochSecretKeyShare(v *shcrypto.EpochSecretKeyShare) []byte {
-	d, _ := v.GobEncode()
-	return encodeBytes(d)
-}
-
-func decodeEpochSecretKeyShare(v []byte) (*shcrypto.EpochSecretKeyShare, error) {
-	decoded, err := decodeBytes(v)
-	if err != nil {
-		return nil, err
-	}
-	share := new(shcrypto.EpochSecretKeyShare)
-	err = share.GobDecode(decoded)
-	if err != nil {
-		return nil, err
-	}
-	return share, nil
-}
-
 // encodeByteSequence encodes a slice o byte strings as a comma separated string.
 func encodeByteSequence(v [][]byte) []byte {
 	var hexstrings []string

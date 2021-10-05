@@ -47,10 +47,3 @@ func newGammas(key string, gammas *shcrypto.Gammas) abcitypes.EventAttribute {
 		Value: encodeGammas(gammas),
 	}
 }
-
-func newEpochSecretKeyShare(key string, share *shcrypto.EpochSecretKeyShare) abcitypes.EventAttribute {
-	return abcitypes.EventAttribute{
-		Key:   []byte(key),
-		Value: encodeEpochSecretKeyShare(share),
-	}
-}

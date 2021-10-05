@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	gocmp "github.com/google/go-cmp/cmp"
 	"gotest.tools/v3/assert"
@@ -141,14 +140,4 @@ func TestPolyEval(t *testing.T) {
 		EncryptedEvals: encryptedEvals,
 	}
 	roundtrip(t, ev)
-}
-
-func TestEpochSecretKeyShare(t *testing.T) {
-	share := &shutterevents.EpochSecretKeyShare{
-		Sender: sender,
-		Eon:    eon,
-		Epoch:  uint64(12345),
-		Share:  (*shcrypto.EpochSecretKeyShare)(new(bn256.G1).ScalarBaseMult(big.NewInt(1111))),
-	}
-	roundtrip(t, share)
 }

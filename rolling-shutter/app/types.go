@@ -138,10 +138,9 @@ type DKGInstance struct {
 }
 
 type (
-	Accusation          = shutterevents.Accusation
-	Apology             = shutterevents.Apology
-	BatchConfig         = shutterevents.BatchConfig
-	PolyCommitment      = shutterevents.PolyCommitment
-	PolyEval            = shutterevents.PolyEval
-	EpochSecretKeyShare = shutterevents.EpochSecretKeyShare
+	Accusation     = shutterevents.Accusation
+	Apology        = shutterevents.Apology
+	BatchConfig    = shutterevents.BatchConfig
+	PolyCommitment = shutterevents.PolyCommitment
+	PolyEval       = shutterevents.PolyEval
 )
