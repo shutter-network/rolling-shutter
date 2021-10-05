@@ -38,8 +38,6 @@ func Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfgFile, "config", "", "config file (required)")
 	cmd.MarkFlagRequired("config")
 	cmd.AddCommand(initCmd())
-	cmd.AddCommand(showCmd())
-	cmd.AddCommand(txsearchCmd())
 	return cmd
 }
 

@@ -113,15 +113,6 @@ func TestCheckIn(t *testing.T) {
 	roundtrip(t, ev)
 }
 
-func TestDecryptionSignature(t *testing.T) {
-	ev := &shutterevents.DecryptionSignature{
-		BatchIndex: uint64(64738),
-		Sender:     sender,
-		Signature:  []byte("fooobar"),
-	}
-	roundtrip(t, ev)
-}
-
 func TestEonStarted(t *testing.T) {
 	ev := &shutterevents.EonStarted{Eon: eon, BatchIndex: 9999, ConfigIndex: 567}
 	roundtrip(t, ev)

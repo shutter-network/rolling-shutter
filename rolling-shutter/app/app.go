@@ -507,27 +507,6 @@ func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64,
 	return dkg, startBatchIndex, true
 }
 
-func (app *ShutterApp) deliverDecryptionSignature(msg *shmsg.DecryptionSignature, sender common.Address) abcitypes.ResponseDeliverTx {
-	bs := app.getBatchState(msg.BatchIndex)
-	err := bs.AddDecryptionSignature(DecryptionSignature{Sender: sender, Signature: msg.Signature})
-	if err != nil {
-		msg := fmt.Sprintf("Error: cannot add decryption signature: %+v", err)
-		log.Print(msg)
-		return makeErrorResponse(msg)
-	}
-	app.BatchStates[msg.BatchIndex] = bs
-
-	event := shutterevents.DecryptionSignature{
-		BatchIndex: msg.BatchIndex,
-		Sender:     sender,
-		Signature:  msg.Signature,
-	}.MakeABCIEvent()
-	return abcitypes.ResponseDeliverTx{
-		Code:   0,
-		Events: []abcitypes.Event{event},
-	}
-}
-
 func (app *ShutterApp) handlePolyEvalMsg(msg *shmsg.PolyEval, sender common.Address) abcitypes.ResponseDeliverTx {
 	appMsg, err := ParsePolyEvalMsg(msg, sender)
 	if err != nil {
@@ -656,9 +635,6 @@ func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address)
 	}
 	if msg.GetEonStartVote() != nil {
 		return app.deliverEonStartVoteMsg(msg.GetEonStartVote(), sender)
-	}
-	if msg.GetDecryptionSignature() != nil {
-		return app.deliverDecryptionSignature(msg.GetDecryptionSignature(), sender)
 	}
 
 	if msg.GetPolyEval() != nil {

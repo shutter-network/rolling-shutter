@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/base64"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -9,7 +8,6 @@ import (
 	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/shutter-network/shutter/shlib/shtest"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 func TestNewShutterApp(t *testing.T) {
@@ -88,61 +86,6 @@ func TestAddConfig(t *testing.T) {
 		Keypers:         addr,
 	})
 	assert.NilError(t, err)
-}
-
-func TestAddDecryptionSignature(t *testing.T) {
-	app := NewShutterApp()
-	keypers := addresses[:3]
-	err := app.addConfig(BatchConfig{
-		ConfigIndex:     1,
-		StartBatchIndex: 100,
-		Threshold:       2,
-		Keypers:         keypers,
-	})
-	assert.NilError(t, err)
-
-	// don't accept signature from non-keyper
-	res1 := app.deliverDecryptionSignature(
-		&shmsg.DecryptionSignature{
-			BatchIndex: 200,
-			Signature:  []byte("signature"),
-		},
-		addresses[3],
-	)
-	assert.Assert(t, res1.IsErr())
-	assert.Assert(t, is.Len(res1.Events, 0))
-
-	// accept signature from keyper
-	res2 := app.deliverDecryptionSignature(
-		&shmsg.DecryptionSignature{
-			BatchIndex: 200,
-			Signature:  []byte("signature"),
-		},
-		keypers[0],
-	)
-	assert.Assert(t, res2.IsOK())
-	assert.Equal(t, 1, len(res2.Events))
-
-	ev := res2.Events[0]
-	assert.Equal(t, "shutter.decryption-signature", ev.Type)
-	assert.DeepEqual(t, []byte("BatchIndex"), ev.Attributes[0].Key)
-	assert.DeepEqual(t, []byte("200"), ev.Attributes[0].Value)
-	assert.DeepEqual(t, []byte("Sender"), ev.Attributes[1].Key)
-	assert.DeepEqual(t, []byte(keypers[0].Hex()), ev.Attributes[1].Value)
-	assert.DeepEqual(t, []byte("Signature"), ev.Attributes[2].Key)
-	decodedSignature, _ := base64.RawURLEncoding.DecodeString(string(ev.Attributes[2].Value))
-	assert.DeepEqual(t, []byte("signature"), decodedSignature)
-
-	// don't accept another signature
-	res3 := app.deliverDecryptionSignature(
-		&shmsg.DecryptionSignature{
-			BatchIndex: 200,
-			Signature:  []byte("signature"),
-		},
-		keypers[0],
-	)
-	assert.Assert(t, res3.IsErr())
-	assert.Assert(t, is.Len(res1.Events, 0))
 }
 
 func TestGobDKG(t *testing.T) {

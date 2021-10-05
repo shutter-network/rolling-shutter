@@ -33,10 +33,6 @@ message CheckIn {
         bytes encryption_public_key = 2;  // compressed ecies public key
 }
 
-message DecryptionSignature {
-        uint64 batch_index = 1;
-        bytes signature = 2;
-}
 
 message PolyEval {
         uint64 eon = 1;
@@ -69,7 +65,6 @@ message Message {
                 BatchConfig batch_config = 4;
                 BatchConfigStarted batch_config_started = 6;
                 CheckIn check_in = 7;
-                DecryptionSignature decryption_signature = 8;
 
                 // DKG messages
                 PolyEval poly_eval = 9;

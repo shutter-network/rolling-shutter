@@ -69,18 +69,6 @@ func NewBatchConfig(
 	}
 }
 
-// NewDecryptionSignature creates a new DecryptionSignature message.
-func NewDecryptionSignature(batchIndex uint64, signature []byte) *Message {
-	return &Message{
-		Payload: &Message_DecryptionSignature{
-			DecryptionSignature: &DecryptionSignature{
-				BatchIndex: batchIndex,
-				Signature:  signature,
-			},
-		},
-	}
-}
-
 // NewApology creates a new apology message used in the DKG process. This message reveals the
 // polyEvals, that where sent encrypted via the PolyEval messages to each accuser.
 func NewApology(eon uint64, accusers []common.Address, polyEvals []*big.Int) *Message {
