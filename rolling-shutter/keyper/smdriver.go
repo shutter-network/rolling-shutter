@@ -60,7 +60,7 @@ func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
 
 	lastCommittedHeight, err := getLastCommittedHeight(ctx, smdrv.shmcl)
 	if errors.Is(err, errEmptyBlockchain) {
-		log.Printf("shuttermint blockchain still empty")
+		log.Printf("Shuttermint blockchain still empty")
 		return nil
 	}
 	if err != nil {
@@ -100,7 +100,7 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 		}
 		query := fmt.Sprintf("tx.height >= %d and tx.height <= %d", currentBlock+1, height)
 		if logProgress {
-			log.Printf("fetchAndApplyEvents: query=%s targetHeight=%d", query, lastCommittedHeight)
+			log.Printf("Fetch events: query=%s targetHeight=%d", query, lastCommittedHeight)
 		}
 		// tendermint silently caps the perPage value at 100, make sure to stay below, otherwise
 		// our exit condition is wrong and the log.Fatalf will trigger a panic below; see

@@ -243,7 +243,7 @@ func (st *ShuttermintState) scheduleShutterMessage(
 	if err != nil {
 		return err
 	}
-	log.Printf("scheduled shuttermint message: id=%d %s", msgid, description)
+	log.Printf("Scheduled shuttermint message: id=%d %s", msgid, description)
 	return nil
 }
 
@@ -709,7 +709,7 @@ func (st *ShuttermintState) HandleEvent(
 	case *shutterevents.Apology:
 		err = st.handleApology(ctx, queries, e)
 	default:
-		log.Printf("handleEvent not yet implemented for %s: %s",
+		log.Printf("HandleEvent not yet implemented for %s: %s",
 			reflect.TypeOf(event), event)
 	}
 
