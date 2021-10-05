@@ -98,3 +98,21 @@ func EncodeBigint(n *big.Int) []byte {
 func DecodeBigint(b []byte) *big.Int {
 	return new(big.Int).SetBytes(b)
 }
+
+func EncodePureDKGResult(result *puredkg.Result) ([]byte, error) {
+	buf := bytes.Buffer{}
+	err := gob.NewEncoder(&buf).Encode(result)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func DecodePureDKGResult(b []byte) (*puredkg.Result, error) {
+	res := puredkg.Result{}
+	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(&res)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
+}

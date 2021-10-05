@@ -5,6 +5,7 @@ package kprdb
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -205,6 +206,28 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Height,
 		arg.Keypers,
 		arg.Threshold,
+	)
+	return err
+}
+
+const insertDKGResult = `-- name: InsertDKGResult :exec
+INSERT INTO keyper.dkg_result (eon,success,error,pure_result)
+VALUES ($1,$2,$3,$4)
+`
+
+type InsertDKGResultParams struct {
+	Eon        int64
+	Success    bool
+	Error      sql.NullString
+	PureResult []byte
+}
+
+func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams) error {
+	_, err := q.db.Exec(ctx, insertDKGResult,
+		arg.Eon,
+		arg.Success,
+		arg.Error,
+		arg.PureResult,
 	)
 	return err
 }

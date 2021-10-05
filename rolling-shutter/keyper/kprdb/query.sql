@@ -98,3 +98,7 @@ ORDER BY ev.eon;
 
 -- name: DeletePolyEval :exec
 DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2;
+
+-- name: InsertDKGResult :exec
+INSERT INTO keyper.dkg_result (eon,success,error,pure_result)
+VALUES ($1,$2,$3,$4);

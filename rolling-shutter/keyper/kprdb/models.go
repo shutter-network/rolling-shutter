@@ -23,6 +23,13 @@ type KeyperDecryptionTrigger struct {
 	EpochID []byte
 }
 
+type KeyperDkgResult struct {
+	Eon        int64
+	Success    bool
+	Error      sql.NullString
+	PureResult []byte
+}
+
 type KeyperEon struct {
 	Eon         int64
 	Height      int64

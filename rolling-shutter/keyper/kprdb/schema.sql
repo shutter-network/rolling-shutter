@@ -1,4 +1,4 @@
--- schema-version: 6 --
+-- schema-version: 7 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -74,4 +74,13 @@ CREATE TABLE keyper.poly_evals(
        receiver_address TEXT NOT NULL,
        eval BYTEA NOT NULL,
        PRIMARY KEY (eon, receiver_address)
+);
+
+-- dkg_result contains the result of running the DKG process or an error message, if the DKG
+-- process failed.
+CREATE TABLE keyper.dkg_result(
+       eon bigint PRIMARY KEY,
+       success BOOLEAN NOT NULL,
+       error TEXT,
+       pure_result BYTEA  -- shdb.EncodePureDKGResult/shdb.DecodePureDKGResult
 );

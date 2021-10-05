@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"log"
 	"math/big"
@@ -384,24 +385,37 @@ func (st *ShuttermintState) startPhase3Apologizing(
 }
 
 func (st *ShuttermintState) finalizeDKG(
-	_ context.Context, _ *kprdb.Queries, eon uint64, dkg *ActiveDKG) error { //nolint:unparam
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
 	dkg.pure.Finalize()
 	dkg.markDirty()
+
+	var dkgerror sql.NullString
+	var pureResult []byte
 
 	dkgresult, err := dkg.pure.ComputeResult()
 	if err != nil {
 		log.Printf("Error: DKG process failed for eon %d: %s", eon, err)
+		dkgerror = sql.NullString{String: err.Error(), Valid: true}
 		// st.scheduleShutterMessage(
 		//	ctx, queries,
 		//	"requesting DKG restart",
 		//	// shmsg.NewEonStartVote(dkg.StartBatchIndex),
 		//	shmsg.NewEonStartVote(dkg.StartBatchIndex),
 		// )
-		return nil
+	} else {
+		log.Printf("Success: DKG process succeeded for eon %d", eon)
+		pureResult, err = shdb.EncodePureDKGResult(&dkgresult)
+		if err != nil {
+			return err
+		}
 	}
-	log.Printf("Success: DKG process succeeded for eon %d", eon)
-	_ = dkgresult
-	return nil
+
+	return queries.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{
+		Eon:        int64(eon),
+		Success:    pureResult != nil,
+		Error:      dkgerror,
+		PureResult: pureResult,
+	})
 }
 
 func (st *ShuttermintState) shiftPhase(
