@@ -56,14 +56,6 @@ func decodeAddresses(val []byte) ([]common.Address, error) {
 	return res, nil
 }
 
-func encodeBytes(v []byte) []byte {
-	return []byte(hexutil.Encode(v))
-}
-
-func decodeBytes(val []byte) ([]byte, error) {
-	return hexutil.Decode(string(val))
-}
-
 // encodeByteSequence encodes a slice o byte strings as a comma separated string.
 func encodeByteSequence(v [][]byte) []byte {
 	var hexstrings []string
