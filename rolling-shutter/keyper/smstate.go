@@ -432,7 +432,13 @@ func (st *ShuttermintState) startPhase3Apologizing(
 func (st *ShuttermintState) finalizeDKG(
 	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
 	dkg.pure.Finalize()
-	dkg.markDirty()
+	// There's no need to call dkg.markDirty() here, since we now remove the object from memory
+	// and the database:
+	delete(st.dkg, eon)
+	err := queries.DeletePureDKG(ctx, int64(eon))
+	if err != nil {
+		return err
+	}
 
 	var dkgerror sql.NullString
 	var pureResult []byte

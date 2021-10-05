@@ -37,6 +37,15 @@ func (q *Queries) DeletePolyEval(ctx context.Context, arg DeletePolyEvalParams) 
 	return err
 }
 
+const deletePureDKG = `-- name: DeletePureDKG :exec
+DELETE FROM keyper.puredkg WHERE eon=$1
+`
+
+func (q *Queries) DeletePureDKG(ctx context.Context, eon int64) error {
+	_, err := q.db.Exec(ctx, deletePureDKG, eon)
+	return err
+}
+
 const deleteShutterMessage = `-- name: DeleteShutterMessage :exec
 DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1
 `
