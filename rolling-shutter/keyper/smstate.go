@@ -440,6 +440,13 @@ func (st *ShuttermintState) finalizeDKG(
 		return err
 	}
 
+	// There's really no need to keep them around now. We could even get rid of them earlier.
+	tag, err := queries.DeletePolyEvalByEon(ctx, int64(eon))
+	if err != nil {
+		return err
+	}
+	log.Printf("Deleted %d poly evals", tag.RowsAffected())
+
 	var dkgerror sql.NullString
 	var pureResult []byte
 

@@ -7,6 +7,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/jackc/pgconn"
 )
 
 const countBatchConfigs = `-- name: CountBatchConfigs :one
@@ -35,6 +37,14 @@ type DeletePolyEvalParams struct {
 func (q *Queries) DeletePolyEval(ctx context.Context, arg DeletePolyEvalParams) error {
 	_, err := q.db.Exec(ctx, deletePolyEval, arg.Eon, arg.ReceiverAddress)
 	return err
+}
+
+const deletePolyEvalByEon = `-- name: DeletePolyEvalByEon :execresult
+DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1
+`
+
+func (q *Queries) DeletePolyEvalByEon(ctx context.Context, eon int64) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deletePolyEvalByEon, eon)
 }
 
 const deletePureDKG = `-- name: DeletePureDKG :exec
