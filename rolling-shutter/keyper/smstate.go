@@ -691,8 +691,6 @@ func (st *ShuttermintState) HandleEvent(
 		err = st.handleCheckIn(ctx, queries, e)
 	case *shutterevents.BatchConfig:
 		err = st.handleBatchConfig(ctx, queries, e)
-	// case *shutterevents.DecryptionSignature:
-	//	//err = shutter.applyDecryptionSignature(*e)
 	case *shutterevents.EonStarted:
 		err = st.handleEonStarted(ctx, queries, e)
 	case *shutterevents.PolyCommitment:
