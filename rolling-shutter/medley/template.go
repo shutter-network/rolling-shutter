@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	multiaddr "github.com/multiformats/go-multiaddr"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
@@ -34,6 +35,11 @@ func blsPublicKey(publicKey *shbls.PublicKey) string {
 	return hex.EncodeToString(b)
 }
 
+func eonPublicKey(epk *shcrypto.EonPublicKey) string {
+	b := epk.Marshal()
+	return hex.EncodeToString(b)
+}
+
 func quoteList(lst []multiaddr.Multiaddr) string {
 	var strlist []string
 	for _, x := range lst {
@@ -54,6 +60,7 @@ func MustBuildTemplate(name, content string) *template.Template {
 		"P2PKeyPublic": p2pKeyPublic,
 		"BLSSecretKey": blsSecretKey,
 		"BLSPublicKey": blsPublicKey,
+		"EonPublicKey": eonPublicKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)

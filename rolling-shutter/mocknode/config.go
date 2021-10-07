@@ -9,6 +9,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
@@ -29,7 +30,9 @@ type Config struct {
 
 }
 
-var configTemplate = `# Shutter mock node config for /p2p/{{ .P2PKey | P2PKeyPublic}}
+var configTemplate = `# Shutter mock node config
+# Peer Identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
+# Eon Public Key: {{ .EonPublicKey | EonPublicKey }}
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"
@@ -68,4 +71,13 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 // WriteTOML writes a toml configuration file with the given config.
 func (config *Config) WriteTOML(w io.Writer) error {
 	return tmpl.Execute(w, config)
+}
+
+// EonPublicKey returns the eon public key defined by the seed value in the config.
+func (config *Config) EonPublicKey() *shcrypto.EonPublicKey {
+	_, eonPublicKey, err := computeEonKeys(config.EonKeySeed)
+	if err != nil {
+		panic(err)
+	}
+	return eonPublicKey
 }
