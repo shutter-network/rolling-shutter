@@ -22,6 +22,8 @@ type Config struct {
 	P2PKey     crypto.PrivKey
 	SigningKey *shbls.SecretKey
 
+	SignerIndex int32
+
 	RequiredSignatures uint
 
 	InstanceID uint64
@@ -40,6 +42,9 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 # Secret Keys
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
+
+# Index representing the signer
+SignerIndex = {{ .SignerIndex }}
 
 # Number of individual signatures required to form an accepted aggregated signature
 requiredSignatures = {{.RequiredSignatures}}

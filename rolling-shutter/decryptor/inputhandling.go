@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -87,7 +86,7 @@ func handleSignatureInput(
 	db *dcrdb.Queries,
 	signature *decryptionSignature,
 ) ([]shmsg.P2PMessage, error) {
-	signers := getSignerIndexes(signature.SignerBitfield)
+	signers := getIndexes(signature.SignerBitfield)
 	if len(signers) > 1 {
 		// Ignore aggregated signatures
 		return nil, nil
@@ -129,7 +128,7 @@ func handleSignatureInput(
 		}
 		signaturesToAggregate = append(signaturesToAggregate, unmarshalledSignature)
 
-		indexes := getSignerIndexes(dbSignature.SignersBitfield)
+		indexes := getIndexes(dbSignature.SignersBitfield)
 		if len(indexes) > 1 {
 			panic("got signature with multiple signers")
 		}
@@ -145,7 +144,7 @@ func handleSignatureInput(
 			return nil, err
 		}
 		publicKeysToAggragate = append(publicKeysToAggragate, pk)
-		addBitfields(bitfield, dbSignature.SignersBitfield)
+		bitfield = addBitfields(bitfield, dbSignature.SignersBitfield)
 	}
 
 	if uint(len(signaturesToAggregate)) < config.RequiredSignatures {
@@ -209,58 +208,27 @@ func handleEpoch(
 		DecryptedBatch: decryptedBatch,
 	}
 	signedHash := signingData.Hash().Bytes()
-	signatureBytes := signingData.Sign(config.SigningKey).Marshal()
-	signerIndexes := make([]byte, 0) // TODO: find this value
+	signature := signingData.Sign(config.SigningKey)
+	signersBitfield := makeBitfield(config.SignerIndex)
 
-	insertParams := dcrdb.InsertDecryptionSignatureParams{
-		EpochID:         epochIDBytes,
-		SignedHash:      signedHash,
-		SignersBitfield: signerIndexes,
-		Signature:       signatureBytes,
-	}
-	tag, err := db.InsertDecryptionSignature(ctx, insertParams)
+	msgs, err := handleSignatureInput(ctx, config, db, &decryptionSignature{
+		instanceID:     config.InstanceID,
+		epochID:        epochID,
+		signedHash:     common.BytesToHash(signedHash),
+		signature:      signature,
+		SignerBitfield: signersBitfield,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to store multiple signatures with same (epoch id, signer index): (%d, %d)",
-			epochID, signerIndexes)
-		return nil, nil
-	}
 
-	msgs := []shmsg.P2PMessage{}
-	// TODO: handle signer bitfield
-	msgs = append(msgs, &shmsg.AggregatedDecryptionSignature{
+	signatureMsg := &shmsg.AggregatedDecryptionSignature{
 		InstanceID:          config.InstanceID,
 		EpochID:             epochID,
 		SignedHash:          signedHash,
-		AggregatedSignature: signatureBytes,
-		SignerBitfield:      signerIndexes,
-	})
+		AggregatedSignature: signature.Marshal(),
+		SignerBitfield:      signersBitfield,
+	}
+	msgs = append(msgs, signatureMsg)
 	return msgs, nil
-}
-
-func getSignerIndexes(bitField []byte) []int32 {
-	numBytes := int32(0)
-	var indexes []int32
-	for _, b := range bitField {
-		for i := 7; i >= 0; i-- {
-			threshold := uint8(math.Pow(2, float64(i)))
-			if b >= threshold {
-				b -= threshold
-				indexes = append(indexes, numBytes*8+int32(i)+1)
-			}
-		}
-	}
-	return indexes
-}
-
-func addBitfields(bf1 []byte, bf2 []byte) []byte {
-	if len(bf1) != len(bf2) {
-		panic("require two bitfields of the same length")
-	}
-	for i, b := range bf2 {
-		bf1[i] += b
-	}
-	return bf1
 }

@@ -29,8 +29,9 @@ func newTestConfig(t *testing.T) Config {
 
 		DatabaseURL: "",
 
-		P2PKey:     p2pKey,
-		SigningKey: signingKey,
+		P2PKey:      p2pKey,
+		SigningKey:  signingKey,
+		SignerIndex: 1,
 
 		InstanceID: 123,
 	}
@@ -55,9 +56,8 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	// send an epoch secret key and check that it's stored in the db
 	m := &decryptionKey{
-		instanceID: config.InstanceID,
-		epochID:    0,
-		key:        tkg.EpochSecretKey(0),
+		epochID: 0,
+		key:     tkg.EpochSecretKey(0),
 	}
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
@@ -72,9 +72,8 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 
 	// send a wrong epoch secret key (e.g., one for a wrong epoch) and check that there's an error
 	m2 := &decryptionKey{
-		instanceID: config.InstanceID,
-		epochID:    1,
-		key:        tkg.EpochSecretKey(2),
+		epochID: 1,
+		key:     tkg.EpochSecretKey(2),
 	}
 	_, err = handleDecryptionKeyInput(ctx, config, db, m2)
 	assert.Check(t, err != nil)
@@ -91,7 +90,6 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	config := newTestConfig(t)
 
 	m := &cipherBatch{
-		InstanceID:   config.InstanceID,
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx1"), []byte("tx2")},
 	}
@@ -105,7 +103,6 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 0)
 
 	m2 := &cipherBatch{
-		InstanceID:   config.InstanceID,
 		EpochID:      100,
 		Transactions: [][]byte{[]byte("tx3")},
 	}
@@ -159,8 +156,8 @@ func TestHandleSignatureIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	bitfield := []byte{1}
-	bitfield2 := []byte{2}
+	bitfield := makeBitfield(1)
+	bitfield2 := makeBitfield(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
 		epochID:        0,
@@ -194,9 +191,12 @@ func TestHandleSignatureIntegration(t *testing.T) {
 			outputs: []*shmsg.AggregatedDecryptionSignature{nil},
 		},
 		{
-			config:  configTwoRequiredSignatures,
-			inputs:  []*decryptionSignature{signature, signature2},
-			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: []byte{3}}},
+			config: configTwoRequiredSignatures,
+			inputs: []*decryptionSignature{signature, signature2},
+			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {
+				InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(),
+				SignerBitfield: makeBitfieldFromArray([]int32{1, 2}),
+			}},
 		},
 	}
 
@@ -228,6 +228,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
+	config.RequiredSignatures = 2 // prevent generation of polluting signatures
 	tkg := medley.NewTestKeyGenerator(t)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
@@ -237,7 +238,6 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	cipherBatchMsg := &cipherBatch{
-		InstanceID:   config.InstanceID,
 		EpochID:      0,
 		Transactions: [][]byte{[]byte("tx1")},
 	}
@@ -246,18 +246,16 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 0)
 
 	keyMsg := &decryptionKey{
-		instanceID: config.InstanceID,
-		epochID:    0,
-		key:        tkg.EpochSecretKey(0),
+		epochID: 0,
+		key:     tkg.EpochSecretKey(0),
 	}
 	msgs, err = handleDecryptionKeyInput(ctx, config, db, keyMsg)
 	assert.NilError(t, err)
 
-	// TODO: handle signer index
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
 		EpochID:         medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
-		SignersBitfield: make([]byte, 0),
+		SignersBitfield: makeBitfield(config.SignerIndex),
 	})
 	assert.NilError(t, err)
 

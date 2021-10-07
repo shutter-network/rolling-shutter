@@ -85,18 +85,6 @@ func (q *Queries) GetDecryptionSignatures(ctx context.Context, epochID []byte) (
 	return items, nil
 }
 
-const getDecryptor = `-- name: GetDecryptor :one
-SELECT start_epoch_id, index, address FROM decryptor.decryptor_set_member
-WHERE index = $1 ORDER BY start_epoch_id DESC LIMIT 1
-`
-
-func (q *Queries) GetDecryptor(ctx context.Context, index int32) (DecryptorDecryptorSetMember, error) {
-	row := q.db.QueryRow(ctx, getDecryptor, index)
-	var i DecryptorDecryptorSetMember
-	err := row.Scan(&i.StartEpochID, &i.Index, &i.Address)
-	return i, err
-}
-
 const getDecryptorIndex = `-- name: GetDecryptorIndex :one
 SELECT index
 FROM decryptor.decryptor_set_member
