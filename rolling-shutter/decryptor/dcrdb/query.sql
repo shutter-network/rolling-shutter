@@ -82,10 +82,6 @@ SELECT index
 FROM decryptor.decryptor_set_member
 WHERE start_epoch_id <= $1 AND address = $2;
 
--- name: GetDecryptor :one
-SELECT * FROM decryptor.decryptor_set_member
-WHERE index = $1 ORDER BY start_epoch_id DESC LIMIT 1;
-
 -- name: GetDecryptorKey :one
 SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
     SELECT address from decryptor.decryptor_set_member
