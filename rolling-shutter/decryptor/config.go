@@ -36,6 +36,7 @@ type Config struct {
 var configTemplate = `# Shutter decryptor config
 # Ethereum address: {{ .EthereumAddress }}
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
+# BLS public key: {{ .SigningPublicKey | BLSPublicKey }}
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
 # It it's empty, we use the standard PG* environment variables
@@ -76,6 +77,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
 				medley.BLSSecretKeyHook,
+				medley.BLSPublicKeyHook,
 			),
 		),
 	)
@@ -83,4 +85,8 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 
 func (config *Config) EthereumAddress() common.Address {
 	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+}
+
+func (config *Config) SigningPublicKey() *shbls.PublicKey {
+	return shbls.SecretToPublicKey(config.SigningKey)
 }
