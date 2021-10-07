@@ -78,6 +78,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.P2PKeyHook,
 				medley.BLSSecretKeyHook,
 				medley.BLSPublicKeyHook,
+				medley.StringToEcdsaPrivateKey,
 			),
 		),
 	)
