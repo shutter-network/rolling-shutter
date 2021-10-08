@@ -2,34 +2,81 @@ package decryptor
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
+// Add decryptor addresses to given db.
+// Uses index of signingKeys map as decryptor index and arbitrary unique addresses.
+func populateDBWithDecryptors(ctx context.Context, t *testing.T, db *dcrdb.Queries, signingKeys map[int32]*shbls.SecretKey) {
+	t.Helper()
+	for i, signingKey := range signingKeys {
+		arbitraryAddress := fmt.Sprint(signingKey)
+		err := db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
+			StartEpochID: []byte{0},
+			Index:        i,
+			Address:      arbitraryAddress,
+		})
+		assert.NilError(t, err)
+		err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+			Address:      arbitraryAddress,
+			BlsPublicKey: shbls.SecretToPublicKey(signingKey).Marshal(),
+		})
+		assert.NilError(t, err)
+	}
+}
+
 func TestMessageValidators(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
+	config := newTestConfig(t)
+
 	var peerID peer.ID
-	d := New(Config{
-		InstanceID: 123,
-	})
+	d := New(config)
+	d.db = db
+
+	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
+	assert.NilError(t, err)
+	populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{0: config.SigningKey, 1: signingKey2})
+
 	validators := d.makeMessagesValidators()
 	validDecryptionKey := make([]byte, 64)
-	validSignature := make([]byte, 128)
-	validHash := make([]byte, 64)
+
+	validHash := common.BytesToHash([]byte("Hello"))
+	wrongHash := common.BytesToHash([]byte("Not Hello"))
+	validSignature := shbls.Sign(validHash.Bytes(), config.SigningKey)
+
+	validSignature2 := shbls.Sign(validHash.Bytes(), signingKey2)
+	aggregatedSignature := shbls.AggregateSignatures([]*shbls.Signature{validSignature, validSignature2})
+
 	tests := []struct {
+		name  string
 		valid bool
 		msg   shmsg.P2PMessage
 	}{
 		{
+			name:  "valid decryption key",
 			valid: true,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: d.Config.InstanceID,
@@ -37,47 +84,74 @@ func TestMessageValidators(t *testing.T) {
 			},
 		},
 		{
-			valid: true,
-			msg: &shmsg.AggregatedDecryptionSignature{
-				InstanceID:          d.Config.InstanceID,
-				AggregatedSignature: validSignature,
-				SignedHash:          validHash,
-			},
-		},
-		{
-			valid: true,
-			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID,
-			},
-		},
-		{
+			name:  "invalid decryption key instance ID",
 			valid: false,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: d.Config.InstanceID + 1,
 			},
 		},
 		{
+			name:  "valid cipher batch",
+			valid: true,
+			msg: &shmsg.CipherBatch{
+				InstanceID: d.Config.InstanceID,
+			},
+		},
+		{
+			name:  "invalid cipher batch instance ID",
+			valid: false,
+			msg: &shmsg.CipherBatch{
+				InstanceID: d.Config.InstanceID + 2,
+			},
+		},
+		{
+			name:  "valid single signature",
+			valid: true,
+			msg: &shmsg.AggregatedDecryptionSignature{
+				InstanceID:          d.Config.InstanceID,
+				AggregatedSignature: validSignature.Marshal(),
+				SignedHash:          validHash.Bytes(),
+				SignerBitfield:      makeBitfieldFromIndex(0),
+			},
+		},
+		{
+			name:  "valid aggregated signature",
+			valid: true,
+			msg: &shmsg.AggregatedDecryptionSignature{
+				InstanceID:          d.Config.InstanceID,
+				AggregatedSignature: aggregatedSignature.Marshal(),
+				SignedHash:          validHash.Bytes(),
+				SignerBitfield:      makeBitfieldFromArray([]int32{0, 1}),
+			},
+		},
+		{
+			name:  "invalid signature instance id",
 			valid: false,
 			msg: &shmsg.AggregatedDecryptionSignature{
 				InstanceID: d.Config.InstanceID - 1,
 			},
 		},
 		{
+			name:  "invalid signature hash",
 			valid: false,
-			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID + 2,
+			msg: &shmsg.AggregatedDecryptionSignature{
+				InstanceID:          d.Config.InstanceID,
+				AggregatedSignature: validSignature.Marshal(),
+				SignedHash:          wrongHash.Bytes(),
 			},
 		},
 	}
 	for _, tc := range tests {
-		pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
-		if err != nil {
-			t.Fatalf("Error in makePubSubMessage: %s", err)
-		}
-		validate := validators[pubsubMessage.GetTopic()]
-		assert.Assert(t, validate != nil)
-		assert.Equal(t, validate(ctx, peerID, pubsubMessage), tc.valid,
-			"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		t.Run(tc.name, func(t *testing.T) {
+			pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
+			if err != nil {
+				t.Fatalf("Error in makePubSubMessage: %s", err)
+			}
+			validate := validators[pubsubMessage.GetTopic()]
+			assert.Assert(t, validate != nil)
+			assert.Equal(t, validate(ctx, peerID, pubsubMessage), tc.valid,
+				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		})
 	}
 }
 
