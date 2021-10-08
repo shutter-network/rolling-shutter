@@ -17,14 +17,14 @@ func getIndexes(bitField []byte) []int32 {
 }
 
 func makeBitfieldFromArray(indexes []int32) []byte {
-	out := make([]byte, 0)
+	out := []byte{}
 	for _, i := range indexes {
-		out = addBitfields(out, makeBitfield(i))
+		out = addBitfields(out, makeBitfieldFromIndex(i))
 	}
 	return out
 }
 
-func makeBitfield(index int32) []byte {
+func makeBitfieldFromIndex(index int32) []byte {
 	bitfield := make([]byte, index/8)
 	bit := math.Pow(2, float64(index%8))
 	return append(bitfield, uint8(int64(bit)))

@@ -156,8 +156,8 @@ func TestHandleSignatureIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	bitfield := makeBitfield(1)
-	bitfield2 := makeBitfield(2)
+	bitfield := makeBitfieldFromIndex(1)
+	bitfield2 := makeBitfieldFromIndex(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
 		epochID:        0,
@@ -255,7 +255,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
 		EpochID:         medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
-		SignersBitfield: makeBitfield(config.SignerIndex),
+		SignersBitfield: makeBitfieldFromIndex(config.SignerIndex),
 	})
 	assert.NilError(t, err)
 

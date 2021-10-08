@@ -123,9 +123,9 @@ func handleSignatureInput(
 	for _, dbSignature := range dbSignatures {
 		unmarshalledSignature := new(shbls.Signature)
 		if err := unmarshalledSignature.Unmarshal(dbSignature.Signature); err != nil {
-			return nil, err
+			log.Printf("failed to unmarshal signature from db %s", err)
+			continue
 		}
-		signaturesToAggregate = append(signaturesToAggregate, unmarshalledSignature)
 
 		indexes := getIndexes(dbSignature.SignersBitfield)
 		if len(indexes) > 1 {
@@ -140,10 +140,17 @@ func handleSignatureInput(
 		}
 		pk := new(shbls.PublicKey)
 		if err := pk.Unmarshal(pkBytes); err != nil {
-			return nil, err
+			log.Printf("failed to unmarshal public key from db %s", err)
+			continue
 		}
+
+		signaturesToAggregate = append(signaturesToAggregate, unmarshalledSignature)
 		publicKeysToAggragate = append(publicKeysToAggragate, pk)
 		bitfield = addBitfields(bitfield, dbSignature.SignersBitfield)
+	}
+
+	if uint(len(signaturesToAggregate)) < config.RequiredSignatures {
+		return nil, nil
 	}
 
 	aggregatedSignature := shbls.AggregateSignatures(signaturesToAggregate)
@@ -204,7 +211,7 @@ func handleEpoch(
 	}
 	signedHash := signingData.Hash().Bytes()
 	signature := signingData.Sign(config.SigningKey)
-	signersBitfield := makeBitfield(config.SignerIndex)
+	signersBitfield := makeBitfieldFromIndex(config.SignerIndex)
 
 	msgs, err := handleSignatureInput(ctx, config, db, &decryptionSignature{
 		instanceID:     config.InstanceID,
