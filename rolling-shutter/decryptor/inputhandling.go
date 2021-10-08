@@ -106,7 +106,10 @@ func handleSignatureInput(
 	}
 
 	// check if we have enough signatures
-	dbSignatures, err := db.GetDecryptionSignatures(ctx, medley.Uint64EpochIDToBytes(signature.epochID))
+	dbSignatures, err := db.GetDecryptionSignatures(ctx, dcrdb.GetDecryptionSignaturesParams{
+		EpochID:    medley.Uint64EpochIDToBytes(signature.epochID),
+		SignedHash: signature.signedHash.Bytes(),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +121,6 @@ func handleSignatureInput(
 	publicKeysToAggragate := make([]*shbls.PublicKey, 0, len(dbSignatures))
 	bitfield := make([]byte, len(signature.SignerBitfield))
 	for _, dbSignature := range dbSignatures {
-		if common.BytesToHash(dbSignature.SignedHash) != signature.signedHash {
-			continue
-		}
-
 		unmarshalledSignature := new(shbls.Signature)
 		if err := unmarshalledSignature.Unmarshal(dbSignature.Signature); err != nil {
 			return nil, err
@@ -145,10 +144,6 @@ func handleSignatureInput(
 		}
 		publicKeysToAggragate = append(publicKeysToAggragate, pk)
 		bitfield = addBitfields(bitfield, dbSignature.SignersBitfield)
-	}
-
-	if uint(len(signaturesToAggregate)) < config.RequiredSignatures {
-		return nil, nil
 	}
 
 	aggregatedSignature := shbls.AggregateSignatures(signaturesToAggregate)

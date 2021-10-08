@@ -57,11 +57,16 @@ func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionS
 
 const getDecryptionSignatures = `-- name: GetDecryptionSignatures :many
 SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.decryption_signature
-WHERE epoch_id = $1
+WHERE epoch_id = $1 AND signed_hash = $2
 `
 
-func (q *Queries) GetDecryptionSignatures(ctx context.Context, epochID []byte) ([]DecryptorDecryptionSignature, error) {
-	rows, err := q.db.Query(ctx, getDecryptionSignatures, epochID)
+type GetDecryptionSignaturesParams struct {
+	EpochID    []byte
+	SignedHash []byte
+}
+
+func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryptionSignaturesParams) ([]DecryptorDecryptionSignature, error) {
+	rows, err := q.db.Query(ctx, getDecryptionSignatures, arg.EpochID, arg.SignedHash)
 	if err != nil {
 		return nil, err
 	}
