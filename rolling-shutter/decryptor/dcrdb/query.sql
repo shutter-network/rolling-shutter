@@ -24,7 +24,7 @@ ON CONFLICT DO NOTHING;
 
 -- name: GetDecryptionSignatures :many
 SELECT * FROM decryptor.decryption_signature
-WHERE epoch_id = $1;
+WHERE epoch_id = $1 AND signed_hash = $2;
 
 -- name: GetDecryptionSignature :one
 SELECT * FROM decryptor.decryption_signature
