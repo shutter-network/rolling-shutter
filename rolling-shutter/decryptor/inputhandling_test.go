@@ -132,29 +132,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
 	assert.NilError(t, err)
 
-	err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
-		StartEpochID: []byte{0},
-		Index:        1,
-		Address:      "0xdeadbeef",
-	})
-	assert.NilError(t, err)
-	err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
-		StartEpochID: []byte{0},
-		Index:        2,
-		Address:      "0xabcdefabcdef",
-	})
-	assert.NilError(t, err)
-
-	err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-		Address:      "0xdeadbeef",
-		BlsPublicKey: shbls.SecretToPublicKey(config.SigningKey).Marshal(),
-	})
-	assert.NilError(t, err)
-	err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-		Address:      "0xabcdefabcdef",
-		BlsPublicKey: shbls.SecretToPublicKey(signingKey2).Marshal(),
-	})
-	assert.NilError(t, err)
+	populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{config.SignerIndex: config.SigningKey, 2: signingKey2})
 
 	bitfield := makeBitfieldFromIndex(1)
 	bitfield2 := makeBitfieldFromIndex(2)
@@ -195,7 +173,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 			inputs: []*decryptionSignature{signature, signature2},
 			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {
 				InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(),
-				SignerBitfield: makeBitfieldFromArray([]int32{1, 2}),
+				SignerBitfield: makeBitfieldFromArray([]int32{config.SignerIndex, 2}),
 			}},
 		},
 	}

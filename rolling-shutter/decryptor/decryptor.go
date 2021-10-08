@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -15,6 +16,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -142,9 +144,9 @@ func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error
 func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 	validators := make(map[string]pubsub.Validator)
 	instanceIDValidator := d.makeInstanceIDValidator()
-	for _, topicName := range gossipTopicNames {
-		validators[topicName] = instanceIDValidator
-	}
+	validators[dcrtopics.DecryptionSignature] = d.makeDecryptionSignatureValidator()
+	validators[dcrtopics.CipherBatch] = instanceIDValidator
+	validators[dcrtopics.DecryptionKey] = instanceIDValidator
 
 	return validators
 }
@@ -160,5 +162,53 @@ func (d *Decryptor) makeInstanceIDValidator() pubsub.Validator {
 			return false
 		}
 		return msg.GetInstanceID() == d.Config.InstanceID
+	}
+}
+
+func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+
+		if msg.GetInstanceID() != d.Config.InstanceID {
+			return false
+		}
+
+		signature, ok := msg.(*decryptionSignature)
+		if !ok {
+			panic("unmarshalled non signature message in signature validator")
+		}
+
+		decryptorIndexes := getIndexes(signature.SignerBitfield)
+		keys := make([]*shbls.PublicKey, 0, len(decryptorIndexes))
+		for _, decryptorIndex := range decryptorIndexes {
+			dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
+				Index:        decryptorIndex,
+				StartEpochID: medley.Uint64EpochIDToBytes(signature.epochID),
+			})
+			if err == pgx.ErrNoRows {
+				return false
+			}
+			if err != nil {
+				log.Printf("error while getting decryption key from database: %s", err)
+				return false
+			}
+			key := new(shbls.PublicKey)
+			if err := key.Unmarshal(dbKey); err != nil {
+				return false
+			}
+			keys = append(keys, key)
+		}
+
+		aggregatedKey := shbls.AggregatePublicKeys(keys)
+		isSignatureValid := shbls.Verify(signature.signature, aggregatedKey, signature.signedHash.Bytes())
+
+		return isSignatureValid && msg.GetInstanceID() == d.Config.InstanceID
 	}
 }
