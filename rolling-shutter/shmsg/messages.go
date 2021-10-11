@@ -34,11 +34,18 @@ func (*CipherBatch) Topic() string {
 	return dcrtopics.CipherBatch
 }
 
+func (*DecryptionSignature) ImplementsP2PMessage() {
+}
+
+func (*DecryptionSignature) Topic() string {
+	return dcrtopics.DecryptionSignature
+}
+
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 }
 
 func (*AggregatedDecryptionSignature) Topic() string {
-	return dcrtopics.DecryptionSignature
+	return dcrtopics.AggregatedDecryptionSignature
 }
 
 // NewBatchConfig creates a new BatchConfig message.

@@ -20,6 +20,14 @@ message CipherBatch {
     repeated bytes transactions = 3;
 }
 
+message DecryptionSignature {
+    uint64 instanceID = 1;
+    uint64 epochID = 2;
+    bytes signedHash = 3;
+    bytes signature = 4;
+    bytes signerBitfield = 5;
+}
+
 message AggregatedDecryptionSignature {
     uint64 instanceID = 1;
     uint64 epochID = 2;

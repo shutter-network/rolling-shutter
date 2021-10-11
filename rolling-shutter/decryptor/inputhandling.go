@@ -224,12 +224,12 @@ func handleEpoch(
 		return nil, err
 	}
 
-	signatureMsg := &shmsg.AggregatedDecryptionSignature{
-		InstanceID:          config.InstanceID,
-		EpochID:             epochID,
-		SignedHash:          signedHash,
-		AggregatedSignature: signature.Marshal(),
-		SignerBitfield:      signersBitfield,
+	signatureMsg := &shmsg.DecryptionSignature{
+		InstanceID:     config.InstanceID,
+		EpochID:        epochID,
+		SignedHash:     signedHash,
+		Signature:      signature.Marshal(),
+		SignerBitfield: signersBitfield,
 	}
 	msgs = append(msgs, signatureMsg)
 	return msgs, nil

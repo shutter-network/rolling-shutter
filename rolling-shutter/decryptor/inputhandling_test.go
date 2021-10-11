@@ -238,7 +238,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	assert.Check(t, len(msgs) == 1)
-	msg, ok := msgs[0].(*shmsg.AggregatedDecryptionSignature)
+	msg, ok := msgs[0].(*shmsg.DecryptionSignature)
 	assert.Check(t, ok, "wrong message type")
 	assert.Equal(
 		t,
@@ -246,5 +246,5 @@ func TestHandleEpochIntegration(t *testing.T) {
 		msg.EpochID,
 	)
 	assert.Check(t, bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash))
-	assert.Check(t, bytes.Equal(storedDecryptionKey.Signature, msg.AggregatedSignature))
+	assert.Check(t, bytes.Equal(storedDecryptionKey.Signature, msg.Signature))
 }
