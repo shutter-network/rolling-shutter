@@ -105,7 +105,43 @@ func TestMessageValidators(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid single signature",
+			name:  "valid signature",
+			valid: true,
+			msg: &shmsg.DecryptionSignature{
+				InstanceID:     d.Config.InstanceID,
+				Signature:      validSignature.Marshal(),
+				SignedHash:     validHash.Bytes(),
+				SignerBitfield: makeBitfieldFromIndex(0),
+			},
+		},
+		{
+			name:  "invalid signature two signers",
+			valid: false,
+			msg: &shmsg.DecryptionSignature{
+				InstanceID:     d.Config.InstanceID,
+				Signature:      aggregatedSignature.Marshal(),
+				SignedHash:     validHash.Bytes(),
+				SignerBitfield: makeBitfieldFromArray([]int32{0, 1}),
+			},
+		},
+		{
+			name:  "invalid signature instance id",
+			valid: false,
+			msg: &shmsg.DecryptionSignature{
+				InstanceID: d.Config.InstanceID - 1,
+			},
+		},
+		{
+			name:  "invalid signature hash",
+			valid: false,
+			msg: &shmsg.DecryptionSignature{
+				InstanceID: d.Config.InstanceID,
+				Signature:  validSignature.Marshal(),
+				SignedHash: wrongHash.Bytes(),
+			},
+		},
+		{
+			name:  "valid aggregated signature one signer",
 			valid: true,
 			msg: &shmsg.AggregatedDecryptionSignature{
 				InstanceID:          d.Config.InstanceID,
@@ -115,7 +151,7 @@ func TestMessageValidators(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid aggregated signature",
+			name:  "valid aggregated signature two signers",
 			valid: true,
 			msg: &shmsg.AggregatedDecryptionSignature{
 				InstanceID:          d.Config.InstanceID,
@@ -125,14 +161,14 @@ func TestMessageValidators(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid signature instance id",
+			name:  "invalid aggregated signature instance id",
 			valid: false,
 			msg: &shmsg.AggregatedDecryptionSignature{
 				InstanceID: d.Config.InstanceID - 1,
 			},
 		},
 		{
-			name:  "invalid signature hash",
+			name:  "invalid aggregated signature hash",
 			valid: false,
 			msg: &shmsg.AggregatedDecryptionSignature{
 				InstanceID:          d.Config.InstanceID,
