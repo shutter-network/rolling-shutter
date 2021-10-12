@@ -38,6 +38,21 @@ INSERT INTO decryptor.decryption_signature (
 )
 ON CONFLICT DO NOTHING;
 
+-- name: GetAggregatedSignature :one
+SELECT * FROM decryptor.aggregated_signature
+WHERE signed_hash = $1;
+
+-- name: ExistsAggregatedSignature :one
+SELECT EXISTS(SELECT 1 FROM decryptor.aggregated_signature WHERE signed_hash = $1);
+
+-- name: InsertAggregatedSignature :execresult
+INSERT INTO decryptor.aggregated_signature (
+    epoch_id, signed_hash, signers_bitfield, signature
+) VALUES (
+    $1, $2, $3, $4
+)
+ON CONFLICT DO NOTHING;
+
 -- name: InsertDecryptorIdentity :exec
 INSERT INTO decryptor.decryptor_identity (
     address, bls_public_key

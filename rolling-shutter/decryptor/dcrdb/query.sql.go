@@ -9,6 +9,34 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const existsAggregatedSignature = `-- name: ExistsAggregatedSignature :one
+SELECT EXISTS(SELECT 1 FROM decryptor.aggregated_signature WHERE signed_hash = $1)
+`
+
+func (q *Queries) ExistsAggregatedSignature(ctx context.Context, signedHash []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, existsAggregatedSignature, signedHash)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const getAggregatedSignature = `-- name: GetAggregatedSignature :one
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.aggregated_signature
+WHERE signed_hash = $1
+`
+
+func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte) (DecryptorAggregatedSignature, error) {
+	row := q.db.QueryRow(ctx, getAggregatedSignature, signedHash)
+	var i DecryptorAggregatedSignature
+	err := row.Scan(
+		&i.EpochID,
+		&i.SignedHash,
+		&i.SignersBitfield,
+		&i.Signature,
+	)
+	return i, err
+}
+
 const getCipherBatch = `-- name: GetCipherBatch :one
 SELECT epoch_id, transactions FROM decryptor.cipher_batch
 WHERE epoch_id = $1
@@ -209,6 +237,31 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (DecryptorMetaInf, er
 	var i DecryptorMetaInf
 	err := row.Scan(&i.Key, &i.Value)
 	return i, err
+}
+
+const insertAggregatedSignature = `-- name: InsertAggregatedSignature :execresult
+INSERT INTO decryptor.aggregated_signature (
+    epoch_id, signed_hash, signers_bitfield, signature
+) VALUES (
+    $1, $2, $3, $4
+)
+ON CONFLICT DO NOTHING
+`
+
+type InsertAggregatedSignatureParams struct {
+	EpochID         []byte
+	SignedHash      []byte
+	SignersBitfield []byte
+	Signature       []byte
+}
+
+func (q *Queries) InsertAggregatedSignature(ctx context.Context, arg InsertAggregatedSignatureParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertAggregatedSignature,
+		arg.EpochID,
+		arg.SignedHash,
+		arg.SignersBitfield,
+		arg.Signature,
+	)
 }
 
 const insertCipherBatch = `-- name: InsertCipherBatch :execresult

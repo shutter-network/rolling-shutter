@@ -105,6 +105,14 @@ func handleSignatureInput(
 		return nil, nil
 	}
 
+	exists, err := db.ExistsAggregatedSignature(ctx, signature.signedHash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, nil
+	}
+
 	// check if we have enough signatures
 	dbSignatures, err := db.GetDecryptionSignatures(ctx, dcrdb.GetDecryptionSignaturesParams{
 		EpochID:    medley.Uint64EpochIDToBytes(signature.epochID),
@@ -157,6 +165,16 @@ func handleSignatureInput(
 	aggregatedKey := shbls.AggregatePublicKeys(publicKeysToAggragate)
 	if !shbls.Verify(aggregatedSignature, aggregatedKey, signature.signedHash.Bytes()) {
 		panic(fmt.Sprintf("could not verify aggregated signature for epochID %d", signature.epochID))
+	}
+
+	_, err = db.InsertAggregatedSignature(ctx, dcrdb.InsertAggregatedSignatureParams{
+		EpochID:         medley.Uint64EpochIDToBytes(signature.epochID),
+		SignedHash:      signature.signedHash.Bytes(),
+		SignersBitfield: bitfield,
+		Signature:       aggregatedSignature.Marshal(),
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	msgs := []shmsg.P2PMessage{
