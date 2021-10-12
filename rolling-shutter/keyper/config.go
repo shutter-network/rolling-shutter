@@ -4,10 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"io"
-	"reflect"
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -56,52 +53,6 @@ P2PKey          = "{{ .P2PKey | P2PKey}}"
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)
-
-func stringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PrivateKey{}) {
-		return data, nil
-	}
-	seed, err := hex.DecodeString(data.(string))
-	if err != nil {
-		return nil, err
-	}
-	if len(seed) != ed25519.SeedSize {
-		return nil, errors.Errorf("invalid seed length %d (must be %d)", len(seed), ed25519.SeedSize)
-	}
-	return ed25519.NewKeyFromSeed(seed), nil
-}
-
-func stringToEcdsaPrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f.Kind() != reflect.String || t != reflect.TypeOf(&ecdsa.PrivateKey{}) {
-		return data, nil
-	}
-	return crypto.HexToECDSA(data.(string))
-}
-
-func stringToEciesPrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f.Kind() != reflect.String || t != reflect.TypeOf(&ecies.PrivateKey{}) {
-		return data, nil
-	}
-	encryptionKeyECDSA, err := crypto.HexToECDSA(data.(string))
-	if err != nil {
-		return nil, err
-	}
-
-	return ecies.ImportECDSA(encryptionKeyECDSA), nil
-}
-
-func stringToAddress(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f.Kind() != reflect.String || t != reflect.TypeOf(common.Address{}) {
-		return data, nil
-	}
-
-	ds := data.(string)
-	addr := common.HexToAddress(ds)
-	if addr.Hex() != ds {
-		return nil, fmt.Errorf("not a checksummed address: %s", ds)
-	}
-	return addr, nil
-}
 
 func randomSigningKey() (*ecdsa.PrivateKey, error) {
 	return crypto.GenerateKey()
@@ -156,10 +107,10 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		config,
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
-				stringToEd25519PrivateKey,
-				stringToEcdsaPrivateKey,
-				stringToEciesPrivateKey,
-				stringToAddress,
+				medley.StringToEd25519PrivateKey,
+				medley.StringToEcdsaPrivateKey,
+				medley.StringToEciesPrivateKey,
+				medley.StringToAddress,
 				medley.P2PKeyHook,
 				mapstructure.StringToTimeDurationHookFunc(),
 				mapstructure.StringToSliceHookFunc(","),

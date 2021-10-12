@@ -1,10 +1,13 @@
 package decryptor
 
 import (
+	"crypto/ecdsa"
 	"io"
 	"text/template"
 
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	libp2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
@@ -19,8 +22,9 @@ type Config struct {
 
 	DatabaseURL string
 
-	P2PKey     crypto.PrivKey
-	SigningKey *shbls.SecretKey
+	EthereumKey *ecdsa.PrivateKey
+	P2PKey      libp2pcrypto.PrivKey
+	SigningKey  *shbls.SecretKey
 
 	SignerIndex int32
 
@@ -29,7 +33,10 @@ type Config struct {
 	InstanceID uint64
 }
 
-var configTemplate = `# Shutter decryptor config for /p2p/{{ .P2PKey | P2PKeyPublic}}
+var configTemplate = `# Shutter decryptor config
+# Ethereum address: {{ .EthereumAddress }}
+# Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
+# BLS public key: {{ .SigningPublicKey | BLSPublicKey }}
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
 # It it's empty, we use the standard PG* environment variables
@@ -40,6 +47,7 @@ ListenAddress   = "{{ .ListenAddress }}"
 PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 
 # Secret Keys
+EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
 
@@ -69,7 +77,17 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
 				medley.BLSSecretKeyHook,
+				medley.BLSPublicKeyHook,
+				medley.StringToEcdsaPrivateKey,
 			),
 		),
 	)
+}
+
+func (config *Config) EthereumAddress() common.Address {
+	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+}
+
+func (config *Config) SigningPublicKey() *shbls.PublicKey {
+	return shbls.SecretToPublicKey(config.SigningKey)
 }

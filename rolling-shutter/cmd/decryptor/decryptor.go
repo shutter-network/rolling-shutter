@@ -6,8 +6,9 @@ import (
 	"crypto/rand"
 	"log"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/libp2p/go-libp2p-core/crypto"
+	lip2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -127,7 +128,11 @@ func readConfig() (decryptor.Config, error) {
 }
 
 func exampleConfig() (*decryptor.Config, error) {
-	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	ethereumKey, err := ethcrypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	p2pkey, _, err := lip2pcrypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +144,10 @@ func exampleConfig() (*decryptor.Config, error) {
 		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "",
-		P2PKey:         p2pkey,
-		SigningKey:     signingKey,
+
+		EthereumKey: ethereumKey,
+		P2PKey:      p2pkey,
+		SigningKey:  signingKey,
 	}, nil
 }
 

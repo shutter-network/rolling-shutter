@@ -200,6 +200,24 @@ func (q *Queries) GetEonPublicKey(ctx context.Context, startEpochID []byte) ([]b
 	return eon_public_key, err
 }
 
+const getKeyperSet = `-- name: GetKeyperSet :one
+SELECT (
+    start_epoch_id,
+    keypers,
+    threshold
+) FROM decryptor.keyper_set
+WHERE start_epoch_id <= $1
+ORDER BY start_epoch_id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetKeyperSet(ctx context.Context, startEpochID []byte) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getKeyperSet, startEpochID)
+	var column_1 interface{}
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getMeta = `-- name: GetMeta :one
 SELECT key, value FROM decryptor.meta_inf WHERE key = $1
 `
