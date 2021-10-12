@@ -4,6 +4,13 @@ package dcrdb
 
 import ()
 
+type DecryptorAggregatedSignature struct {
+	EpochID         []byte
+	SignedHash      []byte
+	SignersBitfield []byte
+	Signature       []byte
+}
+
 type DecryptorCipherBatch struct {
 	EpochID      []byte
 	Transactions [][]byte
