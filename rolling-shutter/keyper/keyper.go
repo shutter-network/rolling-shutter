@@ -157,10 +157,14 @@ func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error
 		return err
 	}
 
-	switch unmarshalled.(type) {
+	s := kgstate{
+		config: kpr.config,
+		db:     kprdb.New(kpr.dbpool),
+	}
+
+	switch typedMsg := unmarshalled.(type) {
 	case *decryptionTrigger:
-	case *decryptionKeyShare:
-	case *decryptionKey:
+		msgsOut, err = s.handleDecryptionTrigger(ctx, typedMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
 		return nil
