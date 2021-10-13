@@ -21,7 +21,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
-var GossipTopicNames = []string{kprtopics.DecryptionTrigger, kprtopics.DecryptionKey}
+var GossipTopicNames = []string{
+	kprtopics.DecryptionTrigger,
+	kprtopics.DecryptionKeyShare,
+	kprtopics.DecryptionKey,
+}
 
 type keyper struct {
 	config            Config
