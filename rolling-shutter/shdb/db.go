@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 )
 
 const SchemaVersionKey = "schema-version"
@@ -115,4 +116,17 @@ func DecodePureDKGResult(b []byte) (*puredkg.Result, error) {
 		return nil, err
 	}
 	return &res, nil
+}
+
+func EncodeEpochSecretKeyShare(share *shcrypto.EpochSecretKeyShare) ([]byte, error) {
+	return share.GobEncode()
+}
+
+func DecodeEpochSecretKeyShare(b []byte) (*shcrypto.EpochSecretKeyShare, error) {
+	share := new(shcrypto.EpochSecretKeyShare)
+	err := share.GobDecode(b)
+	if err != nil {
+		return nil, err
+	}
+	return share, nil
 }

@@ -165,6 +165,8 @@ func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error
 	switch typedMsg := unmarshalled.(type) {
 	case *decryptionTrigger:
 		msgsOut, err = epochKGHandler.handleDecryptionTrigger(ctx, typedMsg)
+	case *decryptionKeyShare:
+		msgsOut, err = epochKGHandler.handleDecryptionKeyShare(ctx, typedMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
 		return nil

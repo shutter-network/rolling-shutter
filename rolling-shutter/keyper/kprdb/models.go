@@ -9,7 +9,6 @@ import (
 
 type KeyperDecryptionKey struct {
 	EpochID       []byte
-	KeyperIndex   sql.NullInt64
 	DecryptionKey []byte
 }
 
