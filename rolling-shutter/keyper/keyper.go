@@ -13,12 +13,14 @@ import (
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 var GossipTopicNames = []string{
@@ -106,6 +108,9 @@ func (kpr *keyper) run(ctx context.Context) error {
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)
 	})
+	group.Go(func() error {
+		return kpr.operateP2P(ctx)
+	})
 	return group.Wait()
 }
 
@@ -125,4 +130,59 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+func (kpr *keyper) operateP2P(ctx context.Context) error {
+	for {
+		select {
+		case msg, ok := <-kpr.p2p.GossipMessages:
+			if !ok {
+				return nil
+			}
+			if err := kpr.handleP2PMessage(ctx, msg); err != nil {
+				log.Printf("error handling message %+v: %s", msg, err)
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error {
+	var msgsOut []shmsg.P2PMessage
+	var err error
+
+	unmarshalled, err := unmarshalP2PMessage(msg)
+	if err != nil {
+		return err
+	}
+
+	switch unmarshalled.(type) {
+	case *decryptionTrigger:
+	case *decryptionKeyShare:
+	case *decryptionKey:
+	default:
+		log.Println("ignoring message received on topic", msg.Topic)
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+	for _, msgOut := range msgsOut {
+		if err := kpr.sendMessage(ctx, msgOut); err != nil {
+			log.Printf("error sending message %+v: %s", msgOut, err)
+			continue
+		}
+	}
+	return nil
+}
+
+func (kpr *keyper) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal p2p message")
+	}
+
+	return kpr.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
