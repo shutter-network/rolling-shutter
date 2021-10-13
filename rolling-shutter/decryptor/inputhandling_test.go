@@ -69,14 +69,6 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	assert.Check(t, bytes.Equal(mStored.Key, keyBytes))
 
 	assert.Check(t, len(msgs) == 0)
-
-	// send a wrong epoch secret key (e.g., one for a wrong epoch) and check that there's an error
-	m2 := &decryptionKey{
-		epochID: 1,
-		key:     tkg.EpochSecretKey(2),
-	}
-	_, err = handleDecryptionKeyInput(ctx, config, db, m2)
-	assert.Check(t, err != nil)
 }
 
 func TestInsertCipherBatchIntegration(t *testing.T) {
