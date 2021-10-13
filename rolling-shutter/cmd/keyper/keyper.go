@@ -182,6 +182,7 @@ func exampleConfig() (*keyper.Config, error) {
 			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
 			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
 		},
+		InstanceID: 0,
 	}
 	err := cfg.GenerateNewKeys()
 	if err != nil {
