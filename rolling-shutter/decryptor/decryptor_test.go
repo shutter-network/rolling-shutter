@@ -41,55 +41,23 @@ func populateDBWithDecryptors(ctx context.Context, t *testing.T, db *dcrdb.Queri
 	}
 }
 
-func TestMessageValidators(t *testing.T) {
+func TestCipherBatchValidatorIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
-	defer closedb()
-
 	config := newTestConfig(t)
+	d := New(config)
 
 	var peerID peer.ID
-	d := New(config)
-	d.db = db
-
-	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
-	assert.NilError(t, err)
-	populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{0: config.SigningKey, 1: signingKey2})
-
-	validators := d.makeMessagesValidators()
-	validDecryptionKey := make([]byte, 64)
-
-	validHash := common.BytesToHash([]byte("Hello"))
-	wrongHash := common.BytesToHash([]byte("Not Hello"))
-	validSignature := shbls.Sign(validHash.Bytes(), config.SigningKey)
-
-	validSignature2 := shbls.Sign(validHash.Bytes(), signingKey2)
-	aggregatedSignature := shbls.AggregateSignatures([]*shbls.Signature{validSignature, validSignature2})
+	validator := d.makeInstanceIDValidator()
 
 	tests := []struct {
 		name  string
 		valid bool
 		msg   shmsg.P2PMessage
 	}{
-		{
-			name:  "valid decryption key",
-			valid: true,
-			msg: &shmsg.DecryptionKey{
-				InstanceID: d.Config.InstanceID,
-				Key:        validDecryptionKey,
-			},
-		},
-		{
-			name:  "invalid decryption key instance ID",
-			valid: false,
-			msg: &shmsg.DecryptionKey{
-				InstanceID: d.Config.InstanceID + 1,
-			},
-		},
 		{
 			name:  "valid cipher batch",
 			valid: true,
@@ -104,6 +72,51 @@ func TestMessageValidators(t *testing.T) {
 				InstanceID: d.Config.InstanceID + 2,
 			},
 		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
+			if err != nil {
+				t.Fatalf("Error in makePubSubMessage: %s", err)
+			}
+			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
+				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		})
+	}
+}
+
+func TestSignatureValidatorsIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
+	var peerID peer.ID
+	config := newTestConfig(t)
+	d := New(config)
+	d.db = db
+
+	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
+	assert.NilError(t, err)
+	populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{0: config.SigningKey, 1: signingKey2})
+
+	validators := d.makeMessagesValidators()
+
+	validHash := common.BytesToHash([]byte("Hello"))
+	wrongHash := common.BytesToHash([]byte("Not Hello"))
+	validSignature := shbls.Sign(validHash.Bytes(), config.SigningKey)
+
+	validSignature2 := shbls.Sign(validHash.Bytes(), signingKey2)
+	aggregatedSignature := shbls.AggregateSignatures([]*shbls.Signature{validSignature, validSignature2})
+
+	tests := []struct {
+		name  string
+		valid bool
+		msg   shmsg.P2PMessage
+	}{
 		{
 			name:  "valid signature",
 			valid: true,
@@ -186,6 +199,79 @@ func TestMessageValidators(t *testing.T) {
 			validate := validators[pubsubMessage.GetTopic()]
 			assert.Assert(t, validate != nil)
 			assert.Equal(t, validate(ctx, peerID, pubsubMessage), tc.valid,
+				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		})
+	}
+}
+
+func TestDecryptionKeyValidatorIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
+	var peerID peer.ID
+	config := newTestConfig(t)
+	d := New(config)
+	d.db = db
+	validator := d.makeDecryptionKeyValidator()
+
+	tkg := medley.NewTestKeyGenerator(t)
+
+	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
+		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+	})
+	assert.NilError(t, err)
+
+	validSecretKey, err := tkg.EpochSecretKey(0).GobEncode()
+	assert.NilError(t, err)
+	invalidSecretKey, err := tkg.EpochSecretKey(1).GobEncode()
+	assert.NilError(t, err)
+
+	tests := []struct {
+		name  string
+		valid bool
+		msg   shmsg.P2PMessage
+	}{
+		{
+			name:  "valid decryption key",
+			valid: true,
+			msg: &shmsg.DecryptionKey{
+				InstanceID: d.Config.InstanceID,
+				Key:        validSecretKey,
+				EpochID:    0,
+			},
+		},
+		{
+			name:  "invalid decryption key wrong epoch",
+			valid: false,
+			msg: &shmsg.DecryptionKey{
+				InstanceID: d.Config.InstanceID,
+				Key:        invalidSecretKey,
+				EpochID:    0,
+			},
+		},
+		{
+			name:  "invalid decryption key instance ID",
+			valid: false,
+			msg: &shmsg.DecryptionKey{
+				InstanceID: d.Config.InstanceID + 1,
+				Key:        validSecretKey,
+				EpochID:    0,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
+			if err != nil {
+				t.Fatalf("Error in makePubSubMessage: %s", err)
+			}
+			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}

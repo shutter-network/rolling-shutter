@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
@@ -150,11 +151,10 @@ func (d *Decryptor) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error
 
 func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 	validators := make(map[string]pubsub.Validator)
-	instanceIDValidator := d.makeInstanceIDValidator()
 	validators[dcrtopics.DecryptionSignature] = d.makeDecryptionSignatureValidator()
 	validators[dcrtopics.AggregatedDecryptionSignature] = d.makeAggregatedDecryptionSignatureValidator()
-	validators[dcrtopics.CipherBatch] = instanceIDValidator
-	validators[dcrtopics.DecryptionKey] = instanceIDValidator
+	validators[dcrtopics.CipherBatch] = d.makeInstanceIDValidator()
+	validators[dcrtopics.DecryptionKey] = d.makeDecryptionKeyValidator()
 
 	return validators
 }
@@ -170,6 +170,49 @@ func (d *Decryptor) makeInstanceIDValidator() pubsub.Validator {
 			return false
 		}
 		return msg.GetInstanceID() == d.Config.InstanceID
+	}
+}
+
+func (d *Decryptor) makeDecryptionKeyValidator() pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		if msg.GetInstanceID() != d.Config.InstanceID {
+			return false
+		}
+
+		key, ok := msg.(*decryptionKey)
+		if !ok {
+			panic("unmarshalled non decryption key message in decryption key validator")
+		}
+
+		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, medley.Uint64EpochIDToBytes(key.epochID))
+		if err == pgx.ErrNoRows {
+			log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
+			return false
+		}
+		if err != nil {
+			log.Printf("error while getting eon public key from database for epoch ID %v", key.epochID)
+			return false
+		}
+		eonPublicKey := new(shcrypto.EonPublicKey)
+		err = eonPublicKey.Unmarshal(eonPublicKeyBytes)
+		if err != nil {
+			log.Printf("error while unmarhsalling eon public key for epoch %v", key.epochID)
+			return false
+		}
+		ok, err = checkEpochSecretKey(key.key, eonPublicKey, key.epochID)
+		if err != nil {
+			log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
+			return false
+		}
+		return ok
 	}
 }
 
