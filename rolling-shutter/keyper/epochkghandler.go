@@ -12,12 +12,12 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-type kgstate struct {
+type epochKGHandler struct {
 	config Config
 	db     *kprdb.Queries
 }
 
-func (s *kgstate) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
+func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
 	eon, err := s.db.GetEonForEpoch(ctx, shdb.EncodeUint64(msg.EpochID))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.EpochID)
