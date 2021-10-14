@@ -36,13 +36,13 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 	threshold := uint64(1)
 	keyperIndex := uint64(1)
 
-	tkg := medley.NewTestKeyGenerator(t)
+	tkg := medley.NewTestKeyGenerator(t, 3, 2)
 	dkgResult := puredkg.Result{
 		Eon:            eon,
 		NumKeypers:     uint64(len(keypers)),
 		Threshold:      threshold,
 		Keyper:         keyperIndex,
-		SecretKeyShare: tkg.EonSecretKeyShare(0),
+		SecretKeyShare: tkg.EonSecretKeyShare(0, 0),
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
 	assert.NilError(t, err)
