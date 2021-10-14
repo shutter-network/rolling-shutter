@@ -18,18 +18,18 @@ type epochKGHandler struct {
 	db     *kprdb.Queries
 }
 
-func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
-	eon, err := s.db.GetEonForEpoch(ctx, shdb.EncodeUint64(msg.EpochID))
+func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
+	eon, err := h.db.GetEonForEpoch(ctx, shdb.EncodeUint64(msg.EpochID))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.EpochID)
 	}
-	batchConfig, err := s.db.GetBatchConfig(ctx, int32(eon.ConfigIndex))
+	batchConfig, err := h.db.GetBatchConfig(ctx, int32(eon.ConfigIndex))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.ConfigIndex)
 	}
 
 	// get our keyper index (and check that we in fact are a keyper)
-	encodedAddress := shdb.EncodeAddress(s.config.Address())
+	encodedAddress := shdb.EncodeAddress(h.config.Address())
 	keyperIndex := int64(-1)
 	for i, address := range batchConfig.Keypers {
 		if address == encodedAddress {
@@ -43,7 +43,7 @@ func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 	}
 
 	// check if we already computed (and therefore most likely sent) our key share
-	shareExists, err := s.db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
+	shareExists, err := h.db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
 		EpochID:     shdb.EncodeUint64(msg.EpochID),
 		KeyperIndex: keyperIndex,
 	})
@@ -55,7 +55,7 @@ func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 	}
 
 	// fetch dkg result from db
-	dkgResultDB, err := s.db.GetDKGResult(ctx, eon.Eon)
+	dkgResultDB, err := h.db.GetDKGResult(ctx, eon.Eon)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon.Eon)
 	}
@@ -77,7 +77,7 @@ func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 	}
 
 	// store share in db and sent it
-	err = s.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
+	err = h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
 		EpochID:            shdb.EncodeUint64(msg.EpochID),
 		KeyperIndex:        keyperIndex,
 		DecryptionKeyShare: encodedShare,
@@ -88,7 +88,7 @@ func (s *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 	log.Printf("sending decryption key share for epoch %d", msg.EpochID)
 	return []shmsg.P2PMessage{
 		&shmsg.DecryptionKeyShare{
-			InstanceID:  s.config.InstanceID,
+			InstanceID:  h.config.InstanceID,
 			EpochID:     msg.EpochID,
 			KeyperIndex: uint64(keyperIndex),
 			Share:       encodedShare,
@@ -101,7 +101,7 @@ func (h *epochKGHandler) insertDecryptionKeyShare(ctx context.Context, msg *decr
 	if err != nil {
 		return err
 	}
-	err = s.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
+	err = h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
 		EpochID:            shdb.EncodeUint64(msg.epochID),
 		KeyperIndex:        int64(msg.keyperIndex),
 		DecryptionKeyShare: encodedShare,
@@ -212,6 +212,8 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 	if err != nil {
 		return nil, err
 	}
+
+	// send decryption key
 	err = h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
 		EpochID:       shdb.EncodeUint64(msg.epochID),
 		DecryptionKey: decryptionKeyEncoded,
