@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/epochkg"
@@ -43,14 +42,14 @@ func (s *kgstate) handleDecryptionTrigger(ctx context.Context, msg *decryptionTr
 	}
 
 	// check if we already computed (and therefore most likely sent) our key share
-	_, err = s.db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
+	shareExists, err := s.db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
 		EpochID:     shdb.EncodeUint64(msg.EpochID),
 		KeyperIndex: keyperIndex,
 	})
-	if err != nil && err != pgx.ErrNoRows {
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get decryption key share for epoch %d from db", msg.EpochID)
 	}
-	if err != pgx.ErrNoRows {
+	if shareExists {
 		return nil, nil // we already sent our share
 	}
 

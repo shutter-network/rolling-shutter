@@ -10,6 +10,13 @@ VALUES ($1, $2, $3);
 SELECT * FROM keyper.decryption_key_share
 WHERE epoch_id = $1 AND keyper_index = $2;
 
+-- name: ExistsDecryptionKeyShare :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key_share
+    WHERE epoch_id = $1 AND keyper_index = $2
+);
+
 -- name: InsertMeta :exec
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2);
 

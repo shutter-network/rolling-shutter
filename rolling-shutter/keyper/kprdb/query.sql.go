@@ -65,6 +65,26 @@ func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
 	return err
 }
 
+const existsDecryptionKeyShare = `-- name: ExistsDecryptionKeyShare :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key_share
+    WHERE epoch_id = $1 AND keyper_index = $2
+)
+`
+
+type ExistsDecryptionKeyShareParams struct {
+	EpochID     []byte
+	KeyperIndex int64
+}
+
+func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryptionKeyShareParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getBatchConfig = `-- name: GetBatchConfig :one
 SELECT config_index, height, keypers, threshold
 FROM keyper.tendermint_batch_config
