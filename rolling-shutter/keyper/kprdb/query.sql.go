@@ -65,6 +65,26 @@ func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
 	return err
 }
 
+const existsDecryptionKeyShare = `-- name: ExistsDecryptionKeyShare :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key_share
+    WHERE epoch_id = $1 AND keyper_index = $2
+)
+`
+
+type ExistsDecryptionKeyShareParams struct {
+	EpochID     []byte
+	KeyperIndex int64
+}
+
+func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryptionKeyShareParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getBatchConfig = `-- name: GetBatchConfig :one
 SELECT config_index, height, keypers, threshold
 FROM keyper.tendermint_batch_config
@@ -114,6 +134,23 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchC
 	return items, nil
 }
 
+const getDKGResult = `-- name: GetDKGResult :one
+SELECT eon, success, error, pure_result FROM keyper.dkg_result
+WHERE eon = $1
+`
+
+func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResult, eon)
+	var i KeyperDkgResult
+	err := row.Scan(
+		&i.Eon,
+		&i.Success,
+		&i.Error,
+		&i.PureResult,
+	)
+	return i, err
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, keyper_index, decryption_key FROM keyper.decryption_key
 WHERE epoch_id = $1
@@ -123,6 +160,23 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperD
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i KeyperDecryptionKey
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
+	return i, err
+}
+
+const getDecryptionKeyShare = `-- name: GetDecryptionKeyShare :one
+SELECT epoch_id, keyper_index, decryption_key_share FROM keyper.decryption_key_share
+WHERE epoch_id = $1 AND keyper_index = $2
+`
+
+type GetDecryptionKeyShareParams struct {
+	EpochID     []byte
+	KeyperIndex int64
+}
+
+func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKeyShareParams) (KeyperDecryptionKeyShare, error) {
+	row := q.db.QueryRow(ctx, getDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
+	var i KeyperDecryptionKeyShare
+	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare)
 	return i, err
 }
 
@@ -156,6 +210,25 @@ SELECT eon, height, batch_index, config_index FROM keyper.eons WHERE eon=$1
 
 func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
 	row := q.db.QueryRow(ctx, getEon, eon)
+	var i KeyperEon
+	err := row.Scan(
+		&i.Eon,
+		&i.Height,
+		&i.BatchIndex,
+		&i.ConfigIndex,
+	)
+	return i, err
+}
+
+const getEonForEpoch = `-- name: GetEonForEpoch :one
+SELECT eon, height, batch_index, config_index FROM keyper.eons
+WHERE batch_index <= $1
+ORDER BY batch_index DESC
+LIMIT 1
+`
+
+func (q *Queries) GetEonForEpoch(ctx context.Context, batchIndex []byte) (KeyperEon, error) {
+	row := q.db.QueryRow(ctx, getEonForEpoch, batchIndex)
 	var i KeyperEon
 	err := row.Scan(
 		&i.Eon,
@@ -267,6 +340,22 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 	return err
 }
 
+const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
+INSERT INTO keyper.decryption_key_share (epoch_id, keyper_index, decryption_key_share)
+VALUES ($1, $2, $3)
+`
+
+type InsertDecryptionKeyShareParams struct {
+	EpochID            []byte
+	KeyperIndex        int64
+	DecryptionKeyShare []byte
+}
+
+func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryptionKeyShareParams) error {
+	_, err := q.db.Exec(ctx, insertDecryptionKeyShare, arg.EpochID, arg.KeyperIndex, arg.DecryptionKeyShare)
+	return err
+}
+
 const insertEncryptionKey = `-- name: InsertEncryptionKey :exec
 INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2)
 `
@@ -334,7 +423,7 @@ func (q *Queries) InsertPolyEval(ctx context.Context, arg InsertPolyEvalParams) 
 }
 
 const insertPureDKG = `-- name: InsertPureDKG :exec
-INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
+INSERT INTO keyper.puredkg (eon, puredkg) VALUES ($1, $2)
 ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg
 `
 

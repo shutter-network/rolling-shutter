@@ -10,6 +10,7 @@ import (
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 )
 
 // P2PMessage can be send via the p2p protocol.
@@ -18,6 +19,20 @@ type P2PMessage interface {
 	ImplementsP2PMessage()
 	GetInstanceID() uint64
 	Topic() string
+}
+
+func (*DecryptionTrigger) ImplementsP2PMessage() {
+}
+
+func (*DecryptionTrigger) Topic() string {
+	return kprtopics.DecryptionTrigger
+}
+
+func (*DecryptionKeyShare) ImplementsP2PMessage() {
+}
+
+func (*DecryptionKeyShare) Topic() string {
+	return kprtopics.DecryptionKeyShare
 }
 
 func (*DecryptionKey) ImplementsP2PMessage() {

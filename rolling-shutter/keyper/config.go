@@ -30,6 +30,8 @@ type Config struct {
 	DKGPhaseLength uint64 // in shuttermint blocks
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
+
+	InstanceID uint64
 }
 
 const configTemplate = `# Shutter keyper configuration for {{ .Address }}, /p2p/{{ .P2PKey | P2PKeyPublic}}
@@ -50,6 +52,8 @@ EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
 SigningKey	= "{{ .SigningKey | FromECDSA | printf "%x" }}"
 ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
+
+InstanceID = {{ .InstanceID }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)

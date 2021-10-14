@@ -2,6 +2,21 @@
 SELECT * FROM keyper.decryption_key
 WHERE epoch_id = $1;
 
+-- name: InsertDecryptionKeyShare :exec
+INSERT INTO keyper.decryption_key_share (epoch_id, keyper_index, decryption_key_share)
+VALUES ($1, $2, $3);
+
+-- name: GetDecryptionKeyShare :one
+SELECT * FROM keyper.decryption_key_share
+WHERE epoch_id = $1 AND keyper_index = $2;
+
+-- name: ExistsDecryptionKeyShare :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key_share
+    WHERE epoch_id = $1 AND keyper_index = $2
+);
+
 -- name: InsertMeta :exec
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2);
 
@@ -48,7 +63,7 @@ ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1;
 
 -- name: InsertPureDKG :exec
-INSERT INTO keyper.puredkg (eon,  puredkg) VALUES ($1, $2)
+INSERT INTO keyper.puredkg (eon, puredkg) VALUES ($1, $2)
 ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg;
 
 -- name: SelectPureDKG :many
@@ -84,6 +99,12 @@ VALUES ($1, $2, $3, $4);
 -- name: GetEon :one
 SELECT * FROM keyper.eons WHERE eon=$1;
 
+-- name: GetEonForEpoch :one
+SELECT * FROM keyper.eons
+WHERE batch_index <= $1
+ORDER BY batch_index DESC
+LIMIT 1;
+
 -- name: InsertPolyEval :exec
 INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
 VALUES ($1, $2, $3);
@@ -111,3 +132,7 @@ DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1;
 -- name: InsertDKGResult :exec
 INSERT INTO keyper.dkg_result (eon,success,error,pure_result)
 VALUES ($1,$2,$3,$4);
+
+-- name: GetDKGResult :one
+SELECT * FROM keyper.dkg_result
+WHERE eon = $1;
