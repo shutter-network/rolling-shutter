@@ -121,7 +121,7 @@ SELECT * FROM keyper.eons WHERE eon=$1;
 -- name: GetEonForEpoch :one
 SELECT * FROM keyper.eons
 WHERE batch_index <= $1
-ORDER BY batch_index DESC
+ORDER BY batch_index DESC, height DESC
 LIMIT 1;
 
 -- name: InsertPolyEval :exec

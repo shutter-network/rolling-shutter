@@ -250,7 +250,7 @@ func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
 const getEonForEpoch = `-- name: GetEonForEpoch :one
 SELECT eon, height, batch_index, config_index FROM keyper.eons
 WHERE batch_index <= $1
-ORDER BY batch_index DESC
+ORDER BY batch_index DESC, height DESC
 LIMIT 1
 `
 
