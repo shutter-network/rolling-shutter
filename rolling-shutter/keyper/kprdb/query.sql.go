@@ -22,6 +22,18 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
+SELECT count(*) FROM keyper.decryption_key_share
+WHERE epoch_id = $1
+`
+
+func (q *Queries) CountDecryptionKeyShares(ctx context.Context, epochID []byte) (int64, error) {
+	row := q.db.QueryRow(ctx, countDecryptionKeyShares, epochID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deletePolyEval = `-- name: DeletePolyEval :exec
 
 DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2
@@ -63,6 +75,21 @@ DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1
 func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
 	_, err := q.db.Exec(ctx, deleteShutterMessage, id)
 	return err
+}
+
+const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key
+    WHERE epoch_id = $1
+)
+`
+
+func (q *Queries) ExistsDecryptionKey(ctx context.Context, epochID []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDecryptionKey, epochID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const existsDecryptionKeyShare = `-- name: ExistsDecryptionKeyShare :one
@@ -152,14 +179,14 @@ func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult,
 }
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
-SELECT epoch_id, keyper_index, decryption_key FROM keyper.decryption_key
+SELECT epoch_id, decryption_key FROM keyper.decryption_key
 WHERE epoch_id = $1
 `
 
 func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperDecryptionKey, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
 	var i KeyperDecryptionKey
-	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKey)
+	err := row.Scan(&i.EpochID, &i.DecryptionKey)
 	return i, err
 }
 
@@ -223,7 +250,7 @@ func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
 const getEonForEpoch = `-- name: GetEonForEpoch :one
 SELECT eon, height, batch_index, config_index FROM keyper.eons
 WHERE batch_index <= $1
-ORDER BY batch_index DESC
+ORDER BY batch_index DESC, height DESC
 LIMIT 1
 `
 
@@ -337,6 +364,21 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 		arg.Error,
 		arg.PureResult,
 	)
+	return err
+}
+
+const insertDecryptionKey = `-- name: InsertDecryptionKey :exec
+INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
+VALUES ($1, $2)
+`
+
+type InsertDecryptionKeyParams struct {
+	EpochID       []byte
+	DecryptionKey []byte
+}
+
+func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) error {
+	_, err := q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
 	return err
 }
 
@@ -499,6 +541,31 @@ func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutte
 	var id int32
 	err := row.Scan(&id)
 	return id, err
+}
+
+const selectDecryptionKeyShares = `-- name: SelectDecryptionKeyShares :many
+SELECT epoch_id, keyper_index, decryption_key_share FROM keyper.decryption_key_share
+WHERE epoch_id = $1
+`
+
+func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte) ([]KeyperDecryptionKeyShare, error) {
+	rows, err := q.db.Query(ctx, selectDecryptionKeyShares, epochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperDecryptionKeyShare
+	for rows.Next() {
+		var i KeyperDecryptionKeyShare
+		if err := rows.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const selectPureDKG = `-- name: SelectPureDKG :many

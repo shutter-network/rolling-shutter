@@ -46,7 +46,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
-	tkg := medley.NewTestKeyGenerator(t)
+	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
 		StartEpochID: medley.Uint64EpochIDToBytes(0),
@@ -259,7 +259,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 	config.RequiredSignatures = 2 // prevent generation of polluting signatures
-	tkg := medley.NewTestKeyGenerator(t)
+	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
 		StartEpochID: medley.Uint64EpochIDToBytes(0),

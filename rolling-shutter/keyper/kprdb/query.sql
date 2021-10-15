@@ -1,10 +1,25 @@
+-- name: InsertDecryptionKey :exec
+INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
+VALUES ($1, $2);
+
 -- name: GetDecryptionKey :one
 SELECT * FROM keyper.decryption_key
 WHERE epoch_id = $1;
 
+-- name: ExistsDecryptionKey :one
+SELECT EXISTS (
+    SELECT 1
+    FROM keyper.decryption_key
+    WHERE epoch_id = $1
+);
+
 -- name: InsertDecryptionKeyShare :exec
 INSERT INTO keyper.decryption_key_share (epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3);
+
+-- name: SelectDecryptionKeyShares :many
+SELECT * FROM keyper.decryption_key_share
+WHERE epoch_id = $1;
 
 -- name: GetDecryptionKeyShare :one
 SELECT * FROM keyper.decryption_key_share
@@ -16,6 +31,10 @@ SELECT EXISTS (
     FROM keyper.decryption_key_share
     WHERE epoch_id = $1 AND keyper_index = $2
 );
+
+-- name: CountDecryptionKeyShares :one
+SELECT count(*) FROM keyper.decryption_key_share
+WHERE epoch_id = $1;
 
 -- name: InsertMeta :exec
 INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2);
@@ -102,7 +121,7 @@ SELECT * FROM keyper.eons WHERE eon=$1;
 -- name: GetEonForEpoch :one
 SELECT * FROM keyper.eons
 WHERE batch_index <= $1
-ORDER BY batch_index DESC
+ORDER BY batch_index DESC, height DESC
 LIMIT 1;
 
 -- name: InsertPolyEval :exec
