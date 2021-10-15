@@ -19,6 +19,7 @@ type TestKeyGenerator struct {
 	randReader io.Reader
 
 	eonInterval        uint64
+	eonPublicKeyShares [][]*shcrypto.EonPublicKeyShare
 	eonPublicKeys      []*shcrypto.EonPublicKey
 	eonSecretKeyShares [][]*shcrypto.EonSecretKeyShare
 
@@ -38,6 +39,7 @@ func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64) *Tes
 		randReader: randReader,
 
 		eonInterval:        100, // 0 stands for infinity
+		eonPublicKeyShares: [][]*shcrypto.EonPublicKeyShare{},
 		eonPublicKeys:      []*shcrypto.EonPublicKey{},
 		eonSecretKeyShares: [][]*shcrypto.EonSecretKeyShare{},
 
@@ -58,6 +60,7 @@ func (tkg *TestKeyGenerator) populateNextEonKeys() {
 	}
 	eonPublicKey := shcrypto.ComputeEonPublicKey(gammas)
 
+	eonPublicKeyShares := []*shcrypto.EonPublicKeyShare{}
 	eonSecretKeyShares := []*shcrypto.EonSecretKeyShare{}
 	for i := 0; i < int(tkg.NumKeypers); i++ {
 		x := shcrypto.KeyperX(i)
@@ -67,11 +70,15 @@ func (tkg *TestKeyGenerator) populateNextEonKeys() {
 			vs = append(vs, v)
 		}
 		eonSecretKeyShare := shcrypto.ComputeEonSecretKeyShare(vs)
+		eonPublicKeyShare := shcrypto.ComputeEonPublicKeyShare(i, gammas)
+
 		eonSecretKeyShares = append(eonSecretKeyShares, eonSecretKeyShare)
+		eonPublicKeyShares = append(eonPublicKeyShares, eonPublicKeyShare)
 	}
 
 	tkg.eonPublicKeys = append(tkg.eonPublicKeys, eonPublicKey)
 	tkg.eonSecretKeyShares = append(tkg.eonSecretKeyShares, eonSecretKeyShares)
+	tkg.eonPublicKeyShares = append(tkg.eonPublicKeyShares, eonPublicKeyShares)
 }
 
 func (tkg *TestKeyGenerator) populateEonKeysUntilEon(eonIndex uint64) {
@@ -92,6 +99,14 @@ func (tkg *TestKeyGenerator) EonIndex(epochID uint64) uint64 {
 		return 0
 	}
 	return epochID / tkg.eonInterval
+}
+
+func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID uint64, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
+	tkg.t.Helper()
+
+	eonIndex := tkg.EonIndex(epochID)
+	tkg.populateEonKeysUntilEon(eonIndex)
+	return tkg.eonPublicKeyShares[eonIndex][keyperIndex]
 }
 
 func (tkg *TestKeyGenerator) EonPublicKey(epochID uint64) *shcrypto.EonPublicKey {
