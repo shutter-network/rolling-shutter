@@ -154,3 +154,9 @@ VALUES ($1,$2,$3,$4);
 -- name: GetDKGResult :one
 SELECT * FROM keyper.dkg_result
 WHERE eon = $1;
+
+-- name: GetDKGResultForEpoch :one
+SELECT * FROM keyper.dkg_result
+WHERE eon = (SELECT eon FROM keyper.eons WHERE batch_index <= $1
+ORDER BY batch_index DESC, height DESC
+LIMIT 1);
