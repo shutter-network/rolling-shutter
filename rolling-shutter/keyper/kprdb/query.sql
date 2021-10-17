@@ -91,7 +91,6 @@ SELECT * FROM keyper.puredkg;
 -- name: DeletePureDKG :exec
 DELETE FROM keyper.puredkg WHERE eon=$1;
 
-
 -- name: InsertEncryptionKey :exec
 INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
 

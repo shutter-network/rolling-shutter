@@ -219,7 +219,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	d.db = db
 	validator := d.makeDecryptionKeyValidator()
 
-	tkg := medley.NewTestKeyGenerator(t)
+	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
 		StartEpochID: medley.Uint64EpochIDToBytes(0),

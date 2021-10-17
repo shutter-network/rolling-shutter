@@ -3,11 +3,13 @@ package keyper
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
@@ -15,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
@@ -102,8 +105,11 @@ func Run(ctx context.Context, config Config) error {
 
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
+
+	topicValidators := kpr.makeMessagesValidators()
+
 	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames, make(map[string]pubsub.Validator))
+		return kpr.p2p.Run(ctx, GossipTopicNames, topicValidators)
 	})
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)
@@ -191,4 +197,66 @@ func (kpr *keyper) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 	}
 
 	return kpr.p2p.Publish(ctx, msg.Topic(), msgBytes)
+}
+
+func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
+	db := kprdb.New(kpr.dbpool)
+	validators := make(map[string]pubsub.Validator)
+	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
+
+	return validators
+}
+
+func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		if msg.GetInstanceID() != kpr.config.InstanceID {
+			return false
+		}
+
+		key, ok := msg.(*decryptionKey)
+		if !ok {
+			panic("unmarshalled non decryption key message in decryption key validator")
+		}
+
+		eon, err := db.GetEonForEpoch(ctx, shdb.EncodeUint64(key.epochID))
+		if err == pgx.ErrNoRows {
+			return false
+		}
+		if err != nil {
+			log.Printf("failed to get eon for epoch %d from db", key.epochID)
+			return false
+		}
+
+		dkgResultDB, err := db.GetDKGResult(ctx, eon.Eon)
+		if err == pgx.ErrNoRows {
+			return false
+		}
+		if err != nil {
+			log.Printf("failed to get dkg result for eon %d from db", eon.Eon)
+			return false
+		}
+		if !dkgResultDB.Success {
+			return false
+		}
+		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
+		if err != nil {
+			log.Printf("error while decoding pure DKG result for eon %d", eon.Eon)
+			return false
+		}
+
+		ok, err = shcrypto.VerifyEpochSecretKey(key.key, pureDKGResult.PublicKey, key.epochID)
+		if err != nil {
+			log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
+			return false
+		}
+		return ok
+	}
 }
