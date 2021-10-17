@@ -1,8 +1,6 @@
 package decryptor
 
 import (
-	"bytes"
-	"crypto/rand"
 	"encoding/binary"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -77,25 +75,4 @@ func decryptCipherBatch(cipherBatch [][]byte, key *shcrypto.EpochSecretKey) [][]
 	}
 
 	return decryptedBatch
-}
-
-// checkEpochSecretKey checks that an epoch secret key is the correct key for an epoch given the
-// eon public key.
-func checkEpochSecretKey(epochSecretKey *shcrypto.EpochSecretKey, eonPublicKey *shcrypto.EonPublicKey, epochIndex uint64) (bool, error) {
-	sigma, err := shcrypto.RandomSigma(rand.Reader)
-	if err != nil {
-		return false, err
-	}
-	message := make([]byte, 32)
-	_, err = rand.Read(message)
-	if err != nil {
-		return false, err
-	}
-	epochID := shcrypto.ComputeEpochID(epochIndex)
-	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochID, sigma)
-	decryptedMessage, err := encryptedMessage.Decrypt(epochSecretKey)
-	if err != nil {
-		return false, nil
-	}
-	return bytes.Equal(decryptedMessage, message), nil
 }
