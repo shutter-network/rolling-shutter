@@ -204,10 +204,10 @@ func (d *Decryptor) makeDecryptionKeyValidator() pubsub.Validator {
 		eonPublicKey := new(shcrypto.EonPublicKey)
 		err = eonPublicKey.Unmarshal(eonPublicKeyBytes)
 		if err != nil {
-			log.Printf("error while unmarhsalling eon public key for epoch %v", key.epochID)
+			log.Printf("error while unmarshalling eon public key for epoch %v", key.epochID)
 			return false
 		}
-		ok, err = checkEpochSecretKey(key.key, eonPublicKey, key.epochID)
+		ok, err = shcrypto.VerifyEpochSecretKey(key.key, eonPublicKey, key.epochID)
 		if err != nil {
 			log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
 			return false
