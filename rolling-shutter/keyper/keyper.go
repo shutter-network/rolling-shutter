@@ -226,21 +226,12 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 			panic("unmarshalled non decryption key message in decryption key validator")
 		}
 
-		eon, err := db.GetEonForEpoch(ctx, shdb.EncodeUint64(key.epochID))
+		dkgResultDB, err := db.GetDKGResultForEpoch(ctx, shdb.EncodeUint64(key.epochID))
 		if err == pgx.ErrNoRows {
 			return false
 		}
 		if err != nil {
-			log.Printf("failed to get eon for epoch %d from db", key.epochID)
-			return false
-		}
-
-		dkgResultDB, err := db.GetDKGResult(ctx, eon.Eon)
-		if err == pgx.ErrNoRows {
-			return false
-		}
-		if err != nil {
-			log.Printf("failed to get dkg result for eon %d from db", eon.Eon)
+			log.Printf("failed to get dkg result for eon %d from db", key.epochID)
 			return false
 		}
 		if !dkgResultDB.Success {
@@ -248,7 +239,7 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 		}
 		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 		if err != nil {
-			log.Printf("error while decoding pure DKG result for eon %d", eon.Eon)
+			log.Printf("error while decoding pure DKG result for eon %d", key.epochID)
 			return false
 		}
 

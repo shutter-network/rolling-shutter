@@ -178,6 +178,25 @@ func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult,
 	return i, err
 }
 
+const getDKGResultForEpoch = `-- name: GetDKGResultForEpoch :one
+SELECT eon, success, error, pure_result FROM keyper.dkg_result
+WHERE eon = (SELECT eon FROM keyper.eons WHERE batch_index <= $1
+ORDER BY batch_index DESC, height DESC
+LIMIT 1)
+`
+
+func (q *Queries) GetDKGResultForEpoch(ctx context.Context, batchIndex []byte) (KeyperDkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResultForEpoch, batchIndex)
+	var i KeyperDkgResult
+	err := row.Scan(
+		&i.Eon,
+		&i.Success,
+		&i.Error,
+		&i.PureResult,
+	)
+	return i, err
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, decryption_key FROM keyper.decryption_key
 WHERE epoch_id = $1
