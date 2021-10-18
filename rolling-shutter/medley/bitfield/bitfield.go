@@ -1,8 +1,8 @@
-package decryptor
+package bitfield
 
 import "math"
 
-func getIndexes(bitField []byte) []int32 {
+func GetIndexes(bitField []byte) []int32 {
 	var indexes []int32
 	for m, b := range bitField {
 		for i := 7; i >= 0; i-- {
@@ -16,21 +16,21 @@ func getIndexes(bitField []byte) []int32 {
 	return indexes
 }
 
-func makeBitfieldFromArray(indexes []int32) []byte {
+func MakeBitfieldFromArray(indexes []int32) []byte {
 	out := []byte{}
 	for _, i := range indexes {
-		out = addBitfields(out, makeBitfieldFromIndex(i))
+		out = AddBitfields(out, MakeBitfieldFromIndex(i))
 	}
 	return out
 }
 
-func makeBitfieldFromIndex(index int32) []byte {
+func MakeBitfieldFromIndex(index int32) []byte {
 	bitfield := make([]byte, index/8)
 	bit := math.Pow(2, float64(index%8))
 	return append(bitfield, uint8(int64(bit)))
 }
 
-func addBitfields(bf1 []byte, bf2 []byte) []byte {
+func AddBitfields(bf1 []byte, bf2 []byte) []byte {
 	if len(bf1) < len(bf2) {
 		bf1, bf2 = bf2, bf1
 	}

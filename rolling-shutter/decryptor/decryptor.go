@@ -18,6 +18,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -236,7 +237,7 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 			panic("unmarshalled non signature message in signature validator")
 		}
 
-		decryptorIndexes := getIndexes(signature.SignerBitfield)
+		decryptorIndexes := bitfield.GetIndexes(signature.SignerBitfield)
 		if len(decryptorIndexes) != 1 {
 			return false
 		}
@@ -280,7 +281,7 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 			panic("unmarshalled non signature message in aggregated signature validator")
 		}
 
-		decryptorIndexes := getIndexes(signature.signerBitfield)
+		decryptorIndexes := bitfield.GetIndexes(signature.signerBitfield)
 		if len(decryptorIndexes) == 0 {
 			return false
 		}
