@@ -69,7 +69,11 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 	for _, addrInfo := range candidates {
 		err := p.host.Connect(ctx, *addrInfo)
 		if err != nil {
-			log.Printf("error connecting to %s: %s", addrInfo, err)
+			if len(addrInfo.Addrs) > 0 {
+				log.Printf("error connecting to %s at %s: %s", addrInfo.ID, addrInfo.Addrs[0], err)
+			} else {
+				log.Printf("error connecting to %s without known multiaddr: %s", addrInfo.ID, err)
+			}
 		}
 	}
 
