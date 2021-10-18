@@ -203,6 +203,7 @@ func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	db := kprdb.New(kpr.dbpool)
 	validators := make(map[string]pubsub.Validator)
 	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
+	validators[kprtopics.DecryptionKeyShare] = kpr.makeKeyShareValidator(db)
 
 	return validators
 }
@@ -231,7 +232,7 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 			return false
 		}
 		if err != nil {
-			log.Printf("failed to get dkg result for eon %d from db", key.epochID)
+			log.Printf("failed to get dkg result for epoch %d from db", key.epochID)
 			return false
 		}
 		if !dkgResultDB.Success {
@@ -239,7 +240,7 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 		}
 		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 		if err != nil {
-			log.Printf("error while decoding pure DKG result for eon %d", key.epochID)
+			log.Printf("error while decoding pure DKG result for epoch %d", key.epochID)
 			return false
 		}
 
@@ -248,6 +249,51 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 			log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
 			return false
 		}
+		return ok
+	}
+}
+
+func (kpr *keyper) makeKeyShareValidator(db *kprdb.Queries) pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		if msg.GetInstanceID() != kpr.config.InstanceID {
+			return false
+		}
+
+		keyShare, ok := msg.(*decryptionKeyShare)
+		if !ok {
+			panic("unmarshalled non decryption key share message in decryption key share validator")
+		}
+
+		dkgResultDB, err := db.GetDKGResultForEpoch(ctx, shdb.EncodeUint64(keyShare.epochID))
+		if err == pgx.ErrNoRows {
+			return false
+		}
+		if err != nil {
+			log.Printf("failed to get dkg result for epoch %d from db", keyShare.epochID)
+			return false
+		}
+		if !dkgResultDB.Success {
+			return false
+		}
+		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
+		if err != nil {
+			log.Printf("error while decoding pure DKG result for epoch %d", keyShare.epochID)
+			return false
+		}
+
+		ok = shcrypto.VerifyEpochSecretKeyShare(
+			keyShare.share,
+			pureDKGResult.PublicKeyShares[keyShare.keyperIndex],
+			shcrypto.ComputeEpochID(keyShare.epochID),
+		)
 		return ok
 	}
 }

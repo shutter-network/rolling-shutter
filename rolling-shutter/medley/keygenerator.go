@@ -52,7 +52,7 @@ func (tkg *TestKeyGenerator) populateNextEonKeys() {
 	ps := []*shcrypto.Polynomial{}
 	gammas := []*shcrypto.Gammas{}
 	for i := 0; i < int(tkg.NumKeypers); i++ {
-		p, err := shcrypto.RandomPolynomial(tkg.randReader, 0)
+		p, err := shcrypto.RandomPolynomial(tkg.randReader, tkg.Threshold-1)
 		assert.NilError(tkg.t, err)
 
 		ps = append(ps, p)

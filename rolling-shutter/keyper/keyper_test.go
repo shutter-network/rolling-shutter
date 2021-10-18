@@ -31,19 +31,23 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	wrongEpochID := uint64(1)
 	tkg := initializeEon(ctx, t, db, config, keyperIndex)
 	secretKey, _ := tkg.EpochSecretKey(epochID).GobEncode()
+	keyshare, _ := tkg.EpochSecretKeyShare(epochID, keyperIndex).GobEncode()
 
 	kpr := keyper{config: config}
-	validator := kpr.makeDecryptionKeyValidator(db)
+	keyValidator := kpr.makeDecryptionKeyValidator(db)
+	keyShareValidator := kpr.makeKeyShareValidator(db)
 	var peerID peer.ID
 
 	tests := []struct {
-		name  string
-		valid bool
-		msg   shmsg.P2PMessage
+		name      string
+		validator pubsub.Validator
+		valid     bool
+		msg       shmsg.P2PMessage
 	}{
 		{
-			name:  "valid decryption key",
-			valid: true,
+			name:      "valid decryption key",
+			validator: keyValidator,
+			valid:     true,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				EpochID:    epochID,
@@ -51,8 +55,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key wrong epoch",
-			valid: false,
+			name:      "invalid decryption key wrong epoch",
+			validator: keyValidator,
+			valid:     false,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				EpochID:    wrongEpochID,
@@ -60,12 +65,57 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key wrong instance ID",
-			valid: false,
+			name:      "invalid decryption key wrong instance ID",
+			validator: keyValidator,
+			valid:     false,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
 				EpochID:    epochID,
 				Key:        secretKey,
+			},
+		},
+		{
+			name:      "valid decryption key share",
+			validator: keyShareValidator,
+			valid:     true,
+			msg: &shmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				EpochID:     epochID,
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:      "invalid decryption key share wrong epoch",
+			validator: keyShareValidator,
+			valid:     false,
+			msg: &shmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				EpochID:     epochID + 1,
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:      "invalid decryption key share wrong instance ID",
+			validator: keyShareValidator,
+			valid:     false,
+			msg: &shmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID + 1,
+				EpochID:     epochID,
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:      "invalid decryption key share wrong keyper index",
+			validator: keyShareValidator,
+			valid:     false,
+			msg: &shmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				EpochID:     epochID,
+				KeyperIndex: keyperIndex + 1,
+				Share:       keyshare,
 			},
 		},
 	}
@@ -75,7 +125,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
+			assert.Equal(t, tc.validator(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}
