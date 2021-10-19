@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
@@ -125,8 +129,6 @@ func generateConfig() error {
 }
 
 func main() error {
-	ctx := context.Background()
-
 	config, err := readConfig()
 	if err != nil {
 		return err
@@ -137,5 +139,20 @@ func main() error {
 		return err
 	}
 
-	return mockNode.Run(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-termChan
+		log.Printf("Received %s signal, shutting down", sig)
+		cancel()
+	}()
+
+	err = mockNode.Run(ctx)
+	if err == context.Canceled {
+		log.Printf("Bye.")
+		return nil
+	}
+	return err
 }

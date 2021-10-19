@@ -5,6 +5,9 @@ import (
 	"context"
 	"crypto/rand"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -165,13 +168,26 @@ func generateConfig() error {
 }
 
 func main() error {
-	ctx := context.Background()
-
 	config, err := readConfig()
 	if err != nil {
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-termChan
+		log.Printf("Received %s signal, shutting down", sig)
+		cancel()
+	}()
+
 	d := decryptor.New(config)
-	return d.Run(ctx)
+	err = d.Run(ctx)
+	if err == context.Canceled {
+		log.Printf("Bye.")
+		return nil
+	}
+	return err
 }
