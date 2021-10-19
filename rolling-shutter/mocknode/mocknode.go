@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -146,9 +147,15 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 		return
 	}
 
+	signerIndices := bitfield.GetIndexes(msg.SignerBitfield)
+	signerKeys := []*shbls.PublicKey{}
+	for _, i := range signerIndices {
+		signerKeys = append(signerKeys, m.Config.DecryptorPublicKeys[i])
+	}
+	aggregatedPublicKey := shbls.AggregatePublicKeys(signerKeys)
 	validSignature := shbls.Verify(
 		sig,
-		m.Config.DecryptorPublicKey,
+		aggregatedPublicKey,
 		msg.SignedHash,
 	)
 

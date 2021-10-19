@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -124,7 +125,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:     d.Config.InstanceID,
 				Signature:      validSignature.Marshal(),
 				SignedHash:     validHash.Bytes(),
-				SignerBitfield: makeBitfieldFromIndex(0),
+				SignerBitfield: bitfield.MakeBitfieldFromIndex(0),
 			},
 		},
 		{
@@ -134,7 +135,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:     d.Config.InstanceID,
 				Signature:      aggregatedSignature.Marshal(),
 				SignedHash:     validHash.Bytes(),
-				SignerBitfield: makeBitfieldFromArray([]int32{0, 1}),
+				SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{0, 1}),
 			},
 		},
 		{
@@ -160,7 +161,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:          d.Config.InstanceID,
 				AggregatedSignature: validSignature.Marshal(),
 				SignedHash:          validHash.Bytes(),
-				SignerBitfield:      makeBitfieldFromIndex(0),
+				SignerBitfield:      bitfield.MakeBitfieldFromIndex(0),
 			},
 		},
 		{
@@ -170,7 +171,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:          d.Config.InstanceID,
 				AggregatedSignature: aggregatedSignature.Marshal(),
 				SignedHash:          validHash.Bytes(),
-				SignerBitfield:      makeBitfieldFromArray([]int32{0, 1}),
+				SignerBitfield:      bitfield.MakeBitfieldFromArray([]int32{0, 1}),
 			},
 		},
 		{

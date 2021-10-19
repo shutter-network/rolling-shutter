@@ -35,6 +35,15 @@ func blsPublicKey(publicKey *shbls.PublicKey) string {
 	return hex.EncodeToString(b)
 }
 
+func blsPublicKeySlice(publicKeys []*shbls.PublicKey) string {
+	strlist := []string{}
+	for _, key := range publicKeys {
+		keyStr := blsPublicKey(key)
+		strlist = append(strlist, "\""+keyStr+"\"")
+	}
+	return "[" + strings.Join(strlist, ", ") + "]"
+}
+
 func eonPublicKey(epk *shcrypto.EonPublicKey) string {
 	b := epk.Marshal()
 	return hex.EncodeToString(b)
@@ -54,13 +63,14 @@ func quoteList(lst []multiaddr.Multiaddr) string {
 
 func MustBuildTemplate(name, content string) *template.Template {
 	t, err := template.New(name).Funcs(template.FuncMap{
-		"FromECDSA":    crypto.FromECDSA,
-		"QuoteList":    quoteList,
-		"P2PKey":       p2pKey,
-		"P2PKeyPublic": p2pKeyPublic,
-		"BLSSecretKey": blsSecretKey,
-		"BLSPublicKey": blsPublicKey,
-		"EonPublicKey": eonPublicKey,
+		"FromECDSA":     crypto.FromECDSA,
+		"QuoteList":     quoteList,
+		"P2PKey":        p2pKey,
+		"P2PKeyPublic":  p2pKeyPublic,
+		"BLSSecretKey":  blsSecretKey,
+		"BLSPublicKey":  blsPublicKey,
+		"BLSPublicKeys": blsPublicKeySlice,
+		"EonPublicKey":  eonPublicKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)

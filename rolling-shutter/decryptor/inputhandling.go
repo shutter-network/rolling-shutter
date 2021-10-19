@@ -13,6 +13,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -63,7 +64,7 @@ func handleSignatureInput(
 	db *dcrdb.Queries,
 	signature *decryptionSignature,
 ) ([]shmsg.P2PMessage, error) {
-	signers := getIndexes(signature.SignerBitfield)
+	signers := bitfield.GetIndexes(signature.SignerBitfield)
 	if len(signers) > 1 {
 		// Ignore aggregated signatures
 		return nil, nil
@@ -104,7 +105,7 @@ func handleSignatureInput(
 
 	signaturesToAggregate := make([]*shbls.Signature, 0, len(dbSignatures))
 	publicKeysToAggragate := make([]*shbls.PublicKey, 0, len(dbSignatures))
-	bitfield := make([]byte, len(signature.SignerBitfield))
+	signerBitfield := make([]byte, len(signature.SignerBitfield))
 	for _, dbSignature := range dbSignatures {
 		unmarshalledSignature := new(shbls.Signature)
 		if err := unmarshalledSignature.Unmarshal(dbSignature.Signature); err != nil {
@@ -112,7 +113,7 @@ func handleSignatureInput(
 			continue
 		}
 
-		indexes := getIndexes(dbSignature.SignersBitfield)
+		indexes := bitfield.GetIndexes(dbSignature.SignersBitfield)
 		if len(indexes) > 1 {
 			panic("got signature with multiple signers")
 		}
@@ -131,7 +132,7 @@ func handleSignatureInput(
 
 		signaturesToAggregate = append(signaturesToAggregate, unmarshalledSignature)
 		publicKeysToAggragate = append(publicKeysToAggragate, pk)
-		bitfield = addBitfields(bitfield, dbSignature.SignersBitfield)
+		signerBitfield = bitfield.AddBitfields(signerBitfield, dbSignature.SignersBitfield)
 	}
 
 	if uint(len(signaturesToAggregate)) < config.RequiredSignatures {
@@ -147,7 +148,7 @@ func handleSignatureInput(
 	_, err = db.InsertAggregatedSignature(ctx, dcrdb.InsertAggregatedSignatureParams{
 		EpochID:         medley.Uint64EpochIDToBytes(signature.epochID),
 		SignedHash:      signature.signedHash.Bytes(),
-		SignersBitfield: bitfield,
+		SignersBitfield: signerBitfield,
 		Signature:       aggregatedSignature.Marshal(),
 	})
 	if err != nil {
@@ -160,7 +161,7 @@ func handleSignatureInput(
 			EpochID:             signature.epochID,
 			SignedHash:          signature.signedHash.Bytes(),
 			AggregatedSignature: aggregatedSignature.Marshal(),
-			SignerBitfield:      bitfield,
+			SignerBitfield:      signerBitfield,
 		},
 	}
 
@@ -206,7 +207,7 @@ func handleEpoch(
 	}
 	signedHash := signingData.Hash().Bytes()
 	signature := signingData.Sign(config.SigningKey)
-	signersBitfield := makeBitfieldFromIndex(config.SignerIndex)
+	signersBitfield := bitfield.MakeBitfieldFromIndex(config.SignerIndex)
 
 	msgs, err := handleSignatureInput(ctx, config, db, &decryptionSignature{
 		instanceID:     config.InstanceID,

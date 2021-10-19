@@ -13,6 +13,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -122,22 +123,22 @@ func TestHandleSignatureIntegration(t *testing.T) {
 	signingKey2, _, err := shbls.RandomKeyPair(rand.Reader)
 	assert.NilError(t, err)
 
-	bitfield := makeBitfieldFromIndex(1)
-	bitfield2 := makeBitfieldFromIndex(2)
+	bf := bitfield.MakeBitfieldFromIndex(1)
+	bf2 := bitfield.MakeBitfieldFromIndex(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
 		epochID:        0,
 		instanceID:     config.InstanceID,
 		signedHash:     hash,
 		signature:      shbls.Sign(hash.Bytes(), config.SigningKey),
-		SignerBitfield: bitfield,
+		SignerBitfield: bf,
 	}
 	signature2 := &decryptionSignature{
 		epochID:        0,
 		instanceID:     config.InstanceID,
 		signedHash:     hash,
 		signature:      shbls.Sign(hash.Bytes(), signingKey2),
-		SignerBitfield: bitfield2,
+		SignerBitfield: bf2,
 	}
 
 	tests := []struct {
@@ -150,7 +151,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 			name:    "single signature required",
 			config:  config,
 			inputs:  []*decryptionSignature{signature},
-			outputs: []*shmsg.AggregatedDecryptionSignature{{InstanceID: config.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: bitfield}},
+			outputs: []*shmsg.AggregatedDecryptionSignature{{InstanceID: config.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: bf}},
 		},
 		{
 			name:    "two signatures required",
@@ -164,7 +165,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 			inputs: []*decryptionSignature{signature, signature2},
 			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {
 				InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(),
-				SignerBitfield: makeBitfieldFromArray([]int32{config.SignerIndex, 2}),
+				SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{config.SignerIndex, 2}),
 			}},
 		},
 	}
@@ -209,22 +210,22 @@ func TestInsertAggregatedSignatureIntegration(t *testing.T) {
 
 	populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{config.SignerIndex: config.SigningKey, 2: signingKey2})
 
-	bitfield := makeBitfieldFromIndex(1)
-	bitfield2 := makeBitfieldFromIndex(2)
+	bf := bitfield.MakeBitfieldFromIndex(1)
+	bf2 := bitfield.MakeBitfieldFromIndex(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
 		epochID:        0,
 		instanceID:     config.InstanceID,
 		signedHash:     hash,
 		signature:      shbls.Sign(hash.Bytes(), config.SigningKey),
-		SignerBitfield: bitfield,
+		SignerBitfield: bf,
 	}
 	signature2 := &decryptionSignature{
 		epochID:        0,
 		instanceID:     config.InstanceID,
 		signedHash:     hash,
 		signature:      shbls.Sign(hash.Bytes(), signingKey2),
-		SignerBitfield: bitfield2,
+		SignerBitfield: bf2,
 	}
 
 	msgs, err := handleSignatureInput(ctx, config, db, signature)
@@ -277,7 +278,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
 		EpochID:         medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
-		SignersBitfield: makeBitfieldFromIndex(config.SignerIndex),
+		SignersBitfield: bitfield.MakeBitfieldFromIndex(config.SignerIndex),
 	})
 	assert.NilError(t, err)
 

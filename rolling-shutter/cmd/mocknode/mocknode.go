@@ -94,11 +94,6 @@ func exampleConfig() (*mocknode.Config, error) {
 		return nil, errors.Wrap(err, "failed to generate random p2p key")
 	}
 
-	_, decryptorPublicKey, err := shbls.RandomKeyPair(rand.Reader)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate random decryptor public key")
-	}
-
 	config := mocknode.Config{
 		ListenAddress:  listenAddress,
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
@@ -110,8 +105,8 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendCipherBatches:      true,
 		SendDecryptionKeys:     true,
 
-		DecryptorPublicKey: decryptorPublicKey,
-		EonKeySeed:         0,
+		DecryptorPublicKeys: []*shbls.PublicKey{},
+		EonKeySeed:          0,
 	}
 	return &config, nil
 }
