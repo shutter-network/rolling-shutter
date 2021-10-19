@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 func TestGetDecryptorSet(t *testing.T) {
@@ -38,7 +39,7 @@ func TestGetDecryptorSet(t *testing.T) {
 
 		for j := 0; j < len(startEpochs[i]); j++ {
 			err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
-				StartEpochID: medley.Uint64EpochIDToBytes(uint64(startEpochs[i][j])),
+				StartEpochID: shdb.EncodeUint64(uint64(startEpochs[i][j])),
 				Index:        int32(setIndices[i][j]),
 				Address:      addresses[i],
 			})
@@ -46,36 +47,36 @@ func TestGetDecryptorSet(t *testing.T) {
 		}
 	}
 
-	rows, err := db.GetDecryptorSet(ctx, medley.Uint64EpochIDToBytes(uint64(0)))
+	rows, err := db.GetDecryptorSet(ctx, shdb.EncodeUint64(uint64(0)))
 	assert.NilError(t, err)
 	assert.Check(t, len(rows) == 2)
 	assert.DeepEqual(t, rows, []dcrdb.GetDecryptorSetRow{
 		{
-			StartEpochID: medley.Uint64EpochIDToBytes(uint64(0)),
+			StartEpochID: shdb.EncodeUint64(uint64(0)),
 			Index:        0,
 			Address:      addresses[0],
 			BlsPublicKey: keys[0],
 		},
 		{
-			StartEpochID: medley.Uint64EpochIDToBytes(uint64(0)),
+			StartEpochID: shdb.EncodeUint64(uint64(0)),
 			Index:        1,
 			Address:      addresses[1],
 			BlsPublicKey: keys[1],
 		},
 	})
 
-	rows, err = db.GetDecryptorSet(ctx, medley.Uint64EpochIDToBytes(uint64(100)))
+	rows, err = db.GetDecryptorSet(ctx, shdb.EncodeUint64(uint64(100)))
 	assert.NilError(t, err)
 	assert.Check(t, len(rows) == 2)
 	assert.DeepEqual(t, rows, []dcrdb.GetDecryptorSetRow{
 		{
-			StartEpochID: medley.Uint64EpochIDToBytes(uint64(100)),
+			StartEpochID: shdb.EncodeUint64(uint64(100)),
 			Index:        0,
 			Address:      addresses[0],
 			BlsPublicKey: keys[0],
 		},
 		{
-			StartEpochID: medley.Uint64EpochIDToBytes(uint64(100)),
+			StartEpochID: shdb.EncodeUint64(uint64(100)),
 			Index:        1,
 			Address:      addresses[2],
 			BlsPublicKey: keys[2],
@@ -92,12 +93,12 @@ func TestEonPublicKey(t *testing.T) {
 	key2 := []byte("key2")
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: medley.Uint64EpochIDToBytes(uint64(10)),
+		StartEpochID: shdb.EncodeUint64(uint64(10)),
 		EonPublicKey: key1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: medley.Uint64EpochIDToBytes(uint64(20)),
+		StartEpochID: shdb.EncodeUint64(uint64(20)),
 		EonPublicKey: key2,
 	})
 	assert.NilError(t, err)
@@ -106,7 +107,7 @@ func TestEonPublicKey(t *testing.T) {
 	keys := [][]byte{nil, nil, key1, key1, key1, key2, key2, key2}
 
 	for i := 0; i < len(epochIDs); i++ {
-		epochIDBytes := medley.Uint64EpochIDToBytes(epochIDs[i])
+		epochIDBytes := shdb.EncodeUint64(epochIDs[i])
 		expectedKey := keys[i]
 		key, err := db.GetEonPublicKey(ctx, epochIDBytes)
 		if expectedKey == nil {

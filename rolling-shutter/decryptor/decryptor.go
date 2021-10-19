@@ -17,7 +17,6 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -193,7 +192,7 @@ func (d *Decryptor) makeDecryptionKeyValidator() pubsub.Validator {
 			panic("unmarshalled non decryption key message in decryption key validator")
 		}
 
-		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, medley.Uint64EpochIDToBytes(key.epochID))
+		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, shdb.EncodeUint64(key.epochID))
 		if err == pgx.ErrNoRows {
 			log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
 			return false
@@ -243,7 +242,7 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 		}
 		dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
 			Index:        decryptorIndexes[0],
-			StartEpochID: medley.Uint64EpochIDToBytes(signature.epochID),
+			StartEpochID: shdb.EncodeUint64(signature.epochID),
 		})
 		if err == pgx.ErrNoRows {
 			return false
@@ -289,7 +288,7 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 		for _, decryptorIndex := range decryptorIndexes {
 			dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
 				Index:        decryptorIndex,
-				StartEpochID: medley.Uint64EpochIDToBytes(signature.epochID),
+				StartEpochID: shdb.EncodeUint64(signature.epochID),
 			})
 			if err == pgx.ErrNoRows {
 				return false

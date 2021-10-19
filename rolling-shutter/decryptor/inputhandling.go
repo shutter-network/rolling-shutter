@@ -12,8 +12,8 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -25,7 +25,7 @@ func handleDecryptionKeyInput(
 ) ([]shmsg.P2PMessage, error) {
 	keyBytes, _ := key.key.GobEncode()
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
-		EpochID: medley.Uint64EpochIDToBytes(key.epochID),
+		EpochID: shdb.EncodeUint64(key.epochID),
 		Key:     keyBytes,
 	})
 	if err != nil {
@@ -45,7 +45,7 @@ func handleCipherBatchInput(
 	cipherBatch *cipherBatch,
 ) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
-		EpochID:      medley.Uint64EpochIDToBytes(cipherBatch.EpochID),
+		EpochID:      shdb.EncodeUint64(cipherBatch.EpochID),
 		Transactions: cipherBatch.Transactions,
 	})
 	if err != nil {
@@ -70,7 +70,7 @@ func handleSignatureInput(
 		return nil, nil
 	}
 	tag, err := db.InsertDecryptionSignature(ctx, dcrdb.InsertDecryptionSignatureParams{
-		EpochID:         medley.Uint64EpochIDToBytes(signature.epochID),
+		EpochID:         shdb.EncodeUint64(signature.epochID),
 		SignedHash:      signature.signedHash.Bytes(),
 		SignersBitfield: signature.SignerBitfield,
 		Signature:       signature.signature.Marshal(),
@@ -93,7 +93,7 @@ func handleSignatureInput(
 
 	// check if we have enough signatures
 	dbSignatures, err := db.GetDecryptionSignatures(ctx, dcrdb.GetDecryptionSignaturesParams{
-		EpochID:    medley.Uint64EpochIDToBytes(signature.epochID),
+		EpochID:    shdb.EncodeUint64(signature.epochID),
 		SignedHash: signature.signedHash.Bytes(),
 	})
 	if err != nil {
@@ -146,7 +146,7 @@ func handleSignatureInput(
 	}
 
 	_, err = db.InsertAggregatedSignature(ctx, dcrdb.InsertAggregatedSignatureParams{
-		EpochID:         medley.Uint64EpochIDToBytes(signature.epochID),
+		EpochID:         shdb.EncodeUint64(signature.epochID),
 		SignedHash:      signature.signedHash.Bytes(),
 		SignersBitfield: signerBitfield,
 		Signature:       aggregatedSignature.Marshal(),
@@ -175,7 +175,7 @@ func handleEpoch(
 	db *dcrdb.Queries,
 	epochID uint64,
 ) ([]shmsg.P2PMessage, error) {
-	epochIDBytes := medley.Uint64EpochIDToBytes(epochID)
+	epochIDBytes := shdb.EncodeUint64(epochID)
 	cipherBatch, err := db.GetCipherBatch(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil, nil

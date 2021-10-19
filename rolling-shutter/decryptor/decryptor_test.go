@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -223,7 +224,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		StartEpochID: shdb.EncodeUint64(0),
 		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)

@@ -14,6 +14,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -50,7 +51,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		StartEpochID: shdb.EncodeUint64(0),
 		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)
@@ -63,9 +64,9 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	msgs, err := handleDecryptionKeyInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
-	mStored, err := db.GetDecryptionKey(ctx, medley.Uint64EpochIDToBytes(m.epochID))
+	mStored, err := db.GetDecryptionKey(ctx, shdb.EncodeUint64(m.epochID))
 	assert.NilError(t, err)
-	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.epochID)
+	assert.Check(t, shdb.DecodeUint64(mStored.EpochID) == m.epochID)
 	keyBytes, _ := m.key.GobEncode()
 	assert.Check(t, bytes.Equal(mStored.Key, keyBytes))
 
@@ -89,9 +90,9 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	msgs, err := handleCipherBatchInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
-	mStored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
+	mStored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.EpochID))
 	assert.NilError(t, err)
-	assert.Check(t, medley.BytesEpochIDToUint64(mStored.EpochID) == m.EpochID)
+	assert.Check(t, shdb.DecodeUint64(mStored.EpochID) == m.EpochID)
 	assert.DeepEqual(t, mStored.Transactions, m.Transactions)
 	assert.Check(t, len(msgs) == 0)
 
@@ -102,7 +103,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	msgs, err = handleCipherBatchInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
-	m2Stored, err := db.GetCipherBatch(ctx, medley.Uint64EpochIDToBytes(m.EpochID))
+	m2Stored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.EpochID))
 	assert.NilError(t, err)
 	assert.DeepEqual(t, m2Stored.Transactions, m.Transactions)
 
@@ -234,7 +235,7 @@ func TestInsertAggregatedSignatureIntegration(t *testing.T) {
 
 	signatureStored, err := db.GetAggregatedSignature(ctx, signature.signedHash.Bytes())
 	assert.NilError(t, err)
-	assert.Equal(t, signature.epochID, medley.BytesEpochIDToUint64(signatureStored.EpochID))
+	assert.Equal(t, signature.epochID, shdb.DecodeUint64(signatureStored.EpochID))
 	assert.Check(t, bytes.Equal(signature.signedHash.Bytes(), signatureStored.SignedHash))
 
 	msgs, err = handleSignatureInput(ctx, config, db, signature2)
@@ -255,7 +256,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: medley.Uint64EpochIDToBytes(0),
+		StartEpochID: shdb.EncodeUint64(0),
 		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)
@@ -277,7 +278,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
-		EpochID:         medley.Uint64EpochIDToBytes(cipherBatchMsg.EpochID),
+		EpochID:         shdb.EncodeUint64(cipherBatchMsg.EpochID),
 		SignersBitfield: bitfield.MakeBitfieldFromIndex(config.SignerIndex),
 	})
 	assert.NilError(t, err)
@@ -287,7 +288,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.Check(t, ok, "wrong message type")
 	assert.Equal(
 		t,
-		medley.BytesEpochIDToUint64(storedDecryptionKey.EpochID),
+		shdb.DecodeUint64(storedDecryptionKey.EpochID),
 		msg.EpochID,
 	)
 	assert.Check(t, bytes.Equal(storedDecryptionKey.SignedHash, msg.SignedHash))
