@@ -29,7 +29,7 @@ func handleDecryptionKeyInput(
 		Key:     keyBytes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %d into db", key.epochID)
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple keys for same epoch %d", key.epochID)
@@ -49,7 +49,7 @@ func handleCipherBatchInput(
 		Transactions: cipherBatch.Transactions,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to insert cipher batch for epoch %d into db", cipherBatch.EpochID)
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
@@ -76,7 +76,7 @@ func handleSignatureInput(
 		Signature:       signature.signature.Marshal(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to insert decryption signature for epoch %d into db", signature.epochID)
 	}
 	if tag.RowsAffected() == 0 {
 		log.Printf("attempted to store multiple decryption signatures with same epoch and signers")
@@ -85,7 +85,7 @@ func handleSignatureInput(
 
 	exists, err := db.ExistsAggregatedSignature(ctx, signature.signedHash.Bytes())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to check if db contains aggregated signature")
 	}
 	if exists {
 		return nil, nil
@@ -97,7 +97,7 @@ func handleSignatureInput(
 		SignedHash: signature.signedHash.Bytes(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to query decryption signatures for epoch %d from db", signature.epochID)
 	}
 	if uint(len(dbSignatures)) < config.RequiredSignatures {
 		return nil, nil
@@ -122,7 +122,7 @@ func handleSignatureInput(
 		}
 		pkBytes, err := db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{Index: indexes[0], StartEpochID: dbSignature.EpochID})
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to query public key of decryptor #%d from db", indexes[0])
 		}
 		pk := new(shbls.PublicKey)
 		if err := pk.Unmarshal(pkBytes); err != nil {
@@ -152,7 +152,7 @@ func handleSignatureInput(
 		Signature:       aggregatedSignature.Marshal(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error inserting aggregated signature for epoch %d into db", signature.epochID)
 	}
 
 	msgs := []shmsg.P2PMessage{
@@ -180,14 +180,14 @@ func handleEpoch(
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get cipher batch for epoch %d from db", epochID)
 	}
 
 	decryptionKeyDB, err := db.GetDecryptionKey(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get decryption key for epoch %d from db", epochID)
 	}
 
 	log.Printf("decrypting batch for epoch %d", epochID)
