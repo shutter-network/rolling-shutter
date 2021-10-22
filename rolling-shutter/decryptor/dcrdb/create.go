@@ -21,10 +21,19 @@ var schemaVersion = shdb.MustFindSchemaVersion(CreateDecryptorTables, "dcrdb/sch
 
 // InitDecryptorDB initializes the database of the decryptor. It is assumed that the db is empty.
 func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	_, err := dbpool.Exec(ctx, CreateDecryptorTables)
+	tx, err := dbpool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, CreateDecryptorTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create decryptor tables")
 	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
 	err = New(dbpool).InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
