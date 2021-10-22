@@ -386,9 +386,10 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 	return err
 }
 
-const insertDecryptionKey = `-- name: InsertDecryptionKey :exec
+const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
 INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
 VALUES ($1, $2)
+ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyParams struct {
@@ -396,9 +397,8 @@ type InsertDecryptionKeyParams struct {
 	DecryptionKey []byte
 }
 
-func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) error {
-	_, err := q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
-	return err
+func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
 }
 
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
