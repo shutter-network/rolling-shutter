@@ -170,3 +170,36 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	assert.Check(t, msg.EpochID == epochID)
 	assert.Check(t, bytes.Equal(msg.Key, encodedDecryptionKey))
 }
+
+func TestHandleDecryptionKeyIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	defer closedb()
+
+	epochID := uint64(50)
+	keyperIndex := uint64(1)
+
+	config := newTestConfig(t)
+	tkg := initializeEon(ctx, t, db, config, keyperIndex)
+	handler := epochKGHandler{
+		config: config,
+		db:     db,
+	}
+	encodedDecryptionKey, err := tkg.EpochSecretKey(epochID).GobEncode()
+	assert.NilError(t, err)
+
+	// send a decryption key and check that it gets inserted
+	msgs, err := handler.handleDecryptionKey(ctx, &decryptionKey{
+		instanceID: 0,
+		epochID:    epochID,
+		key:        tkg.EpochSecretKey(epochID),
+	})
+	assert.NilError(t, err)
+	assert.Check(t, len(msgs) == 0)
+	key, err := db.GetDecryptionKey(ctx, shdb.EncodeUint64(epochID))
+	assert.NilError(t, err)
+	assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKey))
+}

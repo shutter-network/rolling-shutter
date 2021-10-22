@@ -1,6 +1,7 @@
--- name: InsertDecryptionKey :exec
+-- name: InsertDecryptionKey :execresult
 INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
-VALUES ($1, $2);
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
 
 -- name: GetDecryptionKey :one
 SELECT * FROM keyper.decryption_key
