@@ -13,7 +13,10 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
-func TestGetDecryptorSet(t *testing.T) {
+func TestGetDecryptorSetIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
@@ -84,7 +87,10 @@ func TestGetDecryptorSet(t *testing.T) {
 	})
 }
 
-func TestEonPublicKey(t *testing.T) {
+func TestEonPublicKeyIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	db, closedb := medley.NewDecryptorTestDB(ctx, t)
 	defer closedb()
