@@ -149,49 +149,58 @@ func TestHandleSignatureIntegration(t *testing.T) {
 		outputs []*shmsg.AggregatedDecryptionSignature
 	}{
 		{
-			name:    "single signature required",
-			config:  config,
-			inputs:  []*decryptionSignature{signature},
-			outputs: []*shmsg.AggregatedDecryptionSignature{{InstanceID: config.InstanceID, SignedHash: hash.Bytes(), SignerBitfield: bf}},
-		},
-		{
-			name:    "two signatures required",
-			config:  configTwoRequiredSignatures,
-			inputs:  []*decryptionSignature{signature},
-			outputs: []*shmsg.AggregatedDecryptionSignature{nil},
+			name:   "single signature required",
+			config: config,
+			inputs: []*decryptionSignature{
+				signature,
+			},
+			outputs: []*shmsg.AggregatedDecryptionSignature{
+				{
+					InstanceID:     config.InstanceID,
+					SignedHash:     hash.Bytes(),
+					SignerBitfield: bf,
+				},
+			},
 		},
 		{
 			name:   "two signatures required two provided",
 			config: configTwoRequiredSignatures,
-			inputs: []*decryptionSignature{signature, signature2},
-			outputs: []*shmsg.AggregatedDecryptionSignature{nil, {
-				InstanceID: configTwoRequiredSignatures.InstanceID, SignedHash: hash.Bytes(),
-				SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{config.SignerIndex, 2}),
-			}},
+			inputs: []*decryptionSignature{
+				signature,
+				signature2,
+			},
+			outputs: []*shmsg.AggregatedDecryptionSignature{
+				nil,
+				{
+					InstanceID:     configTwoRequiredSignatures.InstanceID,
+					SignedHash:     hash.Bytes(),
+					SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{config.SignerIndex, 2}),
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		db, closedb := medley.NewDecryptorTestDB(ctx, t)
-		populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{config.SignerIndex: config.SigningKey, 2: signingKey2})
 		t.Run(test.name, func(t *testing.T) {
+			db, closedb := medley.NewDecryptorTestDB(ctx, t)
+			defer closedb()
+			populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{config.SignerIndex: config.SigningKey, 2: signingKey2})
 			for i, input := range test.inputs {
 				msgs, err := handleSignatureInput(ctx, test.config, db, input)
 				assert.NilError(t, err)
-				isOutputNill := test.outputs[i] == nil
-				if isOutputNill {
+				output := test.outputs[i]
+				if output == nil {
 					assert.Check(t, len(msgs) == 0)
 				} else {
 					assert.Check(t, len(msgs) == 1)
 					msg, ok := msgs[0].(*shmsg.AggregatedDecryptionSignature)
 					assert.Check(t, ok, "wrong message type")
-					assert.Equal(t, msg.InstanceID, test.outputs[i].InstanceID)
-					assert.Check(t, bytes.Equal(msg.SignedHash, test.outputs[i].SignedHash))
-					assert.Check(t, bytes.Equal(msg.SignerBitfield, test.outputs[i].SignerBitfield))
+					assert.Equal(t, msg.InstanceID, output.InstanceID)
+					assert.Check(t, bytes.Equal(msg.SignedHash, output.SignedHash))
+					assert.Check(t, bytes.Equal(msg.SignerBitfield, output.SignerBitfield))
 				}
 			}
 		})
-		closedb()
 	}
 }
 
