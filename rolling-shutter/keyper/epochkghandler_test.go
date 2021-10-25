@@ -110,6 +110,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		EpochID:     shdb.EncodeUint64(epochID),
 		KeyperIndex: int64(keyperIndex),
 	})
+	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*shmsg.DecryptionKeyShare)
 	assert.Check(t, ok)
