@@ -36,7 +36,7 @@ test-unit:
 
 test-integration:
 	@echo "====================>  Running integration tests"
-	gotestsum -- -run Integration -count=1 ${GOFLAGS} ./...
+	gotestsum -- -p 1 -run Integration -count=1 ${GOFLAGS} ./...
 
 test: test-unit
 
