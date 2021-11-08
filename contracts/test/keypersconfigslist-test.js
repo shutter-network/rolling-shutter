@@ -111,8 +111,10 @@ describe("KeypersConfigsList", function () {
     const cfg = await deploy();
     const addrsSeq = await getAddrsSeq(cfg);
 
-    await expect((await getConfig(cfg, 0)).activationBlockNumber).to.equal(0);
-    await expect((await getConfig(cfg, 0)).setIndex).to.equal(0);
+    expect(await getConfig(cfg, 0)).to.deep.equal({
+      activationBlockNumber: 0,
+      setIndex: 0,
+    });
 
     const blockNumber = 123;
     const index = 1;
@@ -122,28 +124,18 @@ describe("KeypersConfigsList", function () {
       setIndex: index,
     });
 
-    await expect(
-      (
-        await getConfig(cfg, blockNumber)
-      ).activationBlockNumber
-    ).to.equal(blockNumber);
-    await expect((await getConfig(cfg, blockNumber)).setIndex).to.equal(index);
-
-    await expect(
-      (
-        await getConfig(cfg, blockNumber + 1)
-      ).activationBlockNumber
-    ).to.equal(blockNumber);
-    await expect((await getConfig(cfg, blockNumber + 1)).setIndex).to.equal(
-      index
-    );
-
-    await expect(
-      (
-        await getConfig(cfg, blockNumber - 1)
-      ).activationBlockNumber
-    ).to.equal(0);
-    await expect((await getConfig(cfg, blockNumber - 1)).setIndex).to.equal(0);
+    expect(await getConfig(cfg, blockNumber)).to.deep.equal({
+      activationBlockNumber: blockNumber,
+      setIndex: index,
+    });
+    expect(await getConfig(cfg, blockNumber + 1)).to.deep.equal({
+      activationBlockNumber: blockNumber,
+      setIndex: index,
+    });
+    expect(await getConfig(cfg, blockNumber - 1)).to.deep.equal({
+      activationBlockNumber: 0,
+      setIndex: 0,
+    });
   });
 
   it("should replace current set with same block number", async function () {
@@ -159,8 +151,9 @@ describe("KeypersConfigsList", function () {
       setIndex: newIndex,
     });
 
-    await expect((await getConfig(cfg, blockNumber)).setIndex).to.equal(
-      newIndex
-    );
+    expect(await getConfig(cfg, blockNumber)).to.deep.equal({
+      activationBlockNumber: blockNumber,
+      setIndex: newIndex,
+    });
   });
 });
