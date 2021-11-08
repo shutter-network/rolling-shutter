@@ -3,8 +3,9 @@ const { expect } = require("chai");
 async function deploy() {
   const addrsSeqFactory = await ethers.getContractFactory("AddrsSeq");
   const addrsSeqContract = await addrsSeqFactory.deploy();
+  await addrsSeqContract.append();
   const keypersConfigsFactory = await ethers.getContractFactory(
-    "KeypersConfigs"
+    "KeypersConfigsList"
   );
   const keypersConfigsContract = await keypersConfigsFactory.deploy(
     addrsSeqContract.address
@@ -27,7 +28,7 @@ async function getConfig(configContract, blockNumber) {
   };
 }
 
-describe("KeypersConfigs", function () {
+describe("KeypersConfigsList", function () {
   it("adding new set should emit an event", async function () {
     const configContract = await deploy();
     const addrsSeq = await getAddrsSeq(configContract);
@@ -66,8 +67,11 @@ describe("KeypersConfigs", function () {
   it("should be impossible to add new set when not sequenced", async function () {
     const cfg = await deploy();
 
-    await expect(cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 2 })).to
-      .be.reverted;
+    await expect(
+      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 2 })
+    ).to.be.revertedWith(
+      "No appended set in seq corresponding to config's set index"
+    );
   });
 
   it("should be impossible to add sets in decreasing block number order", async function () {
@@ -77,7 +81,9 @@ describe("KeypersConfigs", function () {
     await cfg.addNewCfg({ activationBlockNumber: blockNumber, setIndex: 0 });
     await expect(
       cfg.addNewCfg({ activationBlockNumber: blockNumber - 1, setIndex: 0 })
-    ).to.be.reverted;
+    ).to.be.revertedWith(
+      "Cannot add new set with lower block number than previous"
+    );
   });
 
   it("not owner should not be able to add new set", async function () {
@@ -90,7 +96,7 @@ describe("KeypersConfigs", function () {
       cfg
         .connect(notOwner)
         .addNewCfg({ activationBlockNumber: 123, setIndex: 0 })
-    ).to.be.reverted;
+    ).to.be.revertedWith("Ownable: caller is not the owner");
   });
 
   it("should return active config", async function () {

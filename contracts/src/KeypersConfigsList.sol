@@ -8,7 +8,7 @@ struct KeypersConfig {
     uint64 setIndex;
 }
 
-contract KeypersConfigs is Ownable {
+contract KeypersConfigsList is Ownable {
     KeypersConfig[] public keypersConfigs;
     AddrsSeq public addrsSeq;
 
@@ -16,6 +16,10 @@ contract KeypersConfigs is Ownable {
 
     constructor(AddrsSeq _addrsSeq) {
         addrsSeq = _addrsSeq;
+        require(
+            addrsSeq.countNth(0) == 0,
+            "AddrsSeq must have empty list at index 0"
+        );
         keypersConfigs.push(
             KeypersConfig({activationBlockNumber: 0, setIndex: 0})
         );
@@ -24,7 +28,7 @@ contract KeypersConfigs is Ownable {
 
     function addNewCfg(KeypersConfig calldata config) public onlyOwner {
         require(
-            addrsSeq.count() >= config.setIndex,
+            addrsSeq.count() > config.setIndex,
             "No appended set in seq corresponding to config's set index"
         );
         require(
