@@ -36,6 +36,10 @@ contract KeypersConfigsList is Ownable {
                 config.activationBlockNumber,
             "Cannot add new set with lower block number than previous"
         );
+        require(
+            block.number <= config.activationBlockNumber,
+            "Cannot add new set with past block number"
+        );
 
         keypersConfigs.push(config);
         emit NewConfig(config.activationBlockNumber, config.setIndex);
