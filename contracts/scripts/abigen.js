@@ -33,9 +33,11 @@ async function main() {
   ]);
 
   if (child.error != undefined) {
-    console.log(child.stdout.toString());
-    console.log(child.stderr.toString());
     throw Error(child.error);
+  }
+  if (child.status != 0) {
+    console.log(child.stderr.toString());
+    throw Error("solc exited with non-zero exit status");
   }
 }
 
