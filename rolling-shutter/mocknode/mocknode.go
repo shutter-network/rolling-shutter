@@ -90,11 +90,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 }
 
 func (m *MockNode) logStartupInfo() error {
-	eonPublicKey, err := m.eonPublicKey.GobEncode()
-	if err != nil {
-		return err
-	}
-
+	eonPublicKey := m.eonPublicKey.Marshal()
 	log.Println("starting mocknode")
 	log.Printf("eon public key: %X", eonPublicKey)
 	return nil
@@ -327,10 +323,7 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 		return err
 	}
 
-	keyBytes, err := epochSecretKey.GobEncode()
-	if err != nil {
-		return err
-	}
+	keyBytes := epochSecretKey.Marshal()
 
 	msg := &shmsg.DecryptionKey{
 		InstanceID: m.Config.InstanceID,

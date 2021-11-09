@@ -67,7 +67,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	mStored, err := db.GetDecryptionKey(ctx, shdb.EncodeUint64(m.epochID))
 	assert.NilError(t, err)
 	assert.Check(t, shdb.DecodeUint64(mStored.EpochID) == m.epochID)
-	keyBytes, _ := m.key.GobEncode()
+	keyBytes := m.key.Marshal()
 	assert.Check(t, bytes.Equal(mStored.Key, keyBytes))
 
 	assert.Check(t, len(msgs) == 0)

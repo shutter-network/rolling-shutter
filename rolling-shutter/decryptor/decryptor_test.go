@@ -229,10 +229,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	validSecretKey, err := tkg.EpochSecretKey(0).GobEncode()
-	assert.NilError(t, err)
-	invalidSecretKey, err := tkg.EpochSecretKey(1).GobEncode()
-	assert.NilError(t, err)
+	validSecretKey := tkg.EpochSecretKey(0).Marshal()
+	invalidSecretKey := tkg.EpochSecretKey(1).Marshal()
 
 	tests := []struct {
 		name  string

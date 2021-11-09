@@ -30,8 +30,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	epochID := uint64(0)
 	wrongEpochID := uint64(1)
 	tkg := initializeEon(ctx, t, db, config, keyperIndex)
-	secretKey, _ := tkg.EpochSecretKey(epochID).GobEncode()
-	keyshare, _ := tkg.EpochSecretKeyShare(epochID, keyperIndex).GobEncode()
+	secretKey := tkg.EpochSecretKey(epochID).Marshal()
+	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
 
 	kpr := keyper{config: config}
 	keyValidator := kpr.makeDecryptionKeyValidator(db)

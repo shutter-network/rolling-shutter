@@ -64,7 +64,7 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 		}
 
 		key := new(shcrypto.EpochSecretKey)
-		if err := key.GobDecode(decryptionKeyMsg.Key); err != nil {
+		if err := key.Unmarshal(decryptionKeyMsg.Key); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption key")
 		}
 

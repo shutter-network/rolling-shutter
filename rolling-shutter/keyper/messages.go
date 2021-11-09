@@ -72,7 +72,7 @@ func unmarshalDecryptionKeyShare(msg *p2p.Message) (message, error) {
 	}
 
 	share := new(shcrypto.EpochSecretKeyShare)
-	if err := share.GobDecode(decryptionKeyShareMsg.Share); err != nil {
+	if err := share.Unmarshal(decryptionKeyShareMsg.Share); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
 	}
 
@@ -91,7 +91,7 @@ func unmarshalDecryptionKey(msg *p2p.Message) (message, error) {
 	}
 
 	key := new(shcrypto.EpochSecretKey)
-	if err := key.GobDecode(decryptionKeyMsg.Key); err != nil {
+	if err := key.Unmarshal(decryptionKeyMsg.Key); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
 	}
 

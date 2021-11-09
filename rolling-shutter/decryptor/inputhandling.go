@@ -23,7 +23,7 @@ func handleDecryptionKeyInput(
 	db *dcrdb.Queries,
 	key *decryptionKey,
 ) ([]shmsg.P2PMessage, error) {
-	keyBytes, _ := key.key.GobEncode()
+	keyBytes := key.key.Marshal()
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
 		EpochID: shdb.EncodeUint64(key.epochID),
 		Key:     keyBytes,
@@ -193,7 +193,7 @@ func handleEpoch(
 	log.Printf("decrypting batch for epoch %d", epochID)
 
 	decryptionKey := new(shcrypto.EpochSecretKey)
-	err = decryptionKey.GobDecode(decryptionKeyDB.Key)
+	err = decryptionKey.Unmarshal(decryptionKeyDB.Key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid decryption key for epoch %d in db", epochID)
 	}

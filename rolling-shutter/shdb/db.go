@@ -118,13 +118,13 @@ func DecodePureDKGResult(b []byte) (*puredkg.Result, error) {
 	return &res, nil
 }
 
-func EncodeEpochSecretKeyShare(share *shcrypto.EpochSecretKeyShare) ([]byte, error) {
-	return share.GobEncode()
+func EncodeEpochSecretKeyShare(share *shcrypto.EpochSecretKeyShare) []byte {
+	return share.Marshal()
 }
 
 func DecodeEpochSecretKeyShare(b []byte) (*shcrypto.EpochSecretKeyShare, error) {
 	share := new(shcrypto.EpochSecretKeyShare)
-	err := share.GobDecode(b)
+	err := share.Unmarshal(b)
 	if err != nil {
 		return nil, err
 	}

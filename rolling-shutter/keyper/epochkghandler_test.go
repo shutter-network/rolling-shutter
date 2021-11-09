@@ -142,8 +142,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		config: config,
 		db:     db,
 	}
-	encodedDecryptionKey, err := tkg.EpochSecretKey(epochID).GobEncode()
-	assert.NilError(t, err)
+	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// threshold is two, so no outgoing message after first input
 	msgs, err := handler.handleDecryptionKeyShare(ctx, &decryptionKeyShare{
@@ -189,8 +188,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		config: config,
 		db:     db,
 	}
-	encodedDecryptionKey, err := tkg.EpochSecretKey(epochID).GobEncode()
-	assert.NilError(t, err)
+	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// send a decryption key and check that it gets inserted
 	msgs, err := handler.handleDecryptionKey(ctx, &decryptionKey{

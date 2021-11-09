@@ -71,7 +71,7 @@ func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 	// compute the key share
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 	share := epochKG.ComputeEpochSecretKeyShare(msg.EpochID)
-	encodedShare, err := share.GobEncode()
+	encodedShare := share.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,8 @@ func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decry
 }
 
 func (h *epochKGHandler) insertDecryptionKeyShare(ctx context.Context, msg *decryptionKeyShare) error {
-	encodedShare, err := shdb.EncodeEpochSecretKeyShare(msg.share)
-	if err != nil {
-		return err
-	}
-	err = h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
+	encodedShare := shdb.EncodeEpochSecretKeyShare(msg.share)
+	err := h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
 		EpochID:            shdb.EncodeUint64(msg.epochID),
 		KeyperIndex:        int64(msg.keyperIndex),
 		DecryptionKeyShare: encodedShare,
@@ -208,10 +205,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 			msg.epochID,
 		)
 	}
-	decryptionKeyEncoded, err := decryptionKey.GobEncode()
-	if err != nil {
-		return nil, err
-	}
+	decryptionKeyEncoded := decryptionKey.Marshal()
 
 	// send decryption key
 	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
@@ -238,10 +232,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *decryptionKey) ([]shmsg.P2PMessage, error) {
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
-	encodedKey, err := msg.key.GobEncode()
-	if err != nil {
-		return nil, err
-	}
+	encodedKey := msg.key.Marshal()
 	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
 		EpochID:       shdb.EncodeUint64(msg.epochID),
 		DecryptionKey: encodedKey,
