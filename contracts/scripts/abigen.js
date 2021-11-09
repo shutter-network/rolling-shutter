@@ -1,4 +1,4 @@
-#! /usr/bin/env nodejs
+#!/usr/bin/env node
 /**
    This script compiles the contracts for subsequent use with go-ethereum's abigen tool.
    It creates a combined.json file in the current directory.

@@ -94,7 +94,7 @@ lint-changes:
 	golangci-lint run --new-from-rev $${base}
 
 abigen:
-	cd ../contracts; rm -f combined.json; nodejs scripts/abigen.js
+	cd ../contracts; rm -f combined.json; node scripts/abigen.js
 	abigen --pkg contract --out contract/binding.go --combined-json ../contracts/combined.json
 
 .PHONY: build install run init clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen
