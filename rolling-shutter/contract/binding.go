@@ -4,7 +4,6 @@
 package contract
 
 import (
-	"errors"
 	"math/big"
 	"strings"
 
@@ -18,7 +17,6 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
-	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -28,31 +26,20 @@ var (
 	_ = event.NewSubscription
 )
 
-// AddrsSeqMetaData contains all meta data concerning the AddrsSeq contract.
-var AddrsSeqMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"}],\"name\":\"Appended\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"newAddrs\",\"type\":\"address[]\"}],\"name\":\"add\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"append\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"}],\"name\":\"at\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"}],\"name\":\"countNth\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5061001a33610027565b610022610077565b610150565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b604080516000602080830182815283850190945292825260018054808201825591528151805192937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909201926100d192849201906100d6565b505050565b82805482825590600052602060002090810192821561012b579160200282015b8281111561012b57825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906100f6565b5061013792915061013b565b5090565b5b80821115610137576000815560010161013c565b61092b8061015f6000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c80637f353d551161005b5780637f353d55146100fa5780638da5cb5b14610102578063c4c1c94f14610113578063f2fde38b1461012657600080fd5b806306661abd1461008d5780632a2d01f8146100b257806335147092146100c5578063715018a6146100f0575b600080fd5b610095610139565b6040516001600160401b0390911681526020015b60405180910390f35b6100956100c036600461073c565b61014e565b6100d86100d336600461075e565b6101f5565b6040516001600160a01b0390911681526020016100a9565b6100f861033d565b005b6100f8610373565b6000546001600160a01b03166100d8565b6100f8610121366004610791565b610469565b6100f8610134366004610805565b61055c565b6001805460009161014991610844565b905090565b6000610158610139565b6001600160401b0316826001600160401b0316106101c75760405162461bcd60e51b815260206004820152602160248201527f41646472735365712e636f756e744e74683a206e206f7574206f662072616e676044820152606560f81b60648201526084015b60405180910390fd5b6001826001600160401b0316815481106101e3576101e361086c565b60009182526020909120015492915050565b60006101ff610139565b6001600160401b0316836001600160401b03161061025f5760405162461bcd60e51b815260206004820152601b60248201527f41646472735365712e61743a206e206f7574206f662072616e6765000000000060448201526064016101be565b6001836001600160401b03168154811061027b5761027b61086c565b6000918252602090912001546001600160401b038316106102de5760405162461bcd60e51b815260206004820152601b60248201527f41646472735365712e61743a2069206f7574206f662072616e6765000000000060448201526064016101be565b6001836001600160401b0316815481106102fa576102fa61086c565b90600052602060002001600001826001600160401b0316815481106103215761032161086c565b6000918252602090912001546001600160a01b03169392505050565b6000546001600160a01b031633146103675760405162461bcd60e51b81526004016101be90610882565b61037160006105f7565b565b6000546001600160a01b0316331461039d5760405162461bcd60e51b81526004016101be90610882565b6103af60016001600160401b03610844565b6001600160401b0316600180549050106104175760405162461bcd60e51b815260206004820152602360248201527f41646472735365712e617070656e643a20736571206578636565656473206c696044820152621b5a5d60ea1b60648201526084016101be565b600180547f5ff9c98a1faf73c018d22371cb08c08dec1412825b68523a8e7deaa17683a6b99161044691610844565b6040516001600160401b03909116815260200160405180910390a1610371610647565b6000546001600160a01b031633146104935760405162461bcd60e51b81526004016101be90610882565b600180546000916104a3916108b7565b905060005b6001600160401b038116831115610556576001826001600160401b0316815481106104d5576104d561086c565b906000526020600020016000018484836001600160401b03168181106104fd576104fd61086c565b90506020020160208101906105129190610805565b81546001810183556000928352602090922090910180546001600160a01b0319166001600160a01b039092169190911790558061054e816108ce565b9150506104a8565b50505050565b6000546001600160a01b031633146105865760405162461bcd60e51b81526004016101be90610882565b6001600160a01b0381166105eb5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b60648201526084016101be565b6105f4816105f7565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b604080516000602080830182815283850190945292825260018054808201825591528151805192937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909201926106a192849201906106a6565b505050565b8280548282559060005260206000209081019282156106fb579160200282015b828111156106fb57825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906106c6565b5061070792915061070b565b5090565b5b80821115610707576000815560010161070c565b80356001600160401b038116811461073757600080fd5b919050565b60006020828403121561074e57600080fd5b61075782610720565b9392505050565b6000806040838503121561077157600080fd5b61077a83610720565b915061078860208401610720565b90509250929050565b600080602083850312156107a457600080fd5b82356001600160401b03808211156107bb57600080fd5b818501915085601f8301126107cf57600080fd5b8135818111156107de57600080fd5b8660208260051b85010111156107f357600080fd5b60209290920196919550909350505050565b60006020828403121561081757600080fd5b81356001600160a01b038116811461075757600080fd5b634e487b7160e01b600052601160045260246000fd5b60006001600160401b03838116908316818110156108645761086461082e565b039392505050565b634e487b7160e01b600052603260045260246000fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b6000828210156108c9576108c961082e565b500390565b60006001600160401b03808316818114156108eb576108eb61082e565b600101939250505056fea26469706673582212203251272da89b497480f4a09582108ad651d8da427ef504ecbe4b334d356af24b64736f6c63430008090033",
-}
-
 // AddrsSeqABI is the input ABI used to generate the binding from.
-// Deprecated: Use AddrsSeqMetaData.ABI instead.
-var AddrsSeqABI = AddrsSeqMetaData.ABI
+const AddrsSeqABI = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"}],\"name\":\"Appended\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"newAddrs\",\"type\":\"address[]\"}],\"name\":\"add\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"append\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"}],\"name\":\"at\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"}],\"name\":\"countNth\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // AddrsSeqBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use AddrsSeqMetaData.Bin instead.
-var AddrsSeqBin = AddrsSeqMetaData.Bin
+var AddrsSeqBin = "0x608060405234801561001057600080fd5b5061001a33610027565b610022610077565b610150565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b604080516000602080830182815283850190945292825260018054808201825591528151805192937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909201926100d192849201906100d6565b505050565b82805482825590600052602060002090810192821561012b579160200282015b8281111561012b57825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906100f6565b5061013792915061013b565b5090565b5b80821115610137576000815560010161013c565b61092b8061015f6000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c80637f353d551161005b5780637f353d55146100fa5780638da5cb5b14610102578063c4c1c94f14610113578063f2fde38b1461012657600080fd5b806306661abd1461008d5780632a2d01f8146100b257806335147092146100c5578063715018a6146100f0575b600080fd5b610095610139565b6040516001600160401b0390911681526020015b60405180910390f35b6100956100c036600461073c565b61014e565b6100d86100d336600461075e565b6101f5565b6040516001600160a01b0390911681526020016100a9565b6100f861033d565b005b6100f8610373565b6000546001600160a01b03166100d8565b6100f8610121366004610791565b610469565b6100f8610134366004610805565b61055c565b6001805460009161014991610844565b905090565b6000610158610139565b6001600160401b0316826001600160401b0316106101c75760405162461bcd60e51b815260206004820152602160248201527f41646472735365712e636f756e744e74683a206e206f7574206f662072616e676044820152606560f81b60648201526084015b60405180910390fd5b6001826001600160401b0316815481106101e3576101e361086c565b60009182526020909120015492915050565b60006101ff610139565b6001600160401b0316836001600160401b03161061025f5760405162461bcd60e51b815260206004820152601b60248201527f41646472735365712e61743a206e206f7574206f662072616e6765000000000060448201526064016101be565b6001836001600160401b03168154811061027b5761027b61086c565b6000918252602090912001546001600160401b038316106102de5760405162461bcd60e51b815260206004820152601b60248201527f41646472735365712e61743a2069206f7574206f662072616e6765000000000060448201526064016101be565b6001836001600160401b0316815481106102fa576102fa61086c565b90600052602060002001600001826001600160401b0316815481106103215761032161086c565b6000918252602090912001546001600160a01b03169392505050565b6000546001600160a01b031633146103675760405162461bcd60e51b81526004016101be90610882565b61037160006105f7565b565b6000546001600160a01b0316331461039d5760405162461bcd60e51b81526004016101be90610882565b6103af60016001600160401b03610844565b6001600160401b0316600180549050106104175760405162461bcd60e51b815260206004820152602360248201527f41646472735365712e617070656e643a20736571206578636565656473206c696044820152621b5a5d60ea1b60648201526084016101be565b600180547f5ff9c98a1faf73c018d22371cb08c08dec1412825b68523a8e7deaa17683a6b99161044691610844565b6040516001600160401b03909116815260200160405180910390a1610371610647565b6000546001600160a01b031633146104935760405162461bcd60e51b81526004016101be90610882565b600180546000916104a3916108b7565b905060005b6001600160401b038116831115610556576001826001600160401b0316815481106104d5576104d561086c565b906000526020600020016000018484836001600160401b03168181106104fd576104fd61086c565b90506020020160208101906105129190610805565b81546001810183556000928352602090922090910180546001600160a01b0319166001600160a01b039092169190911790558061054e816108ce565b9150506104a8565b50505050565b6000546001600160a01b031633146105865760405162461bcd60e51b81526004016101be90610882565b6001600160a01b0381166105eb5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b60648201526084016101be565b6105f4816105f7565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b604080516000602080830182815283850190945292825260018054808201825591528151805192937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909201926106a192849201906106a6565b505050565b8280548282559060005260206000209081019282156106fb579160200282015b828111156106fb57825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906106c6565b5061070792915061070b565b5090565b5b80821115610707576000815560010161070c565b80356001600160401b038116811461073757600080fd5b919050565b60006020828403121561074e57600080fd5b61075782610720565b9392505050565b6000806040838503121561077157600080fd5b61077a83610720565b915061078860208401610720565b90509250929050565b600080602083850312156107a457600080fd5b82356001600160401b03808211156107bb57600080fd5b818501915085601f8301126107cf57600080fd5b8135818111156107de57600080fd5b8660208260051b85010111156107f357600080fd5b60209290920196919550909350505050565b60006020828403121561081757600080fd5b81356001600160a01b038116811461075757600080fd5b634e487b7160e01b600052601160045260246000fd5b60006001600160401b03838116908316818110156108645761086461082e565b039392505050565b634e487b7160e01b600052603260045260246000fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b6000828210156108c9576108c961082e565b500390565b60006001600160401b03808316818114156108eb576108eb61082e565b600101939250505056fea26469706673582212207bd5d3542ff670aee0276b5f66ebed986f8b0b546169d49735fc066a03db9b6f64736f6c63430008090033"
 
 // DeployAddrsSeq deploys a new Ethereum contract, binding an instance of AddrsSeq to it.
 func DeployAddrsSeq(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *AddrsSeq, error) {
-	parsed, err := AddrsSeqMetaData.GetAbi()
+	parsed, err := abi.JSON(strings.NewReader(AddrsSeqABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(AddrsSeqBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(AddrsSeqBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -207,7 +194,6 @@ func (_AddrsSeq *AddrsSeqTransactorRaw) Transact(opts *bind.TransactOpts, method
 func (_AddrsSeq *AddrsSeqCaller) At(opts *bind.CallOpts, n uint64, i uint64) (common.Address, error) {
 	var out []interface{}
 	err := _AddrsSeq.contract.Call(opts, &out, "at", n, i)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -215,7 +201,6 @@ func (_AddrsSeq *AddrsSeqCaller) At(opts *bind.CallOpts, n uint64, i uint64) (co
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // At is a free data retrieval call binding the contract method 0x35147092.
@@ -238,7 +223,6 @@ func (_AddrsSeq *AddrsSeqCallerSession) At(n uint64, i uint64) (common.Address, 
 func (_AddrsSeq *AddrsSeqCaller) Count(opts *bind.CallOpts) (uint64, error) {
 	var out []interface{}
 	err := _AddrsSeq.contract.Call(opts, &out, "count")
-
 	if err != nil {
 		return *new(uint64), err
 	}
@@ -246,7 +230,6 @@ func (_AddrsSeq *AddrsSeqCaller) Count(opts *bind.CallOpts) (uint64, error) {
 	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
 
 	return out0, err
-
 }
 
 // Count is a free data retrieval call binding the contract method 0x06661abd.
@@ -269,7 +252,6 @@ func (_AddrsSeq *AddrsSeqCallerSession) Count() (uint64, error) {
 func (_AddrsSeq *AddrsSeqCaller) CountNth(opts *bind.CallOpts, n uint64) (uint64, error) {
 	var out []interface{}
 	err := _AddrsSeq.contract.Call(opts, &out, "countNth", n)
-
 	if err != nil {
 		return *new(uint64), err
 	}
@@ -277,7 +259,6 @@ func (_AddrsSeq *AddrsSeqCaller) CountNth(opts *bind.CallOpts, n uint64) (uint64
 	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
 
 	return out0, err
-
 }
 
 // CountNth is a free data retrieval call binding the contract method 0x2a2d01f8.
@@ -300,7 +281,6 @@ func (_AddrsSeq *AddrsSeqCallerSession) CountNth(n uint64) (uint64, error) {
 func (_AddrsSeq *AddrsSeqCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _AddrsSeq.contract.Call(opts, &out, "owner")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -308,7 +288,6 @@ func (_AddrsSeq *AddrsSeqCaller) Owner(opts *bind.CallOpts) (common.Address, err
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -486,7 +465,6 @@ type AddrsSeqAppended struct {
 //
 // Solidity: event Appended(uint64 n)
 func (_AddrsSeq *AddrsSeqFilterer) FilterAppended(opts *bind.FilterOpts) (*AddrsSeqAppendedIterator, error) {
-
 	logs, sub, err := _AddrsSeq.contract.FilterLogs(opts, "Appended")
 	if err != nil {
 		return nil, err
@@ -498,7 +476,6 @@ func (_AddrsSeq *AddrsSeqFilterer) FilterAppended(opts *bind.FilterOpts) (*Addrs
 //
 // Solidity: event Appended(uint64 n)
 func (_AddrsSeq *AddrsSeqFilterer) WatchAppended(opts *bind.WatchOpts, sink chan<- *AddrsSeqAppended) (event.Subscription, error) {
-
 	logs, sub, err := _AddrsSeq.contract.WatchLogs(opts, "Appended")
 	if err != nil {
 		return nil, err
@@ -621,7 +598,6 @@ type AddrsSeqOwnershipTransferred struct {
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_AddrsSeq *AddrsSeqFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*AddrsSeqOwnershipTransferredIterator, error) {
-
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
@@ -642,7 +618,6 @@ func (_AddrsSeq *AddrsSeqFilterer) FilterOwnershipTransferred(opts *bind.FilterO
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_AddrsSeq *AddrsSeqFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *AddrsSeqOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
-
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
@@ -696,14 +671,8 @@ func (_AddrsSeq *AddrsSeqFilterer) ParseOwnershipTransferred(log types.Log) (*Ad
 	return event, nil
 }
 
-// ContextMetaData contains all meta data concerning the Context contract.
-var ContextMetaData = &bind.MetaData{
-	ABI: "[]",
-}
-
 // ContextABI is the input ABI used to generate the binding from.
-// Deprecated: Use ContextMetaData.ABI instead.
-var ContextABI = ContextMetaData.ABI
+const ContextABI = "[]"
 
 // Context is an auto generated Go binding around an Ethereum contract.
 type Context struct {
@@ -847,14 +816,8 @@ func (_Context *ContextTransactorRaw) Transact(opts *bind.TransactOpts, method s
 	return _Context.Contract.contract.Transact(opts, method, params...)
 }
 
-// OwnableMetaData contains all meta data concerning the Ownable contract.
-var OwnableMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-}
-
 // OwnableABI is the input ABI used to generate the binding from.
-// Deprecated: Use OwnableMetaData.ABI instead.
-var OwnableABI = OwnableMetaData.ABI
+const OwnableABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // Ownable is an auto generated Go binding around an Ethereum contract.
 type Ownable struct {
@@ -1004,7 +967,6 @@ func (_Ownable *OwnableTransactorRaw) Transact(opts *bind.TransactOpts, method s
 func (_Ownable *OwnableCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Ownable.contract.Call(opts, &out, "owner")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -1012,7 +974,6 @@ func (_Ownable *OwnableCaller) Owner(opts *bind.CallOpts) (common.Address, error
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -1149,7 +1110,6 @@ type OwnableOwnershipTransferred struct {
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Ownable *OwnableFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*OwnableOwnershipTransferredIterator, error) {
-
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
@@ -1170,7 +1130,6 @@ func (_Ownable *OwnableFilterer) FilterOwnershipTransferred(opts *bind.FilterOpt
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Ownable *OwnableFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *OwnableOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
-
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
@@ -1224,31 +1183,20 @@ func (_Ownable *OwnableFilterer) ParseOwnershipTransferred(log types.Log) (*Owna
 	return event, nil
 }
 
-// RegistryMetaData contains all meta data concerning the Registry contract.
-var RegistryMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"Registered\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"register\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506040516107be3803806107be83398101604081905261002f91610054565b600080546001600160a01b0319166001600160a01b0392909216919091179055610084565b60006020828403121561006657600080fd5b81516001600160a01b038116811461007d57600080fd5b9392505050565b61072b806100936000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806354d77fe41461003b578063c2bc2efc14610050575b600080fd5b61004e6100493660046104bf565b610079565b005b61006361005e3660046105a9565b6102dd565b604051610070919061061a565b60405180910390f35b60008054604051631a8a384960e11b815267ffffffffffffffff8087166004830152851660248201526001600160a01b039091169063351470929060440160206040518083038186803b1580156100cf57600080fd5b505afa1580156100e3573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610107919061062d565b90506001600160a01b03811633146101665760405162461bcd60e51b815260206004820152601f60248201527f52656769737472793a2073656e646572206973206e6f7420616c6c6f7765640060448201526064015b60405180910390fd5b33600090815260016020526040902080546101809061064a565b1590506101db5760405162461bcd60e51b815260206004820152602360248201527f52656769737472793a2073656e64657220616c726561647920726567697374656044820152621c995960ea1b606482015260840161015d565b600082511161023a5760405162461bcd60e51b815260206004820152602560248201527f52656769737472793a2063616e6e6f7420726567697374657220656d7074792060448201526476616c756560d81b606482015260840161015d565b336000908152600160209081526040909120835161025a928501906103f3565b5061029a6040518060400160405280601e81526020017f526567697374657265642076616c756520666f722073656e646572202573000081525033610389565b7f2791b5fcdbb8707a39509d0547670c51cfca994cc587718f55192d409fd514ca848433856040516102cf9493929190610685565b60405180910390a150505050565b6001600160a01b03811660009081526001602052604090208054606091906103049061064a565b80601f01602080910402602001604051908101604052809291908181526020018280546103309061064a565b801561037d5780601f106103525761010080835404028352916020019161037d565b820191906000526020600020905b81548152906001019060200180831161036057829003601f168201915b50505050509050919050565b6103ce828260405160240161039f9291906106cb565b60408051601f198184030181529190526020810180516001600160e01b031663319af33360e01b1790526103d2565b5050565b80516a636f6e736f6c652e6c6f67602083016000808483855afa5050505050565b8280546103ff9061064a565b90600052602060002090601f0160209004810192826104215760008555610467565b82601f1061043a57805160ff1916838001178555610467565b82800160010185558215610467579182015b8281111561046757825182559160200191906001019061044c565b50610473929150610477565b5090565b5b808211156104735760008155600101610478565b803567ffffffffffffffff811681146104a457600080fd5b919050565b634e487b7160e01b600052604160045260246000fd5b6000806000606084860312156104d457600080fd5b6104dd8461048c565b92506104eb6020850161048c565b9150604084013567ffffffffffffffff8082111561050857600080fd5b818601915086601f83011261051c57600080fd5b81358181111561052e5761052e6104a9565b604051601f8201601f19908116603f01168101908382118183101715610556576105566104a9565b8160405282815289602084870101111561056f57600080fd5b8260208601602083013760006020848301015280955050505050509250925092565b6001600160a01b03811681146105a657600080fd5b50565b6000602082840312156105bb57600080fd5b81356105c681610591565b9392505050565b6000815180845260005b818110156105f3576020818501810151868301820152016105d7565b81811115610605576000602083870101525b50601f01601f19169290920160200192915050565b6020815260006105c660208301846105cd565b60006020828403121561063f57600080fd5b81516105c681610591565b600181811c9082168061065e57607f821691505b6020821081141561067f57634e487b7160e01b600052602260045260246000fd5b50919050565b67ffffffffffffffff8581168252841660208201526001600160a01b03831660408201526080606082018190526000906106c1908301846105cd565b9695505050505050565b6040815260006106de60408301856105cd565b905060018060a01b0383166020830152939250505056fea2646970667358221220ed269b5f5df69592d93fa80cb85caf5bbaa5b4bc696f5752770a43eeb7cc723964736f6c63430008090033",
-}
-
 // RegistryABI is the input ABI used to generate the binding from.
-// Deprecated: Use RegistryMetaData.ABI instead.
-var RegistryABI = RegistryMetaData.ABI
+const RegistryABI = "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"Registered\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"addrsSeq\",\"outputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"n\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"i\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"register\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // RegistryBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use RegistryMetaData.Bin instead.
-var RegistryBin = RegistryMetaData.Bin
+var RegistryBin = "0x608060405234801561001057600080fd5b506040516107f03803806107f083398101604081905261002f91610054565b600080546001600160a01b0319166001600160a01b0392909216919091179055610084565b60006020828403121561006657600080fd5b81516001600160a01b038116811461007d57600080fd5b9392505050565b61075d806100936000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634d89eaaf1461004657806354d77fe414610076578063c2bc2efc1461008b575b600080fd5b600054610059906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100896100843660046104f1565b6100ab565b005b61009e6100993660046105db565b61030f565b60405161006d919061064c565b60008054604051631a8a384960e11b815267ffffffffffffffff8087166004830152851660248201526001600160a01b039091169063351470929060440160206040518083038186803b15801561010157600080fd5b505afa158015610115573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610139919061065f565b90506001600160a01b03811633146101985760405162461bcd60e51b815260206004820152601f60248201527f52656769737472793a2073656e646572206973206e6f7420616c6c6f7765640060448201526064015b60405180910390fd5b33600090815260016020526040902080546101b29061067c565b15905061020d5760405162461bcd60e51b815260206004820152602360248201527f52656769737472793a2073656e64657220616c726561647920726567697374656044820152621c995960ea1b606482015260840161018f565b600082511161026c5760405162461bcd60e51b815260206004820152602560248201527f52656769737472793a2063616e6e6f7420726567697374657220656d7074792060448201526476616c756560d81b606482015260840161018f565b336000908152600160209081526040909120835161028c92850190610425565b506102cc6040518060400160405280601e81526020017f526567697374657265642076616c756520666f722073656e6465722025730000815250336103bb565b7f2791b5fcdbb8707a39509d0547670c51cfca994cc587718f55192d409fd514ca8484338560405161030194939291906106b7565b60405180910390a150505050565b6001600160a01b03811660009081526001602052604090208054606091906103369061067c565b80601f01602080910402602001604051908101604052809291908181526020018280546103629061067c565b80156103af5780601f10610384576101008083540402835291602001916103af565b820191906000526020600020905b81548152906001019060200180831161039257829003601f168201915b50505050509050919050565b61040082826040516024016103d19291906106fd565b60408051601f198184030181529190526020810180516001600160e01b031663319af33360e01b179052610404565b5050565b80516a636f6e736f6c652e6c6f67602083016000808483855afa5050505050565b8280546104319061067c565b90600052602060002090601f0160209004810192826104535760008555610499565b82601f1061046c57805160ff1916838001178555610499565b82800160010185558215610499579182015b8281111561049957825182559160200191906001019061047e565b506104a59291506104a9565b5090565b5b808211156104a557600081556001016104aa565b803567ffffffffffffffff811681146104d657600080fd5b919050565b634e487b7160e01b600052604160045260246000fd5b60008060006060848603121561050657600080fd5b61050f846104be565b925061051d602085016104be565b9150604084013567ffffffffffffffff8082111561053a57600080fd5b818601915086601f83011261054e57600080fd5b813581811115610560576105606104db565b604051601f8201601f19908116603f01168101908382118183101715610588576105886104db565b816040528281528960208487010111156105a157600080fd5b8260208601602083013760006020848301015280955050505050509250925092565b6001600160a01b03811681146105d857600080fd5b50565b6000602082840312156105ed57600080fd5b81356105f8816105c3565b9392505050565b6000815180845260005b8181101561062557602081850181015186830182015201610609565b81811115610637576000602083870101525b50601f01601f19169290920160200192915050565b6020815260006105f860208301846105ff565b60006020828403121561067157600080fd5b81516105f8816105c3565b600181811c9082168061069057607f821691505b602082108114156106b157634e487b7160e01b600052602260045260246000fd5b50919050565b67ffffffffffffffff8581168252841660208201526001600160a01b03831660408201526080606082018190526000906106f3908301846105ff565b9695505050505050565b60408152600061071060408301856105ff565b905060018060a01b0383166020830152939250505056fea2646970667358221220b4df45d08d451d230ac2f8252426160ff79577bb22ce99a4f9ed9eed350ae0f464736f6c63430008090033"
 
 // DeployRegistry deploys a new Ethereum contract, binding an instance of Registry to it.
 func DeployRegistry(auth *bind.TransactOpts, backend bind.ContractBackend, _addrsSeq common.Address) (common.Address, *types.Transaction, *Registry, error) {
-	parsed, err := RegistryMetaData.GetAbi()
+	parsed, err := abi.JSON(strings.NewReader(RegistryABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RegistryBin), backend, _addrsSeq)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(RegistryBin), backend, _addrsSeq)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -1397,13 +1345,41 @@ func (_Registry *RegistryTransactorRaw) Transact(opts *bind.TransactOpts, method
 	return _Registry.Contract.contract.Transact(opts, method, params...)
 }
 
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_Registry *RegistryCaller) AddrsSeq(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _Registry.contract.Call(opts, &out, "addrsSeq")
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+}
+
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_Registry *RegistrySession) AddrsSeq() (common.Address, error) {
+	return _Registry.Contract.AddrsSeq(&_Registry.CallOpts)
+}
+
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_Registry *RegistryCallerSession) AddrsSeq() (common.Address, error) {
+	return _Registry.Contract.AddrsSeq(&_Registry.CallOpts)
+}
+
 // Get is a free data retrieval call binding the contract method 0xc2bc2efc.
 //
 // Solidity: function get(address a) view returns(bytes)
 func (_Registry *RegistryCaller) Get(opts *bind.CallOpts, a common.Address) ([]byte, error) {
 	var out []interface{}
 	err := _Registry.contract.Call(opts, &out, "get", a)
-
 	if err != nil {
 		return *new([]byte), err
 	}
@@ -1411,7 +1387,6 @@ func (_Registry *RegistryCaller) Get(opts *bind.CallOpts, a common.Address) ([]b
 	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
 
 	return out0, err
-
 }
 
 // Get is a free data retrieval call binding the contract method 0xc2bc2efc.
@@ -1529,7 +1504,6 @@ type RegistryRegistered struct {
 //
 // Solidity: event Registered(uint64 n, uint64 i, address a, bytes data)
 func (_Registry *RegistryFilterer) FilterRegistered(opts *bind.FilterOpts) (*RegistryRegisteredIterator, error) {
-
 	logs, sub, err := _Registry.contract.FilterLogs(opts, "Registered")
 	if err != nil {
 		return nil, err
@@ -1541,7 +1515,6 @@ func (_Registry *RegistryFilterer) FilterRegistered(opts *bind.FilterOpts) (*Reg
 //
 // Solidity: event Registered(uint64 n, uint64 i, address a, bytes data)
 func (_Registry *RegistryFilterer) WatchRegistered(opts *bind.WatchOpts, sink chan<- *RegistryRegistered) (event.Subscription, error) {
-
 	logs, sub, err := _Registry.contract.WatchLogs(opts, "Registered")
 	if err != nil {
 		return nil, err
@@ -1586,31 +1559,20 @@ func (_Registry *RegistryFilterer) ParseRegistered(log types.Log) (*RegistryRegi
 	return event, nil
 }
 
-// ConsoleMetaData contains all meta data concerning the Console contract.
-var ConsoleMetaData = &bind.MetaData{
-	ABI: "[]",
-	Bin: "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220bb07727afc6a474f8c7e705d6fe48e9dd5d02f16b2af91738cfe76087e4b1fd064736f6c63430008090033",
-}
-
 // ConsoleABI is the input ABI used to generate the binding from.
-// Deprecated: Use ConsoleMetaData.ABI instead.
-var ConsoleABI = ConsoleMetaData.ABI
+const ConsoleABI = "[]"
 
 // ConsoleBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use ConsoleMetaData.Bin instead.
-var ConsoleBin = ConsoleMetaData.Bin
+var ConsoleBin = "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220bb07727afc6a474f8c7e705d6fe48e9dd5d02f16b2af91738cfe76087e4b1fd064736f6c63430008090033"
 
 // DeployConsole deploys a new Ethereum contract, binding an instance of Console to it.
 func DeployConsole(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Console, error) {
-	parsed, err := ConsoleMetaData.GetAbi()
+	parsed, err := abi.JSON(strings.NewReader(ConsoleABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ConsoleBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(ConsoleBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}

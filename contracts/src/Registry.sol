@@ -7,13 +7,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./AddrsSeq.sol";
 
 /**
-   @title Registry allows senders that are contained inside a AddrsSeq to register a single bytes
+   @title Registry allows senders that are contained inside an AddrsSeq to register a single bytes
    value. We use this to let decryptors register their BLS public key.
  */
 contract Registry {
     event Registered(uint64 n, uint64 i, address a, bytes data);
 
-    AddrsSeq private addrsSeq;
+    AddrsSeq public addrsSeq;
     mapping(address => bytes) private dataMap;
 
     constructor(AddrsSeq _addrsSeq) {
@@ -43,7 +43,7 @@ contract Registry {
     }
 
     /**
-     @notice get the registered  public key for the given address
+     @notice get the registered public key for the given address
     */
     function get(address a) public view returns (bytes memory) {
         return dataMap[a];
