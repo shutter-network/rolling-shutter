@@ -1,5 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@eth-optimism/hardhat-ovm");
+require("hardhat-deploy");
+require("hardhat-deploy-ethers");
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -21,6 +23,15 @@ module.exports = {
   solidity: "0.8.9",
   paths: {
     sources: "./src",
+  },
+  namedAccounts: {
+    deployer: 0,
+    keyper0: 1,
+    keyper1: 2,
+    keyper2: 3,
+    decryptor0: 4,
+    decryptor1: 5,
+    decryptor2: 6,
   },
   networks: {
     optimistic: {
