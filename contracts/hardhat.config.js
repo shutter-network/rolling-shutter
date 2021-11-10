@@ -2,6 +2,7 @@ require("@nomiclabs/hardhat-waffle");
 require("@eth-optimism/hardhat-ovm");
 require("hardhat-deploy");
 require("hardhat-deploy-ethers");
+require("@nomiclabs/hardhat-ganache");
 
 /*global task:false */
 

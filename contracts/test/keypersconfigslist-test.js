@@ -52,7 +52,7 @@ describe("KeypersConfigsList", function () {
     expect(kprSet.setIndex).to.equal(index);
 
     await addrsSeq.append();
-    expect(
+    await expect(
       configContract.addNewCfg({
         activationBlockNumber: blockNumber2,
         setIndex: index2,
