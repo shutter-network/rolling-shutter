@@ -10,6 +10,7 @@ jobs:
           path: ~/src
       - node/install-packages
       - run: npx hardhat test
+      - run: npx hardhat --network ganache test
       - run: npx hardhat deploy
 
 workflows:
