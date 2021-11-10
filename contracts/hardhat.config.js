@@ -3,8 +3,9 @@ require("@eth-optimism/hardhat-ovm");
 require("hardhat-deploy");
 require("hardhat-deploy-ethers");
 require("@nomiclabs/hardhat-ganache");
-
-/*global task:false */
+const { task, extendEnvironment } = require("hardhat/config");
+const fs = require("fs");
+const process = require("process");
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -14,6 +15,25 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   for (const account of accounts) {
     console.log(account.address);
   }
+});
+
+extendEnvironment((hre) => {
+  hre.deployConf = { keypers: null };
+  hre.getKeyperAddresses = async function () {
+    if (hre.deployConf.keypers === null) {
+      const { keyper0, keyper1, keyper2 } = await hre.getNamedAccounts();
+      return [keyper0, keyper1, keyper2];
+    } else {
+      return hre.deployConf.keypers;
+    }
+  };
+});
+
+task("deploy", "deploy contracts", async (args, hre, runSuper) => {
+  if (process.env.DEPLOY_CONF !== undefined) {
+    hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
+  }
+  await runSuper();
 });
 
 // You need to export an object to set up your config

@@ -1,12 +1,10 @@
 const { ethers } = require("hardhat");
 
 module.exports = async function (hre) {
-  const { getNamedAccounts } = hre;
-  const { keyper0, keyper1, keyper2 } = await getNamedAccounts();
-
+  var keyperAddrs = await hre.getKeyperAddresses();
   const keypers = await ethers.getContract("Keypers");
   const index = await keypers.count();
-  await keypers.add([keyper0, keyper1, keyper2]);
+  await keypers.add(keyperAddrs);
   await keypers.append();
 
   const cfg = await ethers.getContract("KeyperConfig");
@@ -16,4 +14,9 @@ module.exports = async function (hre) {
     activationBlockNumber: currentBlock + 10,
     setIndex: index,
   });
+  console.log(
+    "activationBlockNumber %s keypers: %s",
+    currentBlock + 10,
+    keyperAddrs
+  );
 };
