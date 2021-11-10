@@ -1,4 +1,5 @@
 const { expect } = require("chai");
+const { ethers } = require("hardhat");
 
 async function deploy() {
   const addrsSeqFactory = await ethers.getContractFactory("AddrsSeq");
@@ -97,7 +98,7 @@ describe("KeypersConfigsList", function () {
   it("not owner should not be able to add new set", async function () {
     const cfg = await deploy();
 
-    const notOwner = (await hre.ethers.getSigners())[1];
+    const notOwner = (await ethers.getSigners())[1];
     expect(cfg.owner()).to.not.be.equal(notOwner);
 
     await expect(

@@ -1,4 +1,5 @@
 const { expect } = require("chai");
+const { ethers } = require("hardhat");
 
 async function deploy() {
   const Addrs = await ethers.getContractFactory("AddrsSeq");
@@ -26,7 +27,7 @@ describe("AddrsSeq", function () {
     const a = ethers.utils.getAddress(
       "0x8ba1f109551bd432803012645ac136ddd64dba72"
     );
-    tx = await aset.add([a]);
+    var tx = await aset.add([a]);
     await tx.wait();
     await expect(aset.at(0, 0)).to.be.revertedWith(
       "AddrsSeq.at: n out of range"
@@ -39,7 +40,7 @@ describe("AddrsSeq", function () {
     const a = ethers.utils.getAddress(
       "0x8ba1f109551bd432803012645ac136ddd64dba72"
     );
-    tx = await aset.add([a]);
+    var tx = await aset.add([a]);
     await tx.wait();
 
     await expect(aset.append()).to.emit(aset, "Appended").withArgs(0);

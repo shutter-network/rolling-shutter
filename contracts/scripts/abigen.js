@@ -4,9 +4,10 @@
    It creates a combined.json file in the current directory.
  */
 
+const process = require("process");
 const hre = require("hardhat");
 const { spawnSync } = require("child_process");
-const { inspect } = require("util");
+// const { inspect } = require("util");
 
 async function main() {
   const solcVersion = hre.config.solidity.compilers[0].version;

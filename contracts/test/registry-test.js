@@ -31,7 +31,7 @@ describe("Registry", function () {
   });
 
   it("non-members should not be able to register", async function () {
-    tx = await aset.add([a]);
+    var tx = await aset.add([a]);
     await tx.wait();
     tx = await aset.append();
     await tx.wait();
@@ -41,7 +41,7 @@ describe("Registry", function () {
   });
 
   it("members can call register exactly once", async function () {
-    tx = await aset.add([owner.address]);
+    var tx = await aset.add([owner.address]);
     await tx.wait();
     tx = await aset.append();
     await tx.wait();
@@ -49,7 +49,6 @@ describe("Registry", function () {
 
     tx = await registry.register(0, 0, v);
     await tx.wait();
-    const res = await registry.get(owner.address);
     expect(await registry.get(owner.address)).to.equal("0x01020304");
 
     await expect(registry.register(0, 0, v)).to.be.revertedWith(
@@ -58,7 +57,7 @@ describe("Registry", function () {
   });
 
   it("members cannot register empty value", async function () {
-    tx = await aset.add([owner.address]);
+    var tx = await aset.add([owner.address]);
     await tx.wait();
     tx = await aset.append();
     await tx.wait();
