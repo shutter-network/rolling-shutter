@@ -5,14 +5,10 @@ async function deploy() {
   const addrsSeqFactory = await ethers.getContractFactory("AddrsSeq");
   const addrsSeqContract = await addrsSeqFactory.deploy();
   await addrsSeqContract.append();
-  const keypersConfigsFactory = await ethers.getContractFactory(
-    "KeypersConfigsList"
-  );
-  const keypersConfigsContract = await keypersConfigsFactory.deploy(
-    addrsSeqContract.address
-  );
-  await keypersConfigsContract.deployed();
-  return keypersConfigsContract;
+  const SetConfigFactory = await ethers.getContractFactory("SetConfigsList");
+  const SetConfig = await SetConfigFactory.deploy(addrsSeqContract.address);
+  await SetConfig.deployed();
+  return SetConfig;
 }
 
 async function getAddrsSeq(configContract) {
@@ -29,7 +25,7 @@ async function getConfig(configContract, blockNumber) {
   };
 }
 
-describe("KeypersConfigsList", function () {
+describe("SetConfigList", function () {
   it("adding new set should emit an event", async function () {
     const configContract = await deploy();
     const addrsSeq = await getAddrsSeq(configContract);
@@ -47,9 +43,9 @@ describe("KeypersConfigsList", function () {
     )
       .to.emit(configContract, "NewConfig")
       .withArgs(blockNumber, index);
-    let kprSet = await configContract.keypersConfigs(1);
-    expect(kprSet.activationBlockNumber).to.equal(blockNumber);
-    expect(kprSet.setIndex).to.equal(index);
+    let setConfig = await configContract.configs(1);
+    expect(setConfig.activationBlockNumber).to.equal(blockNumber);
+    expect(setConfig.setIndex).to.equal(index);
 
     await addrsSeq.append();
     await expect(
@@ -60,9 +56,9 @@ describe("KeypersConfigsList", function () {
     )
       .to.emit(configContract, "NewConfig")
       .withArgs(blockNumber2, index2);
-    kprSet = await configContract.keypersConfigs(2);
-    expect(kprSet.activationBlockNumber).to.equal(blockNumber2);
-    expect(kprSet.setIndex).to.equal(index2);
+    setConfig = await configContract.configs(2);
+    expect(setConfig.activationBlockNumber).to.equal(blockNumber2);
+    expect(setConfig.setIndex).to.equal(index2);
   });
 
   it("should be impossible to add new set when not sequenced", async function () {
