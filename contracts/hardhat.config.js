@@ -18,7 +18,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 });
 
 extendEnvironment((hre) => {
-  hre.deployConf = { keypers: null };
+  if (process.env.DEPLOY_CONF !== undefined) {
+    hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
+  } else {
+    hre.deployConf = { keypers: null };
+  }
+
   hre.getKeyperAddresses = async function () {
     if (hre.deployConf.keypers === null) {
       const { keyper0, keyper1, keyper2 } = await hre.getNamedAccounts();
@@ -27,13 +32,6 @@ extendEnvironment((hre) => {
       return hre.deployConf.keypers;
     }
   };
-});
-
-task("deploy", "deploy contracts", async (args, hre, runSuper) => {
-  if (process.env.DEPLOY_CONF !== undefined) {
-    hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
-  }
-  await runSuper();
 });
 
 // You need to export an object to set up your config
