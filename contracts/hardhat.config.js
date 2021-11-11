@@ -21,7 +21,7 @@ extendEnvironment((hre) => {
   if (process.env.DEPLOY_CONF !== undefined) {
     hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
   } else {
-    hre.deployConf = { keypers: null };
+    hre.deployConf = { keypers: null, decryptors: null };
   }
 
   hre.getKeyperAddresses = async function () {
@@ -30,6 +30,16 @@ extendEnvironment((hre) => {
       return [keyper0, keyper1, keyper2];
     } else {
       return hre.deployConf.keypers;
+    }
+  };
+
+  hre.getDecryptorAddresses = async function () {
+    if (hre.deployConf.decryptors === null) {
+      const { decryptor0, decryptor1, decryptor2 } =
+        await hre.getNamedAccounts();
+      return [decryptor0, decryptor1, decryptor2];
+    } else {
+      return hre.deployConf.decryptors;
     }
   };
 });

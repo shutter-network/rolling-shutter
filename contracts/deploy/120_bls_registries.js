@@ -4,7 +4,7 @@ module.exports = async function (hre) {
   const { deployments, getNamedAccounts } = hre;
   const { deployer } = await getNamedAccounts();
 
-  const decryptors = await ethers.getContract("Keypers");
+  const decryptors = await ethers.getContract("Decryptors");
 
   await deployments.deploy("BLSPublicKeyRegistry", {
     contract: "Registry",
