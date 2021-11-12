@@ -9,14 +9,15 @@ module.exports = async function (hre) {
 
   const cfg = await ethers.getContract("DecryptorConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
+  const activationBlock = currentBlock + 10;
 
   await cfg.addNewCfg({
-    activationBlockNumber: currentBlock + 10,
+    activationBlockNumber: activationBlock,
     setIndex: index,
   });
   console.log(
-    "activationBlockNumber %s decryptors: %s",
-    currentBlock + 10,
+    "configure decryptors: activationBlockNumber %s decryptors: %s",
+    activationBlock,
     decryptorAddrs
   );
 };

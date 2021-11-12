@@ -9,14 +9,15 @@ module.exports = async function (hre) {
 
   const cfg = await ethers.getContract("KeyperConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
+  const activationBlockNumber = currentBlock + 10;
 
   await cfg.addNewCfg({
-    activationBlockNumber: currentBlock + 10,
+    activationBlockNumber: activationBlockNumber,
     setIndex: index,
   });
   console.log(
-    "activationBlockNumber %s keypers: %s",
-    currentBlock + 10,
+    "configure keypers: activationBlockNumber %s keypers: %s",
+    activationBlockNumber,
     keyperAddrs
   );
 };
