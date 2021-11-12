@@ -21,7 +21,7 @@ extendEnvironment((hre) => {
   if (process.env.DEPLOY_CONF !== undefined) {
     hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
   } else {
-    hre.deployConf = { keypers: null, decryptors: null };
+    hre.deployConf = { keypers: null, decryptors: null, fundValue: "" };
   }
 
   hre.getKeyperAddresses = async function () {
