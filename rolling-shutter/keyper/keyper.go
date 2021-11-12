@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -18,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/contract"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
@@ -37,8 +39,10 @@ type keyper struct {
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
-	shuttermintState  *ShuttermintState
-	p2p               *p2p.P2P
+	contracts         *contract.Contracts
+
+	shuttermintState *ShuttermintState
+	p2p              *p2p.P2P
 }
 
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
@@ -74,6 +78,19 @@ func Run(ctx context.Context, config Config) error {
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
+	ethereumClient, err := ethclient.Dial(config.EthereumURL)
+	if err != nil {
+		return err
+	}
+	deployments, err := contract.LoadDeployments(config.DeploymentDir)
+	if err != nil {
+		return err
+	}
+	contracts, err := contract.NewContracts(ethereumClient, deployments)
+	if err != nil {
+		return err
+	}
+
 	err = kprdb.ValidateKeyperDB(ctx, dbpool)
 	if err != nil {
 		return err
@@ -93,7 +110,9 @@ func Run(ctx context.Context, config Config) error {
 		dbpool:            dbpool,
 		shuttermintClient: shuttermintClient,
 		messageSender:     messageSender,
-		shuttermintState:  NewShuttermintState(config),
+		contracts:         contracts,
+
+		shuttermintState: NewShuttermintState(config),
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     config.ListenAddress,
 			PeerMultiaddrs: config.PeerMultiaddrs,

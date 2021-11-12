@@ -73,6 +73,8 @@ Shuttermint node which have to be started separately in advance.`,
 func readKeyperConfig() (keyper.Config, error) {
 	viper.SetEnvPrefix("KEYPER")
 	viper.BindEnv("ShuttermintURL")
+	viper.BindEnv("EthereumURL")
+	viper.BindEnv("DeploymentDir")
 	viper.BindEnv("SigningKey")
 	viper.BindEnv("ValidatorSeed")
 	viper.BindEnv("EncryptionKey")
@@ -176,6 +178,8 @@ func initDB() error {
 func exampleConfig() (*keyper.Config, error) {
 	cfg := &keyper.Config{
 		ShuttermintURL: "http://localhost:26657",
+		EthereumURL:    "http://127.0.0.1:8545/",
+		DeploymentDir:  "./deployments/localhost/",
 		DKGPhaseLength: 30,
 		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{
