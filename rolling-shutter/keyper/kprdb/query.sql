@@ -161,3 +161,13 @@ SELECT * FROM keyper.dkg_result
 WHERE eon = (SELECT eon FROM keyper.eons WHERE batch_index <= $1
 ORDER BY batch_index DESC, height DESC
 LIMIT 1);
+
+-- name: UpdateEventSyncProgress :exec
+INSERT INTO keyper.event_sync_progress (next_block_number, next_log_index)
+VALUES ($1, $2)
+ON CONFLICT (id) DO UPDATE
+    SET next_block_number = $1,
+        next_log_index = $2;
+
+-- name: GetEventSyncProgress :one
+SELECT * FROM keyper.event_sync_progress LIMIT 1;

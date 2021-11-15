@@ -98,6 +98,8 @@ func initDB() error {
 
 func readConfig() (decryptor.Config, error) {
 	viper.SetEnvPrefix("DECRYPTOR")
+	viper.BindEnv("EthereumURL")
+	viper.BindEnv("DeploymentDir")
 	viper.BindEnv("ListenAddress")
 	viper.BindEnv("PeerMultiaddrs")
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
@@ -144,6 +146,8 @@ func exampleConfig() (*decryptor.Config, error) {
 		return nil, err
 	}
 	return &decryptor.Config{
+		EthereumURL:    "http://127.0.0.1:8545/",
+		DeploymentDir:  "./deployments/localhost/",
 		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "",

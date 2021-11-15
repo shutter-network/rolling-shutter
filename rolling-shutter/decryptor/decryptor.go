@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
@@ -33,6 +35,8 @@ var gossipTopicNames = [4]string{
 type Decryptor struct {
 	Config Config
 
+	contracts *deployment.Contracts
+
 	p2p *p2p.P2P
 	db  *dcrdb.Queries
 }
@@ -47,6 +51,8 @@ func New(config Config) *Decryptor {
 
 	return &Decryptor{
 		Config: config,
+
+		contracts: nil,
 
 		p2p: p,
 		db:  nil,
@@ -66,6 +72,16 @@ func (d *Decryptor) Run(ctx context.Context) error {
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
+	ethereumClient, err := ethclient.Dial(d.Config.EthereumURL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(ethereumClient, d.Config.DeploymentDir)
+	if err != nil {
+		return err
+	}
+	d.contracts = contracts
+
 	err = dcrdb.ValidateDecryptorDB(ctx, dbpool)
 	if err != nil {
 		return err
@@ -76,6 +92,9 @@ func (d *Decryptor) Run(ctx context.Context) error {
 	errorgroup, errorctx := errgroup.WithContext(ctx)
 	errorgroup.Go(func() error {
 		return d.handleMessages(errorctx)
+	})
+	errorgroup.Go(func() error {
+		return d.handleContractEvents(errorctx)
 	})
 
 	topicValidators := d.makeMessagesValidators()

@@ -142,3 +142,13 @@ INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);
 
 -- name: GetMeta :one
 SELECT * FROM decryptor.meta_inf WHERE key = $1;
+
+-- name: UpdateEventSyncProgress :exec
+INSERT INTO decryptor.event_sync_progress (next_block_number, next_log_index)
+VALUES ($1, $2)
+ON CONFLICT (id) DO UPDATE
+    SET next_block_number = $1,
+        next_log_index = $2;
+
+-- name: GetEventSyncProgress :one
+SELECT * FROM decryptor.event_sync_progress LIMIT 1;

@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -18,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
@@ -35,10 +37,13 @@ var GossipTopicNames = []string{
 type keyper struct {
 	config            Config
 	dbpool            *pgxpool.Pool
+	db                *kprdb.Queries
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
-	shuttermintState  *ShuttermintState
-	p2p               *p2p.P2P
+	contracts         *deployment.Contracts
+
+	shuttermintState *ShuttermintState
+	p2p              *p2p.P2P
 }
 
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
@@ -73,6 +78,16 @@ func Run(ctx context.Context, config Config) error {
 	}
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+	db := kprdb.New(dbpool)
+
+	ethereumClient, err := ethclient.Dial(config.EthereumURL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
+	if err != nil {
+		return err
+	}
 
 	err = kprdb.ValidateKeyperDB(ctx, dbpool)
 	if err != nil {
@@ -91,9 +106,12 @@ func Run(ctx context.Context, config Config) error {
 	k := keyper{
 		config:            config,
 		dbpool:            dbpool,
+		db:                db,
 		shuttermintClient: shuttermintClient,
 		messageSender:     messageSender,
-		shuttermintState:  NewShuttermintState(config),
+		contracts:         contracts,
+
+		shuttermintState: NewShuttermintState(config),
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     config.ListenAddress,
 			PeerMultiaddrs: config.PeerMultiaddrs,
@@ -116,6 +134,9 @@ func (kpr *keyper) run(ctx context.Context) error {
 	})
 	group.Go(func() error {
 		return kpr.operateP2P(ctx)
+	})
+	group.Go(func() error {
+		return kpr.handleContractEvents(ctx)
 	})
 	return group.Wait()
 }

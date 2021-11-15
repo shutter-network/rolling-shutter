@@ -36,6 +36,12 @@ type KeyperEon struct {
 	ConfigIndex int64
 }
 
+type KeyperEventSyncProgress struct {
+	ID              bool
+	NextBlockNumber int32
+	NextLogIndex    int32
+}
+
 type KeyperMetaInf struct {
 	Key   string
 	Value string

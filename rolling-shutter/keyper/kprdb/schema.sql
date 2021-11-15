@@ -16,6 +16,11 @@ CREATE TABLE keyper.decryption_key (
        epoch_id bytea PRIMARY KEY,
        decryption_key bytea
 );
+CREATE TABLE keyper.event_sync_progress (
+       id bool UNIQUE NOT NULL DEFAULT true,
+       next_block_number integer NOT NULL,
+       next_log_index integer NOT NULL
+);
 CREATE TABLE keyper.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL

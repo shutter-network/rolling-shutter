@@ -20,7 +20,9 @@ type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 
-	DatabaseURL string
+	EthereumURL   string
+	DeploymentDir string
+	DatabaseURL   string
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      libp2pcrypto.PrivKey
@@ -37,6 +39,9 @@ var configTemplate = `# Shutter decryptor config
 # Ethereum address: {{ .EthereumAddress }}
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
 # BLS public key: {{ .SigningPublicKey | BLSPublicKey }}
+
+EthereumURL     = "{{ .EthereumURL }}"
+DeploymentDir   = "{{ .DeploymentDir }}"
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
 # It it's empty, we use the standard PG* environment variables
