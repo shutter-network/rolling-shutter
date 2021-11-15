@@ -44,6 +44,12 @@ type DecryptorEonPublicKey struct {
 	EonPublicKey []byte
 }
 
+type DecryptorEventSyncProgress struct {
+	ID              bool
+	NextBlockNumber int32
+	NextLogIndex    int32
+}
+
 type DecryptorKeyperSet struct {
 	StartEpochID []byte
 	Keypers      []string

@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS decryptor.eon_public_key (
        start_epoch_id bytea PRIMARY KEY,
        eon_public_key bytea
 );
+CREATE TABLE IF NOT EXISTS decryptor.event_sync_progress (
+       id bool UNIQUE NOT NULL DEFAULT true,
+       next_block_number integer NOT NULL,
+       next_log_index integer NOT NULL
+);
 CREATE TABLE decryptor.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL

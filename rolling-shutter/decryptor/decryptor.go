@@ -93,6 +93,9 @@ func (d *Decryptor) Run(ctx context.Context) error {
 	errorgroup.Go(func() error {
 		return d.handleMessages(errorctx)
 	})
+	errorgroup.Go(func() error {
+		return d.handleContractEvents(errorctx)
+	})
 
 	topicValidators := d.makeMessagesValidators()
 

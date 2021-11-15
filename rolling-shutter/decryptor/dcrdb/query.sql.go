@@ -228,6 +228,17 @@ func (q *Queries) GetEonPublicKey(ctx context.Context, startEpochID []byte) ([]b
 	return eon_public_key, err
 }
 
+const getEventSyncProgress = `-- name: GetEventSyncProgress :one
+SELECT id, next_block_number, next_log_index FROM decryptor.event_sync_progress LIMIT 1
+`
+
+func (q *Queries) GetEventSyncProgress(ctx context.Context) (DecryptorEventSyncProgress, error) {
+	row := q.db.QueryRow(ctx, getEventSyncProgress)
+	var i DecryptorEventSyncProgress
+	err := row.Scan(&i.ID, &i.NextBlockNumber, &i.NextLogIndex)
+	return i, err
+}
+
 const getKeyperSet = `-- name: GetKeyperSet :one
 SELECT (
     start_epoch_id,
@@ -431,5 +442,23 @@ type InsertMetaParams struct {
 
 func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
+}
+
+const updateEventSyncProgress = `-- name: UpdateEventSyncProgress :exec
+INSERT INTO decryptor.event_sync_progress (next_block_number, next_log_index)
+VALUES ($1, $2)
+ON CONFLICT (id) DO UPDATE
+    SET next_block_number = $1,
+        next_log_index = $2
+`
+
+type UpdateEventSyncProgressParams struct {
+	NextBlockNumber int32
+	NextLogIndex    int32
+}
+
+func (q *Queries) UpdateEventSyncProgress(ctx context.Context, arg UpdateEventSyncProgressParams) error {
+	_, err := q.db.Exec(ctx, updateEventSyncProgress, arg.NextBlockNumber, arg.NextLogIndex)
 	return err
 }

@@ -37,6 +37,7 @@ var GossipTopicNames = []string{
 type keyper struct {
 	config            Config
 	dbpool            *pgxpool.Pool
+	db                *kprdb.Queries
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
 	contracts         *deployment.Contracts
@@ -77,6 +78,7 @@ func Run(ctx context.Context, config Config) error {
 	}
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+	db := kprdb.New(dbpool)
 
 	ethereumClient, err := ethclient.Dial(config.EthereumURL)
 	if err != nil {
@@ -104,6 +106,7 @@ func Run(ctx context.Context, config Config) error {
 	k := keyper{
 		config:            config,
 		dbpool:            dbpool,
+		db:                db,
 		shuttermintClient: shuttermintClient,
 		messageSender:     messageSender,
 		contracts:         contracts,
@@ -131,6 +134,9 @@ func (kpr *keyper) run(ctx context.Context) error {
 	})
 	group.Go(func() error {
 		return kpr.operateP2P(ctx)
+	})
+	group.Go(func() error {
+		return kpr.handleContractEvents(ctx)
 	})
 	return group.Wait()
 }

@@ -285,6 +285,17 @@ func (q *Queries) GetEonForEpoch(ctx context.Context, batchIndex []byte) (Keyper
 	return i, err
 }
 
+const getEventSyncProgress = `-- name: GetEventSyncProgress :one
+SELECT id, next_block_number, next_log_index FROM keyper.event_sync_progress LIMIT 1
+`
+
+func (q *Queries) GetEventSyncProgress(ctx context.Context) (KeyperEventSyncProgress, error) {
+	row := q.db.QueryRow(ctx, getEventSyncProgress)
+	var i KeyperEventSyncProgress
+	err := row.Scan(&i.ID, &i.NextBlockNumber, &i.NextLogIndex)
+	return i, err
+}
+
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM keyper.tendermint_sync_meta
@@ -638,5 +649,23 @@ type TMSetSyncMetaParams struct {
 
 func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) error {
 	_, err := q.db.Exec(ctx, tMSetSyncMeta, arg.CurrentBlock, arg.LastCommittedHeight, arg.SyncTimestamp)
+	return err
+}
+
+const updateEventSyncProgress = `-- name: UpdateEventSyncProgress :exec
+INSERT INTO keyper.event_sync_progress (next_block_number, next_log_index)
+VALUES ($1, $2)
+ON CONFLICT (id) DO UPDATE
+    SET next_block_number = $1,
+        next_log_index = $2
+`
+
+type UpdateEventSyncProgressParams struct {
+	NextBlockNumber int32
+	NextLogIndex    int32
+}
+
+func (q *Queries) UpdateEventSyncProgress(ctx context.Context, arg UpdateEventSyncProgressParams) error {
+	_, err := q.db.Exec(ctx, updateEventSyncProgress, arg.NextBlockNumber, arg.NextLogIndex)
 	return err
 }
