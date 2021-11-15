@@ -48,6 +48,12 @@ type logChannelItem struct {
 	eventType   *EventType
 }
 
+type EventSyncUpdate struct {
+	Event       interface{}
+	BlockNumber uint64
+	LogIndex    uint64
+}
+
 // EventSyncer watches the blockchain for events of given types and yields them in order.
 type EventSyncer struct {
 	Client         *ethclient.Client
@@ -84,26 +90,34 @@ func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, f
 // further events were found up until the block number in the second return value. The function
 // may take up to the poll interval to return. It must only be called after the syncer was started
 // with `Run`.
-func (s *EventSyncer) Next(ctx context.Context) (interface{}, uint64, error) {
-	if !s.started {
-		return nil, 0, ErrNotRunning
-	}
+func (s *EventSyncer) Next(ctx context.Context) (EventSyncUpdate, error) {
 	select {
 	case item := <-s.logChannel:
 		if item.log == nil {
-			return nil, item.blockNumber, nil
+			return EventSyncUpdate{
+				Event:       nil,
+				BlockNumber: item.blockNumber,
+				LogIndex:    0,
+			}, nil
 		}
 
 		event := reflect.New(item.eventType.Type)
 		err := item.eventType.Contract.UnpackLog(event.Interface(), item.eventType.Name, *item.log)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "failed to unpack log of %s event", item.eventType.Name)
+			return EventSyncUpdate{}, errors.Wrapf(
+				err,
+				"failed to unpack log of %s event", item.eventType.Name,
+			)
 		}
 		reflect.Indirect(event).FieldByName("Raw").Set(reflect.ValueOf(*item.log))
 
-		return event, item.blockNumber, nil
+		return EventSyncUpdate{
+			Event:       reflect.Indirect(event).Interface(),
+			BlockNumber: item.blockNumber,
+			LogIndex:    uint64(item.log.Index),
+		}, nil
 	case <-ctx.Done():
-		return nil, 0, ctx.Err()
+		return EventSyncUpdate{}, ctx.Err()
 	}
 }
 
