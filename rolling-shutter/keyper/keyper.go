@@ -19,7 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/contract"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
@@ -39,7 +39,7 @@ type keyper struct {
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
-	contracts         *contract.Contracts
+	contracts         *deployment.Contracts
 
 	shuttermintState *ShuttermintState
 	p2p              *p2p.P2P
@@ -82,11 +82,7 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	deployments, err := contract.LoadDeployments(config.DeploymentDir)
-	if err != nil {
-		return err
-	}
-	contracts, err := contract.NewContracts(ethereumClient, deployments)
+	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
 	if err != nil {
 		return err
 	}
