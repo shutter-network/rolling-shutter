@@ -11,6 +11,11 @@ type DecryptorAggregatedSignature struct {
 	Signature       []byte
 }
 
+type DecryptorChainKeyperSet struct {
+	N         int32
+	Addresses []string
+}
+
 type DecryptorCipherBatch struct {
 	EpochID      []byte
 	Transactions [][]byte

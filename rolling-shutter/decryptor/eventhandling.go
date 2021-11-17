@@ -3,7 +3,9 @@ package decryptor
 import (
 	"context"
 	"log"
+	"math"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -12,14 +14,14 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 const finalityOffset = 3
 
 func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	events := []*eventsyncer.EventType{
-		d.contracts.DecryptorsAppended,
-		d.contracts.KeypersAppended,
+		d.contracts.KeypersConfigsListNewConfig,
 	}
 
 	eventSyncProgress, err := d.db.GetEventSyncProgress(ctx)
@@ -103,24 +105,17 @@ func (h *eventHandler) handleEventSyncUpdate(ctx context.Context, eventSyncUpdat
 // handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will
 // neither be committed nor rolled back at the end.
 func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
+	var err error
 	switch event := eventSyncUpdate.Event.(type) {
-	case contract.AddrsSeqAppended:
-		switch event.Raw.Address {
-		case h.contracts.KeypersAppended.Address:
-			if err := h.handleKeypersAppendedEvent(ctx, event); err != nil {
-				return err
-			}
-		case h.contracts.DecryptorsAppended.Address:
-			if err := h.handleDecryptorsAppendedEvent(ctx, event); err != nil {
-				return err
-			}
-		default:
-			log.Printf("ignoring Appended event from unknown contract %s", event.Raw.Address)
-		}
+	case contract.KeypersConfigsListNewConfig:
+		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
 	case nil:
 		// event is nil if no event is found for some time
 	default:
 		log.Printf("ignoring unknown event %+v %T", event, event)
+	}
+	if err != nil {
+		return err
 	}
 
 	var nextBlockNumber uint64
@@ -141,12 +136,29 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 	return nil
 }
 
-func (h *eventHandler) handleKeypersAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
-	log.Println("handling Appended event from keypers")
-	return nil
-}
-
-func (h *eventHandler) handleDecryptorsAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
-	log.Println("handling Appended event from decryptors")
+func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Context, event contract.KeypersConfigsListNewConfig) error {
+	log.Printf("handling NewConfig event from keypers config contract in block %d", event.Raw.BlockNumber)
+	callOpts := &bind.CallOpts{
+		Pending: false,
+		// We call for the current height instead of the height at which the event was emitted,
+		// because the sets cannot change retroactively and we won't need an archive node.
+		BlockNumber: nil,
+		Context:     ctx,
+	}
+	addrs, err := h.contracts.Keypers.GetAddrs(callOpts, event.Index)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query addrs set from contract")
+	}
+	if event.ActivationBlockNumber > math.MaxInt64 {
+		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
+	}
+	err = h.db.InsertKeyperSet(ctx, dcrdb.InsertKeyperSetParams{
+		ActivationBlockNumber: int64(event.ActivationBlockNumber),
+		Keypers:               shdb.EncodeAddresses(addrs),
+		Threshold:             1, // TODO: take threshold from config contract when defined
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to insert keyper set into db")
+	}
 	return nil
 }
