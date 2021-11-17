@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/rand"
 	"log"
+	"math/big"
 	"os"
 	"os/signal"
 	"syscall"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4/pgxpool"
 	lip2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	multiaddr "github.com/multiformats/go-multiaddr"
@@ -18,9 +20,12 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/blsregistry"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/txbatch"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
@@ -42,6 +47,7 @@ func Cmd() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	cmd.AddCommand(initDBCmd())
 	cmd.AddCommand(generateConfigCmd())
+	cmd.AddCommand(registerIdentityCmd())
 	return cmd
 }
 
@@ -70,6 +76,55 @@ func generateConfigCmd() *cobra.Command {
 	cmd.MarkPersistentFlagRequired("output")
 
 	return cmd
+}
+
+func registerIdentityCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "register-identity",
+		Short: "Register the decryptors identity on chain",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return registerIdentity()
+		},
+	}
+
+	return cmd
+}
+
+func registerIdentity() error {
+	ctx := context.Background()
+
+	config, err := readConfig()
+	if err != nil {
+		return err
+	}
+
+	ethereumClient, err := ethclient.DialContext(ctx, config.EthereumURL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
+	if err != nil {
+		return err
+	}
+
+	batch, err := txbatch.New(ctx, ethereumClient, config.EthereumKey)
+	if err != nil {
+		return err
+	}
+
+	/*
+	   If we don't set the gas price here, we run into
+	   https://github.com/ethereum/go-ethereum/issues/23479
+	*/
+	batch.TransactOpts.GasPrice = big.NewInt(2 * 1000000000)
+
+	err = blsregistry.Register(batch, contracts, config.SigningKey)
+	if err != nil {
+		return err
+	}
+	_, err = batch.WaitMined(ctx)
+	return err
 }
 
 func initDB() error {
