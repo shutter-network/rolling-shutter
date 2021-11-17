@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/contract"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 )
@@ -47,7 +48,11 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if err := d.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
+			handler, err := d.newContractEventHandler(errorctx)
+			if err != nil {
+				return err
+			}
+			if err := handler.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
 				return err
 			}
 		}
@@ -55,16 +60,58 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
-func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
+// eventHandler isolates the parts of a decryptor that can be accessed when handling an event. For
+// each new event, a new handler should be created and the handleEventSyncUpdate method be called
+// once.
+type eventHandler struct {
+	tx        pgx.Tx
+	db        *dcrdb.Queries
+	contracts *deployment.Contracts
+}
+
+func (d *Decryptor) newContractEventHandler(ctx context.Context) (*eventHandler, error) {
+	tx, err := d.dbpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	dbWithTx := d.db.WithTx(tx)
+	return &eventHandler{
+		tx:        tx,
+		db:        dbWithTx,
+		contracts: d.contracts,
+	}, nil
+}
+
+// handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
+// on failure.
+func (h *eventHandler) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
+	err := h.handleEventSyncUpdateDirty(ctx, eventSyncUpdate)
+	if err != nil {
+		errRollback := h.tx.Rollback(ctx)
+		if errRollback != nil {
+			log.Printf("error rolling back db transaction: %s", errRollback)
+		}
+		return err
+	}
+	err = h.tx.Commit(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "failed to commit db tx after event was handled")
+	}
+	return nil
+}
+
+// handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will
+// neither be committed nor rolled back at the end.
+func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
 	switch event := eventSyncUpdate.Event.(type) {
 	case contract.AddrsSeqAppended:
 		switch event.Raw.Address {
-		case d.contracts.KeypersAppended.Address:
-			if err := d.handleKeypersAppendedEvent(ctx, event); err != nil {
+		case h.contracts.KeypersAppended.Address:
+			if err := h.handleKeypersAppendedEvent(ctx, event); err != nil {
 				return err
 			}
-		case d.contracts.DecryptorsAppended.Address:
-			if err := d.handleDecryptorsAppendedEvent(ctx, event); err != nil {
+		case h.contracts.DecryptorsAppended.Address:
+			if err := h.handleDecryptorsAppendedEvent(ctx, event); err != nil {
 				return err
 			}
 		default:
@@ -85,7 +132,7 @@ func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate e
 		nextBlockNumber = eventSyncUpdate.BlockNumber
 		nextLogIndex = eventSyncUpdate.LogIndex + 1
 	}
-	if err := d.db.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
+	if err := h.db.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
 		NextBlockNumber: int32(nextBlockNumber),
 		NextLogIndex:    int32(nextLogIndex),
 	}); err != nil {
@@ -94,12 +141,12 @@ func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate e
 	return nil
 }
 
-func (d *Decryptor) handleKeypersAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
+func (h *eventHandler) handleKeypersAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
 	log.Println("handling Appended event from keypers")
 	return nil
 }
 
-func (d *Decryptor) handleDecryptorsAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
+func (h *eventHandler) handleDecryptorsAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
 	log.Println("handling Appended event from decryptors")
 	return nil
 }
