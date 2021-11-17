@@ -1,4 +1,4 @@
-package decryptor
+package collator
 
 import (
 	"crypto/ecdsa"
@@ -12,7 +12,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
@@ -26,19 +25,13 @@ type Config struct {
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      libp2pcrypto.PrivKey
-	SigningKey  *shbls.SecretKey
-
-	SignerIndex int32
-
-	RequiredSignatures uint
 
 	InstanceID uint64
 }
 
-var configTemplate = `# Shutter decryptor config
+var configTemplate = `# Shutter collator config
 # Ethereum address: {{ .EthereumAddress }}
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
-# BLS public key: {{ .SigningPublicKey | BLSPublicKey }}
 
 EthereumURL     = "{{ .EthereumURL }}"
 DeploymentDir   = "{{ .DeploymentDir }}"
@@ -54,19 +47,12 @@ PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
 # Secret Keys
 EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
-SigningKey      = "{{ .SigningKey | BLSSecretKey}}"
-
-# Index representing the signer
-SignerIndex = {{ .SignerIndex }}
-
-# Number of individual signatures required to form an accepted aggregated signature
-requiredSignatures = {{.RequiredSignatures}}
 
 # ID shared by all shutter participants for common instance
 InstanceID = {{ .InstanceID }}
 `
 
-var tmpl *template.Template = medley.MustBuildTemplate("decryptor", configTemplate)
+var tmpl *template.Template = medley.MustBuildTemplate("collator", configTemplate)
 
 // WriteTOML writes a toml configuration file with the given config.
 func (config *Config) WriteTOML(w io.Writer) error {
@@ -81,8 +67,6 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
-				medley.BLSSecretKeyHook,
-				medley.BLSPublicKeyHook,
 				medley.StringToEcdsaPrivateKey,
 			),
 		),
@@ -91,8 +75,4 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 
 func (config *Config) EthereumAddress() common.Address {
 	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
-}
-
-func (config *Config) SigningPublicKey() *shbls.PublicKey {
-	return shbls.SecretToPublicKey(config.SigningKey)
 }
