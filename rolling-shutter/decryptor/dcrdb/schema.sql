@@ -1,4 +1,4 @@
--- schema-version: 8 --
+-- schema-version: 9 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -31,18 +31,18 @@ CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
        bls_public_key bytea
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
-       start_epoch_id bytea,
+       activation_block_number bigint,
        index int,
        address text NOT NULL,
-       PRIMARY KEY (start_epoch_id, index)
+       PRIMARY KEY (activation_block_number, index)
 );
 CREATE TABLE IF NOT EXISTS decryptor.keyper_set(
-       start_epoch_id bytea,
+       activation_block_number bigint,
        keypers text[] NOT NULL,
        threshold integer NOT NULL
 );
 CREATE TABLE IF NOT EXISTS decryptor.eon_public_key (
-       start_epoch_id bytea PRIMARY KEY,
+       activation_block_number bigint PRIMARY KEY,
        eon_public_key bytea
 );
 CREATE TABLE IF NOT EXISTS decryptor.event_sync_progress (

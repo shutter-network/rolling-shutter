@@ -12,6 +12,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -120,7 +121,12 @@ func handleSignatureInput(
 		if len(indexes) == 0 {
 			panic("could not retrieve signer index from bitfield")
 		}
-		pkBytes, err := db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{Index: indexes[0], StartEpochID: dbSignature.EpochID})
+		epochID := shdb.DecodeUint64(dbSignature.EpochID)
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(epochID)
+		pkBytes, err := db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
+			Index:                 indexes[0],
+			ActivationBlockNumber: int64(activationBlockNumber),
+		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to query public key of decryptor #%d from db", indexes[0])
 		}

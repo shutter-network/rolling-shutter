@@ -19,7 +19,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -30,9 +29,9 @@ func populateDBWithDecryptors(ctx context.Context, t *testing.T, db *dcrdb.Queri
 	for i, signingKey := range signingKeys {
 		arbitraryAddress := fmt.Sprint(signingKey)
 		err := db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
-			StartEpochID: []byte{0},
-			Index:        i,
-			Address:      arbitraryAddress,
+			ActivationBlockNumber: 0,
+			Index:                 i,
+			Address:               arbitraryAddress,
 		})
 		assert.NilError(t, err)
 		err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
@@ -224,8 +223,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: shdb.EncodeUint64(0),
-		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+		ActivationBlockNumber: 0,
+		EonPublicKey:          tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)
 

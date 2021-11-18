@@ -5,6 +5,7 @@ package dcrdb
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -121,16 +122,17 @@ func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryption
 const getDecryptorIndex = `-- name: GetDecryptorIndex :one
 SELECT index
 FROM decryptor.decryptor_set_member
-WHERE start_epoch_id <= $1 AND address = $2
+WHERE activation_block_number <= $1 AND address = $2
+ORDER BY activation_block_number DESC LIMIT 1
 `
 
 type GetDecryptorIndexParams struct {
-	StartEpochID []byte
-	Address      string
+	ActivationBlockNumber int64
+	Address               string
 }
 
 func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexParams) (int32, error) {
-	row := q.db.QueryRow(ctx, getDecryptorIndex, arg.StartEpochID, arg.Address)
+	row := q.db.QueryRow(ctx, getDecryptorIndex, arg.ActivationBlockNumber, arg.Address)
 	var index int32
 	err := row.Scan(&index)
 	return index, err
@@ -139,17 +141,18 @@ func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexPa
 const getDecryptorKey = `-- name: GetDecryptorKey :one
 SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
     SELECT address FROM decryptor.decryptor_set_member
-    WHERE index = $1 AND start_epoch_id <= $2 ORDER BY start_epoch_id DESC LIMIT 1
+    WHERE index = $1 AND activation_block_number <= $2
+    ORDER BY activation_block_number DESC LIMIT 1
 )
 `
 
 type GetDecryptorKeyParams struct {
-	Index        int32
-	StartEpochID []byte
+	Index                 int32
+	ActivationBlockNumber int64
 }
 
 func (q *Queries) GetDecryptorKey(ctx context.Context, arg GetDecryptorKeyParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getDecryptorKey, arg.Index, arg.StartEpochID)
+	row := q.db.QueryRow(ctx, getDecryptorKey, arg.Index, arg.ActivationBlockNumber)
 	var bls_public_key []byte
 	err := row.Scan(&bls_public_key)
 	return bls_public_key, err
@@ -157,22 +160,22 @@ func (q *Queries) GetDecryptorKey(ctx context.Context, arg GetDecryptorKeyParams
 
 const getDecryptorSet = `-- name: GetDecryptorSet :many
 SELECT
-    member.start_epoch_id,
+    member.activation_block_number,
     member.index,
     member.address,
     identity.bls_public_key
 FROM (
     SELECT
-        start_epoch_id,
+        activation_block_number,
         index,
         address
     FROM decryptor.decryptor_set_member
-    WHERE start_epoch_id = (
+    WHERE activation_block_number = (
         SELECT
-            m.start_epoch_id
+            m.activation_block_number
         FROM decryptor.decryptor_set_member AS m
-        WHERE m.start_epoch_id <= $1
-        ORDER BY m.start_epoch_id DESC
+        WHERE m.activation_block_number <= $1
+        ORDER BY m.activation_block_number DESC
         LIMIT 1
     )
 ) AS member
@@ -182,14 +185,14 @@ ORDER BY index
 `
 
 type GetDecryptorSetRow struct {
-	StartEpochID []byte
-	Index        int32
-	Address      string
-	BlsPublicKey []byte
+	ActivationBlockNumber int64
+	Index                 int32
+	Address               string
+	BlsPublicKey          []byte
 }
 
-func (q *Queries) GetDecryptorSet(ctx context.Context, startEpochID []byte) ([]GetDecryptorSetRow, error) {
-	rows, err := q.db.Query(ctx, getDecryptorSet, startEpochID)
+func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int64) ([]GetDecryptorSetRow, error) {
+	rows, err := q.db.Query(ctx, getDecryptorSet, activationBlockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +201,7 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, startEpochID []byte) ([]G
 	for rows.Next() {
 		var i GetDecryptorSetRow
 		if err := rows.Scan(
-			&i.StartEpochID,
+			&i.ActivationBlockNumber,
 			&i.Index,
 			&i.Address,
 			&i.BlsPublicKey,
@@ -216,13 +219,12 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, startEpochID []byte) ([]G
 const getEonPublicKey = `-- name: GetEonPublicKey :one
 SELECT eon_public_key
 FROM decryptor.eon_public_key
-WHERE start_epoch_id <= $1
-ORDER BY start_epoch_id DESC
-LIMIT 1
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetEonPublicKey(ctx context.Context, startEpochID []byte) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getEonPublicKey, startEpochID)
+func (q *Queries) GetEonPublicKey(ctx context.Context, activationBlockNumber int64) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getEonPublicKey, activationBlockNumber)
 	var eon_public_key []byte
 	err := row.Scan(&eon_public_key)
 	return eon_public_key, err
@@ -241,17 +243,16 @@ func (q *Queries) GetEventSyncProgress(ctx context.Context) (DecryptorEventSyncP
 
 const getKeyperSet = `-- name: GetKeyperSet :one
 SELECT (
-    start_epoch_id,
+    activation_block_number,
     keypers,
     threshold
 ) FROM decryptor.keyper_set
-WHERE start_epoch_id <= $1
-ORDER BY start_epoch_id DESC
-LIMIT 1
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetKeyperSet(ctx context.Context, startEpochID []byte) (interface{}, error) {
-	row := q.db.QueryRow(ctx, getKeyperSet, startEpochID)
+func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber sql.NullInt64) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getKeyperSet, activationBlockNumber)
 	var column_1 interface{}
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -374,26 +375,26 @@ func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecrypt
 
 const insertDecryptorSetMember = `-- name: InsertDecryptorSetMember :exec
 INSERT INTO decryptor.decryptor_set_member (
-    start_epoch_id, index, address
+    activation_block_number, index, address
 ) VALUES (
     $1, $2, $3
 )
 `
 
 type InsertDecryptorSetMemberParams struct {
-	StartEpochID []byte
-	Index        int32
-	Address      string
+	ActivationBlockNumber int64
+	Index                 int32
+	Address               string
 }
 
 func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryptorSetMemberParams) error {
-	_, err := q.db.Exec(ctx, insertDecryptorSetMember, arg.StartEpochID, arg.Index, arg.Address)
+	_, err := q.db.Exec(ctx, insertDecryptorSetMember, arg.ActivationBlockNumber, arg.Index, arg.Address)
 	return err
 }
 
 const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
 INSERT INTO decryptor.eon_public_key (
-    start_epoch_id,
+    activation_block_number,
     eon_public_key
 ) VALUES (
     $1, $2
@@ -401,18 +402,18 @@ INSERT INTO decryptor.eon_public_key (
 `
 
 type InsertEonPublicKeyParams struct {
-	StartEpochID []byte
-	EonPublicKey []byte
+	ActivationBlockNumber int64
+	EonPublicKey          []byte
 }
 
 func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) error {
-	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.StartEpochID, arg.EonPublicKey)
+	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.ActivationBlockNumber, arg.EonPublicKey)
 	return err
 }
 
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
 INSERT INTO decryptor.keyper_set (
-    start_epoch_id,
+    activation_block_number,
     keypers,
     threshold
 ) VALUES (
@@ -421,13 +422,13 @@ INSERT INTO decryptor.keyper_set (
 `
 
 type InsertKeyperSetParams struct {
-	StartEpochID []byte
-	Keypers      []string
-	Threshold    int32
+	ActivationBlockNumber sql.NullInt64
+	Keypers               []string
+	Threshold             int32
 }
 
 func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams) error {
-	_, err := q.db.Exec(ctx, insertKeyperSet, arg.StartEpochID, arg.Keypers, arg.Threshold)
+	_, err := q.db.Exec(ctx, insertKeyperSet, arg.ActivationBlockNumber, arg.Keypers, arg.Threshold)
 	return err
 }
 

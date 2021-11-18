@@ -2,7 +2,9 @@
 
 package dcrdb
 
-import ()
+import (
+	"database/sql"
+)
 
 type DecryptorAggregatedSignature struct {
 	EpochID         []byte
@@ -34,14 +36,14 @@ type DecryptorDecryptorIdentity struct {
 }
 
 type DecryptorDecryptorSetMember struct {
-	StartEpochID []byte
-	Index        int32
-	Address      string
+	ActivationBlockNumber int64
+	Index                 int32
+	Address               string
 }
 
 type DecryptorEonPublicKey struct {
-	StartEpochID []byte
-	EonPublicKey []byte
+	ActivationBlockNumber int64
+	EonPublicKey          []byte
 }
 
 type DecryptorEventSyncProgress struct {
@@ -51,9 +53,9 @@ type DecryptorEventSyncProgress struct {
 }
 
 type DecryptorKeyperSet struct {
-	StartEpochID []byte
-	Keypers      []string
-	Threshold    int32
+	ActivationBlockNumber sql.NullInt64
+	Keypers               []string
+	Threshold             int32
 }
 
 type DecryptorMetaInf struct {
