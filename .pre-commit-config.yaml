@@ -71,6 +71,7 @@ repos:
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/keyper/kprdb/(models|db|query.sql).go$|
               ^rolling-shutter/decryptor/dcrdb/(models|db|query.sql).go$|
+              ^rolling-shutter/collator/cltrdb/(models|db|query.sql).go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
@@ -85,6 +86,7 @@ repos:
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/keyper/kprdb/(models|db|query.sql).go$|
               ^rolling-shutter/decryptor/dcrdb/(models|db|query.sql).go$|
+              ^rolling-shutter/collator/cltrdb/(models|db|query.sql).go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
