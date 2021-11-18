@@ -51,8 +51,8 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: shdb.EncodeUint64(0),
-		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+		ActivationBlockNumber: 0,
+		EonPublicKey:          tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)
 
@@ -265,8 +265,8 @@ func TestHandleEpochIntegration(t *testing.T) {
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: shdb.EncodeUint64(0),
-		EonPublicKey: tkg.EonPublicKey(0).Marshal(),
+		ActivationBlockNumber: 0,
+		EonPublicKey:          tkg.EonPublicKey(0).Marshal(),
 	})
 	assert.NilError(t, err)
 

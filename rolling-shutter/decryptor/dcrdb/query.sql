@@ -62,29 +62,29 @@ INSERT INTO decryptor.decryptor_identity (
 
 -- name: InsertDecryptorSetMember :exec
 INSERT INTO decryptor.decryptor_set_member (
-    start_epoch_id, index, address
+    activation_block_number, index, address
 ) VALUES (
     $1, $2, $3
 );
 
 -- name: GetDecryptorSet :many
 SELECT
-    member.start_epoch_id,
+    member.activation_block_number,
     member.index,
     member.address,
     identity.bls_public_key
 FROM (
     SELECT
-        start_epoch_id,
+        activation_block_number,
         index,
         address
     FROM decryptor.decryptor_set_member
-    WHERE start_epoch_id = (
+    WHERE activation_block_number = (
         SELECT
-            m.start_epoch_id
+            m.activation_block_number
         FROM decryptor.decryptor_set_member AS m
-        WHERE m.start_epoch_id <= $1
-        ORDER BY m.start_epoch_id DESC
+        WHERE m.activation_block_number <= $1
+        ORDER BY m.activation_block_number DESC
         LIMIT 1
     )
 ) AS member
@@ -95,17 +95,19 @@ ORDER BY index;
 -- name: GetDecryptorIndex :one
 SELECT index
 FROM decryptor.decryptor_set_member
-WHERE start_epoch_id <= $1 AND address = $2;
+WHERE activation_block_number <= $1 AND address = $2
+ORDER BY activation_block_number DESC LIMIT 1;
 
 -- name: GetDecryptorKey :one
 SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
     SELECT address FROM decryptor.decryptor_set_member
-    WHERE index = $1 AND start_epoch_id <= $2 ORDER BY start_epoch_id DESC LIMIT 1
+    WHERE index = $1 AND activation_block_number <= $2
+    ORDER BY activation_block_number DESC LIMIT 1
 );
 
 -- name: InsertEonPublicKey :exec
 INSERT INTO decryptor.eon_public_key (
-    start_epoch_id,
+    activation_block_number,
     eon_public_key
 ) VALUES (
     $1, $2
@@ -114,13 +116,12 @@ INSERT INTO decryptor.eon_public_key (
 -- name: GetEonPublicKey :one
 SELECT eon_public_key
 FROM decryptor.eon_public_key
-WHERE start_epoch_id <= $1
-ORDER BY start_epoch_id DESC
-LIMIT 1;
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1;
 
 -- name: InsertKeyperSet :exec
 INSERT INTO decryptor.keyper_set (
-    start_epoch_id,
+    activation_block_number,
     keypers,
     threshold
 ) VALUES (
@@ -129,13 +130,12 @@ INSERT INTO decryptor.keyper_set (
 
 -- name: GetKeyperSet :one
 SELECT (
-    start_epoch_id,
+    activation_block_number,
     keypers,
     threshold
 ) FROM decryptor.keyper_set
-WHERE start_epoch_id <= $1
-ORDER BY start_epoch_id DESC
-LIMIT 1;
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1;
 
 -- name: InsertMeta :exec
 INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2);

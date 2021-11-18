@@ -10,7 +10,6 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 func TestGetDecryptorSetIntegration(t *testing.T) {
@@ -23,7 +22,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 
 	addresses := []string{"address1", "address2", "address3"}
 	keys := [][]byte{[]byte("key1"), []byte("key2"), []byte("key3")}
-	startEpochs := [][]int{
+	activationBlockNumbers := [][]int64{
 		{0, 100},
 		{0},
 		{100},
@@ -40,49 +39,49 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 		})
 		assert.NilError(t, err)
 
-		for j := 0; j < len(startEpochs[i]); j++ {
+		for j := 0; j < len(activationBlockNumbers[i]); j++ {
 			err = db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
-				StartEpochID: shdb.EncodeUint64(uint64(startEpochs[i][j])),
-				Index:        int32(setIndices[i][j]),
-				Address:      addresses[i],
+				ActivationBlockNumber: activationBlockNumbers[i][j],
+				Index:                 int32(setIndices[i][j]),
+				Address:               addresses[i],
 			})
 			assert.NilError(t, err)
 		}
 	}
 
-	rows, err := db.GetDecryptorSet(ctx, shdb.EncodeUint64(uint64(0)))
+	rows, err := db.GetDecryptorSet(ctx, 0)
 	assert.NilError(t, err)
 	assert.Check(t, len(rows) == 2)
 	assert.DeepEqual(t, rows, []dcrdb.GetDecryptorSetRow{
 		{
-			StartEpochID: shdb.EncodeUint64(uint64(0)),
-			Index:        0,
-			Address:      addresses[0],
-			BlsPublicKey: keys[0],
+			ActivationBlockNumber: 0,
+			Index:                 0,
+			Address:               addresses[0],
+			BlsPublicKey:          keys[0],
 		},
 		{
-			StartEpochID: shdb.EncodeUint64(uint64(0)),
-			Index:        1,
-			Address:      addresses[1],
-			BlsPublicKey: keys[1],
+			ActivationBlockNumber: 0,
+			Index:                 1,
+			Address:               addresses[1],
+			BlsPublicKey:          keys[1],
 		},
 	})
 
-	rows, err = db.GetDecryptorSet(ctx, shdb.EncodeUint64(uint64(100)))
+	rows, err = db.GetDecryptorSet(ctx, 100)
 	assert.NilError(t, err)
 	assert.Check(t, len(rows) == 2)
 	assert.DeepEqual(t, rows, []dcrdb.GetDecryptorSetRow{
 		{
-			StartEpochID: shdb.EncodeUint64(uint64(100)),
-			Index:        0,
-			Address:      addresses[0],
-			BlsPublicKey: keys[0],
+			ActivationBlockNumber: 100,
+			Index:                 0,
+			Address:               addresses[0],
+			BlsPublicKey:          keys[0],
 		},
 		{
-			StartEpochID: shdb.EncodeUint64(uint64(100)),
-			Index:        1,
-			Address:      addresses[2],
-			BlsPublicKey: keys[2],
+			ActivationBlockNumber: 100,
+			Index:                 1,
+			Address:               addresses[2],
+			BlsPublicKey:          keys[2],
 		},
 	})
 }
@@ -99,23 +98,22 @@ func TestEonPublicKeyIntegration(t *testing.T) {
 	key2 := []byte("key2")
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: shdb.EncodeUint64(uint64(10)),
-		EonPublicKey: key1,
+		ActivationBlockNumber: 10,
+		EonPublicKey:          key1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
-		StartEpochID: shdb.EncodeUint64(uint64(20)),
-		EonPublicKey: key2,
+		ActivationBlockNumber: 20,
+		EonPublicKey:          key2,
 	})
 	assert.NilError(t, err)
 
-	epochIDs := []uint64{5, 9, 10, 15, 19, 20, 21, 25}
+	blockNumbers := []int64{5, 9, 10, 11, 19, 20, 21, 25}
 	keys := [][]byte{nil, nil, key1, key1, key1, key2, key2, key2}
 
-	for i := 0; i < len(epochIDs); i++ {
-		epochIDBytes := shdb.EncodeUint64(epochIDs[i])
+	for i := 0; i < len(blockNumbers); i++ {
 		expectedKey := keys[i]
-		key, err := db.GetEonPublicKey(ctx, epochIDBytes)
+		key, err := db.GetEonPublicKey(ctx, blockNumbers[i])
 		if expectedKey == nil {
 			assert.Check(t, err == pgx.ErrNoRows)
 		} else {

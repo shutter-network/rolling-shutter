@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -211,7 +212,8 @@ func (d *Decryptor) makeDecryptionKeyValidator() pubsub.Validator {
 			panic("unmarshalled non decryption key message in decryption key validator")
 		}
 
-		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, shdb.EncodeUint64(key.epochID))
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
+		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, int64(activationBlockNumber))
 		if err == pgx.ErrNoRows {
 			log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
 			return false
@@ -255,13 +257,14 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 			panic("unmarshalled non signature message in signature validator")
 		}
 
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
 		decryptorIndexes := bitfield.GetIndexes(signature.SignerBitfield)
 		if len(decryptorIndexes) != 1 {
 			return false
 		}
 		dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
-			Index:        decryptorIndexes[0],
-			StartEpochID: shdb.EncodeUint64(signature.epochID),
+			Index:                 decryptorIndexes[0],
+			ActivationBlockNumber: int64(activationBlockNumber),
 		})
 		if err == pgx.ErrNoRows {
 			return false
@@ -299,6 +302,7 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 			panic("unmarshalled non signature message in aggregated signature validator")
 		}
 
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
 		decryptorIndexes := bitfield.GetIndexes(signature.signerBitfield)
 		if len(decryptorIndexes) == 0 {
 			return false
@@ -306,8 +310,8 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 		keys := make([]*shbls.PublicKey, 0, len(decryptorIndexes))
 		for _, decryptorIndex := range decryptorIndexes {
 			dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
-				Index:        decryptorIndex,
-				StartEpochID: shdb.EncodeUint64(signature.epochID),
+				Index:                 decryptorIndex,
+				ActivationBlockNumber: int64(activationBlockNumber),
 			})
 			if err == pgx.ErrNoRows {
 				return false
