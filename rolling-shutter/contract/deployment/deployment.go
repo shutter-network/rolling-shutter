@@ -34,6 +34,10 @@ type Contracts struct {
 	Client      *ethclient.Client
 	Deployments *Deployments
 
+	KeypersConfigsList           *contract.KeypersConfigsList
+	KeypersConfigsListDeployment *Deployment
+	KeypersConfigsListNewConfig  *eventsyncer.EventType
+
 	Keypers                     *contract.AddrsSeq
 	KeypersDeployment           *Deployment
 	KeypersAdded                *eventsyncer.EventType
@@ -90,6 +94,9 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 		Client:      client,
 		Deployments: deployments,
 	}
+	if err := c.initKeypersConfigsList(); err != nil {
+		return nil, err
+	}
 	if err := c.initKeypers(); err != nil {
 		return nil, err
 	}
@@ -103,6 +110,27 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 		return nil, err
 	}
 	return c, nil
+}
+
+func (c *Contracts) initKeypersConfigsList() error {
+	d, err := c.getDeployment("KeyperConfig")
+	if err != nil {
+		return err
+	}
+	c.KeypersConfigsListDeployment = d
+	c.KeypersConfigsList, err = contract.NewKeypersConfigsList(d.Address, c.Client)
+	if err != nil {
+		return err
+	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.KeypersConfigsListNewConfig = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "NewConfig",
+		Type:     reflect.TypeOf(contract.KeypersConfigsListNewConfig{}),
+	}
+	return nil
 }
 
 func (c *Contracts) initKeypers() error {
