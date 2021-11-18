@@ -5,7 +5,6 @@ package dcrdb
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -251,7 +250,7 @@ WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber sql.NullInt64) (interface{}, error) {
+func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64) (interface{}, error) {
 	row := q.db.QueryRow(ctx, getKeyperSet, activationBlockNumber)
 	var column_1 interface{}
 	err := row.Scan(&column_1)
@@ -422,7 +421,7 @@ INSERT INTO decryptor.keyper_set (
 `
 
 type InsertKeyperSetParams struct {
-	ActivationBlockNumber sql.NullInt64
+	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }
