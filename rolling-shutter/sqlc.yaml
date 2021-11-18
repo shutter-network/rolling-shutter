@@ -13,3 +13,10 @@ packages:
     queries: "decryptor/dcrdb/query.sql"
     engine: "postgresql"
     sql_package: "pgx/v4"
+
+  - path: "collator/cltrdb"
+    name: "cltrdb"
+    schema: "collator/cltrdb/schema.sql"
+    queries: "collator/cltrdb/query.sql"
+    engine: "postgresql"
+    sql_package: "pgx/v4"

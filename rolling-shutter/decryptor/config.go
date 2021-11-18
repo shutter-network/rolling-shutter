@@ -10,6 +10,7 @@ import (
 	libp2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
@@ -75,7 +76,7 @@ func (config *Config) WriteTOML(w io.Writer) error {
 
 // Unmarshal unmarshals a DecryptorConfig from the given Viper object.
 func (config *Config) Unmarshal(v *viper.Viper) error {
-	return v.Unmarshal(
+	err := v.Unmarshal(
 		config,
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
@@ -87,6 +88,16 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			),
 		),
 	)
+	if err != nil {
+		return err
+	}
+	if config.EthereumKey == nil {
+		return errors.Errorf("EthereumKey is missing")
+	}
+	if config.SigningKey == nil {
+		return errors.Errorf("SigningKey is missing")
+	}
+	return nil
 }
 
 func (config *Config) EthereumAddress() common.Address {
