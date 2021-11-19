@@ -9,6 +9,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shuttermint/keyper/epochkg"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -19,7 +20,8 @@ type epochKGHandler struct {
 }
 
 func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
-	eon, err := h.db.GetEonForEpoch(ctx, shdb.EncodeUint64(msg.EpochID))
+	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(msg.EpochID)
+	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.EpochID)
 	}
@@ -171,7 +173,8 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 	}
 
 	// fetch dkg result from db
-	eon, err := h.db.GetEonForEpoch(ctx, shdb.EncodeUint64(msg.epochID))
+	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(msg.epochID)
+	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.epochID)
 	}

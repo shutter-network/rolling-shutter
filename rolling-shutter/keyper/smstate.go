@@ -7,11 +7,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
@@ -287,11 +289,14 @@ func (st *ShuttermintState) handleEonStarted(
 	if !st.isKeyper {
 		return nil
 	}
+	if e.ActivationBlockNumber > math.MaxInt64 {
+		return errors.Errorf("activation block number %d of eon start would overflow int64", e.ActivationBlockNumber)
+	}
 	err := queries.InsertEon(ctx, kprdb.InsertEonParams{
-		Eon:         int64(e.Eon),
-		Height:      e.Height,
-		BatchIndex:  shdb.EncodeUint64(e.BatchIndex),
-		ConfigIndex: int64(e.ConfigIndex),
+		Eon:                   int64(e.Eon),
+		Height:                e.Height,
+		ActivationBlockNumber: int64(e.ActivationBlockNumber),
+		ConfigIndex:           int64(e.ConfigIndex),
 	})
 	if err != nil {
 		return err
@@ -460,7 +465,7 @@ func (st *ShuttermintState) finalizeDKG(
 		err = st.scheduleShutterMessage(
 			ctx, queries,
 			"requesting DKG restart",
-			shmsg.NewEonStartVote(shdb.DecodeUint64(keyperEon.BatchIndex)),
+			shmsg.NewEonStartVote(uint64(keyperEon.ActivationBlockNumber)),
 		)
 		if err != nil {
 			return err
