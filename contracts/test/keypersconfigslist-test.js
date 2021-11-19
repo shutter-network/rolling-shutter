@@ -29,11 +29,11 @@ async function getAddrsSeq(configContract) {
 }
 
 async function getConfig(configContract, blockNumber) {
-  configContract = await configContract.getActiveConfig(blockNumber);
+  const config = await configContract.getActiveConfig(blockNumber);
   return {
-    activationBlockNumber: configContract[0].toNumber(),
-    setIndex: configContract[1].toNumber(),
-    threshold: configContract[2].toNumber(),
+    activationBlockNumber: config.activationBlockNumber.toNumber(),
+    setIndex: config.setIndex.toNumber(),
+    threshold: config.threshold.toNumber(),
   };
 }
 
