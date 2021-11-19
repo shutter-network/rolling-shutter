@@ -3,21 +3,25 @@ package keyper
 import (
 	"context"
 	"log"
+	"math"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/contract"
+	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 const finalityOffset = 3
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	events := []*eventsyncer.EventType{
-		kpr.contracts.KeypersAppended,
+		kpr.contracts.KeypersConfigsListNewConfig,
 	}
 
 	eventSyncProgress, err := kpr.db.GetEventSyncProgress(ctx)
@@ -46,7 +50,11 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if err := kpr.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
+			handler, err := kpr.newContractEventHandler(errorctx)
+			if err != nil {
+				return err
+			}
+			if err := handler.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
 				return err
 			}
 		}
@@ -54,21 +62,60 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
-func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
-	switch event := eventSyncUpdate.Event.(type) {
-	case contract.AddrsSeqAppended:
-		switch event.Raw.Address {
-		case kpr.contracts.KeypersAppended.Address:
-			if err := kpr.handleKeypersAppendedEvent(ctx, event); err != nil {
-				return err
-			}
-		default:
-			log.Printf("ignoring Appended event from unknown contract %s", event.Raw.Address)
+// eventHandler isolates the parts of a keyper that can be accessed when handling an event. For
+// each new event, a new handler should be created and the handleEventSyncUpdate method be called
+// once.
+type eventHandler struct {
+	tx        pgx.Tx
+	db        *kprdb.Queries
+	contracts *deployment.Contracts
+}
+
+func (kpr *keyper) newContractEventHandler(ctx context.Context) (*eventHandler, error) {
+	tx, err := kpr.dbpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	dbWithTx := kpr.db.WithTx(tx)
+	return &eventHandler{
+		tx:        tx,
+		db:        dbWithTx,
+		contracts: kpr.contracts,
+	}, nil
+}
+
+// handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
+// on failure.
+func (h *eventHandler) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
+	err := h.handleEventSyncUpdateDirty(ctx, eventSyncUpdate)
+	if err != nil {
+		errRollback := h.tx.Rollback(ctx)
+		if errRollback != nil {
+			log.Printf("error rolling back db transaction: %s", errRollback)
 		}
+		return err
+	}
+	err = h.tx.Commit(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "failed to commit db tx after event was handled")
+	}
+	return nil
+}
+
+// handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will
+// neither be committed nor rolled back at the end.
+func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
+	var err error
+	switch event := eventSyncUpdate.Event.(type) {
+	case contract.KeypersConfigsListNewConfig:
+		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
 	case nil:
 		// event is nil if no event is found for some time
 	default:
 		log.Printf("ignoring unknown event %+v %T", event, event)
+	}
+	if err != nil {
+		return err
 	}
 
 	var nextBlockNumber uint64
@@ -80,7 +127,7 @@ func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate ev
 		nextBlockNumber = eventSyncUpdate.BlockNumber
 		nextLogIndex = eventSyncUpdate.LogIndex + 1
 	}
-	if err := kpr.db.UpdateEventSyncProgress(ctx, kprdb.UpdateEventSyncProgressParams{
+	if err := h.db.UpdateEventSyncProgress(ctx, kprdb.UpdateEventSyncProgressParams{
 		NextBlockNumber: int32(nextBlockNumber),
 		NextLogIndex:    int32(nextLogIndex),
 	}); err != nil {
@@ -89,7 +136,32 @@ func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate ev
 	return nil
 }
 
-func (kpr *keyper) handleKeypersAppendedEvent(ctx context.Context, event contract.AddrsSeqAppended) error {
-	log.Println("handling Appended event from keypers contract")
+func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Context, event contract.KeypersConfigsListNewConfig) error {
+	log.Printf(
+		"handling NewConfig event from keypers config contract in block %d (index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+	)
+	callOpts := &bind.CallOpts{
+		Pending: false,
+		// We call for the current height instead of the height at which the event was emitted,
+		// because the sets cannot change retroactively and we won't need an archive node.
+		BlockNumber: nil,
+		Context:     ctx,
+	}
+	addrs, err := h.contracts.Keypers.GetAddrs(callOpts, event.Index)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query addrs set from contract")
+	}
+	if event.ActivationBlockNumber > math.MaxInt64 {
+		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
+	}
+	err = h.db.InsertChainKeyperSet(ctx, kprdb.InsertChainKeyperSetParams{
+		ActivationBlockNumber: int64(event.ActivationBlockNumber),
+		Keypers:               shdb.EncodeAddresses(addrs),
+		Threshold:             1, // TODO: take threshold from config contract when defined
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to insert keyper set into db")
+	}
 	return nil
 }
