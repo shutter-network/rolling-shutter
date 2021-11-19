@@ -16,42 +16,6 @@ func TestNewShutterApp(t *testing.T) {
 	assert.Assert(t, is.DeepEqual(app.Configs[0], &BatchConfig{}), "Bad guard element")
 }
 
-func TestGetBatch(t *testing.T) {
-	app := NewShutterApp()
-
-	err := app.addConfig(BatchConfig{
-		ConfigIndex:           1,
-		ActivationBlockNumber: 100,
-		Threshold:             1,
-		Keypers:               addr,
-	})
-	assert.NilError(t, err)
-
-	err = app.addConfig(BatchConfig{
-		ConfigIndex:           2,
-		ActivationBlockNumber: 200,
-		Threshold:             2,
-		Keypers:               addr,
-	})
-	assert.NilError(t, err)
-
-	err = app.addConfig(BatchConfig{
-		ConfigIndex:           3,
-		ActivationBlockNumber: 300,
-		Threshold:             3,
-		Keypers:               addr,
-	})
-	assert.NilError(t, err)
-
-	assert.Equal(t, uint64(0), app.getBatchState(0).Config.Threshold)
-	assert.Equal(t, uint64(0), app.getBatchState(99).Config.Threshold)
-	assert.Equal(t, uint64(1), app.getBatchState(100).Config.Threshold)
-	assert.Equal(t, uint64(1), app.getBatchState(101).Config.Threshold)
-	assert.Equal(t, uint64(1), app.getBatchState(199).Config.Threshold)
-	assert.Equal(t, uint64(2), app.getBatchState(200).Config.Threshold)
-	assert.Equal(t, uint64(3), app.getBatchState(1000).Config.Threshold)
-}
-
 func TestAddConfig(t *testing.T) {
 	app := NewShutterApp()
 
