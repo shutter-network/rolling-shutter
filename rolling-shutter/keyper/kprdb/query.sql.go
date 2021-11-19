@@ -178,15 +178,15 @@ func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult,
 	return i, err
 }
 
-const getDKGResultForEpoch = `-- name: GetDKGResultForEpoch :one
+const getDKGResultForBlockNumber = `-- name: GetDKGResultForBlockNumber :one
 SELECT eon, success, error, pure_result FROM keyper.dkg_result
-WHERE eon = (SELECT eon FROM keyper.eons WHERE batch_index <= $1
-ORDER BY batch_index DESC, height DESC
+WHERE eon = (SELECT eon FROM keyper.eons WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC, height DESC
 LIMIT 1)
 `
 
-func (q *Queries) GetDKGResultForEpoch(ctx context.Context, batchIndex []byte) (KeyperDkgResult, error) {
-	row := q.db.QueryRow(ctx, getDKGResultForEpoch, batchIndex)
+func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber int64) (KeyperDkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResultForBlockNumber, blockNumber)
 	var i KeyperDkgResult
 	err := row.Scan(
 		&i.Eon,
@@ -251,7 +251,7 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncr
 }
 
 const getEon = `-- name: GetEon :one
-SELECT eon, height, batch_index, config_index FROM keyper.eons WHERE eon=$1
+SELECT eon, height, activation_block_number, config_index FROM keyper.eons WHERE eon=$1
 `
 
 func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
@@ -260,26 +260,26 @@ func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
 	err := row.Scan(
 		&i.Eon,
 		&i.Height,
-		&i.BatchIndex,
+		&i.ActivationBlockNumber,
 		&i.ConfigIndex,
 	)
 	return i, err
 }
 
-const getEonForEpoch = `-- name: GetEonForEpoch :one
-SELECT eon, height, batch_index, config_index FROM keyper.eons
-WHERE batch_index <= $1
-ORDER BY batch_index DESC, height DESC
+const getEonForBlockNumber = `-- name: GetEonForBlockNumber :one
+SELECT eon, height, activation_block_number, config_index FROM keyper.eons
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC, height DESC
 LIMIT 1
 `
 
-func (q *Queries) GetEonForEpoch(ctx context.Context, batchIndex []byte) (KeyperEon, error) {
-	row := q.db.QueryRow(ctx, getEonForEpoch, batchIndex)
+func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (KeyperEon, error) {
+	row := q.db.QueryRow(ctx, getEonForBlockNumber, blockNumber)
 	var i KeyperEon
 	err := row.Scan(
 		&i.Eon,
 		&i.Height,
-		&i.BatchIndex,
+		&i.ActivationBlockNumber,
 		&i.ConfigIndex,
 	)
 	return i, err
@@ -443,22 +443,22 @@ func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionK
 }
 
 const insertEon = `-- name: InsertEon :exec
-INSERT INTO keyper.eons (eon, height, batch_index, config_index)
+INSERT INTO keyper.eons (eon, height, activation_block_number, config_index)
 VALUES ($1, $2, $3, $4)
 `
 
 type InsertEonParams struct {
-	Eon         int64
-	Height      int64
-	BatchIndex  []byte
-	ConfigIndex int64
+	Eon                   int64
+	Height                int64
+	ActivationBlockNumber int64
+	ConfigIndex           int64
 }
 
 func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 	_, err := q.db.Exec(ctx, insertEon,
 		arg.Eon,
 		arg.Height,
-		arg.BatchIndex,
+		arg.ActivationBlockNumber,
 		arg.ConfigIndex,
 	)
 	return err

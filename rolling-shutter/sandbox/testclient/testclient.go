@@ -47,7 +47,7 @@ func printEvents(events []abcitypes.Event, height int64) {
 }
 
 func txsearch(cl client.Client) {
-	query := "shutter.batch-config.StartBatchIndex>=0"
+	query := "shutter.batch-config.ActivationBlockNumber>=0"
 	page := 1
 	perPage := 50
 	res, err := cl.TxSearch(context.Background(), query, false, &page, &perPage, "")

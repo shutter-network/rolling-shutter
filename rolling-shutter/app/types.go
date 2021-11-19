@@ -49,7 +49,8 @@ type ConfigVoting struct {
 	Candidates []BatchConfig
 }
 
-// EonStartVoting is used to vote on the batch index at which the next eon should be started.
+// EonStartVoting is used to vote on the activation block number at which the next eon should be
+// started.
 type EonStartVoting struct {
 	Voting
 	Candidates []uint64

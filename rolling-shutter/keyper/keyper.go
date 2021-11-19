@@ -23,6 +23,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -250,7 +251,8 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 			panic("unmarshalled non decryption key message in decryption key validator")
 		}
 
-		dkgResultDB, err := db.GetDKGResultForEpoch(ctx, shdb.EncodeUint64(key.epochID))
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
+		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
 		if err == pgx.ErrNoRows {
 			return false
 		}
@@ -295,7 +297,8 @@ func (kpr *keyper) makeKeyShareValidator(db *kprdb.Queries) pubsub.Validator {
 			panic("unmarshalled non decryption key share message in decryption key share validator")
 		}
 
-		dkgResultDB, err := db.GetDKGResultForEpoch(ctx, shdb.EncodeUint64(keyShare.epochID))
+		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(keyShare.epochID)
+		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
 		if err == pgx.ErrNoRows {
 			return false
 		}

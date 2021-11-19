@@ -63,10 +63,10 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 	})
 	assert.NilError(t, err)
 	err = db.InsertEon(ctx, kprdb.InsertEonParams{
-		Eon:         0,
-		Height:      0,
-		BatchIndex:  shdb.EncodeUint64(0),
-		ConfigIndex: 1,
+		Eon:                   0,
+		Height:                0,
+		ActivationBlockNumber: 0,
+		ConfigIndex:           1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{

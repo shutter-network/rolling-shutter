@@ -20,26 +20,26 @@ func TestGetBatch(t *testing.T) {
 	app := NewShutterApp()
 
 	err := app.addConfig(BatchConfig{
-		ConfigIndex:     1,
-		StartBatchIndex: 100,
-		Threshold:       1,
-		Keypers:         addr,
+		ConfigIndex:           1,
+		ActivationBlockNumber: 100,
+		Threshold:             1,
+		Keypers:               addr,
 	})
 	assert.NilError(t, err)
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:     2,
-		StartBatchIndex: 200,
-		Threshold:       2,
-		Keypers:         addr,
+		ConfigIndex:           2,
+		ActivationBlockNumber: 200,
+		Threshold:             2,
+		Keypers:               addr,
 	})
 	assert.NilError(t, err)
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:     3,
-		StartBatchIndex: 300,
-		Threshold:       3,
-		Keypers:         addr,
+		ConfigIndex:           3,
+		ActivationBlockNumber: 300,
+		Threshold:             3,
+		Keypers:               addr,
 	})
 	assert.NilError(t, err)
 
@@ -56,34 +56,34 @@ func TestAddConfig(t *testing.T) {
 	app := NewShutterApp()
 
 	err := app.addConfig(BatchConfig{
-		ConfigIndex:     1,
-		StartBatchIndex: 100,
-		Threshold:       1,
-		Keypers:         addr,
+		ConfigIndex:           1,
+		ActivationBlockNumber: 100,
+		Threshold:             1,
+		Keypers:               addr,
 	})
 	assert.NilError(t, err)
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:     2,
-		StartBatchIndex: 99,
-		Threshold:       1,
-		Keypers:         addr,
+		ConfigIndex:           2,
+		ActivationBlockNumber: 99,
+		Threshold:             1,
+		Keypers:               addr,
 	})
-	assert.Assert(t, err != nil, "Expected error, StartBatchIndex must not decrease")
+	assert.Assert(t, err != nil, "Expected error, ActivationBlockNumber must not decrease")
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:     1,
-		StartBatchIndex: 100,
-		Threshold:       1,
-		Keypers:         addr,
+		ConfigIndex:           1,
+		ActivationBlockNumber: 100,
+		Threshold:             1,
+		Keypers:               addr,
 	})
 	assert.Assert(t, err != nil, "Expected error, ConfigIndex must increase")
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:     2,
-		StartBatchIndex: 100,
-		Threshold:       2,
-		Keypers:         addr,
+		ConfigIndex:           2,
+		ActivationBlockNumber: 100,
+		Threshold:             2,
+		Keypers:               addr,
 	})
 	assert.NilError(t, err)
 }
@@ -93,10 +93,10 @@ func TestGobDKG(t *testing.T) {
 	var err error
 	keypers := addr
 	dkg := NewDKGInstance(BatchConfig{
-		ConfigIndex:     1,
-		StartBatchIndex: 100,
-		Threshold:       1,
-		Keypers:         keypers,
+		ConfigIndex:           1,
+		ActivationBlockNumber: 100,
+		Threshold:             1,
+		Keypers:               keypers,
 	}, eon)
 
 	err = dkg.RegisterAccusationMsg(Accusation{

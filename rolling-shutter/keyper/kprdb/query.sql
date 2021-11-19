@@ -112,16 +112,16 @@ LIMIT 1;
 DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1;
 
 -- name: InsertEon :exec
-INSERT INTO keyper.eons (eon, height, batch_index, config_index)
+INSERT INTO keyper.eons (eon, height, activation_block_number, config_index)
 VALUES ($1, $2, $3, $4);
 
 -- name: GetEon :one
 SELECT * FROM keyper.eons WHERE eon=$1;
 
--- name: GetEonForEpoch :one
+-- name: GetEonForBlockNumber :one
 SELECT * FROM keyper.eons
-WHERE batch_index <= $1
-ORDER BY batch_index DESC, height DESC
+WHERE activation_block_number <= sqlc.arg(block_number)
+ORDER BY activation_block_number DESC, height DESC
 LIMIT 1;
 
 -- name: InsertPolyEval :exec
@@ -156,10 +156,10 @@ VALUES ($1,$2,$3,$4);
 SELECT * FROM keyper.dkg_result
 WHERE eon = $1;
 
--- name: GetDKGResultForEpoch :one
+-- name: GetDKGResultForBlockNumber :one
 SELECT * FROM keyper.dkg_result
-WHERE eon = (SELECT eon FROM keyper.eons WHERE batch_index <= $1
-ORDER BY batch_index DESC, height DESC
+WHERE eon = (SELECT eon FROM keyper.eons WHERE activation_block_number <= sqlc.arg(block_number)
+ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
 -- name: UpdateEventSyncProgress :exec

@@ -11,16 +11,16 @@ func NewEonStartVoting() *EonStartVoting {
 	return &v
 }
 
-// AddVote adds or updates a vote for a certain start batch index.
-func (v *EonStartVoting) AddVote(sender common.Address, batchIndex uint64) {
+// AddVote adds or updates a vote for a certain activation block number.
+func (v *EonStartVoting) AddVote(sender common.Address, activationBlockNumber uint64) {
 	for i, b := range v.Candidates {
-		if b == batchIndex {
+		if b == activationBlockNumber {
 			v.AddVoteForIndex(sender, i)
 			return
 		}
 	}
 
-	v.Candidates = append(v.Candidates, batchIndex)
+	v.Candidates = append(v.Candidates, activationBlockNumber)
 	v.AddVoteForIndex(sender, len(v.Candidates)-1)
 }
 

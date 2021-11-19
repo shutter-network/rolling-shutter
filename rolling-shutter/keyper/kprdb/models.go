@@ -30,10 +30,10 @@ type KeyperDkgResult struct {
 }
 
 type KeyperEon struct {
-	Eon         int64
-	Height      int64
-	BatchIndex  []byte
-	ConfigIndex int64
+	Eon                   int64
+	Height                int64
+	ActivationBlockNumber int64
+	ConfigIndex           int64
 }
 
 type KeyperEventSyncProgress struct {

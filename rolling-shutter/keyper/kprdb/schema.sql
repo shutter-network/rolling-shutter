@@ -1,4 +1,4 @@
--- schema-version: 8 --
+-- schema-version: 9 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -69,7 +69,7 @@ CREATE TABLE keyper.tendermint_outgoing_messages(
 CREATE TABLE keyper.eons(
        eon bigint PRIMARY KEY,
        height bigint NOT NULL,
-       batch_index BYTEA NOT NULL,
+       activation_block_number bigint NOT NULL,
        config_index bigint NOT NULL
 );
 
