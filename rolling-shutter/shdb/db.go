@@ -63,6 +63,27 @@ func DecodeAddress(data string) (common.Address, error) {
 	return common.HexToAddress(data), nil
 }
 
+func EncodeAddresses(addrs []common.Address) []string {
+	encodedAddrs := []string{}
+	for _, addr := range addrs {
+		encodedAddr := EncodeAddress(addr)
+		encodedAddrs = append(encodedAddrs, encodedAddr)
+	}
+	return encodedAddrs
+}
+
+func DecodeAddresses(data []string) ([]common.Address, error) {
+	addrs := []common.Address{}
+	for _, d := range data {
+		addr, err := DecodeAddress(d)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
 func EncodePureDKG(p *puredkg.PureDKG) ([]byte, error) {
 	buff := bytes.Buffer{}
 	err := gob.NewEncoder(&buff).Encode(p)

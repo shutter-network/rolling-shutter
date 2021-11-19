@@ -1,4 +1,4 @@
--- schema-version: 9 --
+-- schema-version: 10 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -31,13 +31,13 @@ CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
        bls_public_key bytea
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
-       activation_block_number bigint,
-       index int,
+       activation_block_number bigint NOT NULL,
+       index int NOT NULL,
        address text NOT NULL,
        PRIMARY KEY (activation_block_number, index)
 );
 CREATE TABLE IF NOT EXISTS decryptor.keyper_set(
-       activation_block_number bigint,
+       activation_block_number bigint NOT NULL,
        keypers text[] NOT NULL,
        threshold integer NOT NULL
 );
@@ -53,4 +53,8 @@ CREATE TABLE IF NOT EXISTS decryptor.event_sync_progress (
 CREATE TABLE decryptor.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL
+);
+CREATE TABLE decryptor.chain_keyper_set(
+       n integer PRIMARY KEY,
+       addresses text[] NOT NULL
 );

@@ -19,6 +19,7 @@ can be referenced by its index. New lists can be created by calling `add` multip
 appended with a final call to `append`.
 */
 contract AddrsSeq is Ownable {
+    event Added(uint64 n, uint64 i, address[] newAddrs);
     event Appended(uint64 n);
     AddrSet[] private seq;
 
@@ -35,11 +36,14 @@ contract AddrsSeq is Ownable {
        to the sequence of lists by calling `append`.
      */
     function add(address[] calldata newAddrs) public onlyOwner {
-        uint64 idx = uint64(seq.length - 1);
+        uint64 n = uint64(seq.length - 1);
+        uint64 i = uint64(seq[n].addrs.length);
 
-        for (uint64 i = 0; i < newAddrs.length; i++) {
-            seq[idx].addrs.push(newAddrs[i]);
+        for (uint64 j = 0; j < newAddrs.length; j++) {
+            seq[n].addrs.push(newAddrs[j]);
         }
+
+        emit Added({n: n, i: i, newAddrs: newAddrs});
     }
 
     /**

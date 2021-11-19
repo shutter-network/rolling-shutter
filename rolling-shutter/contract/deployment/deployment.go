@@ -34,13 +34,19 @@ type Contracts struct {
 	Client      *ethclient.Client
 	Deployments *Deployments
 
+	KeypersConfigsList           *contract.KeypersConfigsList
+	KeypersConfigsListDeployment *Deployment
+	KeypersConfigsListNewConfig  *eventsyncer.EventType
+
 	Keypers                     *contract.AddrsSeq
 	KeypersDeployment           *Deployment
+	KeypersAdded                *eventsyncer.EventType
 	KeypersAppended             *eventsyncer.EventType
 	KeypersOwnershipTransferred *eventsyncer.EventType
 
 	Decryptors                     *contract.AddrsSeq
 	DecryptorsDeployment           *Deployment
+	DecryptorsAdded                *eventsyncer.EventType
 	DecryptorsAppended             *eventsyncer.EventType
 	DecryptorsOwnershipTransferred *eventsyncer.EventType
 
@@ -88,6 +94,9 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 		Client:      client,
 		Deployments: deployments,
 	}
+	if err := c.initKeypersConfigsList(); err != nil {
+		return nil, err
+	}
 	if err := c.initKeypers(); err != nil {
 		return nil, err
 	}
@@ -103,6 +112,27 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 	return c, nil
 }
 
+func (c *Contracts) initKeypersConfigsList() error {
+	d, err := c.getDeployment("KeyperConfig")
+	if err != nil {
+		return err
+	}
+	c.KeypersConfigsListDeployment = d
+	c.KeypersConfigsList, err = contract.NewKeypersConfigsList(d.Address, c.Client)
+	if err != nil {
+		return err
+	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.KeypersConfigsListNewConfig = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "NewConfig",
+		Type:     reflect.TypeOf(contract.KeypersConfigsListNewConfig{}),
+	}
+	return nil
+}
+
 func (c *Contracts) initKeypers() error {
 	d, err := c.getDeployment("Keypers")
 	if err != nil {
@@ -113,15 +143,23 @@ func (c *Contracts) initKeypers() error {
 	if err != nil {
 		return err
 	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.KeypersAdded = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "Added",
+		Type:     reflect.TypeOf(contract.AddrsSeqAdded{}),
+	}
 	c.KeypersAppended = &eventsyncer.EventType{
-		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
+		Contract: boundContract,
 		Address:  d.Address,
 		ABI:      d.ABI,
 		Name:     "Appended",
 		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
 	}
 	c.KeypersOwnershipTransferred = &eventsyncer.EventType{
-		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
+		Contract: boundContract,
 		Address:  d.Address,
 		ABI:      d.ABI,
 		Name:     "OwnershipTransferred",
@@ -140,15 +178,23 @@ func (c *Contracts) initDecryptors() error {
 	if err != nil {
 		return err
 	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.DecryptorsAdded = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "Added",
+		Type:     reflect.TypeOf(contract.AddrsSeqAdded{}),
+	}
 	c.DecryptorsAppended = &eventsyncer.EventType{
-		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
+		Contract: boundContract,
 		Address:  d.Address,
 		ABI:      d.ABI,
 		Name:     "Appended",
 		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
 	}
 	c.DecryptorsOwnershipTransferred = &eventsyncer.EventType{
-		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
+		Contract: boundContract,
 		Address:  d.Address,
 		ABI:      d.ABI,
 		Name:     "OwnershipTransferred",

@@ -152,3 +152,9 @@ ON CONFLICT (id) DO UPDATE
 
 -- name: GetEventSyncProgress :one
 SELECT * FROM decryptor.event_sync_progress LIMIT 1;
+
+-- name: InsertChainKeyperSet :exec
+INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2);
+
+-- name: GetChainKeyperSet :one
+SELECT * FROM decryptor.chain_keyper_set LIMIT 1;

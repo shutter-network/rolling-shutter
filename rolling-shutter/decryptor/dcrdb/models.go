@@ -2,15 +2,18 @@
 
 package dcrdb
 
-import (
-	"database/sql"
-)
+import ()
 
 type DecryptorAggregatedSignature struct {
 	EpochID         []byte
 	SignedHash      []byte
 	SignersBitfield []byte
 	Signature       []byte
+}
+
+type DecryptorChainKeyperSet struct {
+	N         int32
+	Addresses []string
 }
 
 type DecryptorCipherBatch struct {
@@ -53,7 +56,7 @@ type DecryptorEventSyncProgress struct {
 }
 
 type DecryptorKeyperSet struct {
-	ActivationBlockNumber sql.NullInt64
+	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }

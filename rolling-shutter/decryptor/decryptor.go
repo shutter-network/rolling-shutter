@@ -38,8 +38,9 @@ type Decryptor struct {
 
 	contracts *deployment.Contracts
 
-	p2p *p2p.P2P
-	db  *dcrdb.Queries
+	p2p    *p2p.P2P
+	dbpool *pgxpool.Pool
+	db     *dcrdb.Queries
 }
 
 func New(config Config) *Decryptor {
@@ -55,8 +56,9 @@ func New(config Config) *Decryptor {
 
 		contracts: nil,
 
-		p2p: p,
-		db:  nil,
+		p2p:    p,
+		dbpool: nil,
+		db:     nil,
 	}
 }
 
@@ -71,6 +73,7 @@ func (d *Decryptor) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+	d.dbpool = dbpool
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
 	ethereumClient, err := ethclient.Dial(d.Config.EthereumURL)

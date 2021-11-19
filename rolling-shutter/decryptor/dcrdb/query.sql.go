@@ -5,7 +5,6 @@ package dcrdb
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -35,6 +34,17 @@ func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte)
 		&i.SignersBitfield,
 		&i.Signature,
 	)
+	return i, err
+}
+
+const getChainKeyperSet = `-- name: GetChainKeyperSet :one
+SELECT n, addresses FROM decryptor.chain_keyper_set LIMIT 1
+`
+
+func (q *Queries) GetChainKeyperSet(ctx context.Context) (DecryptorChainKeyperSet, error) {
+	row := q.db.QueryRow(ctx, getChainKeyperSet)
+	var i DecryptorChainKeyperSet
+	err := row.Scan(&i.N, &i.Addresses)
 	return i, err
 }
 
@@ -251,7 +261,7 @@ WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber sql.NullInt64) (interface{}, error) {
+func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64) (interface{}, error) {
 	row := q.db.QueryRow(ctx, getKeyperSet, activationBlockNumber)
 	var column_1 interface{}
 	err := row.Scan(&column_1)
@@ -292,6 +302,20 @@ func (q *Queries) InsertAggregatedSignature(ctx context.Context, arg InsertAggre
 		arg.SignersBitfield,
 		arg.Signature,
 	)
+}
+
+const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
+INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2)
+`
+
+type InsertChainKeyperSetParams struct {
+	N         int32
+	Addresses []string
+}
+
+func (q *Queries) InsertChainKeyperSet(ctx context.Context, arg InsertChainKeyperSetParams) error {
+	_, err := q.db.Exec(ctx, insertChainKeyperSet, arg.N, arg.Addresses)
+	return err
 }
 
 const insertCipherBatch = `-- name: InsertCipherBatch :execresult
@@ -422,7 +446,7 @@ INSERT INTO decryptor.keyper_set (
 `
 
 type InsertKeyperSetParams struct {
-	ActivationBlockNumber sql.NullInt64
+	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }
