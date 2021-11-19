@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+type KeyperChainKeyperSet struct {
+	ActivationBlockNumber int64
+	Keypers               []string
+	Threshold             int32
+}
+
 type KeyperDecryptionKey struct {
 	EpochID       []byte
 	DecryptionKey []byte

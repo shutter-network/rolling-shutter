@@ -137,7 +137,10 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 }
 
 func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Context, event contract.KeypersConfigsListNewConfig) error {
-	log.Printf("handling NewConfig event from keypers config contract in block %d", event.Raw.BlockNumber)
+	log.Printf(
+		"handling NewConfig event from keypers config contract in block %d (index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+	)
 	callOpts := &bind.CallOpts{
 		Pending: false,
 		// We call for the current height instead of the height at which the event was emitted,

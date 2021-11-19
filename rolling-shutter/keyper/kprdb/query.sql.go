@@ -161,6 +161,19 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchC
 	return items, nil
 }
 
+const getChainKeyperSet = `-- name: GetChainKeyperSet :one
+SELECT activation_block_number, keypers, threshold FROM keyper.chain_keyper_set
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1
+`
+
+func (q *Queries) GetChainKeyperSet(ctx context.Context, blockNumber int64) (KeyperChainKeyperSet, error) {
+	row := q.db.QueryRow(ctx, getChainKeyperSet, blockNumber)
+	var i KeyperChainKeyperSet
+	err := row.Scan(&i.ActivationBlockNumber, &i.Keypers, &i.Threshold)
+	return i, err
+}
+
 const getDKGResult = `-- name: GetDKGResult :one
 SELECT eon, success, error, pure_result FROM keyper.dkg_result
 WHERE eon = $1
@@ -372,6 +385,22 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Keypers,
 		arg.Threshold,
 	)
+	return err
+}
+
+const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
+INSERT INTO keyper.chain_keyper_set (activation_block_number, keypers, threshold)
+VALUES ($1, $2, $3)
+`
+
+type InsertChainKeyperSetParams struct {
+	ActivationBlockNumber int64
+	Keypers               []string
+	Threshold             int32
+}
+
+func (q *Queries) InsertChainKeyperSet(ctx context.Context, arg InsertChainKeyperSetParams) error {
+	_, err := q.db.Exec(ctx, insertChainKeyperSet, arg.ActivationBlockNumber, arg.Keypers, arg.Threshold)
 	return err
 }
 
