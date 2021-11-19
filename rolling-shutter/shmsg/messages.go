@@ -65,7 +65,7 @@ func (*AggregatedDecryptionSignature) Topic() string {
 
 // NewBatchConfig creates a new BatchConfig message.
 func NewBatchConfig(
-	startBatchIndex uint64,
+	activationBlockNumber uint64,
 	keypers []common.Address,
 	threshold uint64,
 	configIndex uint64,
@@ -80,12 +80,12 @@ func NewBatchConfig(
 	return &Message{
 		Payload: &Message_BatchConfig{
 			BatchConfig: &BatchConfig{
-				StartBatchIndex:   startBatchIndex,
-				Keypers:           keypersBytes,
-				Threshold:         threshold,
-				ConfigIndex:       configIndex,
-				Started:           started,
-				ValidatorsUpdated: validatorsUpdated,
+				ActivationBlockNumber: activationBlockNumber,
+				Keypers:               keypersBytes,
+				Threshold:             threshold,
+				ConfigIndex:           configIndex,
+				Started:               started,
+				ValidatorsUpdated:     validatorsUpdated,
 			},
 		},
 	}
@@ -170,11 +170,11 @@ func NewPolyEval(eon uint64, receivers []common.Address, encryptedEvals [][]byte
 }
 
 // NewEonStartVote creates a new eon start vote message.
-func NewEonStartVote(startBatchIndex uint64) *Message {
+func NewEonStartVote(activationBlockNumber uint64) *Message {
 	return &Message{
 		Payload: &Message_EonStartVote{
 			EonStartVote: &EonStartVote{
-				StartBatchIndex: startBatchIndex,
+				ActivationBlockNumber: activationBlockNumber,
 			},
 		},
 	}

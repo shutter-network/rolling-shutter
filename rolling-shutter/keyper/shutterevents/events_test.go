@@ -96,10 +96,10 @@ func TestEmptyApology(t *testing.T) {
 
 func TestBatchConfig(t *testing.T) {
 	ev := &shutterevents.BatchConfig{
-		StartBatchIndex: 111,
-		Threshold:       2,
-		Keypers:         addresses,
-		ConfigIndex:     uint64(0xffffffffffffffff),
+		ActivationBlockNumber: 111,
+		Threshold:             2,
+		Keypers:               addresses,
+		ConfigIndex:           uint64(0xffffffffffffffff),
 	}
 	roundtrip(t, ev)
 }
@@ -113,7 +113,7 @@ func TestCheckIn(t *testing.T) {
 }
 
 func TestEonStarted(t *testing.T) {
-	ev := &shutterevents.EonStarted{Eon: eon, BatchIndex: 9999, ConfigIndex: 567}
+	ev := &shutterevents.EonStarted{Eon: eon, ActivationBlockNumber: 9999, ConfigIndex: 567}
 	roundtrip(t, ev)
 }
 

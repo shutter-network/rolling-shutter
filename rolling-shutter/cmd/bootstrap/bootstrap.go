@@ -98,9 +98,9 @@ func bootstrap() error {
 	threshold := uint64(twothirds(len(keypers)))
 
 	ms := fx.NewRPCMessageSender(shmcl, signingKey)
-	startBatchIndex := uint64(0)
+	activationBlockNumber := uint64(0)
 	batchConfigMsg := shmsg.NewBatchConfig(
-		startBatchIndex,
+		activationBlockNumber,
 		keypers,
 		threshold,
 		batchConfigIndex,
@@ -121,7 +121,7 @@ func bootstrap() error {
 
 	log.Println("Submitted bootstrapping transaction")
 	log.Printf("Config index: %d", batchConfigIndex)
-	log.Printf("StartBatchIndex: %d", startBatchIndex)
+	log.Printf("Activation block number: %d", activationBlockNumber)
 	log.Printf("Threshold: %d", threshold)
 	log.Printf("Num Keypers: %d", len(keypers))
 	return nil

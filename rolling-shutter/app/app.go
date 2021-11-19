@@ -109,10 +109,10 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 	return shapp, nil
 }
 
-// getConfig returns the BatchConfig for the given batchIndex.
-func (app *ShutterApp) getConfig(batchIndex uint64) *BatchConfig {
+// getConfig returns the BatchConfig for the given mainchain block number.
+func (app *ShutterApp) getConfig(blockNumber uint64) *BatchConfig {
 	for i := len(app.Configs) - 1; i >= 0; i-- {
-		if app.Configs[i].StartBatchIndex <= batchIndex {
+		if app.Configs[i].ActivationBlockNumber <= blockNumber {
 			return app.Configs[i]
 		}
 	}
@@ -126,11 +126,11 @@ func (app *ShutterApp) checkConfig(cfg BatchConfig) error {
 		return err
 	}
 	lastConfig := app.LastConfig()
-	if cfg.StartBatchIndex < lastConfig.StartBatchIndex {
+	if cfg.ActivationBlockNumber < lastConfig.ActivationBlockNumber {
 		return errors.Errorf(
-			"start batch index of next config (%d) lower than current one (%d)",
-			cfg.StartBatchIndex,
-			lastConfig.StartBatchIndex,
+			"start activation block number of next config (%d) lower than current one (%d)",
+			cfg.ActivationBlockNumber,
+			lastConfig.ActivationBlockNumber,
 		)
 	}
 	if cfg.ConfigIndex <= lastConfig.ConfigIndex {
@@ -233,9 +233,9 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	}
 
 	bc := BatchConfig{
-		StartBatchIndex: 0,
-		Keypers:         genesisState.GetKeypers(),
-		Threshold:       genesisState.Threshold,
+		ActivationBlockNumber: 0,
+		Keypers:               genesisState.GetKeypers(),
+		Threshold:             genesisState.Threshold,
 	}
 	err = bc.EnsureValid()
 	if err != nil {
@@ -371,9 +371,9 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 			dkg := app.StartDKG(bc)
 			lastConfig := app.LastConfig()
 			events = append(events, shutterevents.EonStarted{
-				Eon:         dkg.Eon,
-				BatchIndex:  lastConfig.StartBatchIndex,
-				ConfigIndex: lastConfig.ConfigIndex,
+				Eon:                   dkg.Eon,
+				ActivationBlockNumber: lastConfig.ActivationBlockNumber,
+				ConfigIndex:           lastConfig.ConfigIndex,
 			}.MakeABCIEvent())
 		}
 	}
@@ -456,13 +456,13 @@ func (app *ShutterApp) deliverBatchConfigStarted(msg *shmsg.BatchConfigStarted, 
 }
 
 func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender common.Address) abcitypes.ResponseDeliverTx {
-	config := app.getConfig(msg.StartBatchIndex)
+	config := app.getConfig(msg.ActivationBlockNumber)
 	if !config.IsKeyper(sender) {
 		return notAKeyper(sender)
 	}
 
-	app.countEonStartVote(sender, config, msg.StartBatchIndex)
-	dkg, startBatchIndex, started := app.maybeStartEon(config)
+	app.countEonStartVote(sender, config, msg.ActivationBlockNumber)
+	dkg, activationBlockNumber, started := app.maybeStartEon(config)
 	if !started {
 		return abcitypes.ResponseDeliverTx{
 			Code:   0,
@@ -473,21 +473,21 @@ func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender co
 		Code: 0,
 		Events: []abcitypes.Event{
 			shutterevents.EonStarted{
-				Eon:         dkg.Eon,
-				BatchIndex:  startBatchIndex,
-				ConfigIndex: config.ConfigIndex,
+				Eon:                   dkg.Eon,
+				ActivationBlockNumber: activationBlockNumber,
+				ConfigIndex:           config.ConfigIndex,
 			}.MakeABCIEvent(),
 		},
 	}
 }
 
-func (app *ShutterApp) countEonStartVote(sender common.Address, config *BatchConfig, startBatchIndex uint64) {
+func (app *ShutterApp) countEonStartVote(sender common.Address, config *BatchConfig, activationBlockNumber uint64) {
 	v := app.EonStartVotings[config.ConfigIndex]
 	if v == nil {
 		v = NewEonStartVoting()
 		app.EonStartVotings[config.ConfigIndex] = v
 	}
-	v.AddVote(sender, startBatchIndex)
+	v.AddVote(sender, activationBlockNumber)
 }
 
 func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64, bool) {
@@ -497,14 +497,14 @@ func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64,
 	}
 
 	threshold := int(config.Threshold)
-	startBatchIndex, success := v.Outcome(threshold)
+	activationBlockNumber, success := v.Outcome(threshold)
 	if !success {
 		return nil, uint64(0), false
 	}
 
 	delete(app.EonStartVotings, config.ConfigIndex)
 	dkg := app.StartDKG(*config)
-	return dkg, startBatchIndex, true
+	return dkg, activationBlockNumber, true
 }
 
 func (app *ShutterApp) handlePolyEvalMsg(msg *shmsg.PolyEval, sender common.Address) abcitypes.ResponseDeliverTx {

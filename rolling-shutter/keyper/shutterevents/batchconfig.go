@@ -54,12 +54,12 @@ func BatchConfigFromMessage(m *shmsg.BatchConfig) (BatchConfig, error) {
 	}
 
 	bc := BatchConfig{
-		StartBatchIndex:   m.StartBatchIndex,
-		Keypers:           keypers,
-		Threshold:         m.Threshold,
-		ConfigIndex:       m.ConfigIndex,
-		Started:           m.Started,
-		ValidatorsUpdated: m.ValidatorsUpdated,
+		ActivationBlockNumber: m.ActivationBlockNumber,
+		Keypers:               keypers,
+		Threshold:             m.Threshold,
+		ConfigIndex:           m.ConfigIndex,
+		Started:               m.Started,
+		ValidatorsUpdated:     m.ValidatorsUpdated,
 	}
 	return bc, nil
 }

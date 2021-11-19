@@ -16,7 +16,7 @@ var (
 func init() {
 	for i := 0; i < 10; i++ {
 		addr = append(addr, common.BigToAddress(big.NewInt(int64(i))))
-		votes = append(votes, BatchConfig{StartBatchIndex: uint64(i)})
+		votes = append(votes, BatchConfig{ActivationBlockNumber: uint64(i)})
 	}
 }
 
