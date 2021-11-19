@@ -56,19 +56,6 @@ type EonStartVoting struct {
 	Candidates []uint64
 }
 
-// DecryptionSignature stores the decryption key signature created by one of the keypers.
-type DecryptionSignature struct {
-	Sender    common.Address
-	Signature []byte
-}
-
-// BatchState is used to manage the key generation process for a certain batch.
-type BatchState struct {
-	BatchIndex           uint64
-	Config               *BatchConfig
-	DecryptionSignatures []DecryptionSignature
-}
-
 // ValidatorPubkey holds the raw 32 byte ed25519 public key to be used as tendermint validator key
 // We use this is a map key, so don't use a byte slice.
 type ValidatorPubkey struct {
@@ -94,7 +81,6 @@ func NewValidatorPubkey(pubkey []byte) (ValidatorPubkey, error) {
 // ShutterApp holds our data structures used for the tendermint app.
 type ShutterApp struct {
 	Configs         []*BatchConfig
-	BatchStates     map[uint64]BatchState
 	DKGMap          map[uint64]*DKGInstance
 	ConfigVoting    ConfigVoting
 	EonStartVotings map[uint64]*EonStartVoting

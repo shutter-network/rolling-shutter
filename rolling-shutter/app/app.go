@@ -73,7 +73,6 @@ func (app *ShutterApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 func NewShutterApp() *ShutterApp {
 	return &ShutterApp{
 		Configs:         []*BatchConfig{{}},
-		BatchStates:     make(map[uint64]BatchState),
 		DKGMap:          make(map[uint64]*DKGInstance),
 		ConfigVoting:    NewConfigVoting(),
 		EonStartVotings: make(map[uint64]*EonStartVoting),
@@ -164,17 +163,6 @@ func (app *ShutterApp) updateCheckTxMembers() {
 		members = append(members, c.Keypers...)
 	}
 	app.CheckTxState.SetMembers(members)
-}
-
-// getBatchState returns the BatchState for the given batchIndex.
-func (app *ShutterApp) getBatchState(batchIndex uint64) BatchState {
-	bs, ok := app.BatchStates[batchIndex]
-	if !ok {
-		bs.BatchIndex = batchIndex
-		bs.Config = app.getConfig(batchIndex)
-	}
-
-	return bs
 }
 
 func (app *ShutterApp) Query(_ abcitypes.RequestQuery) abcitypes.ResponseQuery {
