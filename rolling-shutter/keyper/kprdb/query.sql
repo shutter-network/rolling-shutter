@@ -171,3 +171,12 @@ ON CONFLICT (id) DO UPDATE
 
 -- name: GetEventSyncProgress :one
 SELECT * FROM keyper.event_sync_progress LIMIT 1;
+
+-- name: InsertChainKeyperSet :exec
+INSERT INTO keyper.chain_keyper_set (activation_block_number, keypers, threshold)
+VALUES ($1, $2, $3);
+
+-- name: GetChainKeyperSet :one
+SELECT * FROM keyper.chain_keyper_set
+WHERE activation_block_number <= sqlc.arg(block_number)
+ORDER BY activation_block_number DESC LIMIT 1;

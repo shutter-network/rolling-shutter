@@ -1,4 +1,4 @@
--- schema-version: 9 --
+-- schema-version: 10 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -87,4 +87,10 @@ CREATE TABLE keyper.dkg_result(
        success BOOLEAN NOT NULL,
        error TEXT,
        pure_result BYTEA  -- shdb.EncodePureDKGResult/shdb.DecodePureDKGResult
+);
+
+CREATE TABLE keyper.chain_keyper_set(
+       activation_block_number bigint PRIMARY KEY,
+       keypers text[] NOT NULL,
+       threshold integer NOT NULL
 );
