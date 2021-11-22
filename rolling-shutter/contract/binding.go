@@ -38,6 +38,7 @@ type DecryptorsConfig struct {
 type KeypersConfig struct {
 	ActivationBlockNumber uint64
 	SetIndex              uint64
+	Threshold             uint64
 }
 
 // AddrsSeqMetaData contains all meta data concerning the AddrsSeq contract.
@@ -1752,8 +1753,8 @@ func (_DecryptorsConfigsList *DecryptorsConfigsListFilterer) ParseOwnershipTrans
 
 // KeypersConfigsListMetaData contains all meta data concerning the KeypersConfigsList contract.
 var KeypersConfigsListMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"index\",\"type\":\"uint64\"}],\"name\":\"NewConfig\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"addNewCfg\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"addrsSeq\",\"outputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"}],\"name\":\"getActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCurrentActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"keypersConfigs\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b50604051610b4d380380610b4d83398101604081905261002f91610230565b610038336101e0565b600280546001600160a01b0319166001600160a01b038316908117909155604051630545a03f60e31b815260006004820152632a2d01f89060240160206040518083038186803b15801561008b57600080fd5b505afa15801561009f573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100c39190610260565b6001600160401b03161561012e5760405162461bcd60e51b815260206004820152602860248201527f4164647273536571206d757374206861766520656d707479206c697374206174604482015267020696e64657820360c41b606482015260840160405180910390fd5b6040805180820182526000808252602080830182815260018054808201825590845293517fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909401805491516001600160401b0390811668010000000000000000026001600160801b0319909316951694909417179092558251818152918201527ff991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7910160405180910390a150610289565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b60006020828403121561024257600080fd5b81516001600160a01b038116811461025957600080fd5b9392505050565b60006020828403121561027257600080fd5b81516001600160401b038116811461025957600080fd5b6108b5806102986000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c8063b5351b0d1161005b578063b5351b0d146100eb578063f2fde38b14610125578063f9c72b5314610138578063fc6d0c7e1461014057600080fd5b80634d89eaaf1461008d578063715018a6146100bd57806379f78099146100c75780638da5cb5b146100da575b600080fd5b6002546100a0906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100c5610173565b005b6100c56100d53660046106d4565b6101b2565b6000546001600160a01b03166100a0565b6100fe6100f9366004610701565b6104d3565b6040805182516001600160401b0390811682526020938401511692810192909252016100b4565b6100c5610133366004610725565b610592565b6100fe61062d565b61015361014e36600461074e565b61064f565b604080516001600160401b039384168152929091166020830152016100b4565b6000546001600160a01b031633146101a65760405162461bcd60e51b815260040161019d90610767565b60405180910390fd5b6101b06000610684565b565b6000546001600160a01b031633146101dc5760405162461bcd60e51b815260040161019d90610767565b6101ec6040820160208301610701565b6001600160401b0316600260009054906101000a90046001600160a01b03166001600160a01b03166306661abd6040518163ffffffff1660e01b815260040160206040518083038186803b15801561024357600080fd5b505afa158015610257573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061027b919061079c565b6001600160401b0316116102f75760405162461bcd60e51b815260206004820152603a60248201527f4e6f20617070656e6465642073657420696e2073657120636f72726573706f6e60448201527f64696e6720746f20636f6e66696727732073657420696e646578000000000000606482015260840161019d565b6103046020820182610701565b6001600160401b0316600180808054905061031f91906107cf565b8154811061032f5761032f6107e6565b6000918252602090912001546001600160401b031611156103b85760405162461bcd60e51b815260206004820152603860248201527f43616e6e6f7420616464206e6577207365742077697468206c6f77657220626c60448201527f6f636b206e756d626572207468616e2070726576696f75730000000000000000606482015260840161019d565b6103c56020820182610701565b6001600160401b031643111561042f5760405162461bcd60e51b815260206004820152602960248201527f43616e6e6f7420616464206e6577207365742077697468207061737420626c6f60448201526831b590373ab6b132b960b91b606482015260840161019d565b60018054808201825560009190915281907fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf60161046c82826107fc565b507ff991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7905061049d6020830183610701565b6104ad6040840160208501610701565b604080516001600160401b0393841681529290911660208301520160405180910390a150565b6040805180820190915260008082526020820152600180546000916104f7916107cf565b90505b826001600160401b031660018281548110610517576105176107e6565b6000918252602090912001546001600160401b0316116105805760018181548110610544576105446107e6565b6000918252602091829020604080518082019091529101546001600160401b038082168352600160401b90910416918101919091529392505050565b8061058a81610868565b9150506104fa565b6000546001600160a01b031633146105bc5760405162461bcd60e51b815260040161019d90610767565b6001600160a01b0381166106215760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161019d565b61062a81610684565b50565b604080518082019091526000808252602082015261064a436104d3565b905090565b6001818154811061065f57600080fd5b6000918252602090912001546001600160401b038082169250600160401b9091041682565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000604082840312156106e657600080fd5b50919050565b6001600160401b038116811461062a57600080fd5b60006020828403121561071357600080fd5b813561071e816106ec565b9392505050565b60006020828403121561073757600080fd5b81356001600160a01b038116811461071e57600080fd5b60006020828403121561076057600080fd5b5035919050565b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b6000602082840312156107ae57600080fd5b815161071e816106ec565b634e487b7160e01b600052601160045260246000fd5b6000828210156107e1576107e16107b9565b500390565b634e487b7160e01b600052603260045260246000fd5b8135610807816106ec565b6001600160401b03811690508154816001600160401b031982161783556020840135610832816106ec565b6fffffffffffffffff00000000000000008160401b16836fffffffffffffffffffffffffffffffff198416171784555050505050565b600081610877576108776107b9565b50600019019056fea264697066735822122084ffafd2a530273928af161459fc0a2ce4c89a41ca4446aea565c5524d01d82664736f6c63430008090033",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"index\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"threshold\",\"type\":\"uint64\"}],\"name\":\"NewConfig\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"threshold\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"addNewCfg\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"addrsSeq\",\"outputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"}],\"name\":\"getActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"threshold\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCurrentActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"threshold\",\"type\":\"uint64\"}],\"internalType\":\"structKeypersConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"keypersConfigs\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"threshold\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50604051610e21380380610e2183398101604081905261002f9161025f565b6100383361020f565b600280546001600160a01b0319166001600160a01b038316908117909155604051630545a03f60e31b815260006004820152632a2d01f89060240160206040518083038186803b15801561008b57600080fd5b505afa15801561009f573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100c3919061028f565b6001600160401b03161561012e5760405162461bcd60e51b815260206004820152602860248201527f4164647273536571206d757374206861766520656d707479206c697374206174604482015267020696e64657820360c41b606482015260840160405180910390fd5b60408051606080820183526000808352602080840182815284860183815260018054808201825590855295517fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf69096018054925191516001600160401b03908116600160801b02600160801b600160c01b031993821668010000000000000000026001600160801b031990951691909816179290921716949094179093558351818152928301819052928201929092527ff1c5613227525376c83485d5a7995987dcfcd90512b0de33df550d2469fba9d9910160405180910390a1506102b8565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b60006020828403121561027157600080fd5b81516001600160a01b038116811461028857600080fd5b9392505050565b6000602082840312156102a157600080fd5b81516001600160401b038116811461028857600080fd5b610b5a806102c76000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c8063b5351b0d1161005b578063b5351b0d146100eb578063f2fde38b14610130578063f9c72b5314610143578063fc6d0c7e1461014b57600080fd5b806333419af51461008d5780634d89eaaf146100a2578063715018a6146100d25780638da5cb5b146100da575b600080fd5b6100a061009b366004610944565b610188565b005b6002546100b5906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100a06106e2565b6000546001600160a01b03166100b5565b6100fe6100f9366004610971565b610718565b6040805182516001600160401b03908116825260208085015182169083015292820151909216908201526060016100c9565b6100a061013e366004610995565b6107f0565b6100fe61088b565b61015e6101593660046109be565b6108b6565b604080516001600160401b03948516815292841660208401529216918101919091526060016100c9565b6000546001600160a01b031633146101bb5760405162461bcd60e51b81526004016101b2906109d7565b60405180910390fd5b6101cb6040820160208301610971565b6001600160401b0316600260009054906101000a90046001600160a01b03166001600160a01b03166306661abd6040518163ffffffff1660e01b815260040160206040518083038186803b15801561022257600080fd5b505afa158015610236573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061025a9190610a0c565b6001600160401b0316116102d65760405162461bcd60e51b815260206004820152603a60248201527f4e6f20617070656e6465642073657420696e2073657120636f72726573706f6e60448201527f64696e6720746f20636f6e66696727732073657420696e64657800000000000060648201526084016101b2565b6102e36020820182610971565b6001600160401b031660018080805490506102fe9190610a3f565b8154811061030e5761030e610a56565b6000918252602090912001546001600160401b031611156103975760405162461bcd60e51b815260206004820152603860248201527f43616e6e6f7420616464206e6577207365742077697468206c6f77657220626c60448201527f6f636b206e756d626572207468616e2070726576696f7573000000000000000060648201526084016101b2565b6103a46020820182610971565b6001600160401b031643111561040e5760405162461bcd60e51b815260206004820152602960248201527f43616e6e6f7420616464206e6577207365742077697468207061737420626c6f60448201526831b590373ab6b132b960b91b60648201526084016101b2565b6002546000906001600160a01b0316632a2d01f86104326040850160208601610971565b6040516001600160e01b031960e084901b1681526001600160401b03909116600482015260240160206040518083038186803b15801561047157600080fd5b505afa158015610485573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906104a99190610a0c565b90506001600160401b03811661053a576104c96060830160408401610971565b6001600160401b0316156105355760405162461bcd60e51b815260206004820152602d60248201527f5468726573686f6c64206d757374206265207a65726f206966206b657970657260448201526c2073657420697320656d70747960981b60648201526084016101b2565b610626565b600161054c6060840160408501610971565b6001600160401b031610156105a35760405162461bcd60e51b815260206004820152601e60248201527f5468726573686f6c64206d757374206265206174206c65617374206f6e65000060448201526064016101b2565b6001600160401b0381166105bd6060840160408501610971565b6001600160401b031611156106265760405162461bcd60e51b815260206004820152602960248201527f5468726573686f6c64206d757374206e6f7420657863656564206b6579706572604482015268207365742073697a6560b81b60648201526084016101b2565b60018054808201825560009190915282907fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6016106638282610a6c565b507ff1c5613227525376c83485d5a7995987dcfcd90512b0de33df550d2469fba9d990506106946020840184610971565b6106a46040850160208601610971565b6106b46060860160408701610971565b604080516001600160401b039485168152928416602084015292168183015290519081900360600190a15050565b6000546001600160a01b0316331461070c5760405162461bcd60e51b81526004016101b2906109d7565b61071660006108f4565b565b60408051606081018252600080825260208201819052918101919091526001805460009161074591610a3f565b90505b826001600160401b03166001828154811061076557610765610a56565b6000918252602090912001546001600160401b0316116107de576001818154811061079257610792610a56565b60009182526020918290206040805160608101825291909201546001600160401b038082168352600160401b8204811694830194909452600160801b9004909216908201529392505050565b806107e881610b0d565b915050610748565b6000546001600160a01b0316331461081a5760405162461bcd60e51b81526004016101b2906109d7565b6001600160a01b03811661087f5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b60648201526084016101b2565b610888816108f4565b50565b60408051606081018252600080825260208201819052918101919091526108b143610718565b905090565b600181815481106108c657600080fd5b6000918252602090912001546001600160401b038082169250600160401b8204811691600160801b90041683565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b60006060828403121561095657600080fd5b50919050565b6001600160401b038116811461088857600080fd5b60006020828403121561098357600080fd5b813561098e8161095c565b9392505050565b6000602082840312156109a757600080fd5b81356001600160a01b038116811461098e57600080fd5b6000602082840312156109d057600080fd5b5035919050565b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600060208284031215610a1e57600080fd5b815161098e8161095c565b634e487b7160e01b600052601160045260246000fd5b600082821015610a5157610a51610a29565b500390565b634e487b7160e01b600052603260045260246000fd5b8135610a778161095c565b6001600160401b03811690508154816001600160401b031982161783556020840135610aa28161095c565b6fffffffffffffffff0000000000000000604091821b166fffffffffffffffffffffffffffffffff19831684178117855590850135610ae08161095c565b6001600160c01b0319929092169092179190911760809190911b67ffffffffffffffff60801b1617905550565b600081610b1c57610b1c610a29565b50600019019056fea26469706673582212203a8f58149cf1b633ee913de724d3d0883fa3196d3043a97282b7a71d25e9c7a264736f6c63430008090033",
 }
 
 // KeypersConfigsListABI is the input ABI used to generate the binding from.
@@ -1956,7 +1957,7 @@ func (_KeypersConfigsList *KeypersConfigsListCallerSession) AddrsSeq() (common.A
 
 // GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
 //
-// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListCaller) GetActiveConfig(opts *bind.CallOpts, activationBlockNumber uint64) (KeypersConfig, error) {
 	var out []interface{}
 	err := _KeypersConfigsList.contract.Call(opts, &out, "getActiveConfig", activationBlockNumber)
@@ -1973,21 +1974,21 @@ func (_KeypersConfigsList *KeypersConfigsListCaller) GetActiveConfig(opts *bind.
 
 // GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
 //
-// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListSession) GetActiveConfig(activationBlockNumber uint64) (KeypersConfig, error) {
 	return _KeypersConfigsList.Contract.GetActiveConfig(&_KeypersConfigsList.CallOpts, activationBlockNumber)
 }
 
 // GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
 //
-// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListCallerSession) GetActiveConfig(activationBlockNumber uint64) (KeypersConfig, error) {
 	return _KeypersConfigsList.Contract.GetActiveConfig(&_KeypersConfigsList.CallOpts, activationBlockNumber)
 }
 
 // GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
 //
-// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListCaller) GetCurrentActiveConfig(opts *bind.CallOpts) (KeypersConfig, error) {
 	var out []interface{}
 	err := _KeypersConfigsList.contract.Call(opts, &out, "getCurrentActiveConfig")
@@ -2004,24 +2005,25 @@ func (_KeypersConfigsList *KeypersConfigsListCaller) GetCurrentActiveConfig(opts
 
 // GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
 //
-// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListSession) GetCurrentActiveConfig() (KeypersConfig, error) {
 	return _KeypersConfigsList.Contract.GetCurrentActiveConfig(&_KeypersConfigsList.CallOpts)
 }
 
 // GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
 //
-// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64,uint64))
 func (_KeypersConfigsList *KeypersConfigsListCallerSession) GetCurrentActiveConfig() (KeypersConfig, error) {
 	return _KeypersConfigsList.Contract.GetCurrentActiveConfig(&_KeypersConfigsList.CallOpts)
 }
 
 // KeypersConfigs is a free data retrieval call binding the contract method 0xfc6d0c7e.
 //
-// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListCaller) KeypersConfigs(opts *bind.CallOpts, arg0 *big.Int) (struct {
 	ActivationBlockNumber uint64
 	SetIndex              uint64
+	Threshold             uint64
 }, error) {
 	var out []interface{}
 	err := _KeypersConfigsList.contract.Call(opts, &out, "keypersConfigs", arg0)
@@ -2029,6 +2031,7 @@ func (_KeypersConfigsList *KeypersConfigsListCaller) KeypersConfigs(opts *bind.C
 	outstruct := new(struct {
 		ActivationBlockNumber uint64
 		SetIndex              uint64
+		Threshold             uint64
 	})
 	if err != nil {
 		return *outstruct, err
@@ -2036,6 +2039,7 @@ func (_KeypersConfigsList *KeypersConfigsListCaller) KeypersConfigs(opts *bind.C
 
 	outstruct.ActivationBlockNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
 	outstruct.SetIndex = *abi.ConvertType(out[1], new(uint64)).(*uint64)
+	outstruct.Threshold = *abi.ConvertType(out[2], new(uint64)).(*uint64)
 
 	return *outstruct, err
 
@@ -2043,20 +2047,22 @@ func (_KeypersConfigsList *KeypersConfigsListCaller) KeypersConfigs(opts *bind.C
 
 // KeypersConfigs is a free data retrieval call binding the contract method 0xfc6d0c7e.
 //
-// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListSession) KeypersConfigs(arg0 *big.Int) (struct {
 	ActivationBlockNumber uint64
 	SetIndex              uint64
+	Threshold             uint64
 }, error) {
 	return _KeypersConfigsList.Contract.KeypersConfigs(&_KeypersConfigsList.CallOpts, arg0)
 }
 
 // KeypersConfigs is a free data retrieval call binding the contract method 0xfc6d0c7e.
 //
-// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+// Solidity: function keypersConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListCallerSession) KeypersConfigs(arg0 *big.Int) (struct {
 	ActivationBlockNumber uint64
 	SetIndex              uint64
+	Threshold             uint64
 }, error) {
 	return _KeypersConfigsList.Contract.KeypersConfigs(&_KeypersConfigsList.CallOpts, arg0)
 }
@@ -2092,23 +2098,23 @@ func (_KeypersConfigsList *KeypersConfigsListCallerSession) Owner() (common.Addr
 	return _KeypersConfigsList.Contract.Owner(&_KeypersConfigsList.CallOpts)
 }
 
-// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+// AddNewCfg is a paid mutator transaction binding the contract method 0x33419af5.
 //
-// Solidity: function addNewCfg((uint64,uint64) config) returns()
+// Solidity: function addNewCfg((uint64,uint64,uint64) config) returns()
 func (_KeypersConfigsList *KeypersConfigsListTransactor) AddNewCfg(opts *bind.TransactOpts, config KeypersConfig) (*types.Transaction, error) {
 	return _KeypersConfigsList.contract.Transact(opts, "addNewCfg", config)
 }
 
-// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+// AddNewCfg is a paid mutator transaction binding the contract method 0x33419af5.
 //
-// Solidity: function addNewCfg((uint64,uint64) config) returns()
+// Solidity: function addNewCfg((uint64,uint64,uint64) config) returns()
 func (_KeypersConfigsList *KeypersConfigsListSession) AddNewCfg(config KeypersConfig) (*types.Transaction, error) {
 	return _KeypersConfigsList.Contract.AddNewCfg(&_KeypersConfigsList.TransactOpts, config)
 }
 
-// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+// AddNewCfg is a paid mutator transaction binding the contract method 0x33419af5.
 //
-// Solidity: function addNewCfg((uint64,uint64) config) returns()
+// Solidity: function addNewCfg((uint64,uint64,uint64) config) returns()
 func (_KeypersConfigsList *KeypersConfigsListTransactorSession) AddNewCfg(config KeypersConfig) (*types.Transaction, error) {
 	return _KeypersConfigsList.Contract.AddNewCfg(&_KeypersConfigsList.TransactOpts, config)
 }
@@ -2226,12 +2232,13 @@ func (it *KeypersConfigsListNewConfigIterator) Close() error {
 type KeypersConfigsListNewConfig struct {
 	ActivationBlockNumber uint64
 	Index                 uint64
+	Threshold             uint64
 	Raw                   types.Log // Blockchain specific contextual infos
 }
 
-// FilterNewConfig is a free log retrieval operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+// FilterNewConfig is a free log retrieval operation binding the contract event 0xf1c5613227525376c83485d5a7995987dcfcd90512b0de33df550d2469fba9d9.
 //
-// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListFilterer) FilterNewConfig(opts *bind.FilterOpts) (*KeypersConfigsListNewConfigIterator, error) {
 
 	logs, sub, err := _KeypersConfigsList.contract.FilterLogs(opts, "NewConfig")
@@ -2241,9 +2248,9 @@ func (_KeypersConfigsList *KeypersConfigsListFilterer) FilterNewConfig(opts *bin
 	return &KeypersConfigsListNewConfigIterator{contract: _KeypersConfigsList.contract, event: "NewConfig", logs: logs, sub: sub}, nil
 }
 
-// WatchNewConfig is a free log subscription operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+// WatchNewConfig is a free log subscription operation binding the contract event 0xf1c5613227525376c83485d5a7995987dcfcd90512b0de33df550d2469fba9d9.
 //
-// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListFilterer) WatchNewConfig(opts *bind.WatchOpts, sink chan<- *KeypersConfigsListNewConfig) (event.Subscription, error) {
 
 	logs, sub, err := _KeypersConfigsList.contract.WatchLogs(opts, "NewConfig")
@@ -2278,9 +2285,9 @@ func (_KeypersConfigsList *KeypersConfigsListFilterer) WatchNewConfig(opts *bind
 	}), nil
 }
 
-// ParseNewConfig is a log parse operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+// ParseNewConfig is a log parse operation binding the contract event 0xf1c5613227525376c83485d5a7995987dcfcd90512b0de33df550d2469fba9d9.
 //
-// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index, uint64 threshold)
 func (_KeypersConfigsList *KeypersConfigsListFilterer) ParseNewConfig(log types.Log) (*KeypersConfigsListNewConfig, error) {
 	event := new(KeypersConfigsListNewConfig)
 	if err := _KeypersConfigsList.contract.UnpackLog(event, "NewConfig", log); err != nil {

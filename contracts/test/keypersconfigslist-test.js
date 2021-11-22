@@ -1,6 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+const addresses = [
+  "0x0000000000000000000000000000000000000000",
+  "0x1111111111111111111111111111111111111111",
+  "0x2222222222222222222222222222222222222222",
+  "0x3333333333333333333333333333333333333333",
+];
+
 async function deploy() {
   const addrsSeqFactory = await ethers.getContractFactory("AddrsSeq");
   const addrsSeqContract = await addrsSeqFactory.deploy();
@@ -22,10 +29,11 @@ async function getAddrsSeq(configContract) {
 }
 
 async function getConfig(configContract, blockNumber) {
-  configContract = await configContract.getActiveConfig(blockNumber);
+  const config = await configContract.getActiveConfig(blockNumber);
   return {
-    activationBlockNumber: configContract[0].toNumber(),
-    setIndex: configContract[1].toNumber(),
+    activationBlockNumber: config.activationBlockNumber.toNumber(),
+    setIndex: config.setIndex.toNumber(),
+    threshold: config.threshold.toNumber(),
   };
 }
 
@@ -36,40 +44,47 @@ describe("KeypersConfigsList", function () {
 
     const blockNumber = 123;
     const index = 0;
+    const threshold = 0;
     const blockNumber2 = 123456;
     const index2 = 1;
+    const threshold2 = 3;
 
     await expect(
       configContract.addNewCfg({
         activationBlockNumber: blockNumber,
         setIndex: index,
+        threshold: threshold,
       })
     )
       .to.emit(configContract, "NewConfig")
-      .withArgs(blockNumber, index);
+      .withArgs(blockNumber, index, threshold);
     let kprSet = await configContract.keypersConfigs(1);
     expect(kprSet.activationBlockNumber).to.equal(blockNumber);
     expect(kprSet.setIndex).to.equal(index);
+    expect(kprSet.threshold).to.equal(threshold);
 
+    await addrsSeq.add(addresses);
     await addrsSeq.append();
     await expect(
       configContract.addNewCfg({
         activationBlockNumber: blockNumber2,
         setIndex: index2,
+        threshold: threshold2,
       })
     )
       .to.emit(configContract, "NewConfig")
-      .withArgs(blockNumber2, index2);
+      .withArgs(blockNumber2, index2, threshold2);
     kprSet = await configContract.keypersConfigs(2);
     expect(kprSet.activationBlockNumber).to.equal(blockNumber2);
     expect(kprSet.setIndex).to.equal(index2);
+    expect(kprSet.threshold).to.equal(threshold2);
   });
 
   it("should be impossible to add new set when not sequenced", async function () {
     const cfg = await deploy();
 
     await expect(
-      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 2 })
+      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 2, threshold: 1 })
     ).to.be.revertedWith(
       "No appended set in seq corresponding to config's set index"
     );
@@ -79,9 +94,17 @@ describe("KeypersConfigsList", function () {
     const cfg = await deploy();
     const blockNumber = 123;
 
-    await cfg.addNewCfg({ activationBlockNumber: blockNumber, setIndex: 0 });
+    await cfg.addNewCfg({
+      activationBlockNumber: blockNumber,
+      setIndex: 0,
+      threshold: 0,
+    });
     await expect(
-      cfg.addNewCfg({ activationBlockNumber: blockNumber - 1, setIndex: 0 })
+      cfg.addNewCfg({
+        activationBlockNumber: blockNumber - 1,
+        setIndex: 0,
+        threshold: 0,
+      })
     ).to.be.revertedWith(
       "Cannot add new set with lower block number than previous"
     );
@@ -91,8 +114,40 @@ describe("KeypersConfigsList", function () {
     const cfg = await deploy();
 
     await expect(
-      cfg.addNewCfg({ activationBlockNumber: 1, setIndex: 0 })
+      cfg.addNewCfg({ activationBlockNumber: 1, setIndex: 0, threshold: 0 })
     ).to.be.revertedWith("Cannot add new set with past block number");
+  });
+
+  it("should be impossible to add sets with threshold 0 and non-empty keyper set", async function () {
+    const cfg = await deploy();
+    const addrsSeq = await getAddrsSeq(cfg);
+
+    await addrsSeq.add(addresses);
+    await addrsSeq.append();
+
+    await expect(
+      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 1, threshold: 0 })
+    ).to.be.revertedWith("Threshold must be at least one");
+  });
+
+  it("should be impossible to add sets with threshold non-zero and empty keyper set", async function () {
+    const cfg = await deploy();
+
+    await expect(
+      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 0, threshold: 1 })
+    ).to.be.revertedWith("Threshold must be zero if keyper set is empty");
+  });
+
+  it("should be impossible to add sets with threshold exceeding keyper set size", async function () {
+    const cfg = await deploy();
+    const addrsSeq = await getAddrsSeq(cfg);
+
+    await addrsSeq.add(addresses);
+    await addrsSeq.append();
+
+    await expect(
+      cfg.addNewCfg({ activationBlockNumber: 123, setIndex: 1, threshold: 5 })
+    ).to.be.revertedWith("Threshold must not exceed keyper set size");
   });
 
   it("not owner should not be able to add new set", async function () {
@@ -104,7 +159,7 @@ describe("KeypersConfigsList", function () {
     await expect(
       cfg
         .connect(notOwner)
-        .addNewCfg({ activationBlockNumber: 123, setIndex: 0 })
+        .addNewCfg({ activationBlockNumber: 123, setIndex: 0, threshold: 1 })
     ).to.be.revertedWith("Ownable: caller is not the owner");
   });
 
@@ -115,27 +170,34 @@ describe("KeypersConfigsList", function () {
     expect(await getConfig(cfg, 0)).to.deep.equal({
       activationBlockNumber: 0,
       setIndex: 0,
+      threshold: 0,
     });
 
     const blockNumber = 123;
     const index = 1;
+    const threshold = 2;
+    await addrsSeq.add(addresses);
     await addrsSeq.append();
     await cfg.addNewCfg({
       activationBlockNumber: blockNumber,
       setIndex: index,
+      threshold: threshold,
     });
 
     expect(await getConfig(cfg, blockNumber)).to.deep.equal({
       activationBlockNumber: blockNumber,
       setIndex: index,
+      threshold: threshold,
     });
     expect(await getConfig(cfg, blockNumber + 1)).to.deep.equal({
       activationBlockNumber: blockNumber,
       setIndex: index,
+      threshold: threshold,
     });
     expect(await getConfig(cfg, blockNumber - 1)).to.deep.equal({
       activationBlockNumber: 0,
       setIndex: 0,
+      threshold: 0,
     });
   });
 
@@ -144,17 +206,25 @@ describe("KeypersConfigsList", function () {
     const addrsSeq = await getAddrsSeq(cfg);
     const blockNumber = 123;
     const newIndex = 1;
+    const threshold = 1;
 
-    await cfg.addNewCfg({ activationBlockNumber: blockNumber, setIndex: 0 });
+    await cfg.addNewCfg({
+      activationBlockNumber: blockNumber,
+      setIndex: 0,
+      threshold: 0,
+    });
+    await addrsSeq.add(addresses);
     await addrsSeq.append();
     await cfg.addNewCfg({
       activationBlockNumber: blockNumber,
       setIndex: newIndex,
+      threshold: threshold,
     });
 
     expect(await getConfig(cfg, blockNumber)).to.deep.equal({
       activationBlockNumber: blockNumber,
       setIndex: newIndex,
+      threshold: threshold,
     });
   });
 });
