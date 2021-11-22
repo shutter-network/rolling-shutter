@@ -22,6 +22,7 @@ const finalityOffset = 3
 func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	events := []*eventsyncer.EventType{
 		d.contracts.KeypersConfigsListNewConfig,
+		d.contracts.DecryptorsConfigsListNewConfig,
 	}
 
 	eventSyncProgress, err := d.db.GetEventSyncProgress(ctx)
@@ -109,6 +110,8 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 	switch event := eventSyncUpdate.Event.(type) {
 	case contract.KeypersConfigsListNewConfig:
 		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
+	case contract.DecryptorsConfigsListNewConfig:
+		err = h.handleDecryptorsConfigsListNewConfigEvent(ctx, event)
 	case nil:
 		// event is nil if no event is found for some time
 	default:
@@ -150,7 +153,7 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	}
 	addrs, err := h.contracts.Keypers.GetAddrs(callOpts, event.Index)
 	if err != nil {
-		return errors.Wrapf(err, "failed to query addrs set from contract")
+		return errors.Wrapf(err, "failed to query keyper addrs set from contract")
 	}
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
@@ -162,6 +165,39 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to insert keyper set into db")
+	}
+	return nil
+}
+
+func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Context, event contract.DecryptorsConfigsListNewConfig) error {
+	log.Printf(
+		"handling NewConfig event from decryptors config contract in block %d (index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+	)
+	callOpts := &bind.CallOpts{
+		Pending: false,
+		// We call for the current height instead of the height at which the event was emitted,
+		// because the sets cannot change retroactively and we won't need an archive node.
+		BlockNumber: nil,
+		Context:     ctx,
+	}
+	addrs, err := h.contracts.Decryptors.GetAddrs(callOpts, event.Index)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query decryptor addrs set from contract")
+	}
+	if event.ActivationBlockNumber > math.MaxInt64 {
+		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
+	}
+	for _, addr := range addrs {
+		encodedAddress := shdb.EncodeAddress(addr)
+		err = h.db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
+			ActivationBlockNumber: int64(event.ActivationBlockNumber),
+			Index:                 int32(event.Index),
+			Address:               encodedAddress,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert decryptor set member into db")
+		}
 	}
 	return nil
 }
