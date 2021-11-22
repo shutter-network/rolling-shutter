@@ -158,7 +158,7 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	err = h.db.InsertKeyperSet(ctx, dcrdb.InsertKeyperSetParams{
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
 		Keypers:               shdb.EncodeAddresses(addrs),
-		Threshold:             1, // TODO: take threshold from config contract when defined
+		Threshold:             int32(event.Threshold),
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to insert keyper set into db")
