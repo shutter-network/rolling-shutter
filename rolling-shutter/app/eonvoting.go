@@ -24,7 +24,7 @@ func (v *EonStartVoting) AddVote(sender common.Address, activationBlockNumber ui
 	v.AddVoteForIndex(sender, len(v.Candidates)-1)
 }
 
-// Outcome checks if a start batch index has a majority and if so returns it.
+// Outcome checks if an activation block number has a majority and if so returns it.
 func (v *EonStartVoting) Outcome(numRequiredVotes int) (uint64, bool) {
 	i, success := v.OutcomeIndex(numRequiredVotes)
 	if !success {
