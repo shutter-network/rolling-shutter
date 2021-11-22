@@ -14,6 +14,7 @@ module.exports = async function (hre) {
   await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: index,
+    threshold: Math.ceil((keyperAddrs.length / 3) * 2),
   });
   console.log(
     "configure keypers: activationBlockNumber %s keypers: %s",
