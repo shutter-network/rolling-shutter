@@ -171,3 +171,15 @@ func Lookup(opts *bind.CallOpts, contracts *deployment.Contracts, addr common.Ad
 	}
 	return raw.getKey()
 }
+
+func VerifySignature(publicKey []byte, signature []byte, address common.Address) bool {
+	pk := new(shbls.PublicKey)
+	if err := pk.Unmarshal(publicKey); err != nil {
+		return false
+	}
+	sig := new(shbls.Signature)
+	if err := sig.Unmarshal(signature); err != nil {
+		return false
+	}
+	return shbls.Verify(sig, pk, address.Bytes())
+}

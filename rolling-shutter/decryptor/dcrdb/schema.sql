@@ -1,4 +1,4 @@
--- schema-version: 10 --
+-- schema-version: 11 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS decryptor.aggregated_signature (
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
        address text PRIMARY KEY,
-       bls_public_key bytea
+       bls_public_key bytea,
+       bls_signature bytea,
+       signature_verified boolean NOT NULL DEFAULT false
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
        activation_block_number bigint NOT NULL,

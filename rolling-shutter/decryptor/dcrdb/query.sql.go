@@ -129,6 +129,23 @@ func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryption
 	return items, nil
 }
 
+const getDecryptorIdentity = `-- name: GetDecryptorIdentity :one
+SELECT address, bls_public_key, bls_signature, signature_verified FROM decryptor.decryptor_identity
+WHERE address = $1
+`
+
+func (q *Queries) GetDecryptorIdentity(ctx context.Context, address string) (DecryptorDecryptorIdentity, error) {
+	row := q.db.QueryRow(ctx, getDecryptorIdentity, address)
+	var i DecryptorDecryptorIdentity
+	err := row.Scan(
+		&i.Address,
+		&i.BlsPublicKey,
+		&i.BlsSignature,
+		&i.SignatureVerified,
+	)
+	return i, err
+}
+
 const getDecryptorIndex = `-- name: GetDecryptorIndex :one
 SELECT index
 FROM decryptor.decryptor_set_member
@@ -173,7 +190,9 @@ SELECT
     member.activation_block_number,
     member.index,
     member.address,
-    identity.bls_public_key
+    identity.bls_public_key,
+    identity.bls_signature,
+    coalesce(identity.signature_verified, false)
 FROM (
     SELECT
         activation_block_number,
@@ -199,6 +218,8 @@ type GetDecryptorSetRow struct {
 	Index                 int32
 	Address               string
 	BlsPublicKey          []byte
+	BlsSignature          []byte
+	SignatureVerified     bool
 }
 
 func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int64) ([]GetDecryptorSetRow, error) {
@@ -215,6 +236,8 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int
 			&i.Index,
 			&i.Address,
 			&i.BlsPublicKey,
+			&i.BlsSignature,
+			&i.SignatureVerified,
 		); err != nil {
 			return nil, err
 		}
@@ -379,24 +402,6 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 	)
 }
 
-const insertDecryptorIdentity = `-- name: InsertDecryptorIdentity :exec
-INSERT INTO decryptor.decryptor_identity (
-    address, bls_public_key
-) VALUES (
-    $1, $2
-)
-`
-
-type InsertDecryptorIdentityParams struct {
-	Address      string
-	BlsPublicKey []byte
-}
-
-func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecryptorIdentityParams) error {
-	_, err := q.db.Exec(ctx, insertDecryptorIdentity, arg.Address, arg.BlsPublicKey)
-	return err
-}
-
 const insertDecryptorSetMember = `-- name: InsertDecryptorSetMember :exec
 INSERT INTO decryptor.decryptor_set_member (
     activation_block_number, index, address
@@ -467,6 +472,63 @@ type InsertMetaParams struct {
 
 func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
+}
+
+const updateDecryptorBLSPublicKey = `-- name: UpdateDecryptorBLSPublicKey :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, bls_public_key
+) VALUES (
+    $1, $2
+) ON CONFLICT (address) DO UPDATE
+    SET bls_public_key = excluded.bls_public_key
+`
+
+type UpdateDecryptorBLSPublicKeyParams struct {
+	Address      string
+	BlsPublicKey []byte
+}
+
+func (q *Queries) UpdateDecryptorBLSPublicKey(ctx context.Context, arg UpdateDecryptorBLSPublicKeyParams) error {
+	_, err := q.db.Exec(ctx, updateDecryptorBLSPublicKey, arg.Address, arg.BlsPublicKey)
+	return err
+}
+
+const updateDecryptorBLSSignature = `-- name: UpdateDecryptorBLSSignature :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, bls_signature
+) VALUES (
+    $1, $2
+) ON CONFLICT (address) DO UPDATE
+    SET bls_signature = excluded.bls_signature
+`
+
+type UpdateDecryptorBLSSignatureParams struct {
+	Address      string
+	BlsSignature []byte
+}
+
+func (q *Queries) UpdateDecryptorBLSSignature(ctx context.Context, arg UpdateDecryptorBLSSignatureParams) error {
+	_, err := q.db.Exec(ctx, updateDecryptorBLSSignature, arg.Address, arg.BlsSignature)
+	return err
+}
+
+const updateDecryptorSignatureVerified = `-- name: UpdateDecryptorSignatureVerified :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, signature_verified
+) VALUES (
+    $1, $2
+) ON CONFLICT (address) DO UPDATE
+    SET signature_verified = excluded.signature_verified
+`
+
+type UpdateDecryptorSignatureVerifiedParams struct {
+	Address           string
+	SignatureVerified bool
+}
+
+func (q *Queries) UpdateDecryptorSignatureVerified(ctx context.Context, arg UpdateDecryptorSignatureVerifiedParams) error {
+	_, err := q.db.Exec(ctx, updateDecryptorSignatureVerified, arg.Address, arg.SignatureVerified)
 	return err
 }
 

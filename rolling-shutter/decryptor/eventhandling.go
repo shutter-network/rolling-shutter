@@ -6,12 +6,14 @@ import (
 	"math"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shuttermint/contract"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
+	"github.com/shutter-network/shutter/shuttermint/decryptor/blsregistry"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -23,6 +25,8 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	events := []*eventsyncer.EventType{
 		d.contracts.KeypersConfigsListNewConfig,
 		d.contracts.DecryptorsConfigsListNewConfig,
+		d.contracts.BLSPublicKeyRegistryRegistered,
+		d.contracts.BLSSignatureRegistryRegistered,
 	}
 
 	eventSyncProgress, err := d.db.GetEventSyncProgress(ctx)
@@ -112,6 +116,15 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
 	case contract.DecryptorsConfigsListNewConfig:
 		err = h.handleDecryptorsConfigsListNewConfigEvent(ctx, event)
+	case contract.RegistryRegistered:
+		switch event.Raw.Address {
+		case h.contracts.BLSPublicKeyRegistryRegistered.Address:
+			err = h.handleBLSPublicKeyRegistryRegistered(ctx, event)
+		case h.contracts.BLSSignatureRegistryDeployment.Address:
+			err = h.handleBLSSignatureRegistryRegistered(ctx, event)
+		default:
+			log.Printf("ignoring Registered event from unknown contract %s", event.Raw.Address)
+		}
 	case nil:
 		// event is nil if no event is found for some time
 	default:
@@ -188,16 +201,79 @@ func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Con
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
-	for _, addr := range addrs {
+	for i, addr := range addrs {
 		encodedAddress := shdb.EncodeAddress(addr)
 		err = h.db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
-			Index:                 int32(event.Index),
+			Index:                 int32(i),
 			Address:               encodedAddress,
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert decryptor set member into db")
 		}
 	}
+	return nil
+}
+
+func (h *eventHandler) handleBLSPublicKeyRegistryRegistered(ctx context.Context, event contract.RegistryRegistered) error {
+	log.Printf(
+		"handling BLS Public Key Registry event in block %d for decryptor %s",
+		event.Raw.BlockNumber, event.A,
+	)
+	err := h.db.UpdateDecryptorBLSPublicKey(ctx, dcrdb.UpdateDecryptorBLSPublicKeyParams{
+		Address:      shdb.EncodeAddress(event.A),
+		BlsPublicKey: event.Data,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to update decryptor BLS public key")
+	}
+	if err := h.maybeVerifyDecryptorSignature(ctx, event.A); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *eventHandler) handleBLSSignatureRegistryRegistered(ctx context.Context, event contract.RegistryRegistered) error {
+	log.Printf(
+		"handling BLS Signature Registry event in block %d for decryptor %s",
+		event.Raw.BlockNumber, event.A,
+	)
+	err := h.db.UpdateDecryptorBLSSignature(ctx, dcrdb.UpdateDecryptorBLSSignatureParams{
+		Address:      shdb.EncodeAddress(event.A),
+		BlsSignature: event.Data,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to update decryptor BLS signature")
+	}
+	if err := h.maybeVerifyDecryptorSignature(ctx, event.A); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *eventHandler) maybeVerifyDecryptorSignature(ctx context.Context, address common.Address) error {
+	identity, err := h.db.GetDecryptorIdentity(ctx, shdb.EncodeAddress(address))
+	if err != nil {
+		return errors.Wrapf(err, "failed to get decryptor identity from db")
+	}
+
+	if identity.SignatureVerified {
+		return nil
+	}
+	if !blsregistry.VerifySignature(identity.BlsPublicKey, identity.BlsSignature, address) {
+		if len(identity.BlsPublicKey) != 0 && len(identity.BlsSignature) != 0 {
+			log.Printf("Registered BLS signature of decryptor %s is invalid", identity.Address)
+		}
+		return nil
+	}
+
+	err = h.db.UpdateDecryptorSignatureVerified(ctx, dcrdb.UpdateDecryptorSignatureVerifiedParams{
+		Address:           shdb.EncodeAddress(address),
+		SignatureVerified: true,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to set decryptor signature verification status")
+	}
+	log.Printf("Registered BLS signature of decryptor %s verified", identity.Address)
 	return nil
 }

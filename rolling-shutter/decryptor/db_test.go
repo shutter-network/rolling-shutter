@@ -33,7 +33,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 		{1},
 	}
 	for i := 0; i < len(addresses); i++ {
-		err := db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+		err := db.UpdateDecryptorBLSPublicKey(ctx, dcrdb.UpdateDecryptorBLSPublicKeyParams{
 			Address:      addresses[i],
 			BlsPublicKey: keys[i],
 		})
@@ -58,12 +58,14 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Index:                 0,
 			Address:               addresses[0],
 			BlsPublicKey:          keys[0],
+			SignatureVerified:     false,
 		},
 		{
 			ActivationBlockNumber: 0,
 			Index:                 1,
 			Address:               addresses[1],
 			BlsPublicKey:          keys[1],
+			SignatureVerified:     false,
 		},
 	})
 
