@@ -12,6 +12,7 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
+	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect

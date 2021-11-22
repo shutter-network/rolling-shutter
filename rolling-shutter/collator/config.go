@@ -20,9 +20,10 @@ type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 
-	EthereumURL   string
-	DeploymentDir string
-	DatabaseURL   string
+	EthereumURL       string
+	DeploymentDir     string
+	DatabaseURL       string
+	HTTPListenAddress string
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      libp2pcrypto.PrivKey
@@ -40,6 +41,8 @@ DeploymentDir   = "{{ .DeploymentDir }}"
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
 # If it's empty, we use the standard PG* environment variables
 DatabaseURL     = "{{ .DatabaseURL }}"
+
+HTTPListenAddress = "{{ .HTTPListenAddress }}"
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"
