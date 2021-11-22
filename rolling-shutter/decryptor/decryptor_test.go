@@ -39,6 +39,11 @@ func populateDBWithDecryptors(ctx context.Context, t *testing.T, db *dcrdb.Queri
 			BlsPublicKey: shbls.SecretToPublicKey(signingKey).Marshal(),
 		})
 		assert.NilError(t, err)
+		err = db.UpdateDecryptorSignatureVerified(ctx, dcrdb.UpdateDecryptorSignatureVerifiedParams{
+			Address:           arbitraryAddress,
+			SignatureVerified: true, // pretend that we've verified the BLS signature
+		})
+		assert.NilError(t, err)
 	}
 }
 

@@ -265,22 +265,25 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 		if len(decryptorIndexes) != 1 {
 			return false
 		}
-		dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
-			Index:                 decryptorIndexes[0],
+		decryptorSetMember, err := d.db.GetDecryptorSetMember(ctx, dcrdb.GetDecryptorSetMemberParams{
 			ActivationBlockNumber: int64(activationBlockNumber),
+			Index:                 decryptorIndexes[0],
 		})
 		if err == pgx.ErrNoRows {
 			return false
 		}
 		if err != nil {
-			log.Printf("error while getting decryption key from database: %s", err)
+			log.Printf("error while getting decryptor set member from database: %s", err)
 			return false
 		}
-		key := new(shbls.PublicKey)
-		if err := key.Unmarshal(dbKey); err != nil {
+		if !decryptorSetMember.SignatureVerified {
 			return false
 		}
 
+		key := new(shbls.PublicKey)
+		if err := key.Unmarshal(decryptorSetMember.BlsPublicKey); err != nil {
+			return false
+		}
 		return shbls.Verify(signature.signature, key, signature.signedHash.Bytes())
 	}
 }
@@ -310,21 +313,29 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 		if len(decryptorIndexes) == 0 {
 			return false
 		}
+		decryptorSet, err := d.db.GetDecryptorSet(ctx, int64(activationBlockNumber))
+		if err != nil {
+			log.Printf("failed to get decryptor set from db for block number %d", activationBlockNumber)
+			return false
+		}
+
 		keys := make([]*shbls.PublicKey, 0, len(decryptorIndexes))
 		for _, decryptorIndex := range decryptorIndexes {
-			dbKey, err := d.db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
-				Index:                 decryptorIndex,
-				ActivationBlockNumber: int64(activationBlockNumber),
-			})
-			if err == pgx.ErrNoRows {
+			decryptorSetMember, ok := dcrdb.SearchDecryptorSetRowsForIndex(decryptorSet, decryptorIndex)
+			if !ok {
+				log.Printf(
+					"failed to find decryptor for activation block number %d and index %d in db",
+					activationBlockNumber, decryptorIndex,
+				)
 				return false
 			}
-			if err != nil {
-				log.Printf("error while getting decryption key from database: %s", err)
+			if !decryptorSetMember.SignatureVerified {
 				return false
 			}
+
 			key := new(shbls.PublicKey)
-			if err := key.Unmarshal(dbKey); err != nil {
+			if err := key.Unmarshal(decryptorSetMember.BlsPublicKey); err != nil {
+				log.Printf("failed to unmarshal BLS public key of decryptor %s in db", decryptorSetMember.Address)
 				return false
 			}
 			keys = append(keys, key)

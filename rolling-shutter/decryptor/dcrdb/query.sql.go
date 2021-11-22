@@ -146,45 +146,6 @@ func (q *Queries) GetDecryptorIdentity(ctx context.Context, address string) (Dec
 	return i, err
 }
 
-const getDecryptorIndex = `-- name: GetDecryptorIndex :one
-SELECT index
-FROM decryptor.decryptor_set_member
-WHERE activation_block_number <= $1 AND address = $2
-ORDER BY activation_block_number DESC LIMIT 1
-`
-
-type GetDecryptorIndexParams struct {
-	ActivationBlockNumber int64
-	Address               string
-}
-
-func (q *Queries) GetDecryptorIndex(ctx context.Context, arg GetDecryptorIndexParams) (int32, error) {
-	row := q.db.QueryRow(ctx, getDecryptorIndex, arg.ActivationBlockNumber, arg.Address)
-	var index int32
-	err := row.Scan(&index)
-	return index, err
-}
-
-const getDecryptorKey = `-- name: GetDecryptorKey :one
-SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
-    SELECT address FROM decryptor.decryptor_set_member
-    WHERE index = $1 AND activation_block_number <= $2
-    ORDER BY activation_block_number DESC LIMIT 1
-)
-`
-
-type GetDecryptorKeyParams struct {
-	Index                 int32
-	ActivationBlockNumber int64
-}
-
-func (q *Queries) GetDecryptorKey(ctx context.Context, arg GetDecryptorKeyParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getDecryptorKey, arg.Index, arg.ActivationBlockNumber)
-	var bls_public_key []byte
-	err := row.Scan(&bls_public_key)
-	return bls_public_key, err
-}
-
 const getDecryptorSet = `-- name: GetDecryptorSet :many
 SELECT
     member.activation_block_number,
@@ -247,6 +208,62 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int
 		return nil, err
 	}
 	return items, nil
+}
+
+const getDecryptorSetMember = `-- name: GetDecryptorSetMember :one
+SELECT
+    m1.activation_block_number,
+    m1.index,
+    m1.address,
+    identity.bls_public_key,
+    identity.bls_signature,
+    coalesce(identity.signature_verified, false)
+FROM (
+    SELECT
+        m2.activation_block_number,
+        m2.index,
+        m2.address
+    FROM decryptor.decryptor_set_member AS m2
+    WHERE activation_block_number = (
+        SELECT
+            m3.activation_block_number
+        FROM decryptor.decryptor_set_member AS m3
+        WHERE m3.activation_block_number <= $1
+        ORDER BY m3.activation_block_number DESC
+        LIMIT 1
+    ) AND m2.index = $2
+) AS m1
+LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+ON m1.address = identity.address
+ORDER BY index
+`
+
+type GetDecryptorSetMemberParams struct {
+	ActivationBlockNumber int64
+	Index                 int32
+}
+
+type GetDecryptorSetMemberRow struct {
+	ActivationBlockNumber int64
+	Index                 int32
+	Address               string
+	BlsPublicKey          []byte
+	BlsSignature          []byte
+	SignatureVerified     bool
+}
+
+func (q *Queries) GetDecryptorSetMember(ctx context.Context, arg GetDecryptorSetMemberParams) (GetDecryptorSetMemberRow, error) {
+	row := q.db.QueryRow(ctx, getDecryptorSetMember, arg.ActivationBlockNumber, arg.Index)
+	var i GetDecryptorSetMemberRow
+	err := row.Scan(
+		&i.ActivationBlockNumber,
+		&i.Index,
+		&i.Address,
+		&i.BlsPublicKey,
+		&i.BlsSignature,
+		&i.SignatureVerified,
+	)
+	return i, err
 }
 
 const getEonPublicKey = `-- name: GetEonPublicKey :one

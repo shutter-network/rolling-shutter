@@ -104,6 +104,12 @@ func handleSignatureInput(
 		return nil, nil
 	}
 
+	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
+	decryptorSet, err := db.GetDecryptorSet(ctx, int64(activationBlockNumber))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query decryptor set from db")
+	}
+
 	signaturesToAggregate := make([]*shbls.Signature, 0, len(dbSignatures))
 	publicKeysToAggragate := make([]*shbls.PublicKey, 0, len(dbSignatures))
 	signerBitfield := make([]byte, len(signature.SignerBitfield))
@@ -121,18 +127,21 @@ func handleSignatureInput(
 		if len(indexes) == 0 {
 			panic("could not retrieve signer index from bitfield")
 		}
-		epochID := shdb.DecodeUint64(dbSignature.EpochID)
-		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(epochID)
-		pkBytes, err := db.GetDecryptorKey(ctx, dcrdb.GetDecryptorKeyParams{
-			Index:                 indexes[0],
-			ActivationBlockNumber: int64(activationBlockNumber),
-		})
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query public key of decryptor #%d from db", indexes[0])
+
+		decryptorSetMember, ok := dcrdb.SearchDecryptorSetRowsForIndex(decryptorSet, indexes[0])
+		if !ok {
+			log.Printf(
+				"failed to find decryptor for activation block number %d and index %d in db",
+				activationBlockNumber, indexes[0],
+			)
+			continue
+		}
+		if !decryptorSetMember.SignatureVerified {
+			continue
 		}
 		pk := new(shbls.PublicKey)
-		if err := pk.Unmarshal(pkBytes); err != nil {
-			log.Printf("failed to unmarshal public key from db %s", err)
+		if err := pk.Unmarshal(decryptorSetMember.BlsPublicKey); err != nil {
+			log.Printf("failed to unmarshal public key from db: %s", err)
 			continue
 		}
 
