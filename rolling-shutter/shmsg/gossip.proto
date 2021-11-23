@@ -6,6 +6,8 @@ option go_package = "./;shmsg";
 message DecryptionTrigger {
     uint64 instanceID = 1;
     uint64 epochID = 2;
+    bytes transactionsHash = 3;
+    bytes signature = 4;
 }
 
 // TODO: replace keyper index by signature

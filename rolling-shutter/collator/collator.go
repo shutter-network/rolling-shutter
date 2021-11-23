@@ -13,12 +13,14 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 type Collator struct {
@@ -104,14 +106,58 @@ func (c *Collator) Run(ctx context.Context) error {
 	errorgroup, errorctx := errgroup.WithContext(ctx)
 	errorgroup.Go(httpServer.ListenAndServe)
 	errorgroup.Go(func() error {
-		return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
-	})
-	errorgroup.Go(func() error {
 		<-errorctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		return httpServer.Shutdown(shutdownCtx)
 	})
+	errorgroup.Go(func() error {
+		return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
+	})
+	errorgroup.Go(func() error {
+		return c.processEpochLoop(errorctx)
+	})
 
 	return errorgroup.Wait()
+}
+
+func (c *Collator) processEpochLoop(ctx context.Context) error {
+	sleepDuration := time.Duration(c.Config.EpochDuration) * time.Millisecond
+
+	for {
+		select {
+		case <-time.After(sleepDuration):
+			if err := c.newEpoch(ctx); err != nil {
+				log.Printf("error creating new epoch: %s", err)
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (c *Collator) newEpoch(ctx context.Context) error {
+	outMessages, err := handleEpoch(ctx, c.Config, c.db)
+	if err != nil {
+		return err
+	}
+
+	for _, msgOut := range outMessages {
+		if err := c.sendMessage(ctx, msgOut); err != nil {
+			log.Printf("error sending message %+v: %s", msgOut, err)
+			continue
+		}
+	}
+	return nil
+}
+
+func (c *Collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal p2p message")
+	}
+	log.Printf("sending message %v", msg)
+
+	return c.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }

@@ -29,6 +29,8 @@ type Config struct {
 	P2PKey      libp2pcrypto.PrivKey
 
 	InstanceID uint64
+
+	EpochDuration uint64
 }
 
 var configTemplate = `# Shutter collator config
@@ -54,6 +56,9 @@ P2PKey          = "{{ .P2PKey | P2PKey}}"
 
 # ID shared by all shutter participants for common instance
 InstanceID = {{ .InstanceID }}
+
+# The duration of an epoch in milliseconds
+EpochDuration = {{ .EpochDuration }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("collator", configTemplate)

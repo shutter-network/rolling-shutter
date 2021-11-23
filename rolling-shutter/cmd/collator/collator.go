@@ -102,9 +102,11 @@ func readConfig() (collator.Config, error) {
 	viper.BindEnv("ListenAddress")
 	viper.BindEnv("PeerMultiaddrs")
 	viper.BindEnv("EthereumKey")
+	viper.BindEnv("EpochDuration")
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
 	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("EpochDuration", 5000)
 
 	config := collator.Config{}
 
@@ -149,6 +151,7 @@ func exampleConfig() (*collator.Config, error) {
 		HTTPListenAddress: ":3000",
 		EthereumKey:       ethereumKey,
 		P2PKey:            p2pkey,
+		EpochDuration:     5000,
 	}, nil
 }
 

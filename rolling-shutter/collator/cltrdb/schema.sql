@@ -9,3 +9,13 @@ CREATE TABLE collator.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL
 );
+
+CREATE TABLE collator.decryption_trigger(
+    epoch_id bytea PRIMARY KEY,
+    batch_hash bytea
+);
+
+CREATE TABLE collator.cipher_batch(
+    epoch_id bytea PRIMARY KEY,
+    transactions bytea[]
+);

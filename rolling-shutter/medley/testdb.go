@@ -2,11 +2,13 @@ package medley
 
 import (
 	"context"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
+	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 )
@@ -16,6 +18,7 @@ const testDBURLVar = "ROLLING_SHUTTER_TESTDB_URL"
 const dropEverything = `
 	DROP SCHEMA IF EXISTS decryptor CASCADE;
 	DROP SCHEMA IF EXISTS keyper CASCADE;
+	DROP SCHEMA IF EXISTS collator CASCADE;
 `
 
 // NewTestDBPool connects to a test db specified an environment variable and clears it from all
@@ -74,6 +77,20 @@ func NewDecryptorTestDB(ctx context.Context, t *testing.T) (*dcrdb.Queries, func
 	if err != nil {
 		closedb()
 		t.Fatalf("failed to initialize decryptor db")
+	}
+	return db, closedb
+}
+
+func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, func()) {
+	t.Helper()
+
+	dbpool, closedb := NewTestDBPool(ctx, t)
+	db := cltrdb.New(dbpool)
+	err := cltrdb.InitDB(ctx, dbpool)
+	if err != nil {
+		log.Println(err)
+		closedb()
+		t.Fatalf("failed to initialize collator db")
 	}
 	return db, closedb
 }

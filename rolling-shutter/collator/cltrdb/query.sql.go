@@ -7,6 +7,28 @@ import (
 	"context"
 )
 
+const getBatch = `-- name: GetBatch :one
+SELECT epoch_id, transactions FROM collator.cipher_batch WHERE epoch_id = $1
+`
+
+func (q *Queries) GetBatch(ctx context.Context, epochID []byte) (CollatorCipherBatch, error) {
+	row := q.db.QueryRow(ctx, getBatch, epochID)
+	var i CollatorCipherBatch
+	err := row.Scan(&i.EpochID, &i.Transactions)
+	return i, err
+}
+
+const getLastTrigger = `-- name: GetLastTrigger :one
+SELECT epoch_id, batch_hash FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
+`
+
+func (q *Queries) GetLastTrigger(ctx context.Context) (CollatorDecryptionTrigger, error) {
+	row := q.db.QueryRow(ctx, getLastTrigger)
+	var i CollatorDecryptionTrigger
+	err := row.Scan(&i.EpochID, &i.BatchHash)
+	return i, err
+}
+
 const getMeta = `-- name: GetMeta :one
 SELECT key, value FROM collator.meta_inf WHERE key = $1
 `
@@ -16,6 +38,31 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (CollatorMetaInf, err
 	var i CollatorMetaInf
 	err := row.Scan(&i.Key, &i.Value)
 	return i, err
+}
+
+const getTrigger = `-- name: GetTrigger :one
+SELECT epoch_id, batch_hash FROM collator.decryption_trigger WHERE epoch_id = $1
+`
+
+func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (CollatorDecryptionTrigger, error) {
+	row := q.db.QueryRow(ctx, getTrigger, epochID)
+	var i CollatorDecryptionTrigger
+	err := row.Scan(&i.EpochID, &i.BatchHash)
+	return i, err
+}
+
+const insertBatch = `-- name: InsertBatch :exec
+INSERT INTO collator.cipher_batch (epoch_id, transactions) VALUES ($1, $2)
+`
+
+type InsertBatchParams struct {
+	EpochID      []byte
+	Transactions [][]byte
+}
+
+func (q *Queries) InsertBatch(ctx context.Context, arg InsertBatchParams) error {
+	_, err := q.db.Exec(ctx, insertBatch, arg.EpochID, arg.Transactions)
+	return err
 }
 
 const insertMeta = `-- name: InsertMeta :exec
@@ -29,5 +76,19 @@ type InsertMetaParams struct {
 
 func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
+	return err
+}
+
+const insertTrigger = `-- name: InsertTrigger :exec
+INSERT INTO collator.decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2)
+`
+
+type InsertTriggerParams struct {
+	EpochID   []byte
+	BatchHash []byte
+}
+
+func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) error {
+	_, err := q.db.Exec(ctx, insertTrigger, arg.EpochID, arg.BatchHash)
 	return err
 }
