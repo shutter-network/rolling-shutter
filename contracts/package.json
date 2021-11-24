@@ -1,6 +1,10 @@
 {
   "name": "hardhat-project",
   "license": "MIT",
+  "engines": {
+    "node": ">=12.0.0",
+    "npm": "^8.1.0"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-ganache": "^2.0.1",
