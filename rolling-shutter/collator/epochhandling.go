@@ -3,7 +3,6 @@ package collator
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
@@ -50,18 +49,13 @@ func makeBatch(ctx context.Context, config Config, db *cltrdb.Queries) (*shmsg.C
 
 func makeDecryptionTrigger(
 	ctx context.Context, config Config, db *cltrdb.Queries, cipherBatch *shmsg.CipherBatch) (*shmsg.DecryptionTrigger, error) {
-	hash := crypto.Keccak256(cipherBatch.Transactions...)
 
-	// TODO: use signature
-
-	trigger := &shmsg.DecryptionTrigger{
-		InstanceID:       config.InstanceID,
-		EpochID:          cipherBatch.EpochID,
-		TransactionsHash: hash,
-		Signature:        []byte{},
+	trigger, err := shmsg.NewSignedDecryptionTrigger(config.InstanceID, cipherBatch.EpochID, cipherBatch.Transactions, config.EthereumKey)
+	if err != nil {
+		return nil, err
 	}
 
-	err := db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
+	err = db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
 		EpochID:   shdb.EncodeUint64(trigger.EpochID),
 		BatchHash: trigger.TransactionsHash,
 	})

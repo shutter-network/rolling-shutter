@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/sha3"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shuttermint/medley"
@@ -41,7 +42,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 		EpochID:      nextEpochID,
 		Transactions: [][]byte{},
 	}
-	hash := ethcrypto.Keccak256(batch.Transactions...)
+	hash := sha3.Sum256(bytes.Join(batch.Transactions, []byte{}))
 	msg, err := makeDecryptionTrigger(ctx, config, db, batch)
 	assert.NilError(t, err)
 
@@ -49,12 +50,16 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	stored, err := db.GetTrigger(ctx, shdb.EncodeUint64(nextEpochID))
 	assert.NilError(t, err)
 	assert.Equal(t, shdb.DecodeUint64(stored.EpochID), nextEpochID)
-	assert.Check(t, bytes.Equal(stored.BatchHash, hash))
+	assert.Check(t, bytes.Equal(stored.BatchHash, hash[:]))
 
 	// make sure output is trigger message
 	assert.Equal(t, msg.InstanceID, config.InstanceID)
 	assert.Equal(t, msg.EpochID, nextEpochID)
-	assert.Check(t, bytes.Equal(msg.TransactionsHash, hash))
+	assert.Check(t, bytes.Equal(msg.TransactionsHash, hash[:]))
+	address := ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+	signatureCorrect, err := msg.VerifySignature(address)
+	assert.NilError(t, err)
+	assert.Check(t, signatureCorrect)
 }
 
 func TestBatchIntegration(t *testing.T) {
