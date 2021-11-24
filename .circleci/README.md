@@ -4,7 +4,7 @@ This directory contains a CircleCI dynamic configuration [1]. `config,yml` calls
 into a short clojure script, which generates a CircleCI configuration to be
 executed, based on which files have changed.
 
-## Running the script locally
+## Running the script locally with clojure CLI tools
 
 You can run the script locally. You need to first install the clojure CLI tools
 [2]. Then run
@@ -21,6 +21,14 @@ clojure -X gen/gen :base '"origin/schmir/dev"' :head '"HEAD"'
 
 The script lives inside this directory in the file `gen.clj`. The
 `get-yaml-files` function chooses the yaml files to be merged.
+
+## Running the script locally with babashka
+
+Install babashka and run:
+
+```
+bb -e '(load-file "gen.clj") (gen/gen {})'
+```
 
 [1] https://circleci.com/docs/2.0/dynamic-config/
 
