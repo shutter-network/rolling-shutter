@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -106,7 +107,7 @@ func readConfig() (collator.Config, error) {
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
 	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
-	viper.SetDefault("EpochDuration", 5000)
+	viper.SetDefault("EpochDuration", "5s")
 
 	config := collator.Config{}
 
@@ -151,7 +152,7 @@ func exampleConfig() (*collator.Config, error) {
 		HTTPListenAddress: ":3000",
 		EthereumKey:       ethereumKey,
 		P2PKey:            p2pkey,
-		EpochDuration:     5000,
+		EpochDuration:     5 * time.Second,
 	}, nil
 }
 

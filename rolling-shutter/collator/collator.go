@@ -122,7 +122,7 @@ func (c *Collator) Run(ctx context.Context) error {
 }
 
 func (c *Collator) processEpochLoop(ctx context.Context) error {
-	sleepDuration := time.Duration(c.Config.EpochDuration) * time.Millisecond
+	sleepDuration := c.Config.EpochDuration
 
 	for {
 		select {

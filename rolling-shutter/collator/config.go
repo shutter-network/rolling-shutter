@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"io"
 	"text/template"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -30,7 +31,7 @@ type Config struct {
 
 	InstanceID uint64
 
-	EpochDuration uint64
+	EpochDuration time.Duration
 }
 
 var configTemplate = `# Shutter collator config
@@ -57,8 +58,8 @@ P2PKey          = "{{ .P2PKey | P2PKey}}"
 # ID shared by all shutter participants for common instance
 InstanceID = {{ .InstanceID }}
 
-# The duration of an epoch in milliseconds
-EpochDuration = {{ .EpochDuration }}
+# The duration of an epoch
+EpochDuration = "{{ .EpochDuration }}"
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("collator", configTemplate)
@@ -77,6 +78,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
 				medley.StringToEcdsaPrivateKey,
+				mapstructure.StringToTimeDurationHookFunc(),
 			),
 		),
 	)
