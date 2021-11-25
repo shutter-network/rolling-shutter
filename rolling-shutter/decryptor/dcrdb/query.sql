@@ -53,12 +53,33 @@ INSERT INTO decryptor.aggregated_signature (
 )
 ON CONFLICT DO NOTHING;
 
--- name: InsertDecryptorIdentity :exec
+-- name: UpdateDecryptorBLSPublicKey :exec
 INSERT INTO decryptor.decryptor_identity (
     address, bls_public_key
 ) VALUES (
     $1, $2
-);
+) ON CONFLICT (address) DO UPDATE
+    SET bls_public_key = excluded.bls_public_key;
+
+-- name: UpdateDecryptorBLSSignature :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, bls_signature
+) VALUES (
+    $1, $2
+) ON CONFLICT (address) DO UPDATE
+    SET bls_signature = excluded.bls_signature;
+
+-- name: UpdateDecryptorSignatureVerified :exec
+INSERT INTO decryptor.decryptor_identity (
+    address, signature_verified
+) VALUES (
+    $1, $2
+) ON CONFLICT (address) DO UPDATE
+    SET signature_verified = excluded.signature_verified;
+
+-- name: GetDecryptorIdentity :one
+SELECT * FROM decryptor.decryptor_identity
+WHERE address = $1;
 
 -- name: InsertDecryptorSetMember :exec
 INSERT INTO decryptor.decryptor_set_member (
@@ -67,12 +88,41 @@ INSERT INTO decryptor.decryptor_set_member (
     $1, $2, $3
 );
 
+-- name: GetDecryptorSetMember :one
+SELECT
+    m1.activation_block_number,
+    m1.index,
+    m1.address,
+    identity.bls_public_key,
+    identity.bls_signature,
+    coalesce(identity.signature_verified, false)
+FROM (
+    SELECT
+        m2.activation_block_number,
+        m2.index,
+        m2.address
+    FROM decryptor.decryptor_set_member AS m2
+    WHERE activation_block_number = (
+        SELECT
+            m3.activation_block_number
+        FROM decryptor.decryptor_set_member AS m3
+        WHERE m3.activation_block_number <= $1
+        ORDER BY m3.activation_block_number DESC
+        LIMIT 1
+    ) AND m2.index = $2
+) AS m1
+LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+ON m1.address = identity.address
+ORDER BY index;
+
 -- name: GetDecryptorSet :many
 SELECT
     member.activation_block_number,
     member.index,
     member.address,
-    identity.bls_public_key
+    identity.bls_public_key,
+    identity.bls_signature,
+    coalesce(identity.signature_verified, false)
 FROM (
     SELECT
         activation_block_number,
@@ -91,19 +141,6 @@ FROM (
 LEFT OUTER JOIN decryptor.decryptor_identity AS identity
 ON member.address = identity.address
 ORDER BY index;
-
--- name: GetDecryptorIndex :one
-SELECT index
-FROM decryptor.decryptor_set_member
-WHERE activation_block_number <= $1 AND address = $2
-ORDER BY activation_block_number DESC LIMIT 1;
-
--- name: GetDecryptorKey :one
-SELECT bls_public_key FROM decryptor.decryptor_identity WHERE address = (
-    SELECT address FROM decryptor.decryptor_set_member
-    WHERE index = $1 AND activation_block_number <= $2
-    ORDER BY activation_block_number DESC LIMIT 1
-);
 
 -- name: InsertEonPublicKey :exec
 INSERT INTO decryptor.eon_public_key (
