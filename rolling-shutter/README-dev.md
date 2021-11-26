@@ -31,3 +31,30 @@ Run `make generate` to generate sqlc and protocol buffers related files.
 ## Running
 
 Run `make run` to start shuttermint.
+
+# Managing tools with asdf
+
+[asdf](https://github.com/asdf-vm/asdf) can be used to install and manage the
+versions of the different tools we use to build rolling-shutter. Please follow
+the [installation guide](https://asdf-vm.com/guide/getting-started.htm.).
+
+When asdf is ready, install the following plugins. In case you don't want to
+manage some of the tools with asdf, skip installation of the corresponding
+plugins.
+
+```
+asdf plugin add babashka
+asdf plugin add circleci https://github.com/trnubo/asdf-circleci.git
+asdf plugin add clojure
+asdf plugin add golang
+asdf plugin add java
+asdf plugin add nodejs
+asdf plugin add protoc
+```
+
+Finally, install the tools by running the following inside the rolling shutter
+git repository:
+
+```
+asdf install
+```
