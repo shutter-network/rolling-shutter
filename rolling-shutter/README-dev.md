@@ -47,6 +47,7 @@ asdf plugin add babashka
 asdf plugin add circleci https://github.com/trnubo/asdf-circleci.git
 asdf plugin add clojure
 asdf plugin add golang
+asdf plugin add golangci-lint
 asdf plugin add java
 asdf plugin add nodejs
 asdf plugin add protoc
@@ -56,5 +57,8 @@ Finally, install the tools by running the following inside the rolling shutter
 git repository:
 
 ```
+asdf install java
 asdf install
 ```
+
+`asdf install java` is needed first, because clojure relies on java.
