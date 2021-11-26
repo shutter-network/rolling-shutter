@@ -1,0 +1,4 @@
+golang 1.17.3
+golangci-lint 1.43.0
+nodejs 16.13.0
+protoc 3.18.0
