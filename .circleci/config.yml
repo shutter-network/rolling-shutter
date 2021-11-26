@@ -44,7 +44,7 @@ jobs:
       - run:
           name: Generate continuation config
           command: |
-            bb -e '(load-file "gen.clj") (gen/gen {:validate false :base "origin/main"})'
+            bb -gen-ci
       - save_cache:
           key: gen-clj-v3
           paths:

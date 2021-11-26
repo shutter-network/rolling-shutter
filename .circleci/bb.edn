@@ -1,0 +1,15 @@
+{:min-bb-version "0.6.1"
+ :paths ["."]
+ :tasks
+ {:requires ([babashka.fs :as fs]
+             [gen])
+  gen
+  {:doc "Generate continuation config and validate it"
+   :task
+   (let [validate? (some? (fs/which "circleci"))]
+     (gen/gen {:validate validate? :base "origin/main"})
+     (when-not validate?
+       (println "\nWarning: Cannot validate the resulting configuration, no circleci binary found.")))}
+
+  -gen-ci
+  (gen/gen {:validate false :base "origin/main"})}}

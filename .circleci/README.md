@@ -27,7 +27,7 @@ The script lives inside this directory in the file `gen.clj`. The
 Install babashka and run:
 
 ```
-bb -e '(load-file "gen.clj") (gen/gen {})'
+bb gen
 ```
 
 [1] https://circleci.com/docs/2.0/dynamic-config/
