@@ -36,7 +36,7 @@ Run `make run` to start shuttermint.
 
 [asdf](https://github.com/asdf-vm/asdf) can be used to install and manage the
 versions of the different tools we use to build rolling-shutter. Please follow
-the [installation guide](https://asdf-vm.com/guide/getting-started.htm.).
+the [installation guide](https://asdf-vm.com/guide/getting-started.html).
 
 When asdf is ready, install the following plugins. In case you don't want to
 manage some of the tools with asdf, skip installation of the corresponding
