@@ -9,45 +9,46 @@ orbs:
   continuation: circleci/continuation@0.2.0
 
 commands:
-  install-clojure:
+  install-asdf:
     steps:
       - run:
-          name: Install clojure CLI tools
+          name: Install asdf
           command: |
-            if [[ -e ~/clj/bin/clojure ]]; then
-              echo "Clojure already installed"
+            if [[ -e ~/.asdf ]]; then
+              echo "asdf already installed"
             else
-              curl -O https://download.clojure.org/install/linux-install-1.10.3.967.sh
-              bash ./linux-install-1.10.3.967.sh --prefix ~/clj
-              rm ./linux-install-1.10.3.967.sh
+              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
             fi
-            echo >${BASH_ENV} 'export PATH=~/clj/bin:${PATH}'
+            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
 
 executors:
-  openjdk:
+  cimg-base:
     docker:
-      - image: cimg/openjdk:8.0.292
+      - image: cimg/base:2021.11
 
 jobs:
   gen:
-    executor: openjdk
+    executor: cimg-base
     working_directory: ~/src/.circleci
     steps:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v1-{{ checksum "deps.edn"}}
-      - install-clojure
+          key: gen-clj-v3
+      - install-asdf
+      - run:
+          name: Install babashka
+          command: |
+            asdf plugin add babashka || true
+            asdf install babashka
       - run:
           name: Generate continuation config
           command: |
-            clojure -X gen/gen :validate false :base '"origin/main"'
+            bb -e '(load-file "gen.clj") (gen/gen {:validate false :base "origin/main"})'
       - save_cache:
-          key: gen-clj-v1-{{ checksum "deps.edn"}}
+          key: gen-clj-v3
           paths:
-            - ~/.m2
-            - ~/clj
-            - .cpcache
+            - ~/.asdf
       - continuation/continue:
           configuration_path: continue-generated.yml
 
