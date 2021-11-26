@@ -1,3 +1,16 @@
+commands:
+  install-asdf:
+    steps:
+      - run:
+          name: Install asdf
+          command: |
+            if [[ -e ~/.asdf ]]; then
+              echo "asdf already installed"
+            else
+              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
+            fi
+            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
+
 jobs:
   rs-generate:
     executor: go
@@ -7,24 +20,22 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v3-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v4-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+      - install-asdf
       - run:
-          name: "Download and install protoc"
+          name: "Install protoc"
           command: |
-            if [[ -e ~/bin/protoc ]]; then
-              echo "protoc already installed"
-            else
-              curl -o /tmp/protoc.zip -sSL https://github.com/protocolbuffers/protobuf/releases/download/v3.18.0/protoc-3.18.0-linux-x86_64.zip
-              unzip -d ~ /tmp/protoc.zip bin/protoc
-            fi
+            asdf plugin add protoc || true
+            asdf install protoc
       - run: make install-protoc-gen-go install-sqlc
       - run: make generate
       - save_cache:
-          key: rs-generate-v3-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v4-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
             - "~/bin"
+            - ~/.asdf
       - run: git diff --exit-code
 
   rs-build:
@@ -100,25 +111,21 @@ jobs:
             - go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
-            - rs-lint-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-lint-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - install-asdf
       - run:
           name: "Install golangci-lint"
           command: |
-            if [[ -e ~/bin/golangci-lint ]]; then
-              echo "golangci-lint already installed"
-            else
-              mkdir -p ~/bin
-              curl -sSL -o /tmp/golangci-lint.tgz https://github.com/golangci/golangci-lint/releases/download/v1.42.1/golangci-lint-1.42.1-linux-amd64.tar.gz
-              tar -C ~/bin --strip-components=1 -xf /tmp/golangci-lint.tgz
-            fi
+            asdf plugin add golangci-lint || true
+            asdf install golangci-lint
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-lint-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
-            - "~/bin/golangci-lint"
+            - "~/.asdf"
 workflows:
   rolling-shutter:
     jobs:
