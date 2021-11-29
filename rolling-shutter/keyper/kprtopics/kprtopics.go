@@ -6,4 +6,5 @@ const (
 	DecryptionTrigger  = "decryptionTrigger"
 	DecryptionKey      = dcrtopics.DecryptionKey
 	DecryptionKeyShare = "decryptionKeyShare"
+	EonPublicKey       = "EonPublicKey"
 )

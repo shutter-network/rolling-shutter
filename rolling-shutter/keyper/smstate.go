@@ -476,6 +476,11 @@ func (st *ShuttermintState) finalizeDKG(
 		if err != nil {
 			return err
 		}
+		publicKeyBytes, _ := dkgresult.PublicKey.GobEncode()
+		err := queries.InsertEonPublicKey(ctx, kprdb.InsertEonPublicKeyParams{EonPublicKey: publicKeyBytes, Eon: int64(dkgresult.Eon)})
+		if err != nil {
+			return err
+		}
 	}
 
 	return queries.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{

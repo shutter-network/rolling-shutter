@@ -33,6 +33,7 @@ var GossipTopicNames = []string{
 	kprtopics.DecryptionTrigger,
 	kprtopics.DecryptionKeyShare,
 	kprtopics.DecryptionKey,
+	kprtopics.EonPublicKey,
 }
 
 type keyper struct {
@@ -137,6 +138,9 @@ func (kpr *keyper) run(ctx context.Context) error {
 		return kpr.operateP2P(ctx)
 	})
 	group.Go(func() error {
+		return kpr.broadcastEonPublicKeys(ctx)
+	})
+	group.Go(func() error {
 		return kpr.handleContractEvents(ctx)
 	})
 	return group.Wait()
@@ -172,6 +176,30 @@ func (kpr *keyper) operateP2P(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			return ctx.Err()
+		}
+	}
+}
+
+func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
+	for {
+		eonPublicKeys, err := kpr.db.GetAndDeleteEonPublicKeys(ctx)
+		if err != nil {
+			return err
+		}
+		for _, eonPublicKey := range eonPublicKeys {
+			err := kpr.sendMessage(ctx, &shmsg.EonPublicKey{
+				PublicKey:  eonPublicKey.EonPublicKey,
+				Eon:        uint64(eonPublicKey.Eon),
+				InstanceID: kpr.config.InstanceID,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
 		}
 	}
 }
@@ -228,6 +256,7 @@ func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	validators := make(map[string]pubsub.Validator)
 	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
 	validators[kprtopics.DecryptionKeyShare] = kpr.makeKeyShareValidator(db)
+	validators[kprtopics.EonPublicKey] = kpr.makeEonPublicKeyValidator()
 
 	return validators
 }
@@ -321,5 +350,19 @@ func (kpr *keyper) makeKeyShareValidator(db *kprdb.Queries) pubsub.Validator {
 			shcrypto.ComputeEpochID(keyShare.epochID),
 		)
 		return ok
+	}
+}
+
+func (kpr *keyper) makeEonPublicKeyValidator() pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		return msg.GetInstanceID() == kpr.config.InstanceID
 	}
 }

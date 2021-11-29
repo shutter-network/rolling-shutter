@@ -1,4 +1,4 @@
--- schema-version: 10 --
+-- schema-version: 11 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -93,4 +93,10 @@ CREATE TABLE keyper.chain_keyper_set(
        activation_block_number bigint PRIMARY KEY,
        keypers text[] NOT NULL,
        threshold integer NOT NULL
+);
+
+-- outgoing_eon_keys contains the eon public key(s) that should be broadcast as a result of a successful DKG
+CREATE TABLE keyper.outgoing_eon_keys(
+       eon_public_key bytea,
+       eon bigint NOT NULL PRIMARY KEY
 );
