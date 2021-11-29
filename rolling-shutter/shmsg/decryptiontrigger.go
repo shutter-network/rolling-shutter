@@ -1,7 +1,6 @@
 package shmsg
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
 
@@ -14,11 +13,10 @@ const HashPrefix = "decryptionTriggerPrefix"
 
 func NewSignedDecryptionTrigger(instanceID uint64, epochID uint64, transactions [][]byte,
 	privKey *ecdsa.PrivateKey) (*DecryptionTrigger, error) {
-	transactionsHash := sha3.Sum256(bytes.Join(transactions, []byte{}))
 	trigger := &DecryptionTrigger{
 		InstanceID:       instanceID,
 		EpochID:          epochID,
-		TransactionsHash: transactionsHash[:],
+		TransactionsHash: hashTransactions(transactions),
 	}
 	var err error
 	trigger.Signature, err = ethcrypto.Sign(trigger.Hash(), privKey)
@@ -44,5 +42,15 @@ func (t *DecryptionTrigger) Hash() []byte {
 	binary.LittleEndian.PutUint64(triggerBytes[8:], t.EpochID)
 	triggerBytes = append(triggerBytes, t.TransactionsHash...)
 	hash := sha3.Sum256(triggerBytes)
+	return hash[:]
+}
+
+func hashTransactions(transactions [][]byte) []byte {
+	concatenatedHashedTransactions := []byte{}
+	for _, transaction := range transactions {
+		transactionHash := sha3.Sum256(transaction)
+		concatenatedHashedTransactions = append(concatenatedHashedTransactions, transactionHash[:]...)
+	}
+	hash := sha3.Sum256(concatenatedHashedTransactions)
 	return hash[:]
 }
