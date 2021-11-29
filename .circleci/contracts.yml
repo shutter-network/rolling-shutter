@@ -1,6 +1,3 @@
-orbs:
-  node: circleci/node@4.6
-
 jobs:
   hardhat:
     executor: node14

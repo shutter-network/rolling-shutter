@@ -9,6 +9,8 @@ commands:
             curl -sSL "https://golang.org/dl/go1.17.1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
+orbs:
+  node: circleci/node@4.7
 
 executors:
   py:
