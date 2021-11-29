@@ -18,7 +18,10 @@ type message interface {
 	GetInstanceID() uint64
 }
 
-type decryptionTrigger shmsg.DecryptionTrigger
+type (
+	decryptionTrigger shmsg.DecryptionTrigger
+	eonPublicKey      shmsg.EonPublicKey
+)
 
 type decryptionKeyShare struct {
 	instanceID  uint64
@@ -36,10 +39,12 @@ type decryptionKey struct {
 func (*decryptionTrigger) implementsMessage()  {}
 func (*decryptionKeyShare) implementsMessage() {}
 func (*decryptionKey) implementsMessage()      {}
+func (*eonPublicKey) implementsMessage()       {}
 
 func (d *decryptionTrigger) GetInstanceID() uint64  { return d.InstanceID }
 func (d *decryptionKeyShare) GetInstanceID() uint64 { return d.instanceID }
 func (d *decryptionKey) GetInstanceID() uint64      { return d.instanceID }
+func (e *eonPublicKey) GetInstanceID() uint64       { return e.InstanceID }
 
 func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 	if msg == nil {
@@ -52,6 +57,8 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 		return unmarshalDecryptionKeyShare(msg)
 	case kprtopics.DecryptionKey:
 		return unmarshalDecryptionKey(msg)
+	case kprtopics.EonPublicKey:
+		return unmarshalEonPublicKey(msg)
 	default:
 		return nil, errors.New("unhandled topic from P2P message")
 	}
@@ -100,4 +107,12 @@ func unmarshalDecryptionKey(msg *p2p.Message) (message, error) {
 		epochID:    decryptionKeyMsg.EpochID,
 		key:        key,
 	}, nil
+}
+
+func unmarshalEonPublicKey(msg *p2p.Message) (message, error) {
+	eonKeyMsg := shmsg.EonPublicKey{}
+	if err := proto.Unmarshal(msg.Message, &eonKeyMsg); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal eon public key P2P message")
+	}
+	return (*eonPublicKey)(&eonKeyMsg), nil
 }

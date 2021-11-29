@@ -112,6 +112,30 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	return exists, err
 }
 
+const getAndDeleteEonPublicKeys = `-- name: GetAndDeleteEonPublicKeys :many
+DELETE FROM keyper.outgoing_eon_keys RETURNING eon_public_key, eon
+`
+
+func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]KeyperOutgoingEonKey, error) {
+	rows, err := q.db.Query(ctx, getAndDeleteEonPublicKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperOutgoingEonKey
+	for rows.Next() {
+		var i KeyperOutgoingEonKey
+		if err := rows.Scan(&i.EonPublicKey, &i.Eon); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBatchConfig = `-- name: GetBatchConfig :one
 SELECT config_index, height, keypers, threshold
 FROM keyper.tendermint_batch_config
@@ -490,6 +514,21 @@ func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 		arg.ActivationBlockNumber,
 		arg.ConfigIndex,
 	)
+	return err
+}
+
+const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
+INSERT INTO keyper.outgoing_eon_keys (eon_public_key, eon)
+VALUES ($1, $2)
+`
+
+type InsertEonPublicKeyParams struct {
+	EonPublicKey []byte
+	Eon          int64
+}
+
+func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) error {
+	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.EonPublicKey, arg.Eon)
 	return err
 }
 

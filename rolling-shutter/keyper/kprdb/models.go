@@ -53,6 +53,11 @@ type KeyperMetaInf struct {
 	Value string
 }
 
+type KeyperOutgoingEonKey struct {
+	EonPublicKey []byte
+	Eon          int64
+}
+
 type KeyperPolyEval struct {
 	Eon             int64
 	ReceiverAddress string

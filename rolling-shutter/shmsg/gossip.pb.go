@@ -447,6 +447,69 @@ func (x *AggregatedDecryptionSignature) GetSignerBitfield() []byte {
 	return nil
 }
 
+type EonPublicKey struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	InstanceID uint64 `protobuf:"varint,1,opt,name=instanceID,proto3" json:"instanceID,omitempty"`
+	PublicKey  []byte `protobuf:"bytes,2,opt,name=publicKey,proto3" json:"publicKey,omitempty"`
+	Eon        uint64 `protobuf:"varint,3,opt,name=eon,proto3" json:"eon,omitempty"`
+}
+
+func (x *EonPublicKey) Reset() {
+	*x = EonPublicKey{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_gossip_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *EonPublicKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EonPublicKey) ProtoMessage() {}
+
+func (x *EonPublicKey) ProtoReflect() protoreflect.Message {
+	mi := &file_gossip_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EonPublicKey.ProtoReflect.Descriptor instead.
+func (*EonPublicKey) Descriptor() ([]byte, []int) {
+	return file_gossip_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *EonPublicKey) GetInstanceID() uint64 {
+	if x != nil {
+		return x.InstanceID
+	}
+	return 0
+}
+
+func (x *EonPublicKey) GetPublicKey() []byte {
+	if x != nil {
+		return x.PublicKey
+	}
+	return nil
+}
+
+func (x *EonPublicKey) GetEon() uint64 {
+	if x != nil {
+		return x.Eon
+	}
+	return 0
+}
+
 var File_gossip_proto protoreflect.FileDescriptor
 
 var file_gossip_proto_rawDesc = []byte{
@@ -507,6 +570,12 @@ var file_gossip_proto_rawDesc = []byte{
 	0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x12, 0x26, 0x0a, 0x0e, 0x73, 0x69, 0x67, 0x6e,
 	0x65, 0x72, 0x42, 0x69, 0x74, 0x66, 0x69, 0x65, 0x6c, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c,
 	0x52, 0x0e, 0x73, 0x69, 0x67, 0x6e, 0x65, 0x72, 0x42, 0x69, 0x74, 0x66, 0x69, 0x65, 0x6c, 0x64,
+	0x22, 0x5e, 0x0a, 0x0c, 0x45, 0x6f, 0x6e, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4b, 0x65, 0x79,
+	0x12, 0x1e, 0x0a, 0x0a, 0x69, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x69, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44,
+	0x12, 0x1c, 0x0a, 0x09, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4b, 0x65, 0x79, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x09, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4b, 0x65, 0x79, 0x12, 0x10,
+	0x0a, 0x03, 0x65, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x65, 0x6f, 0x6e,
 	0x42, 0x0a, 0x5a, 0x08, 0x2e, 0x2f, 0x3b, 0x73, 0x68, 0x6d, 0x73, 0x67, 0x62, 0x06, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x33,
 }
@@ -523,7 +592,7 @@ func file_gossip_proto_rawDescGZIP() []byte {
 	return file_gossip_proto_rawDescData
 }
 
-var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_gossip_proto_goTypes = []interface{}{
 	(*DecryptionTrigger)(nil),             // 0: shmsg.DecryptionTrigger
 	(*DecryptionKeyShare)(nil),            // 1: shmsg.DecryptionKeyShare
@@ -531,6 +600,7 @@ var file_gossip_proto_goTypes = []interface{}{
 	(*CipherBatch)(nil),                   // 3: shmsg.CipherBatch
 	(*DecryptionSignature)(nil),           // 4: shmsg.DecryptionSignature
 	(*AggregatedDecryptionSignature)(nil), // 5: shmsg.AggregatedDecryptionSignature
+	(*EonPublicKey)(nil),                  // 6: shmsg.EonPublicKey
 }
 var file_gossip_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -618,6 +688,18 @@ func file_gossip_proto_init() {
 				return nil
 			}
 		}
+		file_gossip_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EonPublicKey); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -625,7 +707,7 @@ func file_gossip_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_gossip_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

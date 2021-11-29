@@ -63,6 +63,13 @@ func (*AggregatedDecryptionSignature) Topic() string {
 	return dcrtopics.AggregatedDecryptionSignature
 }
 
+func (*EonPublicKey) ImplementsP2PMessage() {
+}
+
+func (*EonPublicKey) Topic() string {
+	return kprtopics.EonPublicKey
+}
+
 // NewBatchConfig creates a new BatchConfig message.
 func NewBatchConfig(
 	activationBlockNumber uint64,

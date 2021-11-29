@@ -45,3 +45,9 @@ message AggregatedDecryptionSignature {
     bytes aggregatedSignature = 4;
     bytes signerBitfield = 5;
 }
+
+message EonPublicKey {
+    uint64 instanceID = 1;
+    bytes publicKey= 2;
+    uint64 eon = 3;
+}

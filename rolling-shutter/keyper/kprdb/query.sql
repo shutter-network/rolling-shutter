@@ -180,3 +180,10 @@ VALUES ($1, $2, $3);
 SELECT * FROM keyper.chain_keyper_set
 WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC LIMIT 1;
+
+-- name: InsertEonPublicKey :exec
+INSERT INTO keyper.outgoing_eon_keys (eon_public_key, eon)
+VALUES ($1, $2);
+
+-- name: GetAndDeleteEonPublicKeys :many
+DELETE FROM keyper.outgoing_eon_keys RETURNING *;
