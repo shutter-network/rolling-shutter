@@ -1,0 +1,74 @@
+openapi: "3.0.0"
+info:
+  version: 0.1.0
+  title: rolling shutter collator
+  description: This describes the rolling shutter's collator API to submit transactions
+  contact:
+    name: shutter-network
+    url: http://shutter.network/
+  license:
+    name: MIT
+paths:
+  /ping:
+    get:
+      description: |
+        Pings the server
+      operationId: ping
+      parameters:
+  /tx:
+    post:
+      description: Submit an encrypted transaction
+      operationId: SubmitTransaction
+      requestBody:
+        description: Transaction to submit
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      responses:
+        "200":
+          description: transaction id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionId"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    Transaction:
+      type: object
+      required:
+        - epoch
+        - encrypted_tx
+      properties:
+        epoch:
+          type: string
+          format: byte
+        encrypted_tx:
+          type: string
+          format: byte
+    TransactionId:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: byte
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string

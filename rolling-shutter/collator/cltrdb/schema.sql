@@ -1,4 +1,4 @@
--- schema-version: 0 --
+-- schema-version: 1 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -18,4 +18,10 @@ CREATE TABLE collator.decryption_trigger(
 CREATE TABLE collator.cipher_batch(
     epoch_id bytea PRIMARY KEY,
     transactions bytea[]
+);
+
+CREATE TABLE collator.transaction(
+       tx_id bytea PRIMARY KEY,
+       epoch_id bytea,
+       encrypted_tx bytea
 );

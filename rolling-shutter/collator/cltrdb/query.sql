@@ -18,3 +18,6 @@ INSERT INTO collator.cipher_batch (epoch_id, transactions) VALUES ($1, $2);
 
 -- name: GetBatch :one
 SELECT * FROM collator.cipher_batch WHERE epoch_id = $1;
+
+-- name: InsertTx :exec
+INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx)VALUES ($1, $2, $3);

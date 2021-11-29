@@ -7,6 +7,7 @@
 package tools
 
 import (
+	_ "github.com/deepmap/oapi-codegen/cmd/oapi-codegen"
 	_ "github.com/ethereum/go-ethereum/cmd/abigen"
 	_ "github.com/kyleconroy/sqlc/cmd/sqlc"
 	_ "golang.org/x/tools/cmd/stringer"

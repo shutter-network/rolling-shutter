@@ -92,3 +92,18 @@ func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) er
 	_, err := q.db.Exec(ctx, insertTrigger, arg.EpochID, arg.BatchHash)
 	return err
 }
+
+const insertTx = `-- name: InsertTx :exec
+INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx)VALUES ($1, $2, $3)
+`
+
+type InsertTxParams struct {
+	TxID        []byte
+	EpochID     []byte
+	EncryptedTx []byte
+}
+
+func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
+	_, err := q.db.Exec(ctx, insertTx, arg.TxID, arg.EpochID, arg.EncryptedTx)
+	return err
+}

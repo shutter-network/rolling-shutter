@@ -18,3 +18,9 @@ type CollatorMetaInf struct {
 	Key   string
 	Value string
 }
+
+type CollatorTransaction struct {
+	TxID        []byte
+	EpochID     []byte
+	EncryptedTx []byte
+}

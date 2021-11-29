@@ -57,7 +57,7 @@ clean:
 install:
 	install -o root -m 0555 ${EXECUTABLE} ${PREFIX}/bin/
 
-install-tools: install-abigen install-sqlc install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
+install-tools: install-abigen install-sqlc install-protoc-gen-go  install-oabi-codegen install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
 
 install-sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc
@@ -67,6 +67,9 @@ install-abigen:
 
 install-protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go
+
+install-oapi-codegen:
+	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen
 
 install-golangci-lint:
 	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -97,4 +100,4 @@ abigen:
 	cd ../contracts; rm -f combined.json; node scripts/abigen.js
 	abigen --pkg contract --out contract/binding.abigen.gen.go --combined-json ../contracts/combined.json
 
-.PHONY: build install run init clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen
+.PHONY: build install run init clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen

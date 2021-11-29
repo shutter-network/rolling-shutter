@@ -2,21 +2,28 @@ package collator
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/sha3"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
+	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -30,6 +37,52 @@ type Collator struct {
 
 	p2p *p2p.P2P
 	db  *cltrdb.Queries
+}
+
+type Server struct {
+	c *Collator
+}
+
+func sendError(w http.ResponseWriter, code int, message string) {
+	e := oapi.Error{
+		Code:    int32(code),
+		Message: message,
+	}
+	w.WriteHeader(code)
+	w.Header().Set("Content-Type", "application/json")
+
+	_ = json.NewEncoder(w).Encode(e)
+}
+
+func (srv *Server) Ping(w http.ResponseWriter, _ *http.Request) {
+	w.Write([]byte("pong"))
+}
+
+func (srv *Server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
+	var x oapi.SubmitTransactionJSONBody
+	if err := json.NewDecoder(r.Body).Decode(&x); err != nil {
+		sendError(w, http.StatusBadRequest, "Invalid format for SubmitTransaction")
+		return
+	}
+	ctx := r.Context()
+
+	hash := sha3.New256()
+	fmt.Fprintf(hash, "%d\n", len(x.Epoch))
+	hash.Write(x.Epoch)
+	hash.Write(x.EncryptedTx)
+	txid := hash.Sum(nil)
+
+	err := srv.c.db.InsertTx(ctx, cltrdb.InsertTxParams{
+		TxID:        txid,
+		EpochID:     x.Epoch,
+		EncryptedTx: x.EncryptedTx,
+	})
+	if err != nil {
+		sendError(w, http.StatusConflict, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(oapi.TransactionId{Id: txid})
 }
 
 var gossipTopicNames = [2]string{
@@ -55,16 +108,50 @@ func New(config Config) *Collator {
 	}
 }
 
+func (c *Collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
+	router := chi.NewRouter()
+
+	router.Use(chimiddleware.OapiRequestValidator(swagger))
+
+	_ = oapi.HandlerFromMux(&Server{c: c}, router)
+
+	return router
+}
+
 func (c *Collator) setupRouter() *chi.Mux {
+	swagger, err := oapi.GetSwagger()
+	if err != nil {
+		panic(err)
+	}
+	swagger.Servers = nil
+
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
-	router.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pong"))
+	router.Use(middleware.Recoverer)
+	router.Mount("/v1", http.StripPrefix("/v1", c.setupAPIRouter(swagger)))
+	apiJSON, _ := json.Marshal(swagger)
+	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(apiJSON)
 	})
-	router.Get("/slow", func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(5 * time.Second)
-		w.Write([]byte("slow"))
-	})
+
+	/*
+	   The following enables the swagger ui. Run the following to use it:
+
+	     npm pack swagger-ui-dist@4.1.2
+	     tar -xf swagger-ui-dist-4.1.2.tgz
+	     export SWAGGER_UI=$(pwd)/package
+	*/
+	swaggerUI := os.Getenv("SWAGGER_UI")
+	if swaggerUI != "" {
+		log.Printf("Enabling the swagger ui at /ui/")
+		fs := http.FileServer(http.Dir(os.Getenv("SWAGGER_UI")))
+		router.Mount("/ui/", http.StripPrefix("/ui/", fs))
+	}
+
 	return router
 }
 
