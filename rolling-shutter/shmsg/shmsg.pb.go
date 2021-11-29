@@ -20,147 +20,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type G1 struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	G1Bytes []byte `protobuf:"bytes,1,opt,name=g1bytes,proto3" json:"g1bytes,omitempty"` // Unmarshal with new(G1).Unmarshal(msg.g1bytes)
-}
-
-func (x *G1) Reset() {
-	*x = G1{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *G1) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*G1) ProtoMessage() {}
-
-func (x *G1) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use G1.ProtoReflect.Descriptor instead.
-func (*G1) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *G1) GetG1Bytes() []byte {
-	if x != nil {
-		return x.G1Bytes
-	}
-	return nil
-}
-
-type G2 struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	G2Bytes []byte `protobuf:"bytes,1,opt,name=g2bytes,proto3" json:"g2bytes,omitempty"` // Unmarshal with new(G2).Unmarshal(msg.g2bytes)
-}
-
-func (x *G2) Reset() {
-	*x = G2{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *G2) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*G2) ProtoMessage() {}
-
-func (x *G2) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use G2.ProtoReflect.Descriptor instead.
-func (*G2) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *G2) GetG2Bytes() []byte {
-	if x != nil {
-		return x.G2Bytes
-	}
-	return nil
-}
-
-type GT struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Gtbytes []byte `protobuf:"bytes,1,opt,name=gtbytes,proto3" json:"gtbytes,omitempty"` // Unmarshal with new(GT).Unmarshal(msg.g2bytes)
-}
-
-func (x *GT) Reset() {
-	*x = GT{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GT) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GT) ProtoMessage() {}
-
-func (x *GT) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GT.ProtoReflect.Descriptor instead.
-func (*GT) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GT) GetGtbytes() []byte {
-	if x != nil {
-		return x.Gtbytes
-	}
-	return nil
-}
-
 type BatchConfig struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -177,7 +36,7 @@ type BatchConfig struct {
 func (x *BatchConfig) Reset() {
 	*x = BatchConfig{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[3]
+		mi := &file_shmsg_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -190,7 +49,7 @@ func (x *BatchConfig) String() string {
 func (*BatchConfig) ProtoMessage() {}
 
 func (x *BatchConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[3]
+	mi := &file_shmsg_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -203,7 +62,7 @@ func (x *BatchConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchConfig.ProtoReflect.Descriptor instead.
 func (*BatchConfig) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{3}
+	return file_shmsg_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *BatchConfig) GetActivationBlockNumber() uint64 {
@@ -259,7 +118,7 @@ type BatchConfigStarted struct {
 func (x *BatchConfigStarted) Reset() {
 	*x = BatchConfigStarted{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[4]
+		mi := &file_shmsg_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -272,7 +131,7 @@ func (x *BatchConfigStarted) String() string {
 func (*BatchConfigStarted) ProtoMessage() {}
 
 func (x *BatchConfigStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[4]
+	mi := &file_shmsg_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,7 +144,7 @@ func (x *BatchConfigStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchConfigStarted.ProtoReflect.Descriptor instead.
 func (*BatchConfigStarted) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{4}
+	return file_shmsg_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *BatchConfigStarted) GetBatchConfigIndex() uint64 {
@@ -307,7 +166,7 @@ type CheckIn struct {
 func (x *CheckIn) Reset() {
 	*x = CheckIn{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[5]
+		mi := &file_shmsg_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -320,7 +179,7 @@ func (x *CheckIn) String() string {
 func (*CheckIn) ProtoMessage() {}
 
 func (x *CheckIn) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[5]
+	mi := &file_shmsg_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +192,7 @@ func (x *CheckIn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckIn.ProtoReflect.Descriptor instead.
 func (*CheckIn) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{5}
+	return file_shmsg_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CheckIn) GetValidatorPublicKey() []byte {
@@ -363,7 +222,7 @@ type PolyEval struct {
 func (x *PolyEval) Reset() {
 	*x = PolyEval{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[6]
+		mi := &file_shmsg_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -376,7 +235,7 @@ func (x *PolyEval) String() string {
 func (*PolyEval) ProtoMessage() {}
 
 func (x *PolyEval) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[6]
+	mi := &file_shmsg_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +248,7 @@ func (x *PolyEval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolyEval.ProtoReflect.Descriptor instead.
 func (*PolyEval) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{6}
+	return file_shmsg_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PolyEval) GetEon() uint64 {
@@ -425,7 +284,7 @@ type PolyCommitment struct {
 func (x *PolyCommitment) Reset() {
 	*x = PolyCommitment{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[7]
+		mi := &file_shmsg_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -438,7 +297,7 @@ func (x *PolyCommitment) String() string {
 func (*PolyCommitment) ProtoMessage() {}
 
 func (x *PolyCommitment) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[7]
+	mi := &file_shmsg_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -451,7 +310,7 @@ func (x *PolyCommitment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolyCommitment.ProtoReflect.Descriptor instead.
 func (*PolyCommitment) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{7}
+	return file_shmsg_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PolyCommitment) GetEon() uint64 {
@@ -480,7 +339,7 @@ type Accusation struct {
 func (x *Accusation) Reset() {
 	*x = Accusation{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[8]
+		mi := &file_shmsg_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -493,7 +352,7 @@ func (x *Accusation) String() string {
 func (*Accusation) ProtoMessage() {}
 
 func (x *Accusation) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[8]
+	mi := &file_shmsg_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -506,7 +365,7 @@ func (x *Accusation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Accusation.ProtoReflect.Descriptor instead.
 func (*Accusation) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{8}
+	return file_shmsg_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Accusation) GetEon() uint64 {
@@ -536,7 +395,7 @@ type Apology struct {
 func (x *Apology) Reset() {
 	*x = Apology{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[9]
+		mi := &file_shmsg_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -549,7 +408,7 @@ func (x *Apology) String() string {
 func (*Apology) ProtoMessage() {}
 
 func (x *Apology) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[9]
+	mi := &file_shmsg_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +421,7 @@ func (x *Apology) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Apology.ProtoReflect.Descriptor instead.
 func (*Apology) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{9}
+	return file_shmsg_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Apology) GetEon() uint64 {
@@ -597,7 +456,7 @@ type EonStartVote struct {
 func (x *EonStartVote) Reset() {
 	*x = EonStartVote{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[10]
+		mi := &file_shmsg_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -610,7 +469,7 @@ func (x *EonStartVote) String() string {
 func (*EonStartVote) ProtoMessage() {}
 
 func (x *EonStartVote) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[10]
+	mi := &file_shmsg_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +482,7 @@ func (x *EonStartVote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EonStartVote.ProtoReflect.Descriptor instead.
 func (*EonStartVote) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{10}
+	return file_shmsg_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EonStartVote) GetActivationBlockNumber() uint64 {
@@ -653,7 +512,7 @@ type Message struct {
 func (x *Message) Reset() {
 	*x = Message{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[11]
+		mi := &file_shmsg_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -666,7 +525,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[11]
+	mi := &file_shmsg_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -679,7 +538,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{11}
+	return file_shmsg_proto_rawDescGZIP(), []int{8}
 }
 
 func (m *Message) GetPayload() isMessage_Payload {
@@ -811,7 +670,7 @@ type MessageWithNonce struct {
 func (x *MessageWithNonce) Reset() {
 	*x = MessageWithNonce{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_shmsg_proto_msgTypes[12]
+		mi := &file_shmsg_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -824,7 +683,7 @@ func (x *MessageWithNonce) String() string {
 func (*MessageWithNonce) ProtoMessage() {}
 
 func (x *MessageWithNonce) ProtoReflect() protoreflect.Message {
-	mi := &file_shmsg_proto_msgTypes[12]
+	mi := &file_shmsg_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -837,7 +696,7 @@ func (x *MessageWithNonce) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageWithNonce.ProtoReflect.Descriptor instead.
 func (*MessageWithNonce) Descriptor() ([]byte, []int) {
-	return file_shmsg_proto_rawDescGZIP(), []int{12}
+	return file_shmsg_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MessageWithNonce) GetMsg() *Message {
@@ -865,13 +724,7 @@ var File_shmsg_proto protoreflect.FileDescriptor
 
 var file_shmsg_proto_rawDesc = []byte{
 	0x0a, 0x0b, 0x73, 0x68, 0x6d, 0x73, 0x67, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x73,
-	0x68, 0x6d, 0x73, 0x67, 0x22, 0x1e, 0x0a, 0x02, 0x47, 0x31, 0x12, 0x18, 0x0a, 0x07, 0x67, 0x31,
-	0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x67, 0x31, 0x62,
-	0x79, 0x74, 0x65, 0x73, 0x22, 0x1e, 0x0a, 0x02, 0x47, 0x32, 0x12, 0x18, 0x0a, 0x07, 0x67, 0x32,
-	0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x67, 0x32, 0x62,
-	0x79, 0x74, 0x65, 0x73, 0x22, 0x1e, 0x0a, 0x02, 0x47, 0x54, 0x12, 0x18, 0x0a, 0x07, 0x67, 0x74,
-	0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x67, 0x74, 0x62,
-	0x79, 0x74, 0x65, 0x73, 0x22, 0xe8, 0x01, 0x0a, 0x0b, 0x42, 0x61, 0x74, 0x63, 0x68, 0x43, 0x6f,
+	0x68, 0x6d, 0x73, 0x67, 0x22, 0xe8, 0x01, 0x0a, 0x0b, 0x42, 0x61, 0x74, 0x63, 0x68, 0x43, 0x6f,
 	0x6e, 0x66, 0x69, 0x67, 0x12, 0x36, 0x0a, 0x17, 0x61, 0x63, 0x74, 0x69, 0x76, 0x61, 0x74, 0x69,
 	0x6f, 0x6e, 0x5f, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x15, 0x61, 0x63, 0x74, 0x69, 0x76, 0x61, 0x74, 0x69, 0x6f,
@@ -974,37 +827,34 @@ func file_shmsg_proto_rawDescGZIP() []byte {
 	return file_shmsg_proto_rawDescData
 }
 
-var file_shmsg_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_shmsg_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_shmsg_proto_goTypes = []interface{}{
-	(*G1)(nil),                 // 0: shmsg.G1
-	(*G2)(nil),                 // 1: shmsg.G2
-	(*GT)(nil),                 // 2: shmsg.GT
-	(*BatchConfig)(nil),        // 3: shmsg.BatchConfig
-	(*BatchConfigStarted)(nil), // 4: shmsg.BatchConfigStarted
-	(*CheckIn)(nil),            // 5: shmsg.CheckIn
-	(*PolyEval)(nil),           // 6: shmsg.PolyEval
-	(*PolyCommitment)(nil),     // 7: shmsg.PolyCommitment
-	(*Accusation)(nil),         // 8: shmsg.Accusation
-	(*Apology)(nil),            // 9: shmsg.Apology
-	(*EonStartVote)(nil),       // 10: shmsg.EonStartVote
-	(*Message)(nil),            // 11: shmsg.Message
-	(*MessageWithNonce)(nil),   // 12: shmsg.MessageWithNonce
+	(*BatchConfig)(nil),        // 0: shmsg.BatchConfig
+	(*BatchConfigStarted)(nil), // 1: shmsg.BatchConfigStarted
+	(*CheckIn)(nil),            // 2: shmsg.CheckIn
+	(*PolyEval)(nil),           // 3: shmsg.PolyEval
+	(*PolyCommitment)(nil),     // 4: shmsg.PolyCommitment
+	(*Accusation)(nil),         // 5: shmsg.Accusation
+	(*Apology)(nil),            // 6: shmsg.Apology
+	(*EonStartVote)(nil),       // 7: shmsg.EonStartVote
+	(*Message)(nil),            // 8: shmsg.Message
+	(*MessageWithNonce)(nil),   // 9: shmsg.MessageWithNonce
 }
 var file_shmsg_proto_depIdxs = []int32{
-	3,  // 0: shmsg.Message.batch_config:type_name -> shmsg.BatchConfig
-	4,  // 1: shmsg.Message.batch_config_started:type_name -> shmsg.BatchConfigStarted
-	5,  // 2: shmsg.Message.check_in:type_name -> shmsg.CheckIn
-	6,  // 3: shmsg.Message.poly_eval:type_name -> shmsg.PolyEval
-	7,  // 4: shmsg.Message.poly_commitment:type_name -> shmsg.PolyCommitment
-	8,  // 5: shmsg.Message.accusation:type_name -> shmsg.Accusation
-	9,  // 6: shmsg.Message.apology:type_name -> shmsg.Apology
-	10, // 7: shmsg.Message.eon_start_vote:type_name -> shmsg.EonStartVote
-	11, // 8: shmsg.MessageWithNonce.msg:type_name -> shmsg.Message
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0, // 0: shmsg.Message.batch_config:type_name -> shmsg.BatchConfig
+	1, // 1: shmsg.Message.batch_config_started:type_name -> shmsg.BatchConfigStarted
+	2, // 2: shmsg.Message.check_in:type_name -> shmsg.CheckIn
+	3, // 3: shmsg.Message.poly_eval:type_name -> shmsg.PolyEval
+	4, // 4: shmsg.Message.poly_commitment:type_name -> shmsg.PolyCommitment
+	5, // 5: shmsg.Message.accusation:type_name -> shmsg.Accusation
+	6, // 6: shmsg.Message.apology:type_name -> shmsg.Apology
+	7, // 7: shmsg.Message.eon_start_vote:type_name -> shmsg.EonStartVote
+	8, // 8: shmsg.MessageWithNonce.msg:type_name -> shmsg.Message
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_shmsg_proto_init() }
@@ -1014,42 +864,6 @@ func file_shmsg_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_shmsg_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*G1); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_shmsg_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*G2); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_shmsg_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GT); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_shmsg_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BatchConfig); i {
 			case 0:
 				return &v.state
@@ -1061,7 +875,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BatchConfigStarted); i {
 			case 0:
 				return &v.state
@@ -1073,7 +887,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CheckIn); i {
 			case 0:
 				return &v.state
@@ -1085,7 +899,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*PolyEval); i {
 			case 0:
 				return &v.state
@@ -1097,7 +911,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*PolyCommitment); i {
 			case 0:
 				return &v.state
@@ -1109,7 +923,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Accusation); i {
 			case 0:
 				return &v.state
@@ -1121,7 +935,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Apology); i {
 			case 0:
 				return &v.state
@@ -1133,7 +947,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*EonStartVote); i {
 			case 0:
 				return &v.state
@@ -1145,7 +959,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Message); i {
 			case 0:
 				return &v.state
@@ -1157,7 +971,7 @@ func file_shmsg_proto_init() {
 				return nil
 			}
 		}
-		file_shmsg_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+		file_shmsg_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MessageWithNonce); i {
 			case 0:
 				return &v.state
@@ -1170,7 +984,7 @@ func file_shmsg_proto_init() {
 			}
 		}
 	}
-	file_shmsg_proto_msgTypes[11].OneofWrappers = []interface{}{
+	file_shmsg_proto_msgTypes[8].OneofWrappers = []interface{}{
 		(*Message_BatchConfig)(nil),
 		(*Message_BatchConfigStarted)(nil),
 		(*Message_CheckIn)(nil),
@@ -1186,7 +1000,7 @@ func file_shmsg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_shmsg_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
