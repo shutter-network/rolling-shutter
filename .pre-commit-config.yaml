@@ -68,7 +68,6 @@ repos:
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
-              ^rolling-shutter/contract/binding.go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
@@ -80,7 +79,6 @@ repos:
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
-              ^rolling-shutter/contract/binding.go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
