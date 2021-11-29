@@ -67,11 +67,8 @@ repos:
         args: ["-local", "github.com/shutter-network/shutter"]
         exclude: |
           (?x)(
+              ^.*\.gen\.go$|
               ^rolling-shutter/contract/binding.go$|
-              ^rolling-shutter/shmsg/.*\.pb\.go$|
-              ^rolling-shutter/keyper/kprdb/(models|db|query.sql).go$|
-              ^rolling-shutter/decryptor/dcrdb/(models|db|query.sql).go$|
-              ^rolling-shutter/collator/cltrdb/(models|db|query.sql).go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
@@ -82,11 +79,8 @@ repos:
       - id: gofumpt
         exclude: |
           (?x)(
+              ^.*\.gen\.go$|
               ^rolling-shutter/contract/binding.go$|
-              ^rolling-shutter/shmsg/.*\.pb\.go$|
-              ^rolling-shutter/keyper/kprdb/(models|db|query.sql).go$|
-              ^rolling-shutter/decryptor/dcrdb/(models|db|query.sql).go$|
-              ^rolling-shutter/collator/cltrdb/(models|db|query.sql).go$|
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )

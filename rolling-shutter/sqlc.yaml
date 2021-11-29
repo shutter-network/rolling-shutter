@@ -6,6 +6,9 @@ packages:
     queries: "keyper/kprdb/query.sql"
     engine: "postgresql"
     sql_package: "pgx/v4"
+    output_db_file_name: "db.sqlc.gen.go"
+    output_models_file_name: "models.sqlc.gen.go"
+    output_files_suffix: "c.gen"
 
   - path: "decryptor/dcrdb"
     name: "dcrdb"
@@ -13,6 +16,9 @@ packages:
     queries: "decryptor/dcrdb/query.sql"
     engine: "postgresql"
     sql_package: "pgx/v4"
+    output_db_file_name: "db.sqlc.gen.go"
+    output_models_file_name: "models.sqlc.gen.go"
+    output_files_suffix: "c.gen"
 
   - path: "collator/cltrdb"
     name: "cltrdb"
@@ -20,3 +26,6 @@ packages:
     queries: "collator/cltrdb/query.sql"
     engine: "postgresql"
     sql_package: "pgx/v4"
+    output_db_file_name: "db.sqlc.gen.go"
+    output_models_file_name: "models.sqlc.gen.go"
+    output_files_suffix: "c.gen"
