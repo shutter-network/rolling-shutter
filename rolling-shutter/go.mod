@@ -18,13 +18,12 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/go-cmp v0.5.6
-	github.com/jackc/pgconn v1.10.0
-	github.com/jackc/pgx/v4 v4.13.0
-	github.com/jackc/puddle v1.1.4 // indirect
+	github.com/jackc/pgconn v1.10.1
+	github.com/jackc/pgx/v4 v4.14.0
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/kr/pretty v0.2.1
-	github.com/kyleconroy/sqlc v1.10.0
+	github.com/kyleconroy/sqlc v1.11.0
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
@@ -41,7 +40,6 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multihash v0.0.16 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
-	github.com/pingcap/log v0.0.0-20210906054005-afc726e70354 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
@@ -57,12 +55,10 @@ require (
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
-	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa
 	golang.org/x/net v0.0.0-20211020060615-d418f374d309 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211109065445-02f5c0300f6e // indirect
-	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.7
 	google.golang.org/genproto v0.0.0-20211021150943-2b146023228c // indirect
 	google.golang.org/protobuf v1.27.1
