@@ -28,16 +28,7 @@
       (apply str "gotestsum" (if no-color? " --no-color ") args))
 
     (def repo-root
-      (str (fs/canonicalize
-            (cond
-              (System/getenv "ROLLING_SHUTTER_ROOT")
-                (System/getenv "ROLLING_SHUTTER_ROOT")
-              (fs/exists? "keyper/keyper.go")
-                ".."
-              (fs/exists? "../keyper/keyper.go")
-                "../.."
-              :else
-                (throw (ex-info "please set ROLLING_SHUTTER_ROOT" {}))))))
+      (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
     (def src-dir
       (-> repo-root (fs/path "rolling-shutter") str))
     (defn src-file [p]
