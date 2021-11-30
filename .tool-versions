@@ -7,3 +7,4 @@ java adoptopenjdk-11.0.13+8
 nodejs 16.13.0
 protoc 3.18.0
 solidity 0.8.9
+sqlc 1.11.0
