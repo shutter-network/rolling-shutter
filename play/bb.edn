@@ -1,0 +1,496 @@
+{:min-bb-version "0.6.1"
+ :tasks
+ {:requires ([babashka.fs :as fs]
+             [clojure.string :as str]
+             [clojure.java.io :as io]
+             [babashka.curl :as curl]
+             [cheshire.core :as json])
+
+  :init
+  (do
+    (def num-keypers 3)
+    (def num-decryptors 3)
+    (def windows? (str/starts-with? (System/getProperty "os.name") "Windows"))
+    (def no-color? windows?)
+    (defn inside-asdf?
+      [path]
+      (let [asdf-dir (some-> "ASDF_DIR" System/getenv fs/canonicalize (str "/"))
+            path (some-> path fs/canonicalize str)]
+        (if (or (nil? asdf-dir) (nil? path))
+          false
+          (str/starts-with? path asdf-dir))))
+    (def asdf-go?
+      (inside-asdf? (fs/which "go")))
+    (defn which [cmd]
+      (fs/which (str cmd (if windows? ".exe" ""))))
+    (defn gotestsum
+      [& args]
+      (apply str "gotestsum" (if no-color? " --no-color ") args))
+
+    (def repo-root
+      (str (fs/canonicalize
+            (cond
+              (System/getenv "ROLLING_SHUTTER_ROOT")
+                (System/getenv "ROLLING_SHUTTER_ROOT")
+              (fs/exists? "keyper/keyper.go")
+                ".."
+              (fs/exists? "../keyper/keyper.go")
+                "../.."
+              :else
+                (throw (ex-info "please set ROLLING_SHUTTER_ROOT" {}))))))
+    (def src-dir
+      (-> repo-root (fs/path "rolling-shutter") str))
+    (defn src-file [p]
+      (-> src-dir (fs/path p) str))
+    (def contracts-dir
+      (-> src-dir (fs/path ".." "contracts" ) fs/canonicalize str))
+
+    (def insert-keyper-set-sql "insert_keyper_set.sql")
+    (def insert-decryptor-sql "insert_decryptor.sql")
+    (def insert-eon-key-sql "insert_eon_public_key.sql")
+
+    (def exe (src-file (str "bin/rolling-shutter" (if windows? ".exe"))))
+    (def ansi-green (if no-color? "" "\u001B[32m"))
+    (def ansi-reset (if no-color? "" "\u001B[0m"))
+    (defn log
+      [& args]
+      (print ansi-green (format "==> [%s] " (:name (current-task))))
+      (apply print args)
+      (println ansi-reset))
+
+    (defn download-to
+      [url path]
+      (log "Downloading" url "to" path)
+      (io/copy
+       (:body (curl/get url {:as :stream}))
+       (io/file path)))
+
+    (defn extract-address [cfgfile]
+      (re-find (re-pattern "0x[0-9a-fA-F]{40}") (slurp cfgfile)))
+
+    (defn extract-peerid [cfgfile]
+      (second (re-find (re-pattern "/p2p/([0-9a-zA-Z]*)") (slurp cfgfile))))
+
+    (defn extract-bls-key [cfgfile]
+      (second (re-find (re-pattern "(?i)# BLS public key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
+
+    (defn extract-eon-key [cfgfile]
+      (second (re-find (re-pattern "(?i)# Eon Public Key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
+
+    (defn extract-toml-value [cfgfile key]
+      (second (re-find (re-pattern (format "\\s*%s\\s*=\\s*(.*)" key)) (slurp cfgfile))))
+
+    (defn extract-toml-value-str [cfgfile key]
+      (let [v-with-quotes (extract-toml-value cfgfile key)]
+        (subs v-with-quotes 1 (dec (count v-with-quotes)))))
+
+    (defn toml-replace
+      [toml-str key value]
+      (str/replace-first
+       toml-str
+       (re-pattern (format "(?m)(^\\s*%s\\s*=)(.*)" key))
+       (str "$1 " (json/encode value))))
+
+    (defn toml-edit-string
+      [toml-str m]
+      (reduce (fn [toml-str [k v]]
+                (toml-replace toml-str k v))
+              toml-str
+              m))
+
+    (defn toml-edit-file
+      [filename m]
+      (spit filename (toml-edit-string (slurp filename) m)))
+
+
+    (defn keyper-cfg
+      [n]
+      (format "keyper-%s.toml" n))
+
+    (defn decryptor-cfg
+      [n]
+      (format "decryptor-%s.toml" n))
+
+    (def mock-cfg "mock.toml")
+    (def collator-cfg "collator.toml")
+
+    (defn keyper-db
+      [n]
+      (format "keyper-db-%d" n))
+
+    (defn decryptor-db
+      [n]
+      (format "decryptor-db-%d" n))
+
+    (defn keyper-port
+      [n]
+      (+ 2000 n))
+
+    (defn collator-port
+      []
+      (dec (keyper-port 0)))
+
+    (defn decryptor-port
+      [n]
+      (+ (keyper-port num-keypers) n))
+
+    (def mock-port (decryptor-port num-keypers))
+
+    (defn myshell
+      [& args]
+      (log args)
+      (let [[opts args] (if (map? (first args))
+                          [(first args) (rest args)]
+                          [{} args])
+            dir (:dir opts)]
+        (when dir
+          (println (format "Entering directory '%s'" dir)))
+        (apply shell opts args)
+        (when dir
+          (println (format "Leaving directory '%s'" dir)))))
+
+    (defn go-install
+      ([pkg]
+       (myshell {:dir src-dir} "go" "install" pkg)
+       (when asdf-go?
+         (myshell "asdf" "reshim" "golang")))
+      ([executable pkg]
+       (when (nil? (which executable))
+         (go-install pkg)
+         (when (nil? (which executable))
+           (throw (ex-info "Cannot find the executable installed with go install. Check your PATH" {:executable executable :pkg pkg}))))))
+    (defn rs
+      [& args]
+      (apply myshell exe args))
+    (defn dropdb
+      [db]
+      (myshell "dropdb" "-f" "--if-exists" db))
+    (defn psql
+      [db & args]
+      (apply (partial myshell "psql -d" db) args)))
+
+  -oapi-files
+  (src-file "collator/oapi/oapi.yaml")
+
+  -sqlc-files
+  (concat [(src-file "sqlc.yaml")] (fs/glob src-dir "**.sql"))
+
+  -go-files
+  (concat (fs/glob src-dir "**.go") [(src-file "go.mod") (src-file "go.sum")])
+
+  -protoc-files
+  (fs/glob src-dir "**.proto")
+
+  -install:protoc-gen-go
+  (go-install "protoc-gen-go" "google.golang.org/protobuf/cmd/protoc-gen-go")
+
+  -install:sqlc
+  (go-install "sqlc" "github.com/kyleconroy/sqlc/cmd/sqlc")
+
+  -install:gotestsum
+  (go-install "gotestsum" "gotest.tools/gotestsum@latest")
+
+  -install:abigen
+  (go-install "abigen" "github.com/ethereum/go-ethereum/cmd/abigen")
+
+  -install:oapi-codegen
+  (go-install "oapi-codegen" "github.com/deepmap/oapi-codegen/cmd/oapi-codegen")
+
+  contracts:install
+  {:doc "Run npm install in contracts directory"
+   :task (let [node-modules (format "%s/node_modules" contracts-dir)
+               marker-file (format "%s/.mark-npm-install" node-modules)
+               marker-exists? (fs/exists? marker-file)
+               anchor (if marker-exists? marker-file node-modules)]
+           ;; we use the marker file instead of node_modules as anchor to speedup the build, since
+           ;; node_modules is rather large
+           (when (seq (fs/modified-since anchor
+                                         [(format "%s/package.json" contracts-dir)
+                                          (format "%s/package-lock.json" contracts-dir)]))
+             (myshell {:dir contracts-dir} (str (if windows? "cmd /c " "")
+                                                "npm install"))
+             (if marker-exists?
+               (fs/set-last-modified-time marker-file (System/currentTimeMillis))))
+           (when-not marker-exists?
+             (fs/create-file marker-file)))}
+
+  contracts:test
+  {:doc "Run hardhat tests in contracts directory"
+   :depends [contracts:install]
+   :task (myshell {:dir contracts-dir} "npx hardhat test")}
+
+  build:abigen
+  {:doc "Generate go bindings for the contracts"
+   :depends [contracts:install -install:abigen]
+   :task (when (seq (fs/modified-since (format "%s/combined.json" contracts-dir)
+                                       (format "%s/src" contracts-dir)))
+           (myshell {:dir contracts-dir} "node" "scripts/abigen.js")
+           (myshell {:dir src-dir}
+                    "abigen" "--pkg"  "contract"
+                    ,        "--out" "contract/binding.go"
+                    ,        "--combined-json" "../contracts/combined.json"))}
+
+  test
+  {:doc "Run tests"
+   :depends [-install:gotestsum]
+   :task (myshell {:dir src-dir} (gotestsum " -- -short ./..."))}
+
+  test-integration
+  {:doc "Run integration tests"
+   :depends [-install:gotestsum]
+   :task (myshell {:dir src-dir} (gotestsum " -- -p 1 -run Integration -count=1  ./..."))}
+
+  test-all
+  {:doc "Run all tests"
+   :depends [test test-integration contracts:test]}
+
+  lint
+  {:doc "Run linter"
+   :depends []
+   :task (myshell {:dir src-dir} "golangci-lint run --tests")}
+
+  lint-changes
+  {:doc "Show only new linter warnings"
+   :depends []
+   :task (myshell {:dir src-dir} "golangci-lint run --new-from-rev origin/main")}
+
+  build:oapi-codegen
+  {:doc "Run oapi-codegen"
+   :depends [-oapi-files]
+   :task (when (seq (fs/modified-since exe -oapi-files))
+           (run '-install:oapi-codegen)
+           (myshell {:dir src-dir} "go generate -x ./collator/oapi"))}
+
+  build:sqlc
+  {:doc "Run sqlc"
+   :depends [-sqlc-files]
+   :task (when (and (not windows?)
+                    (seq (fs/modified-since exe -sqlc-files)))
+           (run '-install:sqlc)
+           (myshell {:dir src-dir} "sqlc generate"))}
+
+  build:protoc
+  {:doc "Run protoc"
+   :depends [-protoc-files]
+   :task (when (seq (fs/modified-since exe -protoc-files))
+           (run '-install:protoc-gen-go)
+           (myshell {:dir src-dir} "go generate ./shmsg"))}
+
+  build
+  {:doc "Build rolling-shutter executable"
+   :depends [build:abigen build:sqlc build:protoc build:oapi-codegen -go-files]
+   :task (when (seq (fs/modified-since exe -go-files))
+           (myshell {:dir src-dir} (if windows?
+                                     "go build -o bin/rolling-shutter.exe"
+                                     "make")))}
+
+  genconfig:collator
+  {:doc "Generate collator config"
+   :depends [build]
+   :task (when-not (fs/exists? collator-cfg)
+           (rs "collator" "generate-config" "--output" collator-cfg)
+           (toml-edit-file collator-cfg
+                           {"DatabaseURL" (format "postgres:///collator")
+                            "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" (collator-port))}))}
+
+  genconfig:keypers
+  {:doc "Generate keyper configs"
+   :depends [build]
+   :task (doseq [n (range num-keypers)
+                 :let [cfgfile (keyper-cfg n)
+                       db (keyper-db n)
+                       port (keyper-port n)]]
+           (when-not (fs/exists? cfgfile)
+             (rs "keyper" "generate-config" "--output" cfgfile)
+             (toml-edit-file cfgfile
+                             {"DatabaseURL" (format "postgres:///%s" db)
+                              "DKGPhaseLength" 5
+                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" port)})))}
+
+  genconfig:decryptors
+  {:doc "Generate decryptor configs"
+   :depends [build]
+   :task (doseq [n (range num-decryptors)
+                 :let [cfgfile (decryptor-cfg n)
+                       db (decryptor-db n)
+                       port (decryptor-port n)]]
+           (when-not (fs/exists? cfgfile)
+             (rs "decryptor" "generate-config" "--output" cfgfile)
+             (toml-edit-file cfgfile
+                             {"DatabaseURL" (format "postgres:///%s" db)
+                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" port)
+                              "SignerIndex" n
+                              "requiredSignatures" (inc (quot num-decryptors 3))})))}
+
+  genconfig:mock
+  {:doc "Generate mocknode config"
+   :depends [build genconfig:decryptors]
+   :task (when-not (fs/exists? mock-cfg)
+           (rs "mocknode" "generate-config" "--output" mock-cfg)
+           (toml-edit-file mock-cfg
+                           {"ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" mock-port)
+                            "DecryptorPublicKeys" (->> (range num-decryptors)
+                                                       (map decryptor-cfg)
+                                                       (map extract-bls-key))}))}
+
+  genconfig
+  {:doc "Generate configs"
+   :depends [genconfig:keypers genconfig:decryptors genconfig:mock]}
+
+  peer
+  {:doc "Add nodes as peers of each other"
+   :task (let [cfgs *command-line-args*
+               peers (map (fn [cfg]
+                            (str  (extract-toml-value-str cfg "ListenAddress")
+                                  "/p2p/"
+                                  (extract-peerid cfg)))
+                          cfgs)]
+           (doseq [cfg cfgs]
+             (toml-edit-file cfg {"PeerMultiaddrs" peers})))}
+
+  init:testchain
+  {:doc "Initialize the shuttermint testchain directory"
+   :depends [build]
+   :task (do
+           (fs/delete-tree "testchain")
+           (rs "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"))}
+
+  init:kprdb
+  {:doc "Initialize the keyper database"
+   :depends [build]
+   :task (doseq [n (range num-keypers)
+                 :let [db (keyper-db n)]]
+           (dropdb db)
+           (myshell "createdb" db)
+           (rs "keyper" "initdb" "--config" (keyper-cfg n)))}
+
+  init:decryptors
+  {:doc "Initialize decryptor databases"
+   :depends [build genconfig:decryptors]
+   :task (doseq [n (range num-decryptors)
+                 :let [cfgfile (decryptor-cfg n)
+                       db (decryptor-db n)]]
+           (dropdb db)
+           (myshell "createdb" db)
+           (rs "decryptor" "initdb" "--config" cfgfile))}
+
+  init:collatordb
+  {:doc "Initialize the colllator database"
+   :depends [build genconfig:collator]
+   :task (let [db "collator"]
+           (dropdb db)
+           (myshell "createdb" db)
+           (rs "collator" "initdb" "--config" collator-cfg))}
+
+  init
+  {:doc "Initialize keyper and decryptor databases as well as shuttermint"
+   :depends [genconfig init:testchain init:kprdb init:decryptors init:collatordb]}
+
+  -keypers
+  {:depends [genconfig:keypers]
+   :doc "List of keyper addresses"
+   :task (mapv (comp extract-address keyper-cfg) (range num-keypers))}
+
+  -decryptors
+  {:depends [genconfig:decryptors]
+   :doc "List of decryptor addresses"
+   :task (mapv (comp extract-address decryptor-cfg) (range num-decryptors))}
+
+  -deploy-conf
+  {:doc "Generate a deploy config"
+   :depends [-decryptors -keypers]
+   :task (let [conf {:keypers -keypers,
+                     :decryptors -decryptors,
+                     :fundValue "100"}
+               play-json (str (fs/absolutize "play.json"))]
+           (spit play-json (json/encode conf {:pretty true}))
+           play-json)}
+
+  node
+  {:doc "Start a hardhat node"
+   :depends [-deploy-conf contracts:install]
+   :task (myshell {:extra-env {"DEPLOY_CONF" -deploy-conf}
+                   :dir contracts-dir}
+                  "npx hardhat node")}
+
+  populate:ds-with-ks
+  {:doc "Populate decryptor dbs with keyper set"
+   :depends [genconfig:decryptors -keypers]
+   :task (let [kaddrs-quoted (map (partial format "\"%s\"") -keypers)
+               kaddrs-args (format "'{%s}'" (str/join "," kaddrs-quoted))]
+           (doseq [i (range num-decryptors)]
+             (psql (decryptor-db i)
+                   "-f" insert-keyper-set-sql
+                   (format "-vkeypers=%s" kaddrs-args))))}
+
+  populate:ds-with-ds
+  {:doc "Populate decryptor dbs with decryptor set"
+   :depends [genconfig:decryptors]
+   :task (doseq [db (map decryptor-db (range num-keypers))
+                 i (range num-decryptors)
+                 :let [cfg (decryptor-cfg i)
+                       addr (extract-address cfg)
+                       key (extract-bls-key cfg)]]
+           (psql db
+                 "-f" insert-decryptor-sql
+                 (format "-vaddress='%s'" addr)
+                 (format "-vkey=E'\\\\x%s'" key)))}
+
+  populate:ds-with-eon-key
+  {:doc "Populate decryptor dbs with eon key from mocknode"
+   :depends [genconfig:decryptors genconfig:mock]
+   :task (let [key (extract-eon-key mock-cfg)]
+           (doseq [db (map decryptor-db (range num-keypers))]
+             (psql db
+                   "-f" insert-eon-key-sql
+                   (format "-veon_public_key=E'\\\\x%s'" key))))}
+
+  populate:decryptors
+  {:doc "Populate the decryptor databases"
+   :depends [populate:ds-with-ks populate:ds-with-ds populate:ds-with-eon-key]}
+
+  chain
+  {:doc "Run shuttermint"
+   :depends [build]
+   :task (rs "chain" "--config" "testchain/config/config.toml")}
+
+  boot
+  {:doc "Bootstrap shuttermint node"
+   :depends [build -keypers]
+   :task (->> -keypers
+              (interleave (repeat "-K"))
+              (concat [exe "bootstrap"])
+              (apply myshell))}
+
+  k
+  {:doc "Run keyper"
+   :depends [build genconfig:keypers]
+   :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
+               cfgfile (keyper-cfg n)]
+           (rs "keyper" "--config" cfgfile))}
+
+  d
+  {:doc "Run decryptor"
+   :depends [build genconfig:decryptors]
+   :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
+               cfgfile (decryptor-cfg n)]
+           (rs "decryptor" "--config" cfgfile))}
+
+  m
+  {:doc "Run mocknode"
+   :depends [build genconfig:mock]
+   :task (rs "mocknode" "--config" mock-cfg)}
+
+  collator
+  {:doc "Run collator"
+   :depends [build genconfig:collator]
+   :task (rs "collator" "--config" collator-cfg)}
+
+  clean
+  {:doc "Remove config files and chain related files"
+   :task (do
+           (fs/delete-tree "testchain")
+           (doseq [cfgfile (concat (map keyper-cfg (range num-keypers))
+                                   (map decryptor-cfg (range num-decryptors))
+                                   [mock-cfg collator-cfg])]
+             (fs/delete-if-exists cfgfile)))}}}
