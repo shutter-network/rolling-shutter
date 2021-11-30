@@ -1,6 +1,7 @@
-{:min-bb-version "0.6.1"
+{:min-bb-version "0.6.7"
  :tasks
- {:requires ([babashka.fs :as fs]
+ {:requires ([babashka.fs :as fs :refer [which]]
+             [babashka.core]
              [clojure.string :as str]
              [clojure.java.io :as io]
              [babashka.curl :as curl]
@@ -10,7 +11,7 @@
   (do
     (def num-keypers 3)
     (def num-decryptors 3)
-    (def windows? (str/starts-with? (System/getProperty "os.name") "Windows"))
+    (def windows? (babashka.core/windows?))
     (def no-color? windows?)
     (defn inside-asdf?
       [path]
@@ -21,8 +22,6 @@
           (str/starts-with? path asdf-dir))))
     (def asdf-go?
       (inside-asdf? (fs/which "go")))
-    (defn which [cmd]
-      (fs/which (str cmd (if windows? ".exe" ""))))
     (defn gotestsum
       [& args]
       (apply str "gotestsum" (if no-color? " --no-color ") args))
@@ -198,8 +197,7 @@
            (when (seq (fs/modified-since anchor
                                          [(format "%s/package.json" contracts-dir)
                                           (format "%s/package-lock.json" contracts-dir)]))
-             (myshell {:dir contracts-dir} (str (if windows? "cmd /c " "")
-                                                "npm install"))
+             (myshell {:dir contracts-dir} "npm install")
              (if marker-exists?
                (fs/set-last-modified-time marker-file (System/currentTimeMillis))))
            (when-not marker-exists?
