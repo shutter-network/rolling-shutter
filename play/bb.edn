@@ -218,7 +218,7 @@
            (myshell {:dir contracts-dir} "node" "scripts/abigen.js")
            (myshell {:dir src-dir}
                     "abigen" "--pkg"  "contract"
-                    ,        "--out" "contract/binding.go"
+                    ,        "--out" "contract/binding.abigen.gen.go"
                     ,        "--combined-json" "../contracts/combined.json"))}
 
   test
