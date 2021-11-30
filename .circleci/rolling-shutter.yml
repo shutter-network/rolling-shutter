@@ -20,29 +20,26 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v6-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v7-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
-          name: "Install protoc"
+          name: "Install asdf plugins"
           command: |
             asdf plugin add protoc || true
-            asdf install protoc
-      - run:
-          name: "Install node"
-          command: |
             asdf plugin add nodejs || true
-            asdf install nodejs
+            asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git || true
+      - run: asdf install
       - node/install-packages:
           app-dir: ~/src/contracts
           override-ci-command: npm install
-      - run: make install-protoc-gen-go install-sqlc install-abigen install-oapi-codegen
+      - run: make install-protoc-gen-go install-abigen install-oapi-codegen
       - run:
           name: Remove generated files
           command: |
             find . -name '*.gen.go' |xargs rm
       - run: make generate abigen
       - save_cache:
-          key: rs-generate-v6-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v7-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
