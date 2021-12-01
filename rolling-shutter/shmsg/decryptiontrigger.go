@@ -38,8 +38,8 @@ func (t *DecryptionTrigger) VerifySignature(address common.Address) (bool, error
 func (t *DecryptionTrigger) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(triggerHashPrefix)
-	_ = binary.Write(hash, binary.LittleEndian, t.InstanceID)
-	_ = binary.Write(hash, binary.LittleEndian, t.EpochID)
+	_ = binary.Write(hash, binary.BigEndian, t.InstanceID)
+	_ = binary.Write(hash, binary.BigEndian, t.EpochID)
 	hash.Write(t.TransactionsHash)
 	return hash.Sum(nil)
 }

@@ -105,12 +105,12 @@ func DecodePureDKG(data []byte) (*puredkg.PureDKG, error) {
 
 func EncodeUint64(n uint64) []byte {
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, n)
+	binary.BigEndian.PutUint64(b, n)
 	return b
 }
 
 func DecodeUint64(b []byte) uint64 {
-	return binary.LittleEndian.Uint64(b)
+	return binary.BigEndian.Uint64(b)
 }
 
 func EncodeBigint(n *big.Int) []byte {
