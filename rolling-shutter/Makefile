@@ -1,15 +1,9 @@
 .POSIX:
 
-PREFIX ?= /usr/local
-GO ?= go
-GOFLAGS ?=
-SHROOT ?= $(CURDIR)
-TESTROOT=$(SHROOT)/testchain
-BINDIR ?= ./bin
-
-EXECUTABLE ?= ${BINDIR}/rolling-shutter
-OPENZEPPELIN_CONTRACTS=openzeppelin
-OPENZEPPELIN_CONTRACTS_DIR=../contracts/openzeppelin
+GO		?= go
+GOFLAGS		?=
+BINDIR		?= ./bin
+EXECUTABLE	?= ${BINDIR}/rolling-shutter
 
 build:
 	@VERSION=`git describe --tags --always --abbrev=4 --dirty --match 'rolling-shutter/v*' | sed -e s#^rolling-shutter/##`; \
@@ -21,14 +15,6 @@ wasm:
 
 protoc:
 	${GO} generate ./shmsg/
-
-${TESTROOT}:
-	${EXECUTABLE} init --dev --root ${TESTROOT}
-
-init: ${TESTROOT}
-
-run: build init
-	${EXECUTABLE} chain --config ${TESTROOT}/config/config.toml
 
 test-unit:
 	@echo "====================> Running unit tests"
@@ -42,7 +28,6 @@ test: test-unit
 
 test-all: test-unit test-integration
 
-
 generate:
 	${GO} generate -x ./...
 
@@ -51,11 +36,7 @@ coverage:
 	${GO} tool cover -html=coverage.out
 
 clean:
-	rm -rf ${TESTROOT}
-	rm -f ${EXECUTABLE} ${BINDIR}/testclient ${BINDIR}/shuttermint
-
-install:
-	install -o root -m 0555 ${EXECUTABLE} ${PREFIX}/bin/
+	rm -f ${EXECUTABLE}
 
 install-tools: install-abigen install-sqlc install-protoc-gen-go  install-oabi-codegen install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
 
@@ -100,4 +81,4 @@ abigen:
 	cd ../contracts; rm -f combined.json; node scripts/abigen.js
 	abigen --pkg contract --out contract/binding.abigen.gen.go --combined-json ../contracts/combined.json
 
-.PHONY: build install run init clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen
+.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen

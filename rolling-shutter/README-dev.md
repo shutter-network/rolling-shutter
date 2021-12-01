@@ -28,10 +28,6 @@ Run `make lint` to run `golangci-lint`. Run `make lint-changes` to run
 
 Run `make generate` to generate sqlc and protocol buffers related files.
 
-## Running
-
-Run `make run` to start shuttermint.
-
 # Managing tools with asdf
 
 [asdf](https://github.com/asdf-vm/asdf) can be used to install and manage the
@@ -45,10 +41,8 @@ plugins.
 ```
 asdf plugin add babashka
 asdf plugin add circleci https://github.com/trnubo/asdf-circleci.git
-asdf plugin add clojure
 asdf plugin add golang
 asdf plugin add golangci-lint
-asdf plugin add java
 asdf plugin add nodejs
 asdf plugin add protoc
 asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git
@@ -58,8 +52,14 @@ Finally, install the tools by running the following inside the rolling shutter
 git repository:
 
 ```
-asdf install java
 asdf install
 ```
 
-`asdf install java` is needed first, because clojure relies on java.
+Optionally you may also install clojure and java:
+
+```
+asdf plugin add java
+asdf plugin add clojure
+asdf install java
+asdf install clojure
+```
