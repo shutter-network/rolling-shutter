@@ -213,11 +213,7 @@
    :depends [contracts:install -install:abigen]
    :task (when (seq (fs/modified-since (format "%s/combined.json" contracts-dir)
                                        (format "%s/src" contracts-dir)))
-           (myshell {:dir contracts-dir} "node" "scripts/abigen.js")
-           (myshell {:dir src-dir}
-                    "abigen" "--pkg"  "contract"
-                    ,        "--out" "contract/binding.abigen.gen.go"
-                    ,        "--combined-json" "../contracts/combined.json"))}
+           (myshell {:dir contracts-dir} "node" "scripts/abigen.js"))}
 
   test
   {:doc "Run tests"
