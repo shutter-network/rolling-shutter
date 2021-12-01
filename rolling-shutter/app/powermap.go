@@ -17,11 +17,11 @@ func MakePowermap(validators []abcitypes.ValidatorUpdate) (Powermap, error) {
 		if data == nil {
 			return res, errors.Errorf("cannot handle key %s", v.PubKey)
 		}
-		pk, err := NewValidatorPubkey(data)
+		pubkey, err := NewValidatorPubkey(data)
 		if err != nil {
 			return res, err
 		}
-		res[pk] += v.Power
+		res[pubkey] += v.Power
 	}
 	return res, nil
 }

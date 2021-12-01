@@ -13,6 +13,9 @@ linters-settings:
     threshold: 100
   exhaustive:
     default-signifies-exhaustive: false
+  forbidigo:
+    forbid:
+      - "pk\\b"
   funlen:
     lines: 100
     statements: 50
@@ -142,6 +145,7 @@ linters:
     - thelper
     - godot
     - godox
+    - forbidigo
 
   # don't enable:
   # - asciicheck

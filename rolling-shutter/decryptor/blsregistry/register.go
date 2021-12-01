@@ -173,13 +173,13 @@ func Lookup(opts *bind.CallOpts, contracts *deployment.Contracts, addr common.Ad
 }
 
 func VerifySignature(publicKey []byte, signature []byte, address common.Address) bool {
-	pk := new(shbls.PublicKey)
-	if err := pk.Unmarshal(publicKey); err != nil {
+	pubkey := new(shbls.PublicKey)
+	if err := pubkey.Unmarshal(publicKey); err != nil {
 		return false
 	}
 	sig := new(shbls.Signature)
 	if err := sig.Unmarshal(signature); err != nil {
 		return false
 	}
-	return shbls.Verify(sig, pk, address.Bytes())
+	return shbls.Verify(sig, pubkey, address.Bytes())
 }

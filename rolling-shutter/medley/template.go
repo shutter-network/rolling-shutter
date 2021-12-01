@@ -44,8 +44,8 @@ func blsPublicKeySlice(publicKeys []*shbls.PublicKey) string {
 	return "[" + strings.Join(strlist, ", ") + "]"
 }
 
-func eonPublicKey(epk *shcrypto.EonPublicKey) string {
-	b := epk.Marshal()
+func eonPublicKey(pubkey *shcrypto.EonPublicKey) string {
+	b := pubkey.Marshal()
 	return hex.EncodeToString(b)
 }
 

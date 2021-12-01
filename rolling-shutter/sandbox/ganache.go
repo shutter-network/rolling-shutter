@@ -21,11 +21,11 @@ var ganacheHexKeys = []string{
 
 // GanacheKey returns the nth key used by ganache when started with '-d'.
 func GanacheKey(n int) *ecdsa.PrivateKey {
-	pk, err := crypto.HexToECDSA(ganacheHexKeys[n])
+	privkey, err := crypto.HexToECDSA(ganacheHexKeys[n])
 	if err != nil {
 		panic(err)
 	}
-	return pk
+	return privkey
 }
 
 func NumGanacheKeys() int {

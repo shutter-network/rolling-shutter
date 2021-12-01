@@ -139,14 +139,14 @@ func handleSignatureInput(
 		if !decryptorSetMember.SignatureVerified {
 			continue
 		}
-		pk := new(shbls.PublicKey)
-		if err := pk.Unmarshal(decryptorSetMember.BlsPublicKey); err != nil {
+		pubkey := new(shbls.PublicKey)
+		if err := pubkey.Unmarshal(decryptorSetMember.BlsPublicKey); err != nil {
 			log.Printf("failed to unmarshal public key from db: %s", err)
 			continue
 		}
 
 		signaturesToAggregate = append(signaturesToAggregate, unmarshalledSignature)
-		publicKeysToAggragate = append(publicKeysToAggragate, pk)
+		publicKeysToAggragate = append(publicKeysToAggragate, pubkey)
 		signerBitfield = bitfield.AddBitfields(signerBitfield, dbSignature.SignersBitfield)
 	}
 

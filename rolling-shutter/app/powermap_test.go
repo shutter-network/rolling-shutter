@@ -13,7 +13,7 @@ func makeKey(n int) []byte {
 	return []byte(fmt.Sprintf("%32d", n))
 }
 
-func newpk(n int) ValidatorPubkey {
+func newPubkey(n int) ValidatorPubkey {
 	res, err := NewValidatorPubkey(makeKey(n))
 	if err != nil {
 		panic(err)
@@ -44,30 +44,30 @@ func TestMakePowermap(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 1, len(pm))
-	assert.Equal(t, power, pm[newpk(1)])
+	assert.Equal(t, power, pm[newPubkey(1)])
 }
 
 func TestDiffPowermaps(t *testing.T) {
 	oldpm := make(Powermap)
 	for i := 0; i < 4; i++ {
-		oldpm[newpk(i)] = int64(i)
+		oldpm[newPubkey(i)] = int64(i)
 	}
 
 	newpm := make(Powermap)
 	// drop 0,1
-	newpm[newpk(2)] = oldpm[newpk(2)] // keep 2
-	newpm[newpk(3)] = 15              // change 3
-	newpm[newpk(4)] = 20              // add 4
+	newpm[newPubkey(2)] = oldpm[newPubkey(2)] // keep 2
+	newpm[newPubkey(3)] = 15                  // change 3
+	newpm[newPubkey(4)] = 20                  // add 4
 
 	assert.Equal(t, 0, len(DiffPowermaps(oldpm, oldpm)))
 
 	diff := DiffPowermaps(oldpm, newpm)
 
 	expected := Powermap{
-		newpk(0): 0,
-		newpk(1): 0,
-		newpk(3): 15,
-		newpk(4): 20,
+		newPubkey(0): 0,
+		newPubkey(1): 0,
+		newPubkey(3): 15,
+		newPubkey(4): 20,
 	}
 	fmt.Println("DIFF", diff)
 

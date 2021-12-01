@@ -675,9 +675,9 @@ func (app *ShutterApp) LastConfig() *BatchConfig {
 func (app *ShutterApp) makePowermap(keypers []common.Address) Powermap {
 	pm := make(Powermap)
 	for _, k := range keypers {
-		pk, ok := app.Identities[k]
+		pubkey, ok := app.Identities[k]
 		if ok {
-			pm[pk] += 10
+			pm[pubkey] += 10
 		} else {
 			pm[NonExistentValidator] += 10
 		}
