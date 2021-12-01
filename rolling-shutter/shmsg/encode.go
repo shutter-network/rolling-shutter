@@ -14,7 +14,7 @@ import (
 
 // Add a prefix to avoid accidentally signing data with special meaning in different context, in
 // particular Ethereum transactions (c.f. EIP191 https://eips.ethereum.org/EIPS/eip-191).
-var hashPrefix = []byte{0x19, 's', 'h', 'm', 's', 'g'}
+var shmsgHashPrefix = []byte{0x19, 's', 'h', 'm', 's', 'g'}
 
 // SignMessage signs the given Message with the given private key.
 func SignMessage(msg proto.Message, privkey *ecdsa.PrivateKey) ([]byte, error) {
@@ -23,7 +23,7 @@ func SignMessage(msg proto.Message, privkey *ecdsa.PrivateKey) ([]byte, error) {
 		return nil, err
 	}
 	hash := sha3.New256()
-	_, err = hash.Write(hashPrefix)
+	_, err = hash.Write(shmsgHashPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func GetSigner(signedMessage []byte) (common.Address, error) {
 		return signer, errors.New("message too short")
 	}
 	hash := sha3.New256()
-	_, err := hash.Write(hashPrefix)
+	_, err := hash.Write(shmsgHashPrefix)
 	if err != nil {
 		return common.Address{}, err
 	}

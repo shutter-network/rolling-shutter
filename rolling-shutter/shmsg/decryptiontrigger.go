@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-const HashPrefix = "decryptionTriggerPrefix"
+var triggerHashPrefix = []byte{0x19, 't', 'r', 'i', 'g', 'g', 'e', 'r'}
 
 func NewSignedDecryptionTrigger(instanceID uint64, epochID uint64, transactions [][]byte,
 	privKey *ecdsa.PrivateKey) (*DecryptionTrigger, error) {
@@ -36,21 +36,19 @@ func (t *DecryptionTrigger) VerifySignature(address common.Address) (bool, error
 }
 
 func (t *DecryptionTrigger) Hash() []byte {
-	triggerBytes := make([]byte, 16)
-	triggerBytes = append(triggerBytes, []byte(HashPrefix)...)
-	binary.LittleEndian.PutUint64(triggerBytes, t.InstanceID)
-	binary.LittleEndian.PutUint64(triggerBytes[8:], t.EpochID)
-	triggerBytes = append(triggerBytes, t.TransactionsHash...)
-	hash := sha3.Sum256(triggerBytes)
-	return hash[:]
+	hash := sha3.New256()
+	hash.Write(triggerHashPrefix)
+	_ = binary.Write(hash, binary.LittleEndian, t.InstanceID)
+	_ = binary.Write(hash, binary.LittleEndian, t.EpochID)
+	hash.Write(t.TransactionsHash)
+	return hash.Sum(nil)
 }
 
 func hashTransactions(transactions [][]byte) []byte {
-	concatenatedHashedTransactions := []byte{}
+	hash := sha3.New256()
 	for _, transaction := range transactions {
-		transactionHash := sha3.Sum256(transaction)
-		concatenatedHashedTransactions = append(concatenatedHashedTransactions, transactionHash[:]...)
+		h := sha3.Sum256(transaction)
+		hash.Write(h[:])
 	}
-	hash := sha3.Sum256(concatenatedHashedTransactions)
-	return hash[:]
+	return hash.Sum(nil)
 }
