@@ -23,6 +23,7 @@ func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
 	validators[kprtopics.DecryptionKeyShare] = kpr.makeKeyShareValidator(db)
 	validators[kprtopics.EonPublicKey] = kpr.makeEonPublicKeyValidator()
+	validators[kprtopics.DecryptionTrigger] = kpr.makeDecryptionTriggerValidator()
 
 	return validators
 }
@@ -130,5 +131,28 @@ func (kpr *keyper) makeEonPublicKeyValidator() pubsub.Validator {
 			return false
 		}
 		return msg.GetInstanceID() == kpr.config.InstanceID
+	}
+}
+
+func (kpr *keyper) makeDecryptionTriggerValidator() pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		if msg.GetInstanceID() != kpr.config.InstanceID {
+			return false
+		}
+
+		t, ok := msg.(*decryptionTrigger)
+		if !ok {
+			panic("unmarshalled non decryption key message in decryption key validator")
+		}
+		log.Println(t)
+		return true
 	}
 }
