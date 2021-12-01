@@ -187,3 +187,7 @@ VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
 DELETE FROM keyper.outgoing_eon_keys RETURNING *;
+
+-- name: InsertChainCollator :exec
+INSERT INTO keyper.chain_collator (activation_block_number, collator)
+VALUES ($1, $2);

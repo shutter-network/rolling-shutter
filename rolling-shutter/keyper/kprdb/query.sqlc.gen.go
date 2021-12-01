@@ -413,6 +413,21 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 	return err
 }
 
+const insertChainCollator = `-- name: InsertChainCollator :exec
+INSERT INTO keyper.chain_collator (activation_block_number, collator)
+VALUES ($1, $2)
+`
+
+type InsertChainCollatorParams struct {
+	ActivationBlockNumber int64
+	Collator              string
+}
+
+func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollatorParams) error {
+	_, err := q.db.Exec(ctx, insertChainCollator, arg.ActivationBlockNumber, arg.Collator)
+	return err
+}
+
 const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
 INSERT INTO keyper.chain_keyper_set (activation_block_number, keypers, threshold)
 VALUES ($1, $2, $3)

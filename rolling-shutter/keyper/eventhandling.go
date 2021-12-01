@@ -22,6 +22,7 @@ const finalityOffset = 3
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	events := []*eventsyncer.EventType{
 		kpr.contracts.KeypersConfigsListNewConfig,
+		kpr.contracts.CollatorConfigsListNewConfig,
 	}
 
 	eventSyncProgress, err := kpr.db.GetEventSyncProgress(ctx)
@@ -109,6 +110,8 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 	switch event := eventSyncUpdate.Event.(type) {
 	case contract.KeypersConfigsListNewConfig:
 		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
+	case contract.CollatorConfigsListNewConfig:
+		err = h.handleCollatorConfigsListNewConfigEvent(ctx, event)
 	case nil:
 		// event is nil if no event is found for some time
 	default:
@@ -162,6 +165,39 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to insert keyper set into db")
+	}
+	return nil
+}
+
+func (h *eventHandler) handleCollatorConfigsListNewConfigEvent(ctx context.Context, event contract.CollatorConfigsListNewConfig) error {
+	log.Printf(
+		"handling NewConfig event from collator config contract in block %d (index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+	)
+	callOpts := &bind.CallOpts{
+		Pending: false,
+		// We call for the current height instead of the height at which the event was emitted,
+		// because the sets cannot change retroactively and we won't need an archive node.
+		BlockNumber: nil,
+		Context:     ctx,
+	}
+	addrs, err := h.contracts.Collators.GetAddrs(callOpts, event.Index)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query addrs set from contract")
+	}
+	if event.ActivationBlockNumber > math.MaxInt64 {
+		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
+	}
+	if len(addrs) > 1 {
+		return errors.Errorf("got multiple collators from collator addrs set contract: %s", addrs)
+	} else if len(addrs) == 1 {
+		err = h.db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
+			ActivationBlockNumber: int64(event.ActivationBlockNumber),
+			Collator:              shdb.EncodeAddress(addrs[0]),
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert collator into db")
+		}
 	}
 	return nil
 }
