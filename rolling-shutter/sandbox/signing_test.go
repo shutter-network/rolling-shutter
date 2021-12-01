@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
-	"gotest.tools/v3/assert"
 )
 
 // TestSigning shows how to sign messages and check signatures.
@@ -20,8 +19,7 @@ func TestSigning(t *testing.T) {
 	msg := []byte("message to be signed")
 
 	hash := sha3.New256()
-	_, err = hash.Write(msg)
-	assert.NilError(t, err)
+	hash.Write(msg)
 	h := hash.Sum(nil)
 
 	address := crypto.PubkeyToAddress(privateKey.PublicKey)
