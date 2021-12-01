@@ -11,6 +11,11 @@ type DecryptorAggregatedSignature struct {
 	Signature       []byte
 }
 
+type DecryptorChainCollator struct {
+	ActivationBlockNumber int64
+	Collator              string
+}
+
 type DecryptorChainKeyperSet struct {
 	N         int32
 	Addresses []string

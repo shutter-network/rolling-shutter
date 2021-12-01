@@ -344,6 +344,21 @@ func (q *Queries) InsertAggregatedSignature(ctx context.Context, arg InsertAggre
 	)
 }
 
+const insertChainCollator = `-- name: InsertChainCollator :exec
+INSERT INTO decryptor.chain_collator (activation_block_number, collator)
+VALUES ($1, $2)
+`
+
+type InsertChainCollatorParams struct {
+	ActivationBlockNumber int64
+	Collator              string
+}
+
+func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollatorParams) error {
+	_, err := q.db.Exec(ctx, insertChainCollator, arg.ActivationBlockNumber, arg.Collator)
+	return err
+}
+
 const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
 INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2)
 `

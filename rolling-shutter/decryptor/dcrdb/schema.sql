@@ -60,3 +60,8 @@ CREATE TABLE decryptor.chain_keyper_set(
        n integer PRIMARY KEY,
        addresses text[] NOT NULL
 );
+
+CREATE TABLE decryptor.chain_collator(
+       activation_block_number bigint PRIMARY KEY,
+       collator text NOT NULL
+);
