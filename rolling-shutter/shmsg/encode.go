@@ -23,15 +23,8 @@ func SignMessage(msg proto.Message, privkey *ecdsa.PrivateKey) ([]byte, error) {
 		return nil, err
 	}
 	hash := sha3.New256()
-	_, err = hash.Write(shmsgHashPrefix)
-	if err != nil {
-		return nil, err
-	}
-	_, err = hash.Write(marshaled)
-	if err != nil {
-		return nil, err
-	}
-
+	hash.Write(shmsgHashPrefix)
+	hash.Write(marshaled)
 	h := hash.Sum(nil)
 	signature, err := crypto.Sign(h, privkey)
 	if err != nil {
@@ -48,15 +41,8 @@ func GetSigner(signedMessage []byte) (common.Address, error) {
 		return signer, errors.New("message too short")
 	}
 	hash := sha3.New256()
-	_, err := hash.Write(shmsgHashPrefix)
-	if err != nil {
-		return common.Address{}, err
-	}
-
-	_, err = hash.Write(signedMessage[crypto.SignatureLength:])
-	if err != nil {
-		return common.Address{}, err
-	}
+	hash.Write(shmsgHashPrefix)
+	hash.Write(signedMessage[crypto.SignatureLength:])
 	h := hash.Sum(nil)
 	pubkey, err := crypto.SigToPub(h, signedMessage[:crypto.SignatureLength])
 	if err != nil {
