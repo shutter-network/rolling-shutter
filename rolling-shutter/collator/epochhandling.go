@@ -23,10 +23,10 @@ func handleEpoch(ctx context.Context, config Config, db *cltrdb.Queries) ([]shms
 }
 
 func makeBatch(ctx context.Context, config Config, db *cltrdb.Queries) (*shmsg.CipherBatch, error) {
-	lastTrigger, err := db.GetLastTrigger(ctx)
 	nextEpochID := uint64(0)
+	lastEpochID, err := db.GetLastBatchEpochID(ctx)
 	if err == nil {
-		nextEpochID = shdb.DecodeUint64(lastTrigger.EpochID) + 1
+		nextEpochID = shdb.DecodeUint64(lastEpochID) + 1
 	} else if err != pgx.ErrNoRows {
 		return nil, err
 	}

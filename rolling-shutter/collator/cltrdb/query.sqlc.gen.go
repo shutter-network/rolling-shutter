@@ -18,15 +18,15 @@ func (q *Queries) GetBatch(ctx context.Context, epochID []byte) (CollatorCipherB
 	return i, err
 }
 
-const getLastTrigger = `-- name: GetLastTrigger :one
-SELECT epoch_id, batch_hash FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
+const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
+SELECT epoch_id FROM collator.cipher_batch ORDER BY epoch_id DESC LIMIT 1
 `
 
-func (q *Queries) GetLastTrigger(ctx context.Context) (CollatorDecryptionTrigger, error) {
-	row := q.db.QueryRow(ctx, getLastTrigger)
-	var i CollatorDecryptionTrigger
-	err := row.Scan(&i.EpochID, &i.BatchHash)
-	return i, err
+func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getLastBatchEpochID)
+	var epoch_id []byte
+	err := row.Scan(&epoch_id)
+	return epoch_id, err
 }
 
 const getMeta = `-- name: GetMeta :one
