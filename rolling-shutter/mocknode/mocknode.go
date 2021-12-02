@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -26,8 +27,9 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [4]string{
+var gossipTopicNames = [5]string{
 	kprtopics.DecryptionTrigger,
+	kprtopics.EonPublicKey,
 	dcrtopics.CipherBatch,
 	dcrtopics.DecryptionKey,
 	dcrtopics.DecryptionSignature,
@@ -121,7 +123,7 @@ func (m *MockNode) listen(ctx context.Context) error {
 
 func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 	switch plainMsg.Topic {
-	case "decryptionSignature":
+	case dcrtopics.DecryptionSignature:
 		msg := shmsg.AggregatedDecryptionSignature{}
 		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
 			log.Printf(
@@ -132,6 +134,22 @@ func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 			)
 		}
 		m.handleDecryptionSignature(&msg, plainMsg.SenderID)
+	case kprtopics.EonPublicKey:
+		msg := shmsg.EonPublicKey{}
+		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
+			log.Printf(
+				"received invalid message on topic %s from %s: %X",
+				plainMsg.Topic,
+				plainMsg.SenderID,
+				plainMsg.Message,
+			)
+		}
+		m.mux.Lock()
+		defer m.mux.Unlock()
+		if err := m.eonPublicKey.Unmarshal(msg.PublicKey); err != nil {
+			log.Printf("error while unmarshalling eon public key: %s", err)
+		}
+		log.Printf("updated eon public key from messages to %s", (*bn256.G2)(m.eonPublicKey))
 	default:
 		log.Printf(
 			"received message on topic %s from %s: %X",
@@ -147,7 +165,7 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 	err := sig.Unmarshal(msg.AggregatedSignature)
 	if err != nil {
 		log.Printf(
-			"received inunmarshalable decryption signature in epoch %d from %s: %+v",
+			"received not unmarshalable decryption signature in epoch %d from %s: %+v",
 			msg.EpochID,
 			senderID,
 			msg,
