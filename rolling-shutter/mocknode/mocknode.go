@@ -16,11 +16,13 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/collator/client"
 	"github.com/shutter-network/shutter/shuttermint/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -36,7 +38,8 @@ type MockNode struct {
 
 	mux sync.Mutex
 
-	p2p *p2p.P2P
+	collatorClient *client.Client
+	p2p            *p2p.P2P
 
 	eonSecretKeyShare *shcrypto.EonSecretKeyShare
 	eonPublicKey      *shcrypto.EonPublicKey
@@ -58,10 +61,16 @@ func New(config Config) (*MockNode, error) {
 		return nil, err
 	}
 
+	collatorClient, err := client.NewClient("http://localhost:3000/v1")
+	if err != nil {
+		return nil, err
+	}
+
 	return &MockNode{
 		Config: config,
 
-		p2p: p,
+		collatorClient: collatorClient,
+		p2p:            p,
 
 		eonSecretKeyShare: eonSecretKeyShare,
 		eonPublicKey:      eonPublicKey,
@@ -85,6 +94,9 @@ func (m *MockNode) Run(ctx context.Context) error {
 	})
 	g.Go(func() error {
 		return m.sendMessages(errctx)
+	})
+	g.Go(func() error {
+		return m.sendTransactions(errctx)
 	})
 	return g.Wait()
 }
@@ -181,6 +193,40 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 			correctSignedHash,
 			msg,
 		)
+	}
+}
+
+func (m *MockNode) sendTransactions(ctx context.Context) error {
+	sleepDuration := time.Duration(1000/m.Config.Rate) * time.Millisecond
+
+	epochID := uint64(0)
+	for {
+		select {
+		case <-time.After(sleepDuration):
+			httpResponse, err := m.collatorClient.SubmitTransaction(
+				ctx,
+				client.SubmitTransactionJSONRequestBody{
+					EncryptedTx: []byte{'f', 'o', 'o'},
+					Epoch:       shdb.EncodeUint64(epochID),
+				})
+			if err != nil {
+				return err
+			}
+			response, err := client.ParseSubmitTransactionResponse(httpResponse)
+			if err != nil {
+				return err
+			}
+			if response.JSON200 != nil {
+				log.Printf("Submitted tx %x", response.JSON200.Id)
+			} else if response.JSONDefault != nil {
+				log.Printf("Error submitting tx: %v", response.JSONDefault)
+			} else {
+				log.Printf("Error submitting tx: %s", response.Status())
+			}
+			epochID++
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
