@@ -32,11 +32,25 @@ Run `make generate` to generate sqlc and protocol buffers related files.
 
 [asdf](https://github.com/asdf-vm/asdf) can be used to install and manage the
 versions of the different tools we use to build rolling-shutter. Please follow
-the [installation guide](https://asdf-vm.com/guide/getting-started.html).
+the [installation guide](https://asdf-vm.com/guide/getting-started.html) for
+detailed instructions. On an debian/ubuntu based system the following should
+work for a user using bash:
 
-When asdf is ready, install the following plugins. In case you don't want to
-manage some of the tools with asdf, skip installation of the corresponding
-plugins.
+```
+sudo apt install curl git build-essential unzip
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
+```
+
+And tell bash to source asdf's init file by appending these two lines to
+~/.bashrc:
+
+```
+. $HOME/.asdf/asdf.sh
+. $HOME/.asdf/completions/asdf.bash
+```
+
+When asdf is ready, install the needed plugins. In case you don't want to manage
+some of the tools with asdf, skip installation of the corresponding plugins.
 
 ```
 asdf plugin add babashka
