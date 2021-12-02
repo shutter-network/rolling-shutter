@@ -148,13 +148,21 @@
        (when (nil? (which executable))
          (go-install pkg)
          (when (nil? (which executable))
-           (throw (ex-info "Cannot find the executable installed with go install. Check your PATH" {:executable executable :pkg pkg}))))))
+           (throw (ex-info "Cannot find the executable installed with go install. Check your PATH"
+                           {:executable executable :pkg pkg}))))))
     (defn rs
       [& args]
       (apply myshell exe args))
+    (def dropdb-with-force?
+      (delay
+        (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
+                       "--force")))
     (defn dropdb
       [db]
-      (myshell "dropdb" "-f" "--if-exists" db))
+      (apply myshell "dropdb" "--if-exists"
+             (if (deref dropdb-with-force?)
+               ["--force" db]
+               [db])))
     (defn psql
       [db & args]
       (apply (partial myshell "psql -d" db) args)))
