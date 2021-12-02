@@ -261,7 +261,7 @@
    :depends [-oapi-files]
    :task (when (seq (fs/modified-since exe -oapi-files))
            (run '-install:oapi-codegen)
-           (myshell {:dir src-dir} "go generate -x ./collator/oapi"))}
+           (myshell {:dir src-dir} "go generate -x ./collator/..."))}
 
   build:sqlc
   {:doc "Run sqlc"
