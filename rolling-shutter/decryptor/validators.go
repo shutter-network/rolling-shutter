@@ -62,7 +62,7 @@ func (d *Decryptor) makeDecryptionKeyValidator() pubsub.Validator {
 		}
 
 		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
-		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, int64(activationBlockNumber))
+		eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, activationBlockNumber)
 		if err == pgx.ErrNoRows {
 			log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
 			return false
@@ -112,7 +112,7 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 			return false
 		}
 		decryptorSetMember, err := d.db.GetDecryptorSetMember(ctx, dcrdb.GetDecryptorSetMemberParams{
-			ActivationBlockNumber: int64(activationBlockNumber),
+			ActivationBlockNumber: activationBlockNumber,
 			Index:                 decryptorIndexes[0],
 		})
 		if err == pgx.ErrNoRows {
@@ -159,7 +159,7 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 		if len(decryptorIndexes) == 0 {
 			return false
 		}
-		decryptorSet, err := d.db.GetDecryptorSet(ctx, int64(activationBlockNumber))
+		decryptorSet, err := d.db.GetDecryptorSet(ctx, activationBlockNumber)
 		if err != nil {
 			log.Printf("failed to get decryptor set from db for block number %d", activationBlockNumber)
 			return false

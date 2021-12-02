@@ -2,17 +2,22 @@ package keyper
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"testing"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/assert"
 
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -127,6 +132,110 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			}
 			assert.Equal(t, tc.validator(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		})
+	}
+}
+
+func TestTriggerValidatorIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	defer closedb()
+
+	config := newTestConfig(t)
+	kpr := keyper{config: config, db: db}
+	validator := kpr.makeDecryptionTriggerValidator()
+
+	collatorKey1, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	collatorAddress1 := ethcrypto.PubkeyToAddress(collatorKey1.PublicKey)
+
+	collatorKey2, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	collatorAddress2 := ethcrypto.PubkeyToAddress(collatorKey2.PublicKey)
+
+	// Make a db with collator 1 from a certain block and collator 2 afterwards
+	activationBlk1 := int64(0)
+	epochID1 := uint64(0)
+	activationBlk2 := int64(123)
+	epochID2, err := medley.EncodeActivationBlockNumberInEpochID(0, uint64(activationBlk2))
+	assert.NilError(t, err)
+	collator1 := shdb.EncodeAddress(collatorAddress1)
+	collator2 := shdb.EncodeAddress(collatorAddress2)
+	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
+		ActivationBlockNumber: activationBlk1,
+		Collator:              collator1,
+	})
+	assert.NilError(t, err)
+	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
+		ActivationBlockNumber: activationBlk2,
+		Collator:              collator2,
+	})
+	assert.NilError(t, err)
+
+	var peerID peer.ID
+
+	tests := []struct {
+		name       string
+		valid      bool
+		instanceID uint64
+		epochID    uint64
+		privKey    *ecdsa.PrivateKey
+	}{
+		{
+			name:       "valid trigger collator 1",
+			valid:      true,
+			instanceID: config.InstanceID,
+			epochID:    epochID1,
+			privKey:    collatorKey1,
+		},
+		{
+			name:       "valid trigger collator 2",
+			valid:      true,
+			instanceID: config.InstanceID,
+			epochID:    epochID2,
+			privKey:    collatorKey2,
+		},
+		{
+			name:       "invalid trigger wrong collator 1",
+			valid:      false,
+			instanceID: config.InstanceID,
+			epochID:    epochID2,
+			privKey:    collatorKey1,
+		},
+		{
+			name:       "invalid trigger wrong collator 2",
+			valid:      false,
+			instanceID: config.InstanceID,
+			epochID:    epochID1,
+			privKey:    collatorKey2,
+		},
+		{
+			name:       "invalid trigger wrong instanceID",
+			valid:      false,
+			instanceID: config.InstanceID + 1,
+			epochID:    epochID1,
+			privKey:    collatorKey1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			msg, err := shmsg.NewSignedDecryptionTrigger(
+				tc.instanceID,
+				tc.epochID,
+				[][]byte{},
+				tc.privKey,
+			)
+			assert.NilError(t, err)
+			pubsubMsg, err := makePubSubMessage(msg, kprtopics.DecryptionTrigger)
+			if err != nil {
+				t.Fatalf("Error in makePubSubMessage: %s", err)
+			}
+			assert.Equal(t, validator(ctx, peerID, pubsubMsg), tc.valid,
+				"validate failed valid=%t", tc.valid)
 		})
 	}
 }

@@ -186,6 +186,19 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchC
 	return items, nil
 }
 
+const getChainCollator = `-- name: GetChainCollator :one
+SELECT collator FROM keyper.chain_collator
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1
+`
+
+func (q *Queries) GetChainCollator(ctx context.Context, blockNumber int64) (string, error) {
+	row := q.db.QueryRow(ctx, getChainCollator, blockNumber)
+	var collator string
+	err := row.Scan(&collator)
+	return collator, err
+}
+
 const getChainKeyperSet = `-- name: GetChainKeyperSet :one
 SELECT activation_block_number, keypers, threshold FROM keyper.chain_keyper_set
 WHERE activation_block_number <= $1
