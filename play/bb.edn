@@ -167,6 +167,15 @@
       [db & args]
       (apply (partial myshell "psql -d" db) args)))
 
+  ;; the computation of the relative path here seems excessive and it probably is, as it returns
+  ;; "../contracts/deployments" unless we're not using the default directory structure.
+  -deployments
+  (when-not (fs/exists? "deployments" {:nofollow-links true})
+    (let [target (-> repo-root (fs/path "contracts" "deployments") str)
+          target (fs/relativize (fs/canonicalize ".") target)]
+      (log (format "Symlinking deployments -> %s" target))
+      (fs/create-sym-link "deployments" target)))
+
   -oapi-files
   (src-file "collator/oapi/oapi.yaml")
 
@@ -457,14 +466,14 @@
 
   k
   {:doc "Run keyper"
-   :depends [build genconfig:keypers]
+   :depends [build genconfig:keypers -deployments]
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
                cfgfile (keyper-cfg n)]
            (rs "keyper" "--config" cfgfile))}
 
   d
   {:doc "Run decryptor"
-   :depends [build genconfig:decryptors]
+   :depends [build genconfig:decryptors -deployments]
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
                cfgfile (decryptor-cfg n)]
            (rs "decryptor" "--config" cfgfile))}
@@ -476,7 +485,7 @@
 
   collator
   {:doc "Run collator"
-   :depends [build genconfig:collator]
+   :depends [build genconfig:collator -deployments]
    :task (rs "collator" "--config" collator-cfg)}
 
   clean
