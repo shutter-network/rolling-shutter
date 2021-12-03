@@ -196,7 +196,7 @@ func (c *Collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")
 	}
-	log.Printf("sending message %v", msg)
+	log.Printf("sending message %T{%v}", msg, msg)
 
 	return c.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
