@@ -6,13 +6,7 @@ module.exports = async function (hre) {
 
   const decryptors = await ethers.getContract("Decryptors");
 
-  await deployments.deploy("BLSPublicKeyRegistry", {
-    contract: "Registry",
-    from: deployer,
-    args: [decryptors.address],
-    log: true,
-  });
-  await deployments.deploy("BLSSignatureRegistry", {
+  await deployments.deploy("BLSRegistry", {
     contract: "Registry",
     from: deployer,
     args: [decryptors.address],

@@ -13,36 +13,22 @@ struct DecryptorsConfig {
 contract DecryptorsConfigsList is Ownable {
     DecryptorsConfig[] public decryptorsConfigs;
     AddrsSeq public addrsSeq;
-    Registry public BLSKeysRegistry;
-    Registry public KeySignaturesRegistry;
+    Registry public blsRegistry;
 
     event NewConfig(uint64 activationBlockNumber, uint64 index);
 
-    constructor(
-        AddrsSeq _addrsSeq,
-        Registry _BLSKeysRegistry,
-        Registry _KeySignaturesRegistry
-    ) {
+    constructor(AddrsSeq _addrsSeq, Registry _blsRegistry) {
         require(
             _addrsSeq.countNth(0) == 0,
             "AddrsSeq must have empty list at index 0"
         );
         require(
-            _BLSKeysRegistry.addrsSeq() == _addrsSeq,
-            "AddrsSeq of _BLSKeysRegistry must be _addrsSeq"
-        );
-        require(
-            _KeySignaturesRegistry.addrsSeq() == _addrsSeq,
-            "AddrsSeq of _KeySignaturesRegistry must be _addrsSeq"
-        );
-        require(
-            _KeySignaturesRegistry != _BLSKeysRegistry,
-            "The two used registries must be different"
+            _blsRegistry.addrsSeq() == _addrsSeq,
+            "AddrsSeq of _blsRegistry must be _addrsSeq"
         );
 
         addrsSeq = _addrsSeq;
-        BLSKeysRegistry = _BLSKeysRegistry;
-        KeySignaturesRegistry = _KeySignaturesRegistry;
+        blsRegistry = _blsRegistry;
 
         decryptorsConfigs.push(
             DecryptorsConfig({activationBlockNumber: 0, setIndex: 0})
