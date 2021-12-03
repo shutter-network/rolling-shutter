@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -15,6 +16,19 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/medley/txbatch"
 )
+
+var keyAndSignatureABIArguments abi.Arguments
+
+func init() {
+	bytesType, err := abi.NewType("bytes", "", nil)
+	if err != nil {
+		panic("unexpected error creating representation of type bytes")
+	}
+	keyAndSignatureABIArguments = abi.Arguments{
+		{Type: bytesType},
+		{Type: bytesType},
+	}
+}
 
 type addrsSeqPos struct {
 	N uint64
@@ -49,25 +63,60 @@ func findCoordinates(
 	return res, nil
 }
 
-type rawIdentity struct {
-	Key             []byte
-	Signature       []byte
+func encodeKeyAndSignature(key *shbls.PublicKey, signature *shbls.Signature) []byte {
+	encodedKey := key.Marshal()
+	encodedSignature := signature.Marshal()
+
+	values := []interface{}{
+		encodedKey,
+		encodedSignature,
+	}
+	encodedKeyAndSignature, err := keyAndSignatureABIArguments.PackValues(values)
+	if err != nil {
+		panic(errors.Wrapf(err, "unexpected error packing key and signature"))
+	}
+	return encodedKeyAndSignature
+}
+
+func decodeKeyAndSignature(d []byte) (*shbls.PublicKey, *shbls.Signature, error) {
+	values, err := keyAndSignatureABIArguments.UnpackValues(d)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "invalid encoding of key and signature")
+	}
+	if len(values) != 2 {
+		panic(errors.Errorf("expected key and signature to be two values, got %d", len(values)))
+	}
+	encodedKey := values[0].([]byte)
+	encodedSignature := values[1].([]byte)
+
+	key := new(shbls.PublicKey)
+	err = key.Unmarshal(encodedKey)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "invalid BLS public key %X", encodedKey)
+	}
+
+	signature := new(shbls.Signature)
+	err = signature.Unmarshal(encodedSignature)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "invalid BLS signature %X", encodedKey)
+	}
+
+	return key, signature, nil
+}
+
+type RawIdentity struct {
+	KeyAndSignature []byte
 	EthereumAddress common.Address
 }
 
-func getRawIdentity(opts *bind.CallOpts, contracts *deployment.Contracts, addr common.Address) (rawIdentity, error) {
-	key, err := contracts.BLSPublicKeyRegistry.Get(opts, addr)
+func getRawIdentity(opts *bind.CallOpts, contracts *deployment.Contracts, addr common.Address) (RawIdentity, error) {
+	keyAndSignature, err := contracts.BLSRegistry.Get(opts, addr)
 	if err != nil {
-		return rawIdentity{}, err
+		return RawIdentity{}, err
 	}
 
-	signature, err := contracts.BLSSignatureRegistry.Get(opts, addr)
-	if err != nil {
-		return rawIdentity{}, err
-	}
-	return rawIdentity{
-		Key:             key,
-		Signature:       signature,
+	return RawIdentity{
+		KeyAndSignature: keyAndSignature,
 		EthereumAddress: addr,
 	}, nil
 }
@@ -75,7 +124,7 @@ func getRawIdentity(opts *bind.CallOpts, contracts *deployment.Contracts, addr c
 func registerRawIdentity(
 	batch *txbatch.TXBatch,
 	contracts *deployment.Contracts,
-	identity rawIdentity) error {
+	identity RawIdentity) error {
 	from := batch.TransactOpts.From
 	ctx := batch.TransactOpts.Context
 	callOpts := &bind.CallOpts{Context: ctx}
@@ -84,18 +133,15 @@ func registerRawIdentity(
 	if err != nil {
 		return err
 	}
-	registerKey := len(currentIdentity.Key) == 0
-	if !registerKey && !bytes.Equal(currentIdentity.Key, identity.Key) {
-		return errors.Errorf("Identity already registered: wrong key: have %x, expected %x",
-			currentIdentity.Key, identity.Key)
+	register := len(currentIdentity.KeyAndSignature) == 0
+	if !register && !bytes.Equal(currentIdentity.KeyAndSignature, identity.KeyAndSignature) {
+		return errors.Errorf(
+			"Identity already registered: wrong key and/or signature: have %x, expected %x",
+			currentIdentity.KeyAndSignature, identity.KeyAndSignature,
+		)
 	}
 
-	registerSignature := len(currentIdentity.Signature) == 0
-	if !registerSignature && !bytes.Equal(currentIdentity.Signature, identity.Signature) {
-		return errors.Errorf("Identity already registered: wrong signature")
-	}
-
-	if !registerKey && !registerSignature {
+	if !register {
 		log.Printf("Identity already registered.")
 		return nil
 	}
@@ -110,20 +156,11 @@ func registerRawIdentity(
 	}
 	n, i := pos[0].N, pos[0].I
 
-	if registerKey {
-		tx, err := contracts.BLSPublicKeyRegistry.Register(batch.TransactOpts, n, i, identity.Key)
-		if err != nil {
-			return err
-		}
-		batch.Add(tx)
+	tx, err := contracts.BLSRegistry.Register(batch.TransactOpts, n, i, identity.KeyAndSignature)
+	if err != nil {
+		return err
 	}
-	if registerSignature {
-		tx, err := contracts.BLSSignatureRegistry.Register(batch.TransactOpts, n, i, identity.Signature)
-		if err != nil {
-			return err
-		}
-		batch.Add(tx)
-	}
+	batch.Add(tx)
 	return nil
 }
 
@@ -136,30 +173,27 @@ func Register(
 	// We sign the sender's address with the BLS key. That makes sure that the sender has
 	// access to the private key belonging to the registered key.
 	msg := batch.TransactOpts.From.Bytes()
-	raw := rawIdentity{
-		Key:             shbls.SecretToPublicKey(key).Marshal(),
-		Signature:       shbls.Sign(msg, key).Marshal(),
+	signature := shbls.Sign(msg, key)
+	keyAndSignature := encodeKeyAndSignature(shbls.SecretToPublicKey(key), signature)
+	raw := RawIdentity{
+		KeyAndSignature: keyAndSignature,
 		EthereumAddress: batch.TransactOpts.From,
 	}
 
 	return registerRawIdentity(batch, contracts, raw)
 }
 
-func (raw *rawIdentity) getKey() (*shbls.PublicKey, error) {
-	key := shbls.PublicKey{}
-	err := key.Unmarshal(raw.Key)
+// GetKeyAndSignature returns the BLS public key and the signature after verifying that the
+// signature is correct.
+func (raw *RawIdentity) GetKeyAndSignature() (*shbls.PublicKey, *shbls.Signature, error) {
+	key, signature, err := decodeKeyAndSignature(raw.KeyAndSignature)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	signature := shbls.Signature{}
-	err = signature.Unmarshal(raw.Signature)
-	if err != nil {
-		return nil, err
+	if !shbls.Verify(signature, key, raw.EthereumAddress.Bytes()) {
+		return nil, nil, errors.Errorf("Cannot verify signature")
 	}
-	if !shbls.Verify(&signature, &key, raw.EthereumAddress.Bytes()) {
-		return nil, errors.Errorf("Cannot verify signature")
-	}
-	return &key, nil
+	return key, signature, nil
 }
 
 // Lookup retrieves and verifies the BLS public key the decryptor with the given address has
@@ -169,17 +203,6 @@ func Lookup(opts *bind.CallOpts, contracts *deployment.Contracts, addr common.Ad
 	if err != nil {
 		return nil, err
 	}
-	return raw.getKey()
-}
-
-func VerifySignature(publicKey []byte, signature []byte, address common.Address) bool {
-	pubkey := new(shbls.PublicKey)
-	if err := pubkey.Unmarshal(publicKey); err != nil {
-		return false
-	}
-	sig := new(shbls.Signature)
-	if err := sig.Unmarshal(signature); err != nil {
-		return false
-	}
-	return shbls.Verify(sig, pubkey, address.Bytes())
+	key, _, err := raw.GetKeyAndSignature()
+	return key, err
 }
