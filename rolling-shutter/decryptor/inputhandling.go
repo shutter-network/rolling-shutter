@@ -136,7 +136,7 @@ func handleSignatureInput(
 			)
 			continue
 		}
-		if !decryptorSetMember.SignatureVerified {
+		if !decryptorSetMember.SignatureValid {
 			continue
 		}
 		pubkey := new(shbls.PublicKey)

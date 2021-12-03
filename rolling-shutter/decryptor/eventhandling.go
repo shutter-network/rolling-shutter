@@ -223,18 +223,18 @@ func (h *eventHandler) handleBLSRegistryRegistered(ctx context.Context, event co
 	if err != nil {
 		log.Printf("Decryptor %s registered invalid BLS key and signature: %s", event.A, err)
 		err = h.db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-			Address:           encodedAddress,
-			BlsPublicKey:      []byte{},
-			BlsSignature:      []byte{},
-			SignatureVerified: false,
+			Address:        encodedAddress,
+			BlsPublicKey:   []byte{},
+			BlsSignature:   []byte{},
+			SignatureValid: false,
 		})
 	} else {
 		log.Printf("Decryptor %s successfully registered their BLS key", event.A)
 		err = h.db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-			Address:           encodedAddress,
-			BlsPublicKey:      shdb.EncodeBLSPublicKey(key),
-			BlsSignature:      shdb.EncodeBLSSignature(signature),
-			SignatureVerified: true,
+			Address:        encodedAddress,
+			BlsPublicKey:   shdb.EncodeBLSPublicKey(key),
+			BlsSignature:   shdb.EncodeBLSSignature(signature),
+			SignatureValid: true,
 		})
 	}
 	if err != nil {

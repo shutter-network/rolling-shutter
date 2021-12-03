@@ -41,10 +41,10 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			key = []byte{}
 		}
 		err := db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-			Address:           addresses[i],
-			BlsPublicKey:      key,
-			BlsSignature:      []byte{},
-			SignatureVerified: valid,
+			Address:        addresses[i],
+			BlsPublicKey:   key,
+			BlsSignature:   []byte{},
+			SignatureValid: valid,
 		})
 		assert.NilError(t, err)
 
@@ -68,7 +68,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Address:               addresses[0],
 			BlsPublicKey:          keys[0],
 			BlsSignature:          []byte{},
-			SignatureVerified:     true,
+			SignatureValid:        true,
 		},
 		{
 			ActivationBlockNumber: 0,
@@ -76,7 +76,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Address:               addresses[1],
 			BlsPublicKey:          []byte{},
 			BlsSignature:          []byte{},
-			SignatureVerified:     false,
+			SignatureValid:        false,
 		},
 	})
 
@@ -90,7 +90,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Address:               addresses[0],
 			BlsPublicKey:          keys[0],
 			BlsSignature:          []byte{},
-			SignatureVerified:     true,
+			SignatureValid:        true,
 		},
 		{
 			ActivationBlockNumber: 100,
@@ -98,7 +98,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Address:               addresses[2],
 			BlsPublicKey:          keys[2],
 			BlsSignature:          []byte{},
-			SignatureVerified:     true,
+			SignatureValid:        true,
 		},
 	})
 }

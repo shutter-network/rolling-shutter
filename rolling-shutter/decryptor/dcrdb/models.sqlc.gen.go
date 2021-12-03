@@ -39,10 +39,10 @@ type DecryptorDecryptionSignature struct {
 }
 
 type DecryptorDecryptorIdentity struct {
-	Address           string
-	BlsPublicKey      []byte
-	BlsSignature      []byte
-	SignatureVerified bool
+	Address        string
+	BlsPublicKey   []byte
+	BlsSignature   []byte
+	SignatureValid bool
 }
 
 type DecryptorDecryptorSetMember struct {

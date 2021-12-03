@@ -130,7 +130,7 @@ func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryption
 }
 
 const getDecryptorIdentity = `-- name: GetDecryptorIdentity :one
-SELECT address, bls_public_key, bls_signature, signature_verified FROM decryptor.decryptor_identity
+SELECT address, bls_public_key, bls_signature, signature_valid FROM decryptor.decryptor_identity
 WHERE address = $1
 `
 
@@ -141,7 +141,7 @@ func (q *Queries) GetDecryptorIdentity(ctx context.Context, address string) (Dec
 		&i.Address,
 		&i.BlsPublicKey,
 		&i.BlsSignature,
-		&i.SignatureVerified,
+		&i.SignatureValid,
 	)
 	return i, err
 }
@@ -153,7 +153,7 @@ SELECT
     member.address,
     identity.bls_public_key,
     identity.bls_signature,
-    coalesce(identity.signature_verified, false)
+    coalesce(identity.signature_valid, false)
 FROM (
     SELECT
         activation_block_number,
@@ -180,7 +180,7 @@ type GetDecryptorSetRow struct {
 	Address               string
 	BlsPublicKey          []byte
 	BlsSignature          []byte
-	SignatureVerified     bool
+	SignatureValid        bool
 }
 
 func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int64) ([]GetDecryptorSetRow, error) {
@@ -198,7 +198,7 @@ func (q *Queries) GetDecryptorSet(ctx context.Context, activationBlockNumber int
 			&i.Address,
 			&i.BlsPublicKey,
 			&i.BlsSignature,
-			&i.SignatureVerified,
+			&i.SignatureValid,
 		); err != nil {
 			return nil, err
 		}
@@ -217,7 +217,7 @@ SELECT
     m1.address,
     identity.bls_public_key,
     identity.bls_signature,
-    coalesce(identity.signature_verified, false)
+    coalesce(identity.signature_valid, false)
 FROM (
     SELECT
         m2.activation_block_number,
@@ -249,7 +249,7 @@ type GetDecryptorSetMemberRow struct {
 	Address               string
 	BlsPublicKey          []byte
 	BlsSignature          []byte
-	SignatureVerified     bool
+	SignatureValid        bool
 }
 
 func (q *Queries) GetDecryptorSetMember(ctx context.Context, arg GetDecryptorSetMemberParams) (GetDecryptorSetMemberRow, error) {
@@ -261,7 +261,7 @@ func (q *Queries) GetDecryptorSetMember(ctx context.Context, arg GetDecryptorSet
 		&i.Address,
 		&i.BlsPublicKey,
 		&i.BlsSignature,
-		&i.SignatureVerified,
+		&i.SignatureValid,
 	)
 	return i, err
 }
@@ -436,17 +436,17 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 
 const insertDecryptorIdentity = `-- name: InsertDecryptorIdentity :exec
 INSERT INTO decryptor.decryptor_identity (
-    address, bls_public_key, bls_signature, signature_verified
+    address, bls_public_key, bls_signature, signature_valid
 ) VALUES (
     $1, $2, $3, $4
 )
 `
 
 type InsertDecryptorIdentityParams struct {
-	Address           string
-	BlsPublicKey      []byte
-	BlsSignature      []byte
-	SignatureVerified bool
+	Address        string
+	BlsPublicKey   []byte
+	BlsSignature   []byte
+	SignatureValid bool
 }
 
 func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecryptorIdentityParams) error {
@@ -454,7 +454,7 @@ func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecrypt
 		arg.Address,
 		arg.BlsPublicKey,
 		arg.BlsSignature,
-		arg.SignatureVerified,
+		arg.SignatureValid,
 	)
 	return err
 }

@@ -55,7 +55,7 @@ ON CONFLICT DO NOTHING;
 
 -- name: InsertDecryptorIdentity :exec
 INSERT INTO decryptor.decryptor_identity (
-    address, bls_public_key, bls_signature, signature_verified
+    address, bls_public_key, bls_signature, signature_valid
 ) VALUES (
     $1, $2, $3, $4
 );
@@ -78,7 +78,7 @@ SELECT
     m1.address,
     identity.bls_public_key,
     identity.bls_signature,
-    coalesce(identity.signature_verified, false)
+    coalesce(identity.signature_valid, false)
 FROM (
     SELECT
         m2.activation_block_number,
@@ -105,7 +105,7 @@ SELECT
     member.address,
     identity.bls_public_key,
     identity.bls_signature,
-    coalesce(identity.signature_verified, false)
+    coalesce(identity.signature_valid, false)
 FROM (
     SELECT
         activation_block_number,

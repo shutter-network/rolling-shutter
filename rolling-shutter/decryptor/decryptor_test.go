@@ -35,10 +35,10 @@ func populateDBWithDecryptors(ctx context.Context, t *testing.T, db *dcrdb.Queri
 		})
 		assert.NilError(t, err)
 		err = db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
-			Address:           arbitraryAddress,
-			BlsPublicKey:      shbls.SecretToPublicKey(signingKey).Marshal(),
-			BlsSignature:      []byte{},
-			SignatureVerified: true,
+			Address:        arbitraryAddress,
+			BlsPublicKey:   shbls.SecretToPublicKey(signingKey).Marshal(),
+			BlsSignature:   []byte{},
+			SignatureValid: true,
 		})
 		assert.NilError(t, err)
 	}
