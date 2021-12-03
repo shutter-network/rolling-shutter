@@ -3,27 +3,22 @@ package keyper
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -249,120 +244,4 @@ func (kpr *keyper) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 	}
 
 	return kpr.p2p.Publish(ctx, msg.Topic(), msgBytes)
-}
-
-func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
-	db := kprdb.New(kpr.dbpool)
-	validators := make(map[string]pubsub.Validator)
-	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
-	validators[kprtopics.DecryptionKeyShare] = kpr.makeKeyShareValidator(db)
-	validators[kprtopics.EonPublicKey] = kpr.makeEonPublicKeyValidator()
-
-	return validators
-}
-
-func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validator {
-	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
-		p2pMessage := new(p2p.Message)
-		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-			return false
-		}
-		msg, err := unmarshalP2PMessage(p2pMessage)
-		if err != nil {
-			return false
-		}
-		if msg.GetInstanceID() != kpr.config.InstanceID {
-			return false
-		}
-
-		key, ok := msg.(*decryptionKey)
-		if !ok {
-			panic("unmarshalled non decryption key message in decryption key validator")
-		}
-
-		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
-		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
-		if err == pgx.ErrNoRows {
-			return false
-		}
-		if err != nil {
-			log.Printf("failed to get dkg result for epoch %d from db", key.epochID)
-			return false
-		}
-		if !dkgResultDB.Success {
-			return false
-		}
-		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
-		if err != nil {
-			log.Printf("error while decoding pure DKG result for epoch %d", key.epochID)
-			return false
-		}
-
-		ok, err = shcrypto.VerifyEpochSecretKey(key.key, pureDKGResult.PublicKey, key.epochID)
-		if err != nil {
-			log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
-			return false
-		}
-		return ok
-	}
-}
-
-func (kpr *keyper) makeKeyShareValidator(db *kprdb.Queries) pubsub.Validator {
-	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
-		p2pMessage := new(p2p.Message)
-		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-			return false
-		}
-		msg, err := unmarshalP2PMessage(p2pMessage)
-		if err != nil {
-			return false
-		}
-		if msg.GetInstanceID() != kpr.config.InstanceID {
-			return false
-		}
-
-		keyShare, ok := msg.(*decryptionKeyShare)
-		if !ok {
-			panic("unmarshalled non decryption key share message in decryption key share validator")
-		}
-
-		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(keyShare.epochID)
-		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
-		if err == pgx.ErrNoRows {
-			return false
-		}
-		if err != nil {
-			log.Printf("failed to get dkg result for epoch %d from db", keyShare.epochID)
-			return false
-		}
-		if !dkgResultDB.Success {
-			return false
-		}
-		pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
-		if err != nil {
-			log.Printf("error while decoding pure DKG result for epoch %d", keyShare.epochID)
-			return false
-		}
-
-		ok = shcrypto.VerifyEpochSecretKeyShare(
-			keyShare.share,
-			pureDKGResult.PublicKeyShares[keyShare.keyperIndex],
-			shcrypto.ComputeEpochID(keyShare.epochID),
-		)
-		return ok
-	}
-}
-
-func (kpr *keyper) makeEonPublicKeyValidator() pubsub.Validator {
-	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
-		p2pMessage := new(p2p.Message)
-		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-			return false
-		}
-		msg, err := unmarshalP2PMessage(p2pMessage)
-		if err != nil {
-			return false
-		}
-		return msg.GetInstanceID() == kpr.config.InstanceID
-	}
 }
