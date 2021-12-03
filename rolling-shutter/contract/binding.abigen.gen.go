@@ -28,6 +28,12 @@ var (
 	_ = event.NewSubscription
 )
 
+// CollatorConfig is an auto generated low-level Go binding around an user-defined struct.
+type CollatorConfig struct {
+	ActivationBlockNumber uint64
+	SetIndex              uint64
+}
+
 // DecryptorsConfig is an auto generated low-level Go binding around an user-defined struct.
 type DecryptorsConfig struct {
 	ActivationBlockNumber uint64
@@ -839,6 +845,699 @@ func (_AddrsSeq *AddrsSeqFilterer) WatchOwnershipTransferred(opts *bind.WatchOpt
 func (_AddrsSeq *AddrsSeqFilterer) ParseOwnershipTransferred(log types.Log) (*AddrsSeqOwnershipTransferred, error) {
 	event := new(AddrsSeqOwnershipTransferred)
 	if err := _AddrsSeq.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// CollatorConfigsListMetaData contains all meta data concerning the CollatorConfigsList contract.
+var CollatorConfigsListMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"index\",\"type\":\"uint64\"}],\"name\":\"NewConfig\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"addNewCfg\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"addrsSeq\",\"outputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"collatorConfigs\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"}],\"name\":\"getActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCurrentActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50604051610b4d380380610b4d83398101604081905261002f91610230565b610038336101e0565b600280546001600160a01b0319166001600160a01b038316908117909155604051630545a03f60e31b815260006004820152632a2d01f89060240160206040518083038186803b15801561008b57600080fd5b505afa15801561009f573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100c39190610260565b6001600160401b03161561012e5760405162461bcd60e51b815260206004820152602860248201527f4164647273536571206d757374206861766520656d707479206c697374206174604482015267020696e64657820360c41b606482015260840160405180910390fd5b6040805180820182526000808252602080830182815260018054808201825590845293517fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909401805491516001600160401b0390811668010000000000000000026001600160801b0319909316951694909417179092558251818152918201527ff991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7910160405180910390a150610289565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b60006020828403121561024257600080fd5b81516001600160a01b038116811461025957600080fd5b9392505050565b60006020828403121561027257600080fd5b81516001600160401b038116811461025957600080fd5b6108b5806102986000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c80638da5cb5b1161005b5780638da5cb5b1461010d578063b5351b0d1461011e578063f2fde38b14610158578063f9c72b531461016b57600080fd5b80634d89eaaf1461008d578063715018a6146100bd57806377e18fc4146100c757806379f78099146100fa575b600080fd5b6002546100a0906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100c5610173565b005b6100da6100d53660046106d4565b6101b2565b604080516001600160401b039384168152929091166020830152016100b4565b6100c56101083660046106ed565b6101e7565b6000546001600160a01b03166100a0565b61013161012c36600461071a565b610508565b6040805182516001600160401b0390811682526020938401511692810192909252016100b4565b6100c561016636600461073e565b6105c7565b610131610662565b6000546001600160a01b031633146101a65760405162461bcd60e51b815260040161019d90610767565b60405180910390fd5b6101b06000610684565b565b600181815481106101c257600080fd5b6000918252602090912001546001600160401b038082169250600160401b9091041682565b6000546001600160a01b031633146102115760405162461bcd60e51b815260040161019d90610767565b610221604082016020830161071a565b6001600160401b0316600260009054906101000a90046001600160a01b03166001600160a01b03166306661abd6040518163ffffffff1660e01b815260040160206040518083038186803b15801561027857600080fd5b505afa15801561028c573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906102b0919061079c565b6001600160401b03161161032c5760405162461bcd60e51b815260206004820152603a60248201527f4e6f20617070656e6465642073657420696e2073657120636f72726573706f6e60448201527f64696e6720746f20636f6e66696727732073657420696e646578000000000000606482015260840161019d565b610339602082018261071a565b6001600160401b0316600180808054905061035491906107cf565b81548110610364576103646107e6565b6000918252602090912001546001600160401b031611156103ed5760405162461bcd60e51b815260206004820152603860248201527f43616e6e6f7420616464206e6577207365742077697468206c6f77657220626c60448201527f6f636b206e756d626572207468616e2070726576696f75730000000000000000606482015260840161019d565b6103fa602082018261071a565b6001600160401b03164311156104645760405162461bcd60e51b815260206004820152602960248201527f43616e6e6f7420616464206e6577207365742077697468207061737420626c6f60448201526831b590373ab6b132b960b91b606482015260840161019d565b60018054808201825560009190915281907fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6016104a182826107fc565b507ff991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a790506104d2602083018361071a565b6104e2604084016020850161071a565b604080516001600160401b0393841681529290911660208301520160405180910390a150565b60408051808201909152600080825260208201526001805460009161052c916107cf565b90505b826001600160401b03166001828154811061054c5761054c6107e6565b6000918252602090912001546001600160401b0316116105b55760018181548110610579576105796107e6565b6000918252602091829020604080518082019091529101546001600160401b038082168352600160401b90910416918101919091529392505050565b806105bf81610868565b91505061052f565b6000546001600160a01b031633146105f15760405162461bcd60e51b815260040161019d90610767565b6001600160a01b0381166106565760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161019d565b61065f81610684565b50565b604080518082019091526000808252602082015261067f43610508565b905090565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156106e657600080fd5b5035919050565b6000604082840312156106ff57600080fd5b50919050565b6001600160401b038116811461065f57600080fd5b60006020828403121561072c57600080fd5b813561073781610705565b9392505050565b60006020828403121561075057600080fd5b81356001600160a01b038116811461073757600080fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b6000602082840312156107ae57600080fd5b815161073781610705565b634e487b7160e01b600052601160045260246000fd5b6000828210156107e1576107e16107b9565b500390565b634e487b7160e01b600052603260045260246000fd5b813561080781610705565b6001600160401b03811690508154816001600160401b03198216178355602084013561083281610705565b6fffffffffffffffff00000000000000008160401b16836fffffffffffffffffffffffffffffffff198416171784555050505050565b600081610877576108776107b9565b50600019019056fea264697066735822122056fa628eace363bc49dba3b5915cb71732ba7843dbf8bfb77c929161dccfe92164736f6c63430008090033",
+}
+
+// CollatorConfigsListABI is the input ABI used to generate the binding from.
+// Deprecated: Use CollatorConfigsListMetaData.ABI instead.
+var CollatorConfigsListABI = CollatorConfigsListMetaData.ABI
+
+// CollatorConfigsListBin is the compiled bytecode used for deploying new contracts.
+// Deprecated: Use CollatorConfigsListMetaData.Bin instead.
+var CollatorConfigsListBin = CollatorConfigsListMetaData.Bin
+
+// DeployCollatorConfigsList deploys a new Ethereum contract, binding an instance of CollatorConfigsList to it.
+func DeployCollatorConfigsList(auth *bind.TransactOpts, backend bind.ContractBackend, _addrsSeq common.Address) (common.Address, *types.Transaction, *CollatorConfigsList, error) {
+	parsed, err := CollatorConfigsListMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CollatorConfigsListBin), backend, _addrsSeq)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &CollatorConfigsList{CollatorConfigsListCaller: CollatorConfigsListCaller{contract: contract}, CollatorConfigsListTransactor: CollatorConfigsListTransactor{contract: contract}, CollatorConfigsListFilterer: CollatorConfigsListFilterer{contract: contract}}, nil
+}
+
+// CollatorConfigsList is an auto generated Go binding around an Ethereum contract.
+type CollatorConfigsList struct {
+	CollatorConfigsListCaller     // Read-only binding to the contract
+	CollatorConfigsListTransactor // Write-only binding to the contract
+	CollatorConfigsListFilterer   // Log filterer for contract events
+}
+
+// CollatorConfigsListCaller is an auto generated read-only Go binding around an Ethereum contract.
+type CollatorConfigsListCaller struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// CollatorConfigsListTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type CollatorConfigsListTransactor struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// CollatorConfigsListFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type CollatorConfigsListFilterer struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// CollatorConfigsListSession is an auto generated Go binding around an Ethereum contract,
+// with pre-set call and transact options.
+type CollatorConfigsListSession struct {
+	Contract     *CollatorConfigsList // Generic contract binding to set the session for
+	CallOpts     bind.CallOpts        // Call options to use throughout this session
+	TransactOpts bind.TransactOpts    // Transaction auth options to use throughout this session
+}
+
+// CollatorConfigsListCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// with pre-set call options.
+type CollatorConfigsListCallerSession struct {
+	Contract *CollatorConfigsListCaller // Generic contract caller binding to set the session for
+	CallOpts bind.CallOpts              // Call options to use throughout this session
+}
+
+// CollatorConfigsListTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// with pre-set transact options.
+type CollatorConfigsListTransactorSession struct {
+	Contract     *CollatorConfigsListTransactor // Generic contract transactor binding to set the session for
+	TransactOpts bind.TransactOpts              // Transaction auth options to use throughout this session
+}
+
+// CollatorConfigsListRaw is an auto generated low-level Go binding around an Ethereum contract.
+type CollatorConfigsListRaw struct {
+	Contract *CollatorConfigsList // Generic contract binding to access the raw methods on
+}
+
+// CollatorConfigsListCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type CollatorConfigsListCallerRaw struct {
+	Contract *CollatorConfigsListCaller // Generic read-only contract binding to access the raw methods on
+}
+
+// CollatorConfigsListTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type CollatorConfigsListTransactorRaw struct {
+	Contract *CollatorConfigsListTransactor // Generic write-only contract binding to access the raw methods on
+}
+
+// NewCollatorConfigsList creates a new instance of CollatorConfigsList, bound to a specific deployed contract.
+func NewCollatorConfigsList(address common.Address, backend bind.ContractBackend) (*CollatorConfigsList, error) {
+	contract, err := bindCollatorConfigsList(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsList{CollatorConfigsListCaller: CollatorConfigsListCaller{contract: contract}, CollatorConfigsListTransactor: CollatorConfigsListTransactor{contract: contract}, CollatorConfigsListFilterer: CollatorConfigsListFilterer{contract: contract}}, nil
+}
+
+// NewCollatorConfigsListCaller creates a new read-only instance of CollatorConfigsList, bound to a specific deployed contract.
+func NewCollatorConfigsListCaller(address common.Address, caller bind.ContractCaller) (*CollatorConfigsListCaller, error) {
+	contract, err := bindCollatorConfigsList(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsListCaller{contract: contract}, nil
+}
+
+// NewCollatorConfigsListTransactor creates a new write-only instance of CollatorConfigsList, bound to a specific deployed contract.
+func NewCollatorConfigsListTransactor(address common.Address, transactor bind.ContractTransactor) (*CollatorConfigsListTransactor, error) {
+	contract, err := bindCollatorConfigsList(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsListTransactor{contract: contract}, nil
+}
+
+// NewCollatorConfigsListFilterer creates a new log filterer instance of CollatorConfigsList, bound to a specific deployed contract.
+func NewCollatorConfigsListFilterer(address common.Address, filterer bind.ContractFilterer) (*CollatorConfigsListFilterer, error) {
+	contract, err := bindCollatorConfigsList(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsListFilterer{contract: contract}, nil
+}
+
+// bindCollatorConfigsList binds a generic wrapper to an already deployed contract.
+func bindCollatorConfigsList(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := abi.JSON(strings.NewReader(CollatorConfigsListABI))
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_CollatorConfigsList *CollatorConfigsListRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _CollatorConfigsList.Contract.CollatorConfigsListCaller.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_CollatorConfigsList *CollatorConfigsListRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.CollatorConfigsListTransactor.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_CollatorConfigsList *CollatorConfigsListRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.CollatorConfigsListTransactor.contract.Transact(opts, method, params...)
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_CollatorConfigsList *CollatorConfigsListCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _CollatorConfigsList.Contract.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_CollatorConfigsList *CollatorConfigsListTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_CollatorConfigsList *CollatorConfigsListTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.contract.Transact(opts, method, params...)
+}
+
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListCaller) AddrsSeq(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _CollatorConfigsList.contract.Call(opts, &out, "addrsSeq")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListSession) AddrsSeq() (common.Address, error) {
+	return _CollatorConfigsList.Contract.AddrsSeq(&_CollatorConfigsList.CallOpts)
+}
+
+// AddrsSeq is a free data retrieval call binding the contract method 0x4d89eaaf.
+//
+// Solidity: function addrsSeq() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListCallerSession) AddrsSeq() (common.Address, error) {
+	return _CollatorConfigsList.Contract.AddrsSeq(&_CollatorConfigsList.CallOpts)
+}
+
+// CollatorConfigs is a free data retrieval call binding the contract method 0x77e18fc4.
+//
+// Solidity: function collatorConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+func (_CollatorConfigsList *CollatorConfigsListCaller) CollatorConfigs(opts *bind.CallOpts, arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	SetIndex              uint64
+}, error) {
+	var out []interface{}
+	err := _CollatorConfigsList.contract.Call(opts, &out, "collatorConfigs", arg0)
+
+	outstruct := new(struct {
+		ActivationBlockNumber uint64
+		SetIndex              uint64
+	})
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.ActivationBlockNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
+	outstruct.SetIndex = *abi.ConvertType(out[1], new(uint64)).(*uint64)
+
+	return *outstruct, err
+
+}
+
+// CollatorConfigs is a free data retrieval call binding the contract method 0x77e18fc4.
+//
+// Solidity: function collatorConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+func (_CollatorConfigsList *CollatorConfigsListSession) CollatorConfigs(arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	SetIndex              uint64
+}, error) {
+	return _CollatorConfigsList.Contract.CollatorConfigs(&_CollatorConfigsList.CallOpts, arg0)
+}
+
+// CollatorConfigs is a free data retrieval call binding the contract method 0x77e18fc4.
+//
+// Solidity: function collatorConfigs(uint256 ) view returns(uint64 activationBlockNumber, uint64 setIndex)
+func (_CollatorConfigsList *CollatorConfigsListCallerSession) CollatorConfigs(arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	SetIndex              uint64
+}, error) {
+	return _CollatorConfigsList.Contract.CollatorConfigs(&_CollatorConfigsList.CallOpts, arg0)
+}
+
+// GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
+//
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListCaller) GetActiveConfig(opts *bind.CallOpts, activationBlockNumber uint64) (CollatorConfig, error) {
+	var out []interface{}
+	err := _CollatorConfigsList.contract.Call(opts, &out, "getActiveConfig", activationBlockNumber)
+
+	if err != nil {
+		return *new(CollatorConfig), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(CollatorConfig)).(*CollatorConfig)
+
+	return out0, err
+
+}
+
+// GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
+//
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListSession) GetActiveConfig(activationBlockNumber uint64) (CollatorConfig, error) {
+	return _CollatorConfigsList.Contract.GetActiveConfig(&_CollatorConfigsList.CallOpts, activationBlockNumber)
+}
+
+// GetActiveConfig is a free data retrieval call binding the contract method 0xb5351b0d.
+//
+// Solidity: function getActiveConfig(uint64 activationBlockNumber) view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListCallerSession) GetActiveConfig(activationBlockNumber uint64) (CollatorConfig, error) {
+	return _CollatorConfigsList.Contract.GetActiveConfig(&_CollatorConfigsList.CallOpts, activationBlockNumber)
+}
+
+// GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
+//
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListCaller) GetCurrentActiveConfig(opts *bind.CallOpts) (CollatorConfig, error) {
+	var out []interface{}
+	err := _CollatorConfigsList.contract.Call(opts, &out, "getCurrentActiveConfig")
+
+	if err != nil {
+		return *new(CollatorConfig), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(CollatorConfig)).(*CollatorConfig)
+
+	return out0, err
+
+}
+
+// GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
+//
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListSession) GetCurrentActiveConfig() (CollatorConfig, error) {
+	return _CollatorConfigsList.Contract.GetCurrentActiveConfig(&_CollatorConfigsList.CallOpts)
+}
+
+// GetCurrentActiveConfig is a free data retrieval call binding the contract method 0xf9c72b53.
+//
+// Solidity: function getCurrentActiveConfig() view returns((uint64,uint64))
+func (_CollatorConfigsList *CollatorConfigsListCallerSession) GetCurrentActiveConfig() (CollatorConfig, error) {
+	return _CollatorConfigsList.Contract.GetCurrentActiveConfig(&_CollatorConfigsList.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _CollatorConfigsList.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListSession) Owner() (common.Address, error) {
+	return _CollatorConfigsList.Contract.Owner(&_CollatorConfigsList.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_CollatorConfigsList *CollatorConfigsListCallerSession) Owner() (common.Address, error) {
+	return _CollatorConfigsList.Contract.Owner(&_CollatorConfigsList.CallOpts)
+}
+
+// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+//
+// Solidity: function addNewCfg((uint64,uint64) config) returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactor) AddNewCfg(opts *bind.TransactOpts, config CollatorConfig) (*types.Transaction, error) {
+	return _CollatorConfigsList.contract.Transact(opts, "addNewCfg", config)
+}
+
+// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+//
+// Solidity: function addNewCfg((uint64,uint64) config) returns()
+func (_CollatorConfigsList *CollatorConfigsListSession) AddNewCfg(config CollatorConfig) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.AddNewCfg(&_CollatorConfigsList.TransactOpts, config)
+}
+
+// AddNewCfg is a paid mutator transaction binding the contract method 0x79f78099.
+//
+// Solidity: function addNewCfg((uint64,uint64) config) returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactorSession) AddNewCfg(config CollatorConfig) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.AddNewCfg(&_CollatorConfigsList.TransactOpts, config)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _CollatorConfigsList.contract.Transact(opts, "renounceOwnership")
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_CollatorConfigsList *CollatorConfigsListSession) RenounceOwnership() (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.RenounceOwnership(&_CollatorConfigsList.TransactOpts)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.RenounceOwnership(&_CollatorConfigsList.TransactOpts)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _CollatorConfigsList.contract.Transact(opts, "transferOwnership", newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_CollatorConfigsList *CollatorConfigsListSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.TransferOwnership(&_CollatorConfigsList.TransactOpts, newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_CollatorConfigsList *CollatorConfigsListTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _CollatorConfigsList.Contract.TransferOwnership(&_CollatorConfigsList.TransactOpts, newOwner)
+}
+
+// CollatorConfigsListNewConfigIterator is returned from FilterNewConfig and is used to iterate over the raw logs and unpacked data for NewConfig events raised by the CollatorConfigsList contract.
+type CollatorConfigsListNewConfigIterator struct {
+	Event *CollatorConfigsListNewConfig // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *CollatorConfigsListNewConfigIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(CollatorConfigsListNewConfig)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(CollatorConfigsListNewConfig)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *CollatorConfigsListNewConfigIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *CollatorConfigsListNewConfigIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// CollatorConfigsListNewConfig represents a NewConfig event raised by the CollatorConfigsList contract.
+type CollatorConfigsListNewConfig struct {
+	ActivationBlockNumber uint64
+	Index                 uint64
+	Raw                   types.Log // Blockchain specific contextual infos
+}
+
+// FilterNewConfig is a free log retrieval operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+//
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) FilterNewConfig(opts *bind.FilterOpts) (*CollatorConfigsListNewConfigIterator, error) {
+
+	logs, sub, err := _CollatorConfigsList.contract.FilterLogs(opts, "NewConfig")
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsListNewConfigIterator{contract: _CollatorConfigsList.contract, event: "NewConfig", logs: logs, sub: sub}, nil
+}
+
+// WatchNewConfig is a free log subscription operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+//
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) WatchNewConfig(opts *bind.WatchOpts, sink chan<- *CollatorConfigsListNewConfig) (event.Subscription, error) {
+
+	logs, sub, err := _CollatorConfigsList.contract.WatchLogs(opts, "NewConfig")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(CollatorConfigsListNewConfig)
+				if err := _CollatorConfigsList.contract.UnpackLog(event, "NewConfig", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseNewConfig is a log parse operation binding the contract event 0xf991c74e88b00b8de409caf790045f133e9a8283d3b989db88e2b2d93612c3a7.
+//
+// Solidity: event NewConfig(uint64 activationBlockNumber, uint64 index)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) ParseNewConfig(log types.Log) (*CollatorConfigsListNewConfig, error) {
+	event := new(CollatorConfigsListNewConfig)
+	if err := _CollatorConfigsList.contract.UnpackLog(event, "NewConfig", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// CollatorConfigsListOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the CollatorConfigsList contract.
+type CollatorConfigsListOwnershipTransferredIterator struct {
+	Event *CollatorConfigsListOwnershipTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *CollatorConfigsListOwnershipTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(CollatorConfigsListOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(CollatorConfigsListOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *CollatorConfigsListOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *CollatorConfigsListOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// CollatorConfigsListOwnershipTransferred represents a OwnershipTransferred event raised by the CollatorConfigsList contract.
+type CollatorConfigsListOwnershipTransferred struct {
+	PreviousOwner common.Address
+	NewOwner      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*CollatorConfigsListOwnershipTransferredIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _CollatorConfigsList.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &CollatorConfigsListOwnershipTransferredIterator{contract: _CollatorConfigsList.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CollatorConfigsListOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _CollatorConfigsList.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(CollatorConfigsListOwnershipTransferred)
+				if err := _CollatorConfigsList.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_CollatorConfigsList *CollatorConfigsListFilterer) ParseOwnershipTransferred(log types.Log) (*CollatorConfigsListOwnershipTransferred, error) {
+	event := new(CollatorConfigsListOwnershipTransferred)
+	if err := _CollatorConfigsList.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

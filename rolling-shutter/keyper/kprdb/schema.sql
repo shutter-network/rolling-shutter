@@ -100,3 +100,8 @@ CREATE TABLE keyper.outgoing_eon_keys(
        eon_public_key bytea,
        eon bigint NOT NULL PRIMARY KEY
 );
+
+CREATE TABLE keyper.chain_collator(
+       activation_block_number bigint PRIMARY KEY,
+       collator text NOT NULL
+);

@@ -195,3 +195,7 @@ INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2);
 
 -- name: GetChainKeyperSet :one
 SELECT * FROM decryptor.chain_keyper_set LIMIT 1;
+
+-- name: InsertChainCollator :exec
+INSERT INTO decryptor.chain_collator (activation_block_number, collator)
+VALUES ($1, $2);

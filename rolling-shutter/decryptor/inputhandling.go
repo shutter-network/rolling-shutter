@@ -105,7 +105,7 @@ func handleSignatureInput(
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
-	decryptorSet, err := db.GetDecryptorSet(ctx, int64(activationBlockNumber))
+	decryptorSet, err := db.GetDecryptorSet(ctx, activationBlockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query decryptor set from db")
 	}

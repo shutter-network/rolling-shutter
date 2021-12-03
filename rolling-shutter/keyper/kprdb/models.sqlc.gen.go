@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+type KeyperChainCollator struct {
+	ActivationBlockNumber int64
+	Collator              string
+}
+
 type KeyperChainKeyperSet struct {
 	ActivationBlockNumber int64
 	Keypers               []string

@@ -3,6 +3,7 @@ package keyper
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v4"
@@ -15,6 +16,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
@@ -23,6 +25,7 @@ func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	validators[kprtopics.DecryptionKey] = kpr.makeDecryptionKeyValidator(db)
 	validators[kprtopics.DecryptionKeyShare] = kpr.makeKeyShareValidator(db)
 	validators[kprtopics.EonPublicKey] = kpr.makeEonPublicKeyValidator()
+	validators[kprtopics.DecryptionTrigger] = kpr.makeDecryptionTriggerValidator()
 
 	return validators
 }
@@ -47,7 +50,7 @@ func (kpr *keyper) makeDecryptionKeyValidator(db *kprdb.Queries) pubsub.Validato
 		}
 
 		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
-		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
 		if err == pgx.ErrNoRows {
 			return false
 		}
@@ -93,7 +96,7 @@ func (kpr *keyper) makeKeyShareValidator(db *kprdb.Queries) pubsub.Validator {
 		}
 
 		activationBlockNumber := medley.ActivationBlockNumberFromEpochID(keyShare.epochID)
-		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+		dkgResultDB, err := db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
 		if err == pgx.ErrNoRows {
 			return false
 		}
@@ -130,5 +133,51 @@ func (kpr *keyper) makeEonPublicKeyValidator() pubsub.Validator {
 			return false
 		}
 		return msg.GetInstanceID() == kpr.config.InstanceID
+	}
+}
+
+func (kpr *keyper) makeDecryptionTriggerValidator() pubsub.Validator {
+	return func(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+		p2pMessage := new(p2p.Message)
+		if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
+			return false
+		}
+		msg, err := unmarshalP2PMessage(p2pMessage)
+		if err != nil {
+			return false
+		}
+		if msg.GetInstanceID() != kpr.config.InstanceID {
+			return false
+		}
+
+		t, ok := msg.(*decryptionTrigger)
+		if !ok {
+			panic("unmarshalled non decryption trigger message in decryption trigger validator")
+		}
+		blk := medley.ActivationBlockNumberFromEpochID(t.EpochID)
+		collatorString, err := kpr.db.GetChainCollator(ctx, blk)
+		if err == pgx.ErrNoRows {
+			fmt.Printf("got decryption trigger with no collators for given block number: %d", blk)
+			return false
+		}
+		if err != nil {
+			fmt.Printf("error while getting collator from db for block nubmer: %d", blk)
+			return false
+		}
+
+		collator, err := shdb.DecodeAddress(collatorString)
+		if err != nil {
+			fmt.Printf("error while converting collator from string to address: %s", collatorString)
+			return false
+		}
+
+		trigger := (*shmsg.DecryptionTrigger)(t)
+		signatureValid, err := trigger.VerifySignature(collator)
+		if err != nil {
+			fmt.Printf("error while verifying decryption trigger signature for epoch: %d", t.EpochID)
+			return false
+		}
+
+		return signatureValid
 	}
 }

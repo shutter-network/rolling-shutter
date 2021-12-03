@@ -42,6 +42,10 @@ type Contracts struct {
 	DecryptorsConfigsListDeployment *Deployment
 	DecryptorsConfigsListNewConfig  *eventsyncer.EventType
 
+	CollatorConfigsList           *contract.CollatorConfigsList
+	CollatorConfigsListDeployment *Deployment
+	CollatorConfigsListNewConfig  *eventsyncer.EventType
+
 	Keypers                     *contract.AddrsSeq
 	KeypersDeployment           *Deployment
 	KeypersAdded                *eventsyncer.EventType
@@ -53,6 +57,12 @@ type Contracts struct {
 	DecryptorsAdded                *eventsyncer.EventType
 	DecryptorsAppended             *eventsyncer.EventType
 	DecryptorsOwnershipTransferred *eventsyncer.EventType
+
+	Collators                     *contract.AddrsSeq
+	CollatorsDeployment           *Deployment
+	CollatorsAdded                *eventsyncer.EventType
+	CollatorsAppended             *eventsyncer.EventType
+	CollatorsOwnershipTransferred *eventsyncer.EventType
 
 	BLSPublicKeyRegistry           *contract.Registry
 	BLSPublicKeyRegistryDeployment *Deployment
@@ -104,10 +114,16 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 	if err := c.initDecryptorsConfigsList(); err != nil {
 		return nil, err
 	}
+	if err := c.initCollatorConfigsList(); err != nil {
+		return nil, err
+	}
 	if err := c.initKeypers(); err != nil {
 		return nil, err
 	}
 	if err := c.initDecryptors(); err != nil {
+		return nil, err
+	}
+	if err := c.initCollator(); err != nil {
 		return nil, err
 	}
 	if err := c.initBLSPublicKeyRegistry(); err != nil {
@@ -157,6 +173,27 @@ func (c *Contracts) initDecryptorsConfigsList() error {
 		ABI:      d.ABI,
 		Name:     "NewConfig",
 		Type:     reflect.TypeOf(contract.DecryptorsConfigsListNewConfig{}),
+	}
+	return nil
+}
+
+func (c *Contracts) initCollatorConfigsList() error {
+	d, err := c.getDeployment("CollatorConfig")
+	if err != nil {
+		return err
+	}
+	c.CollatorConfigsListDeployment = d
+	c.CollatorConfigsList, err = contract.NewCollatorConfigsList(d.Address, c.Client)
+	if err != nil {
+		return err
+	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.CollatorConfigsListNewConfig = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "NewConfig",
+		Type:     reflect.TypeOf(contract.CollatorConfigsListNewConfig{}),
 	}
 	return nil
 }
@@ -222,6 +259,41 @@ func (c *Contracts) initDecryptors() error {
 		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
 	}
 	c.DecryptorsOwnershipTransferred = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "OwnershipTransferred",
+		Type:     reflect.TypeOf(contract.AddrsSeqOwnershipTransferred{}),
+	}
+	return nil
+}
+
+func (c *Contracts) initCollator() error {
+	d, err := c.getDeployment("Collator")
+	if err != nil {
+		return err
+	}
+	c.CollatorsDeployment = d
+	c.Collators, err = contract.NewAddrsSeq(d.Address, c.Client)
+	if err != nil {
+		return err
+	}
+	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
+	c.CollatorsAdded = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "Added",
+		Type:     reflect.TypeOf(contract.AddrsSeqAdded{}),
+	}
+	c.CollatorsAppended = &eventsyncer.EventType{
+		Contract: boundContract,
+		Address:  d.Address,
+		ABI:      d.ABI,
+		Name:     "Appended",
+		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
+	}
+	c.CollatorsOwnershipTransferred = &eventsyncer.EventType{
 		Contract: boundContract,
 		Address:  d.Address,
 		ABI:      d.ABI,
