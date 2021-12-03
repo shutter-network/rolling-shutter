@@ -20,7 +20,9 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/go-cmp v0.5.6
+	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgconn v1.10.1
+	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jackc/pgx/v4 v4.14.0
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
