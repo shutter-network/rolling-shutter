@@ -122,7 +122,7 @@ func (d *Decryptor) makeDecryptionSignatureValidator() pubsub.Validator {
 			log.Printf("error while getting decryptor set member from database: %s", err)
 			return false
 		}
-		if !decryptorSetMember.SignatureVerified {
+		if !decryptorSetMember.SignatureValid {
 			return false
 		}
 
@@ -175,7 +175,7 @@ func (d *Decryptor) makeAggregatedDecryptionSignatureValidator() pubsub.Validato
 				)
 				return false
 			}
-			if !decryptorSetMember.SignatureVerified {
+			if !decryptorSetMember.SignatureValid {
 				return false
 			}
 

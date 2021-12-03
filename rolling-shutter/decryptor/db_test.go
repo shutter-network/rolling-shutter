@@ -33,9 +33,18 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 		{1},
 	}
 	for i := 0; i < len(addresses); i++ {
-		err := db.UpdateDecryptorBLSPublicKey(ctx, dcrdb.UpdateDecryptorBLSPublicKeyParams{
-			Address:      addresses[i],
-			BlsPublicKey: keys[i],
+		valid := i%2 == 0
+		var key []byte
+		if valid {
+			key = keys[i]
+		} else {
+			key = []byte{}
+		}
+		err := db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+			Address:        addresses[i],
+			BlsPublicKey:   key,
+			BlsSignature:   []byte{},
+			SignatureValid: valid,
 		})
 		assert.NilError(t, err)
 
@@ -58,14 +67,16 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Index:                 0,
 			Address:               addresses[0],
 			BlsPublicKey:          keys[0],
-			SignatureVerified:     false,
+			BlsSignature:          []byte{},
+			SignatureValid:        true,
 		},
 		{
 			ActivationBlockNumber: 0,
 			Index:                 1,
 			Address:               addresses[1],
-			BlsPublicKey:          keys[1],
-			SignatureVerified:     false,
+			BlsPublicKey:          []byte{},
+			BlsSignature:          []byte{},
+			SignatureValid:        false,
 		},
 	})
 
@@ -78,12 +89,16 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 			Index:                 0,
 			Address:               addresses[0],
 			BlsPublicKey:          keys[0],
+			BlsSignature:          []byte{},
+			SignatureValid:        true,
 		},
 		{
 			ActivationBlockNumber: 100,
 			Index:                 1,
 			Address:               addresses[2],
 			BlsPublicKey:          keys[2],
+			BlsSignature:          []byte{},
+			SignatureValid:        true,
 		},
 	})
 }

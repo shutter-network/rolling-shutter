@@ -1,4 +1,4 @@
--- schema-version: 12 --
+-- schema-version: 13 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS decryptor.decryptor_identity (
        address text PRIMARY KEY,
        bls_public_key bytea,
        bls_signature bytea,
-       signature_verified boolean NOT NULL DEFAULT false
+       signature_valid boolean NOT NULL
 );
 CREATE TABLE IF NOT EXISTS decryptor.decryptor_set_member (
        activation_block_number bigint NOT NULL,

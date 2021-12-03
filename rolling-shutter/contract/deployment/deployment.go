@@ -64,13 +64,9 @@ type Contracts struct {
 	CollatorsAppended             *eventsyncer.EventType
 	CollatorsOwnershipTransferred *eventsyncer.EventType
 
-	BLSPublicKeyRegistry           *contract.Registry
-	BLSPublicKeyRegistryDeployment *Deployment
-	BLSPublicKeyRegistryRegistered *eventsyncer.EventType
-
-	BLSSignatureRegistry           *contract.Registry
-	BLSSignatureRegistryDeployment *Deployment
-	BLSSignatureRegistryRegistered *eventsyncer.EventType
+	BLSRegistry           *contract.Registry
+	BLSRegistryDeployment *Deployment
+	BLSRegistryRegistered *eventsyncer.EventType
 }
 
 // Deployments contains information about all deployed contracts loaded from a deployment
@@ -126,10 +122,7 @@ func NewContracts(client *ethclient.Client, deploymentDir string) (*Contracts, e
 	if err := c.initCollator(); err != nil {
 		return nil, err
 	}
-	if err := c.initBLSPublicKeyRegistry(); err != nil {
-		return nil, err
-	}
-	if err := c.initBLSSignatureRegistry(); err != nil {
+	if err := c.initBLSRegistry(); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -303,37 +296,17 @@ func (c *Contracts) initCollator() error {
 	return nil
 }
 
-func (c *Contracts) initBLSPublicKeyRegistry() error {
-	d, err := c.getDeployment("BLSPublicKeyRegistry")
+func (c *Contracts) initBLSRegistry() error {
+	d, err := c.getDeployment("BLSRegistry")
 	if err != nil {
 		return err
 	}
-	c.BLSPublicKeyRegistryDeployment = d
-	c.BLSPublicKeyRegistry, err = contract.NewRegistry(d.Address, c.Client)
+	c.BLSRegistryDeployment = d
+	c.BLSRegistry, err = contract.NewRegistry(d.Address, c.Client)
 	if err != nil {
 		return err
 	}
-	c.BLSPublicKeyRegistryRegistered = &eventsyncer.EventType{
-		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "Registered",
-		Type:     reflect.TypeOf(contract.RegistryRegistered{}),
-	}
-	return nil
-}
-
-func (c *Contracts) initBLSSignatureRegistry() error {
-	d, err := c.getDeployment("BLSSignatureRegistry")
-	if err != nil {
-		return err
-	}
-	c.BLSSignatureRegistryDeployment = d
-	c.BLSSignatureRegistry, err = contract.NewRegistry(c.BLSSignatureRegistryDeployment.Address, c.Client)
-	if err != nil {
-		return err
-	}
-	c.BLSSignatureRegistryRegistered = &eventsyncer.EventType{
+	c.BLSRegistryRegistered = &eventsyncer.EventType{
 		Contract: bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client),
 		Address:  d.Address,
 		ABI:      d.ABI,
