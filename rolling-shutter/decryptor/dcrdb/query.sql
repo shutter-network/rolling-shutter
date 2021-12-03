@@ -53,29 +53,12 @@ INSERT INTO decryptor.aggregated_signature (
 )
 ON CONFLICT DO NOTHING;
 
--- name: UpdateDecryptorBLSPublicKey :exec
+-- name: InsertDecryptorIdentity :exec
 INSERT INTO decryptor.decryptor_identity (
-    address, bls_public_key
+    address, bls_public_key, bls_signature, signature_verified
 ) VALUES (
-    $1, $2
-) ON CONFLICT (address) DO UPDATE
-    SET bls_public_key = excluded.bls_public_key;
-
--- name: UpdateDecryptorBLSSignature :exec
-INSERT INTO decryptor.decryptor_identity (
-    address, bls_signature
-) VALUES (
-    $1, $2
-) ON CONFLICT (address) DO UPDATE
-    SET bls_signature = excluded.bls_signature;
-
--- name: UpdateDecryptorSignatureVerified :exec
-INSERT INTO decryptor.decryptor_identity (
-    address, signature_verified
-) VALUES (
-    $1, $2
-) ON CONFLICT (address) DO UPDATE
-    SET signature_verified = excluded.signature_verified;
+    $1, $2, $3, $4
+);
 
 -- name: GetDecryptorIdentity :one
 SELECT * FROM decryptor.decryptor_identity
