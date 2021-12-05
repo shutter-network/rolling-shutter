@@ -174,7 +174,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 				{
 					InstanceID:     configTwoRequiredSignatures.InstanceID,
 					SignedHash:     hash.Bytes(),
-					SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{config.SignerIndex, 2}),
+					SignerBitfield: bitfield.MakeBitfieldFromIndex(config.SignerIndex, 2),
 				},
 			},
 		},

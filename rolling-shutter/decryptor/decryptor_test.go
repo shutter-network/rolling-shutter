@@ -137,7 +137,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:     d.Config.InstanceID,
 				Signature:      aggregatedSignature.Marshal(),
 				SignedHash:     validHash.Bytes(),
-				SignerBitfield: bitfield.MakeBitfieldFromArray([]int32{0, 1}),
+				SignerBitfield: bitfield.MakeBitfieldFromIndex(0, 1),
 			},
 		},
 		{
@@ -173,7 +173,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 				InstanceID:          d.Config.InstanceID,
 				AggregatedSignature: aggregatedSignature.Marshal(),
 				SignedHash:          validHash.Bytes(),
-				SignerBitfield:      bitfield.MakeBitfieldFromArray([]int32{0, 1}),
+				SignerBitfield:      bitfield.MakeBitfieldFromIndex(0, 1),
 			},
 		},
 		{
