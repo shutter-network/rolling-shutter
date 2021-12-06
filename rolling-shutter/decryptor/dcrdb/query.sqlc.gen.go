@@ -37,6 +37,19 @@ func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte)
 	return i, err
 }
 
+const getChainCollator = `-- name: GetChainCollator :one
+SELECT activation_block_number, collator FROM decryptor.chain_collator
+WHERE activation_block_number <= $1
+ORDER BY activation_block_number DESC LIMIT 1
+`
+
+func (q *Queries) GetChainCollator(ctx context.Context, activationBlockNumber int64) (DecryptorChainCollator, error) {
+	row := q.db.QueryRow(ctx, getChainCollator, activationBlockNumber)
+	var i DecryptorChainCollator
+	err := row.Scan(&i.ActivationBlockNumber, &i.Collator)
+	return i, err
+}
+
 const getChainKeyperSet = `-- name: GetChainKeyperSet :one
 SELECT n, addresses FROM decryptor.chain_keyper_set LIMIT 1
 `

@@ -1,6 +1,7 @@
 package decryptor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log"
@@ -16,18 +17,21 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 	return map[string]pubsub.Validator{
 		dcrtopics.DecryptionSignature:           d.validateDecryptionSignature,
 		dcrtopics.AggregatedDecryptionSignature: d.validateAggregatedDecryptionSignature,
-		dcrtopics.CipherBatch:                   d.validateInstanceID,
+		dcrtopics.CipherBatch:                   d.validateCipherBatch,
 		dcrtopics.DecryptionKey:                 d.validateDecryptionKey,
 	}
 }
 
-func (d *Decryptor) validateInstanceID(_ context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
+func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
+	log.Println("validating cipher batch")
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
@@ -36,7 +40,43 @@ func (d *Decryptor) validateInstanceID(_ context.Context, _ peer.ID, libp2pMessa
 	if err != nil {
 		return false
 	}
-	return msg.GetInstanceID() == d.Config.InstanceID
+
+	if msg.GetInstanceID() != d.Config.InstanceID {
+		return false
+	}
+
+	cipherBatch, ok := msg.(*cipherBatch)
+	if !ok {
+		return false
+	}
+
+	// check that it's signed by the collator
+	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(cipherBatch.DecryptionTrigger.EpochID)
+	collatorDBEntry, err := d.db.GetChainCollator(ctx, activationBlockNumber)
+	if err == pgx.ErrNoRows {
+		log.Printf("error getting collator from db: %s", err)
+		return false
+	}
+	collator, err := shdb.DecodeAddress(collatorDBEntry.Collator)
+	if err != nil {
+		log.Printf("invalid collator entry: %+v", collatorDBEntry)
+		return false
+	}
+	ok, err = cipherBatch.DecryptionTrigger.VerifySignature(collator)
+	if err != nil {
+		log.Printf("failed to verify collator signature: %s", err)
+		return false
+	}
+	if !ok {
+		return false
+	}
+
+	// check the transaction hash matches the given transactions
+	if !bytes.Equal(shmsg.HashTransactions(cipherBatch.Transactions), cipherBatch.DecryptionTrigger.TransactionsHash) {
+		return false
+	}
+
+	return true
 }
 
 func (d *Decryptor) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
