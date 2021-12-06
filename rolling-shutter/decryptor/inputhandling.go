@@ -46,17 +46,17 @@ func handleCipherBatchInput(
 	cipherBatch *cipherBatch,
 ) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
-		EpochID:      shdb.EncodeUint64(cipherBatch.EpochID),
+		EpochID:      shdb.EncodeUint64(cipherBatch.DecryptionTrigger.EpochID),
 		Transactions: cipherBatch.Transactions,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to insert cipher batch for epoch %d into db", cipherBatch.EpochID)
+		return nil, errors.Wrapf(err, "failed to insert cipher batch for epoch %d into db", cipherBatch.DecryptionTrigger.EpochID)
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.EpochID)
+		log.Printf("attempted to store multiple cipherbatches for same epoch %d", cipherBatch.DecryptionTrigger.EpochID)
 		return nil, nil
 	}
-	return handleEpoch(ctx, config, db, cipherBatch.EpochID)
+	return handleEpoch(ctx, config, db, cipherBatch.DecryptionTrigger.EpochID)
 }
 
 func handleSignatureInput(

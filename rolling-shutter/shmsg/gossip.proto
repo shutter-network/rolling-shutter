@@ -25,9 +25,8 @@ message DecryptionKey {
 }
 
 message CipherBatch {
-    uint64 instanceID = 1;
-    uint64 epochID = 2;
-    repeated bytes transactions = 3;
+    DecryptionTrigger decryption_trigger = 1;
+    repeated bytes transactions = 2;
 }
 
 message DecryptionSignature {

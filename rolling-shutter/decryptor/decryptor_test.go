@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -50,38 +51,108 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	defer closedb()
+
 	config := newTestConfig(t)
 	d := New(config)
+	d.db = db
+
+	err := d.db.InsertChainCollator(ctx, dcrdb.InsertChainCollatorParams{
+		ActivationBlockNumber: 1,
+		Collator:              shdb.EncodeAddress(config.EthereumAddress()),
+	})
+	assert.NilError(t, err)
+	err = d.db.InsertChainCollator(ctx, dcrdb.InsertChainCollatorParams{
+		ActivationBlockNumber: 20,
+		Collator:              "0x0000000000000000000000000000000000000000",
+	})
+	assert.NilError(t, err)
+
+	txs := [][]byte{
+		[]byte("tx1"),
+		[]byte("tx2"),
+		[]byte("tx3"),
+	}
+	epochID, err := medley.EncodeActivationBlockNumberInEpochID(0, 1)
+	assert.NilError(t, err)
+
+	trigger, err := shmsg.NewSignedDecryptionTrigger(d.Config.InstanceID, epochID, txs, config.EthereumKey)
+	assert.NilError(t, err)
+	triggerBadInstanceID, err := shmsg.NewSignedDecryptionTrigger(
+		d.Config.InstanceID+2,
+		epochID,
+		txs,
+		config.EthereumKey,
+	)
+	assert.NilError(t, err)
+	wrongCollatorEpochID, err := medley.EncodeActivationBlockNumberInEpochID(0, 20)
+	assert.NilError(t, err)
+	triggerWrongCollator, err := shmsg.NewSignedDecryptionTrigger(
+		d.Config.InstanceID,
+		wrongCollatorEpochID,
+		txs,
+		config.EthereumKey,
+	)
+	assert.NilError(t, err)
+	triggerBadHash, err := shmsg.NewSignedDecryptionTrigger(
+		d.Config.InstanceID,
+		wrongCollatorEpochID,
+		append(txs, []byte("tx4")),
+		config.EthereumKey,
+	)
+	assert.NilError(t, err)
+	triggerBadSignature := &shmsg.DecryptionTrigger{
+		InstanceID:       trigger.InstanceID,
+		EpochID:          trigger.EpochID,
+		TransactionsHash: trigger.TransactionsHash,
+		Signature:        []byte("badsignature"),
+	}
 
 	var peerID peer.ID
 	tests := []struct {
-		name  string
-		valid bool
-		msg   shmsg.P2PMessage
+		name    string
+		valid   bool
+		trigger *shmsg.DecryptionTrigger
 	}{
 		{
-			name:  "valid cipher batch",
-			valid: true,
-			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID,
-			},
+			name:    "valid cipher batch",
+			valid:   true,
+			trigger: trigger,
 		},
 		{
-			name:  "invalid cipher batch instance ID",
-			valid: false,
-			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID + 2,
-			},
+			name:    "invalid cipher batch instance ID",
+			valid:   false,
+			trigger: triggerBadInstanceID,
+		},
+		{
+			name:    "invalid cipher batch collator",
+			valid:   false,
+			trigger: triggerWrongCollator,
+		},
+		{
+			name:    "invalid cipher batch transaction hash",
+			valid:   false,
+			trigger: triggerBadHash,
+		},
+		{
+			name:    "invalid cipher batch signature",
+			valid:   false,
+			trigger: triggerBadSignature,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			pubsubMessage, err := makePubSubMessage(tc.msg, tc.msg.Topic())
+			cipherBatch := &shmsg.CipherBatch{
+				DecryptionTrigger: tc.trigger,
+				Transactions:      txs,
+			}
+			pubsubMessage, err := makePubSubMessage(cipherBatch, cipherBatch.Topic())
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, d.validateInstanceID(ctx, peerID, pubsubMessage), tc.valid,
-				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+			assert.Equal(t, d.validateCipherBatch(ctx, peerID, pubsubMessage), tc.valid,
+				"validate failed valid=%t msg=%+v type=%T", tc.valid, cipherBatch, cipherBatch)
 		})
 	}
 }

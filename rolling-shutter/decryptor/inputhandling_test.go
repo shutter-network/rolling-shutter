@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	crypto "github.com/libp2p/go-libp2p-crypto"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
@@ -21,7 +22,9 @@ import (
 func newTestConfig(t *testing.T) Config {
 	t.Helper()
 
-	p2pKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	ethereumKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	p2pKey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	assert.NilError(t, err)
 	signingKey, _, err := shbls.RandomKeyPair(rand.Reader)
 	assert.NilError(t, err)
@@ -31,6 +34,7 @@ func newTestConfig(t *testing.T) Config {
 
 		DatabaseURL: "",
 
+		EthereumKey: ethereumKey,
 		P2PKey:      p2pKey,
 		SigningKey:  signingKey,
 		SignerIndex: 1,
@@ -84,26 +88,30 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	config := newTestConfig(t)
 
 	m := &cipherBatch{
-		EpochID:      100,
+		DecryptionTrigger: &shmsg.DecryptionTrigger{
+			EpochID: 100,
+		},
 		Transactions: [][]byte{[]byte("tx1"), []byte("tx2")},
 	}
 	msgs, err := handleCipherBatchInput(ctx, config, db, m)
 	assert.NilError(t, err)
 
-	mStored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.EpochID))
+	mStored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.DecryptionTrigger.EpochID))
 	assert.NilError(t, err)
-	assert.Check(t, shdb.DecodeUint64(mStored.EpochID) == m.EpochID)
+	assert.Check(t, shdb.DecodeUint64(mStored.EpochID) == m.DecryptionTrigger.EpochID)
 	assert.DeepEqual(t, mStored.Transactions, m.Transactions)
 	assert.Check(t, len(msgs) == 0)
 
 	m2 := &cipherBatch{
-		EpochID:      100,
+		DecryptionTrigger: &shmsg.DecryptionTrigger{
+			EpochID: 100,
+		},
 		Transactions: [][]byte{[]byte("tx3")},
 	}
 	msgs, err = handleCipherBatchInput(ctx, config, db, m2)
 	assert.NilError(t, err)
 
-	m2Stored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.EpochID))
+	m2Stored, err := db.GetCipherBatch(ctx, shdb.EncodeUint64(m.DecryptionTrigger.EpochID))
 	assert.NilError(t, err)
 	assert.DeepEqual(t, m2Stored.Transactions, m.Transactions)
 
@@ -271,7 +279,9 @@ func TestHandleEpochIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	cipherBatchMsg := &cipherBatch{
-		EpochID:      0,
+		DecryptionTrigger: &shmsg.DecryptionTrigger{
+			EpochID: 0,
+		},
 		Transactions: [][]byte{[]byte("tx1")},
 	}
 	msgs, err := handleCipherBatchInput(ctx, config, db, cipherBatchMsg)
@@ -287,7 +297,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 
 	storedDecryptionKey,
 		err := db.GetDecryptionSignature(ctx, dcrdb.GetDecryptionSignatureParams{
-		EpochID:         shdb.EncodeUint64(cipherBatchMsg.EpochID),
+		EpochID:         shdb.EncodeUint64(cipherBatchMsg.DecryptionTrigger.EpochID),
 		SignersBitfield: bitfield.MakeBitfieldFromIndex(config.SignerIndex),
 	})
 	assert.NilError(t, err)

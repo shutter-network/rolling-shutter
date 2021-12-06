@@ -377,8 +377,10 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 	}
 
 	msg := &shmsg.CipherBatch{
-		InstanceID:   m.Config.InstanceID,
-		EpochID:      epochID,
+		DecryptionTrigger: &shmsg.DecryptionTrigger{
+			InstanceID: m.Config.InstanceID,
+			EpochID:    epochID,
+		},
 		Transactions: cipherTxs,
 	}
 	msgBytes, err := proto.Marshal(msg)

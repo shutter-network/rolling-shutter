@@ -37,7 +37,9 @@ type Config struct {
 	InstanceID uint64
 }
 
-const configTemplate = `# Shutter keyper configuration for {{ .Address }}, /p2p/{{ .P2PKey | P2PKeyPublic}}
+const configTemplate = `# Shutter keyper config
+# Ethereum address: {{ .Address }}
+# Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 EthereumURL         = "{{ .EthereumURL }}"
