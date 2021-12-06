@@ -109,7 +109,7 @@ func (c *Collator) setupRouter() *chi.Mux {
 
 func (c *Collator) Run(ctx context.Context) error {
 	log.Printf(
-		"starting collator with ethereum address %X",
+		"starting collator with ethereum address %s",
 		c.Config.EthereumAddress(),
 	)
 
