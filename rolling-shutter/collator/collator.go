@@ -177,7 +177,7 @@ func (c *Collator) processEpochLoop(ctx context.Context) error {
 }
 
 func (c *Collator) newEpoch(ctx context.Context) error {
-	outMessages, err := handleEpoch(ctx, c.Config, c.db)
+	outMessages, err := startNextEpoch(ctx, c.Config, c.db)
 	if err != nil {
 		return err
 	}

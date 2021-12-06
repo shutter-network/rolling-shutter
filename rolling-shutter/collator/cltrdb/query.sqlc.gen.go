@@ -7,19 +7,8 @@ import (
 	"context"
 )
 
-const getBatch = `-- name: GetBatch :one
-SELECT epoch_id, transactions FROM collator.cipher_batch WHERE epoch_id = $1
-`
-
-func (q *Queries) GetBatch(ctx context.Context, epochID []byte) (CollatorCipherBatch, error) {
-	row := q.db.QueryRow(ctx, getBatch, epochID)
-	var i CollatorCipherBatch
-	err := row.Scan(&i.EpochID, &i.Transactions)
-	return i, err
-}
-
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
-SELECT epoch_id FROM collator.cipher_batch ORDER BY epoch_id DESC LIMIT 1
+SELECT epoch_id FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `
 
 func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
@@ -40,6 +29,30 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (CollatorMetaInf, err
 	return i, err
 }
 
+const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
+SELECT encrypted_tx FROM collator.transaction WHERE epoch_id = $1 ORDER BY tx_id
+`
+
+func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, getTransactionsByEpoch, epochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items [][]byte
+	for rows.Next() {
+		var encrypted_tx []byte
+		if err := rows.Scan(&encrypted_tx); err != nil {
+			return nil, err
+		}
+		items = append(items, encrypted_tx)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTrigger = `-- name: GetTrigger :one
 SELECT epoch_id, batch_hash FROM collator.decryption_trigger WHERE epoch_id = $1
 `
@@ -49,20 +62,6 @@ func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (CollatorDecry
 	var i CollatorDecryptionTrigger
 	err := row.Scan(&i.EpochID, &i.BatchHash)
 	return i, err
-}
-
-const insertBatch = `-- name: InsertBatch :exec
-INSERT INTO collator.cipher_batch (epoch_id, transactions) VALUES ($1, $2)
-`
-
-type InsertBatchParams struct {
-	EpochID      []byte
-	Transactions [][]byte
-}
-
-func (q *Queries) InsertBatch(ctx context.Context, arg InsertBatchParams) error {
-	_, err := q.db.Exec(ctx, insertBatch, arg.EpochID, arg.Transactions)
-	return err
 }
 
 const insertMeta = `-- name: InsertMeta :exec
@@ -94,7 +93,7 @@ func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) er
 }
 
 const insertTx = `-- name: InsertTx :exec
-INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx)VALUES ($1, $2, $3)
+INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3)
 `
 
 type InsertTxParams struct {

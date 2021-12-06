@@ -11,12 +11,13 @@ import (
 
 var triggerHashPrefix = []byte{0x19, 't', 'r', 'i', 'g', 'g', 'e', 'r'}
 
-func NewSignedDecryptionTrigger(instanceID uint64, epochID uint64, transactions [][]byte,
-	privKey *ecdsa.PrivateKey) (*DecryptionTrigger, error) {
+func NewSignedDecryptionTrigger(
+	instanceID uint64, epochID uint64, transactions [][]byte, privKey *ecdsa.PrivateKey,
+) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
 		InstanceID:       instanceID,
 		EpochID:          epochID,
-		TransactionsHash: hashTransactions(transactions),
+		TransactionsHash: HashTransactions(transactions),
 	}
 	var err error
 	trigger.Signature, err = ethcrypto.Sign(trigger.Hash(), privKey)
@@ -44,7 +45,7 @@ func (t *DecryptionTrigger) Hash() []byte {
 	return hash.Sum(nil)
 }
 
-func hashTransactions(transactions [][]byte) []byte {
+func HashTransactions(transactions [][]byte) []byte {
 	hash := sha3.New256()
 	for _, transaction := range transactions {
 		h := sha3.Sum256(transaction)

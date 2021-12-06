@@ -4,11 +4,6 @@ package cltrdb
 
 import ()
 
-type CollatorCipherBatch struct {
-	EpochID      []byte
-	Transactions [][]byte
-}
-
 type CollatorDecryptionTrigger struct {
 	EpochID   []byte
 	BatchHash []byte
