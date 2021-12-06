@@ -36,6 +36,7 @@ func (srv *Server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
+	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(oapi.NextEpoch{
 		Id: shdb.EncodeUint64(epoch),
 	})
