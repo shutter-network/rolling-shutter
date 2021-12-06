@@ -57,7 +57,7 @@ func New(config Config) *Decryptor {
 
 func (d *Decryptor) Run(ctx context.Context) error {
 	log.Printf(
-		"starting keyper with signing public key %X",
+		"starting decryptor with signing public key %X",
 		shbls.SecretToPublicKey(d.Config.SigningKey).Marshal(),
 	)
 
