@@ -30,7 +30,7 @@
     (defn src-file [p]
       (-> src-dir (fs/path p) str))
     (def contracts-dir
-      (-> src-dir (fs/path ".." "contracts" ) fs/canonicalize str))
+      (-> src-dir (fs/path ".." "contracts") fs/canonicalize str))
 
     (def insert-keyper-set-sql "insert_keyper_set.sql")
     (def insert-decryptor-sql "insert_decryptor.sql")
@@ -56,16 +56,16 @@
       (re-find (re-pattern "0x[0-9a-fA-F]{40}") (slurp cfgfile)))
 
     (defn extract-peerid [cfgfile]
-      (second (re-find (re-pattern "/p2p/([0-9a-zA-Z]*)") (slurp cfgfile))))
+      (second (re-find (re-pattern "(?m)(?i)^# Peer identity: /p2p/([0-9a-zA-Z]*)") (slurp cfgfile))))
 
     (defn extract-bls-key [cfgfile]
-      (second (re-find (re-pattern "(?i)# BLS public key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
+      (second (re-find (re-pattern "(?m)(?i)^# BLS public key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
 
     (defn extract-eon-key [cfgfile]
-      (second (re-find (re-pattern "(?i)# Eon Public Key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
+      (second (re-find (re-pattern "(?m)(?i)^# Eon Public Key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
 
     (defn extract-toml-value [cfgfile key]
-      (second (re-find (re-pattern (format "\\s*%s\\s*=\\s*(.*)" key)) (slurp cfgfile))))
+      (second (re-find (re-pattern (format "(?m)^\\s*%s\\s*=\\s*(.*)" key)) (slurp cfgfile))))
 
     (defn extract-toml-value-str [cfgfile key]
       (let [v-with-quotes (extract-toml-value cfgfile key)]
@@ -160,8 +160,8 @@
       (apply myshell exe args))
     (def dropdb-with-force?
       (delay
-        (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
-                       "--force")))
+       (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
+                      "--force")))
     (defn dropdb
       [db]
       (apply myshell "dropdb" "--if-exists"
