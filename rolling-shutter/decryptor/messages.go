@@ -50,7 +50,7 @@ func (*cipherBatch) implementsMessage()                   {}
 func (d *decryptionSignature) GetInstanceID() uint64           { return d.instanceID }
 func (d *aggregatedDecryptionSignature) GetInstanceID() uint64 { return d.instanceID }
 func (d *decryptionKey) GetInstanceID() uint64                 { return d.instanceID }
-func (c *cipherBatch) GetInstanceID() uint64                   { return c.InstanceID }
+func (c *cipherBatch) GetInstanceID() uint64                   { return c.DecryptionTrigger.InstanceID }
 
 func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 	if msg == nil {

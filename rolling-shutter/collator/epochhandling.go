@@ -38,9 +38,8 @@ func startNextEpoch(ctx context.Context, config Config, db *cltrdb.Queries) ([]s
 	}
 
 	batch := &shmsg.CipherBatch{
-		InstanceID:   config.InstanceID,
-		EpochID:      epochID,
-		Transactions: transactions,
+		DecryptionTrigger: trigger,
+		Transactions:      transactions,
 	}
 
 	return []shmsg.P2PMessage{batch, trigger}, nil

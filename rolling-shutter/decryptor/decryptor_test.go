@@ -63,14 +63,18 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 			name:  "valid cipher batch",
 			valid: true,
 			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID,
+				DecryptionTrigger: &shmsg.DecryptionTrigger{
+					InstanceID: d.Config.InstanceID,
+				},
 			},
 		},
 		{
 			name:  "invalid cipher batch instance ID",
 			valid: false,
 			msg: &shmsg.CipherBatch{
-				InstanceID: d.Config.InstanceID + 2,
+				DecryptionTrigger: &shmsg.DecryptionTrigger{
+					InstanceID: d.Config.InstanceID + 2,
+				},
 			},
 		},
 	}

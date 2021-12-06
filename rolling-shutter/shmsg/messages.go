@@ -49,6 +49,10 @@ func (*CipherBatch) Topic() string {
 	return dcrtopics.CipherBatch
 }
 
+func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
+	return cipherBatch.DecryptionTrigger.GetInstanceID()
+}
+
 func (*DecryptionSignature) ImplementsP2PMessage() {
 }
 
