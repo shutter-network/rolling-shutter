@@ -22,9 +22,6 @@
           (str/starts-with? path asdf-dir))))
     (def asdf-go?
       (inside-asdf? (fs/which "go")))
-    (defn gotestsum
-      [& args]
-      (apply str "gotestsum" (if no-color? " --no-color ") args))
 
     (def repo-root
       (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
@@ -139,6 +136,14 @@
         (when dir
           (println (format "Leaving directory '%s'" dir)))))
 
+    (defn gotest
+      [& args]
+      (let [args (concat ["gotestsum" (if no-color? " --no-color ") "--"]
+                         args
+                         (or *command-line-args* ["./..."]))
+            args (remove nil? args)]
+        (apply myshell {:dir src-dir} args)))
+
     (defn go-install
       ([pkg]
        (myshell {:dir src-dir} "go" "install" pkg)
@@ -235,12 +240,12 @@
   test
   {:doc "Run tests"
    :depends [-install:gotestsum]
-   :task (myshell {:dir src-dir} (gotestsum " -- -short ./..."))}
+   :task (gotest "-short")}
 
   test-integration
   {:doc "Run integration tests"
    :depends [-install:gotestsum]
-   :task (myshell {:dir src-dir} (gotestsum " -- -p 1 -run Integration -count=1  ./..."))}
+   :task (gotest "-p=1" "-run=Integration" "-count=1")}
 
   test-all
   {:doc "Run all tests"
