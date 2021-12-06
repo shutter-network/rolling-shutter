@@ -22,12 +22,20 @@ func handleEpoch(ctx context.Context, config Config, db *cltrdb.Queries) ([]shms
 	return []shmsg.P2PMessage{cipherBatch, decryptionTrigger}, nil
 }
 
-func makeBatch(ctx context.Context, config Config, db *cltrdb.Queries) (*shmsg.CipherBatch, error) {
-	nextEpochID := uint64(0)
+func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
 	lastEpochID, err := db.GetLastBatchEpochID(ctx)
-	if err == nil {
-		nextEpochID = shdb.DecodeUint64(lastEpochID) + 1
-	} else if err != pgx.ErrNoRows {
+	if err == pgx.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return shdb.DecodeUint64(lastEpochID) + 1, nil
+}
+
+func makeBatch(ctx context.Context, config Config, db *cltrdb.Queries) (*shmsg.CipherBatch, error) {
+	nextEpochID, err := getNextEpochID(ctx, db)
+	if err != nil {
 		return nil, err
 	}
 
@@ -39,7 +47,10 @@ func makeBatch(ctx context.Context, config Config, db *cltrdb.Queries) (*shmsg.C
 		Transactions: [][]byte{},
 	}
 
-	err = db.InsertBatch(ctx, cltrdb.InsertBatchParams{EpochID: shdb.EncodeUint64(batch.EpochID), Transactions: batch.Transactions})
+	err = db.InsertBatch(ctx, cltrdb.InsertBatchParams{
+		EpochID:      shdb.EncodeUint64(batch.EpochID),
+		Transactions: batch.Transactions,
+	})
 	if err != nil {
 		return nil, err
 	}
