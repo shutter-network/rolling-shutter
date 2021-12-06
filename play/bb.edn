@@ -403,11 +403,17 @@
    :doc "List of decryptor addresses"
    :task (mapv (comp extract-address decryptor-cfg) (range num-decryptors))}
 
+  -collator
+  {:depends [genconfig:collator]
+   :doc "Collator addresses"
+   :task (extract-address collator-cfg)}
+
   -deploy-conf
   {:doc "Generate a deploy config"
-   :depends [-decryptors -keypers]
-   :task (let [conf {:keypers -keypers,
-                     :decryptors -decryptors,
+   :depends [-decryptors -keypers -collator]
+   :task (let [conf {:keypers -keypers
+                     :decryptors -decryptors
+                     :collator -collator
                      :fundValue "100"}
                play-json (str (fs/absolutize "play.json"))]
            (spit play-json (json/encode conf {:pretty true}))

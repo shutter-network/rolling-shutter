@@ -21,7 +21,12 @@ extendEnvironment((hre) => {
   if (process.env.DEPLOY_CONF !== undefined) {
     hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
   } else {
-    hre.deployConf = { keypers: null, decryptors: null, fundValue: "" };
+    hre.deployConf = {
+      keypers: null,
+      decryptors: null,
+      collator: null,
+      fundValue: "",
+    };
   }
 
   hre.getKeyperAddresses = async function () {
@@ -40,6 +45,15 @@ extendEnvironment((hre) => {
       return [decryptor0, decryptor1, decryptor2];
     } else {
       return hre.deployConf.decryptors;
+    }
+  };
+
+  hre.getCollatorAddress = async function () {
+    if (hre.deployConf.decryptors === null) {
+      const { collator } = await hre.getNamedAccounts();
+      return collator;
+    } else {
+      return hre.deployConf.collator;
     }
   };
 });
@@ -63,6 +77,7 @@ module.exports = {
     decryptor0: 4,
     decryptor1: 5,
     decryptor2: 6,
+    collator: 7,
   },
   networks: {
     optimistic: {
