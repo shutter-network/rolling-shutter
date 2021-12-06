@@ -54,8 +54,6 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 	d := New(config)
 
 	var peerID peer.ID
-	validator := d.makeInstanceIDValidator()
-
 	tests := []struct {
 		name  string
 		valid bool
@@ -82,7 +80,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
+			assert.Equal(t, d.validateInstanceID(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}
@@ -220,7 +218,6 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	config := newTestConfig(t)
 	d := New(config)
 	d.db = db
-	validator := d.makeDecryptionKeyValidator()
 
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
 
@@ -272,7 +269,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
+			assert.Equal(t, d.validateDecryptionKey(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}
