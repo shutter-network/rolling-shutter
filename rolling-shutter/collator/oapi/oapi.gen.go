@@ -23,6 +23,11 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// NextEpoch defines model for NextEpoch.
+type NextEpoch struct {
+	Id []byte `json:"id"`
+}
+
 // Transaction defines model for Transaction.
 type Transaction struct {
 	EncryptedTx []byte `json:"encrypted_tx"`
@@ -43,6 +48,9 @@ type SubmitTransactionJSONRequestBody SubmitTransactionJSONBody
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /next-epoch)
+	GetNextEpoch(w http.ResponseWriter, r *http.Request)
+
 	// (GET /ping)
 	Ping(w http.ResponseWriter, r *http.Request)
 
@@ -58,6 +66,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// GetNextEpoch operation middleware
+func (siw *ServerInterfaceWrapper) GetNextEpoch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNextEpoch(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // Ping operation middleware
 func (siw *ServerInterfaceWrapper) Ping(w http.ResponseWriter, r *http.Request) {
@@ -203,6 +226,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/next-epoch", wrapper.GetNextEpoch)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ping", wrapper.Ping)
 	})
 	r.Group(func(r chi.Router) {
@@ -215,15 +241,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7RUTY/TMBD9K9GAxCU0YfeWG0gcekBaid4AIdeZJl6csRlPlq2q/Hdku236JQESe6pj",
-	"j997fm+mO9Bu8I6QJECzg6B7HFRafmR2HBeenUcWg2lbuxbj78bxoAQaMCT3d1CCbD3mT+yQYSphwBBU",
-	"l6r3h0HYUAfTVALjz9EwttB8yZhz/bcjmFs/opaItWJFQWkxjq41IWneesH2uzyfaVtvBWdpB/YS0Dvd",
-	"/0Xlhc58rTzn+4PaZXut17T/zm3aG0yxyNDG5WBIlJa4JDUkpH4UQX5LKL8c/4ASRrbQQC/im6raHy/2",
-	"x1UU3mLQbHy2GVa9CUXeWmMopMeCnbWGumJ/+U0otLNWiePi/cOyEFeEcT0YKWS2IEAJ1mikgCfqPi1X",
-	"kVGM2Ph5AXyEhRKekEMWVC/eLep4y3kk5Q00cL+oFzWU4JX0ydzKR/uaHXSYzDh/0oOhLr8kID8hfyVI",
-	"aKwOYaUSiOYH7yjExGi0Nlpd5fbyLtxA/pzfrag4tsepCVc0uX51VhEDxyAfXLs9RIqUuJT31uh0u3oM",
-	"eQjysMbVa8YNNPCqmqe52o9ydcqQGuYi4/l4Tg9Oe094xOnMjx3c1fVLCFy2tySeuFiYNrfpRo1W/puE",
-	"/F93g3okfPaoY5Z4qJmm6XcAAAD//+9N9/83BQAA",
+	"H4sIAAAAAAAC/8RUTW/UMBD9K9aAxCXdhPaWG0gV2gOoEnsDhLzObOKS2GY8Kbuq8t+R7d1NQlMVpFac",
+	"4mQ+3st7M74HZTtnDRr2UN6DVw12Mh6viSyFgyPrkFhj/KxsheG5s9RJhhK04atLyIAPDtMr1kgwZNCh",
+	"97KO2cegZ9KmhmHIgPBnrwkrKL+knmP+t3Mzu71FxaHXJ9zztbOqechIVzM+2wPjSOcRRF0tomxIGi8V",
+	"a2se4qBRdHCM1Xfe/wViBnji+2/cUlk2x3uC7bp6QV1CkjY7m+w3LBWHo5Fd7NT0zEgXBvmXpR+QQU8t",
+	"lNAwuzLPj+HVMZwH4hV6RdolmWHTaC/Spy16wQ0Ksm2rTS2OxW+8ULZtJVsS727Wgq3w/bbTLHiUwEMG",
+	"rVZoPE7YfVxvAiJrbsPrH43PbSGDOySfCBWrt6siVFmHRjoNJVytilUBGTjJTRQ3N7jni7PDNUZJ5j/2",
+	"AVkE3YIB2hoht7bn+H+hWMTirwYiDsmTjaFsnPZgj3fW+OTpZVGcXEATIaVzrVaxOr/1aW7TFofTa8Id",
+	"lPAqH9c8P+54PoJEh+fc10/wTjbuZN/ysxFKN84Cmd7g3qFirASecoYMchdG+DH1b7Sp0zR5pDukBaVD",
+	"ylxh07dtbJ1W3Fm/0Plzmj1pxHlFp4P4ACblb2YZYenQ83tbHZ5NvynCgoqT8LhBMN1/ph6HF5y4+YW1",
+	"QHGiotDV/5+xYfgdAAD//1fUUtQhBwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

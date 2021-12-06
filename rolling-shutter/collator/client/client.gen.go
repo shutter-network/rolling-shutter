@@ -21,6 +21,11 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// NextEpoch defines model for NextEpoch.
+type NextEpoch struct {
+	Id []byte `json:"id"`
+}
+
 // Transaction defines model for Transaction.
 type Transaction struct {
 	EncryptedTx []byte `json:"encrypted_tx"`
@@ -111,6 +116,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetNextEpoch request
+	GetNextEpoch(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// Ping request
 	Ping(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -118,6 +126,18 @@ type ClientInterface interface {
 	SubmitTransactionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	SubmitTransaction(ctx context.Context, body SubmitTransactionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetNextEpoch(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNextEpochRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) Ping(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -154,6 +174,33 @@ func (c *Client) SubmitTransaction(ctx context.Context, body SubmitTransactionJS
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetNextEpochRequest generates requests for GetNextEpoch
+func NewGetNextEpochRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/next-epoch")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewPingRequest generates requests for Ping
@@ -266,6 +313,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetNextEpoch request
+	GetNextEpochWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNextEpochResponse, error)
+
 	// Ping request
 	PingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PingResponse, error)
 
@@ -273,6 +323,29 @@ type ClientWithResponsesInterface interface {
 	SubmitTransactionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitTransactionResponse, error)
 
 	SubmitTransactionWithResponse(ctx context.Context, body SubmitTransactionJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitTransactionResponse, error)
+}
+
+type GetNextEpochResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *NextEpoch
+	JSONDefault  *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNextEpochResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNextEpochResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type PingResponse struct {
@@ -319,6 +392,15 @@ func (r SubmitTransactionResponse) StatusCode() int {
 	return 0
 }
 
+// GetNextEpochWithResponse request returning *GetNextEpochResponse
+func (c *ClientWithResponses) GetNextEpochWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNextEpochResponse, error) {
+	rsp, err := c.GetNextEpoch(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNextEpochResponse(rsp)
+}
+
 // PingWithResponse request returning *PingResponse
 func (c *ClientWithResponses) PingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PingResponse, error) {
 	rsp, err := c.Ping(ctx, reqEditors...)
@@ -343,6 +425,39 @@ func (c *ClientWithResponses) SubmitTransactionWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseSubmitTransactionResponse(rsp)
+}
+
+// ParseGetNextEpochResponse parses an HTTP response from a GetNextEpochWithResponse call
+func ParseGetNextEpochResponse(rsp *http.Response) (*GetNextEpochResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNextEpochResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NextEpoch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParsePingResponse parses an HTTP response from a PingWithResponse call

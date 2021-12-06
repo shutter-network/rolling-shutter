@@ -15,6 +15,26 @@ paths:
         Pings the server
       operationId: ping
       parameters:
+  /next-epoch:
+    get:
+      description: |
+        Get information about the next epoch
+      operationId: getNextEpoch
+      parameters:
+      responses:
+        "200":
+          description: Information about the next epoch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextEpoch"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /tx:
     post:
       description: Submit an encrypted transaction
@@ -54,6 +74,14 @@ components:
           type: string
           format: byte
     TransactionId:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: byte
+    NextEpoch:
       type: object
       required:
         - id
