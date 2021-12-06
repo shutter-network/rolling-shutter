@@ -38,9 +38,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
 
-	kpr := keyper{config: config}
-	keyValidator := kpr.makeDecryptionKeyValidator(db)
-	keyShareValidator := kpr.makeKeyShareValidator(db)
+	kpr := keyper{config: config, db: db}
 	var peerID peer.ID
 
 	tests := []struct {
@@ -51,7 +49,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}{
 		{
 			name:      "valid decryption key",
-			validator: keyValidator,
+			validator: kpr.validateDecryptionKey,
 			valid:     true,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
@@ -61,7 +59,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "invalid decryption key wrong epoch",
-			validator: keyValidator,
+			validator: kpr.validateDecryptionKey,
 			valid:     false,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
@@ -71,7 +69,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "invalid decryption key wrong instance ID",
-			validator: keyValidator,
+			validator: kpr.validateDecryptionKey,
 			valid:     false,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
@@ -81,7 +79,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "valid decryption key share",
-			validator: keyShareValidator,
+			validator: kpr.validateDecryptionKeyShare,
 			valid:     true,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
@@ -92,7 +90,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "invalid decryption key share wrong epoch",
-			validator: keyShareValidator,
+			validator: kpr.validateDecryptionKeyShare,
 			valid:     false,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
@@ -103,7 +101,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "invalid decryption key share wrong instance ID",
-			validator: keyShareValidator,
+			validator: kpr.validateDecryptionKeyShare,
 			valid:     false,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID + 1,
@@ -114,7 +112,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		},
 		{
 			name:      "invalid decryption key share wrong keyper index",
-			validator: keyShareValidator,
+			validator: kpr.validateDecryptionKeyShare,
 			valid:     false,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
@@ -147,7 +145,6 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 	config := newTestConfig(t)
 	kpr := keyper{config: config, db: db}
-	validator := kpr.makeDecryptionTriggerValidator()
 
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
@@ -234,7 +231,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMsg), tc.valid,
+			assert.Equal(t, kpr.validateDecryptionTrigger(ctx, peerID, pubsubMsg), tc.valid,
 				"validate failed valid=%t", tc.valid)
 		})
 	}
