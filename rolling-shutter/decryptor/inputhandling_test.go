@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	crypto "github.com/libp2p/go-libp2p-crypto"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
@@ -21,7 +22,9 @@ import (
 func newTestConfig(t *testing.T) Config {
 	t.Helper()
 
-	p2pKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	ethereumKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	p2pKey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	assert.NilError(t, err)
 	signingKey, _, err := shbls.RandomKeyPair(rand.Reader)
 	assert.NilError(t, err)
@@ -31,6 +34,7 @@ func newTestConfig(t *testing.T) Config {
 
 		DatabaseURL: "",
 
+		EthereumKey: ethereumKey,
 		P2PKey:      p2pKey,
 		SigningKey:  signingKey,
 		SignerIndex: 1,
