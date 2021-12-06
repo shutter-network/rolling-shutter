@@ -215,13 +215,33 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {
-	sleepDuration := time.Duration(1000/m.Config.Rate) * time.Millisecond
+	sleepDuration := 1500 * time.Millisecond // TODO: make this configurable
 
-	epochID := uint64(0)
 	for {
 		select {
 		case <-time.After(sleepDuration):
-			httpResponse, err := m.collatorClient.SubmitTransaction(
+			httpResponse, err := m.collatorClient.GetNextEpoch(ctx)
+			if err != nil {
+				log.Printf("Error while calling next-epoch: %s", err)
+				continue
+			}
+			nextEpochResponse, err := client.ParseGetNextEpochResponse(httpResponse)
+			if err != nil {
+				log.Printf("111 Error while calling next-epoch: %s", err)
+				continue
+			}
+			if nextEpochResponse.JSONDefault != nil {
+				log.Printf("222 Error while calling next-epoch: %v", nextEpochResponse.JSONDefault)
+				continue
+			}
+
+			if nextEpochResponse.JSON200 == nil {
+				log.Printf("333 Error getting next-epoch: %+v", nextEpochResponse)
+				continue
+			}
+
+			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
+			httpResponse, err = m.collatorClient.SubmitTransaction(
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
 					EncryptedTx: []byte{'f', 'o', 'o'},
@@ -235,13 +255,12 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				return err
 			}
 			if response.JSON200 != nil {
-				log.Printf("Submitted tx %x", response.JSON200.Id)
+				log.Printf("Submitted tx for epoch %d: %x", epochID, response.JSON200.Id)
 			} else if response.JSONDefault != nil {
-				log.Printf("Error submitting tx: %v", response.JSONDefault)
+				log.Printf("Error submitting tx for epoch %d: %v", epochID, response.JSONDefault)
 			} else {
-				log.Printf("Error submitting tx: %s", response.Status())
+				log.Printf("Error submitting tx for epoch %d: %s", epochID, response.Status())
 			}
-			epochID++
 		case <-ctx.Done():
 			return ctx.Err()
 		}
