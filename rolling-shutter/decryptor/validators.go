@@ -31,7 +31,6 @@ func (d *Decryptor) makeMessagesValidators() map[string]pubsub.Validator {
 }
 
 func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
-	log.Println("validating cipher batch")
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
@@ -94,7 +93,7 @@ func (d *Decryptor) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2p
 
 	key, ok := msg.(*decryptionKey)
 	if !ok {
-		panic("unmarshalled non decryption key message in decryption key validator")
+		return false
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
@@ -137,7 +136,7 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 
 	signature, ok := msg.(*decryptionSignature)
 	if !ok {
-		panic("unmarshalled non signature message in signature validator")
+		return false
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
@@ -183,7 +182,7 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 
 	signature, ok := msg.(*aggregatedDecryptionSignature)
 	if !ok {
-		panic("unmarshalled non signature message in aggregated signature validator")
+		return false
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)

@@ -43,7 +43,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, peerID peer.ID, li
 
 	key, ok := msg.(*decryptionKey)
 	if !ok {
-		panic("unmarshalled non decryption key message in decryption key validator")
+		return false
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
@@ -87,7 +87,7 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, peerID peer.I
 
 	keyShare, ok := msg.(*decryptionKeyShare)
 	if !ok {
-		panic("unmarshalled non decryption key share message in decryption key share validator")
+		return false
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(keyShare.epochID)
@@ -143,7 +143,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, peerID peer.ID
 
 	t, ok := msg.(*decryptionTrigger)
 	if !ok {
-		panic("unmarshalled non decryption trigger message in decryption trigger validator")
+		return false
 	}
 	blk := medley.ActivationBlockNumberFromEpochID(t.EpochID)
 	collatorString, err := kpr.db.GetChainCollator(ctx, blk)
