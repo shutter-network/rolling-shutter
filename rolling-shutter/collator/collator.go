@@ -33,8 +33,9 @@ type Collator struct {
 
 	contracts *deployment.Contracts
 
-	p2p *p2p.P2P
-	db  *cltrdb.Queries
+	p2p    *p2p.P2P
+	dbpool *pgxpool.Pool
+	db     *cltrdb.Queries
 }
 
 var gossipTopicNames = [2]string{
@@ -43,20 +44,18 @@ var gossipTopicNames = [2]string{
 }
 
 func New(config Config) *Collator {
-	p2pConfig := p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-	}
-	p := p2p.New(p2pConfig)
-
 	return &Collator{
 		Config: config,
 
 		contracts: nil,
 
-		p2p: p,
-		db:  nil,
+		p2p: p2p.New(p2p.Config{
+			ListenAddr:     config.ListenAddress,
+			PeerMultiaddrs: config.PeerMultiaddrs,
+			PrivKey:        config.P2PKey,
+		}),
+		dbpool: nil,
+		db:     nil,
 	}
 }
 
@@ -118,6 +117,7 @@ func (c *Collator) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+	c.dbpool = dbpool
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
 	ethereumClient, err := ethclient.Dial(c.Config.EthereumURL)
@@ -177,11 +177,19 @@ func (c *Collator) processEpochLoop(ctx context.Context) error {
 }
 
 func (c *Collator) newEpoch(ctx context.Context) error {
-	outMessages, err := startNextEpoch(ctx, c.Config, c.db)
+	tx, err := c.dbpool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-
+	outMessages, err := startNextEpoch(ctx, c.Config, cltrdb.New(c.dbpool).WithTx(tx))
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
 	for _, msgOut := range outMessages {
 		if err := c.sendMessage(ctx, msgOut); err != nil {
 			log.Printf("error sending message %+v: %s", msgOut, err)
