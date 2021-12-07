@@ -241,10 +241,15 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 			}
 
 			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
+			encryptedTx := []byte("tx XXXXX")
+			_, err = rand.Read(encryptedTx[3:])
+			if err != nil {
+				return err
+			}
 			httpResponse, err = m.collatorClient.SubmitTransaction(
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
-					EncryptedTx: []byte{'f', 'o', 'o'},
+					EncryptedTx: encryptedTx,
 					Epoch:       shdb.EncodeUint64(epochID),
 				})
 			if err != nil {
