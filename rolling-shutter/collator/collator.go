@@ -35,7 +35,6 @@ type collator struct {
 
 	p2p    *p2p.P2P
 	dbpool *pgxpool.Pool
-	db     *cltrdb.Queries
 }
 
 var gossipTopicNames = [2]string{
@@ -69,8 +68,6 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	db := cltrdb.New(dbpool)
-
 	c := collator{
 		Config: config,
 
@@ -83,7 +80,6 @@ func Run(ctx context.Context, config Config) error {
 		}),
 
 		dbpool: dbpool,
-		db:     db,
 	}
 	return c.run(ctx)
 }
@@ -180,6 +176,14 @@ func (c *collator) newEpoch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Disallow submitting transactions at the same time.
+	_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
 	outMessages, err := startNextEpoch(ctx, c.Config, cltrdb.New(c.dbpool).WithTx(tx))
 	if err != nil {
 		_ = tx.Rollback(ctx)

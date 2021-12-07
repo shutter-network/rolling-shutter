@@ -3,6 +3,7 @@ package collator
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"golang.org/x/crypto/sha3"
@@ -32,7 +33,8 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
-	epoch, err := getNextEpochID(req.Context(), srv.c.db)
+	db := cltrdb.New(srv.c.dbpool)
+	epoch, err := getNextEpochID(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
@@ -56,12 +58,13 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	hash.Write(x.EncryptedTx)
 	txid := hash.Sum(nil)
 
-	err := srv.c.db.InsertTx(ctx, cltrdb.InsertTxParams{
+	err := insertTx(ctx, srv.c.dbpool, cltrdb.InsertTxParams{
 		TxID:        txid,
 		EpochID:     x.Epoch,
 		EncryptedTx: x.EncryptedTx,
 	})
 	if err != nil {
+		log.Printf("Error in SubmitTransaction: %s", err)
 		sendError(w, http.StatusConflict, err.Error())
 		return
 	}
