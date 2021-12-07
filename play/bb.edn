@@ -3,6 +3,7 @@
  {:requires ([babashka.fs :as fs :refer [which]]
              [babashka.core]
              [clojure.string :as str]
+             [clojure.java.browse :as browse]
              [clojure.java.io :as io]
              [babashka.curl :as curl]
              [cheshire.core :as json])
@@ -160,8 +161,8 @@
       (apply myshell exe args))
     (def dropdb-with-force?
       (delay
-       (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
-                      "--force")))
+        (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
+                       "--force")))
     (defn dropdb
       [db]
       (apply myshell "dropdb" "--if-exists"
@@ -172,6 +173,13 @@
       [db & args]
       (apply (partial myshell "psql -d" db) args)))
 
+
+  -godoc:idx
+  {:depends [-install:godoc]
+   :task (let [path (src-file "godoc.idx")]
+           (when-not (fs/exists? path)
+             (myshell {:dir src-dir} "godoc -index -index_files=godoc.idx -write_index -v"))
+           path)}
   ;; the computation of the relative path here seems excessive and it probably is, as it returns
   ;; "../contracts/deployments" unless we're not using the default directory structure.
   -deployments
@@ -207,6 +215,9 @@
 
   -install:oapi-codegen
   (go-install "oapi-codegen" "github.com/deepmap/oapi-codegen/cmd/oapi-codegen")
+
+  -install:godoc
+  (go-install "godoc" "golang.org/x/tools/cmd/godoc@latest")
 
   contracts:install
   {:doc "Run npm install in contracts directory"
@@ -419,6 +430,15 @@
            (spit play-json (json/encode conf {:pretty true}))
            play-json)}
 
+  godoc
+  {:doc "Run godoc"
+   :depends [-godoc:idx]
+   :task (do
+           (print "===============> Starting godoc. Please wait a few seconds for the browser to open!\n" )
+           (future
+             (Thread/sleep 4000)
+             (browse/browse-url "http://localhost:6060/"))
+           (myshell {:dir src-dir} "godoc -index -index_files=godoc.idx -http=:6060"))}
   node
   {:doc "Start a hardhat node"
    :depends [-deploy-conf contracts:install]

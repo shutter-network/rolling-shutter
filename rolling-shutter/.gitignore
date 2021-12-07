@@ -6,3 +6,4 @@
 /t/
 *.json
 *.toml
+/godoc.idx
