@@ -4,7 +4,7 @@ clojure 1.10.3.1040
 golang 1.17.4
 golangci-lint 1.43.0
 java adoptopenjdk-17.0.0+35
-nodejs 16.13.0
+nodejs 16.13.1
 protoc 3.18.0
 solidity 0.8.9
 sqlc 1.11.0

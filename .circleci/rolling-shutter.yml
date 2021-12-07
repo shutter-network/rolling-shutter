@@ -7,7 +7,7 @@ commands:
             if [[ -e ~/.asdf ]]; then
               echo "asdf already installed"
             else
-              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
+              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
             fi
             echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
 
@@ -20,7 +20,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v7-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v8-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -28,7 +28,12 @@ jobs:
             asdf plugin add protoc || true
             asdf plugin add nodejs || true
             asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git || true
-      - run: asdf install
+      - run:
+          name: "Install asdf managed executable"
+          command: |
+            asdf install protoc
+            asdf install nodejs
+            asdf install sqlc
       - node/install-packages:
           app-dir: ~/src/contracts
           override-ci-command: npm install
@@ -39,7 +44,7 @@ jobs:
             find . -name '*.gen.go' |xargs rm
       - run: make generate
       - save_cache:
-          key: rs-generate-v7-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v8-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"

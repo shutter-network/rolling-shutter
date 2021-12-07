@@ -38,7 +38,7 @@ work for a user using bash:
 
 ```
 sudo apt install curl git build-essential unzip
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
 ```
 
 And tell bash to source asdf's init file by appending these two lines to
