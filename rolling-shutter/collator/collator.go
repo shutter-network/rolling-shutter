@@ -28,7 +28,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-type Collator struct {
+type collator struct {
 	Config Config
 
 	contracts *deployment.Contracts
@@ -43,33 +43,62 @@ var gossipTopicNames = [2]string{
 	cltrtopics.DecryptionTrigger,
 }
 
-func New(config Config) *Collator {
-	return &Collator{
+func Run(ctx context.Context, config Config) error {
+	log.Printf(
+		"starting collator with ethereum address %s",
+		config.EthereumAddress(),
+	)
+
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	defer dbpool.Close()
+	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+
+	ethereumClient, err := ethclient.Dial(config.EthereumURL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
+	if err != nil {
+		return err
+	}
+
+	err = cltrdb.ValidateDB(ctx, dbpool)
+	if err != nil {
+		return err
+	}
+	db := cltrdb.New(dbpool)
+
+	c := collator{
 		Config: config,
 
-		contracts: nil,
+		contracts: contracts,
 
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     config.ListenAddress,
 			PeerMultiaddrs: config.PeerMultiaddrs,
 			PrivKey:        config.P2PKey,
 		}),
-		dbpool: nil,
-		db:     nil,
+
+		dbpool: dbpool,
+		db:     db,
 	}
+	return c.run(ctx)
 }
 
-func (c *Collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
+func (c *collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(chimiddleware.OapiRequestValidator(swagger))
 
-	_ = oapi.HandlerFromMux(&Server{c: c}, router)
+	_ = oapi.HandlerFromMux(&server{c: c}, router)
 
 	return router
 }
 
-func (c *Collator) setupRouter() *chi.Mux {
+func (c *collator) setupRouter() *chi.Mux {
 	swagger, err := oapi.GetSwagger()
 	if err != nil {
 		panic(err)
@@ -106,37 +135,7 @@ func (c *Collator) setupRouter() *chi.Mux {
 	return router
 }
 
-func (c *Collator) Run(ctx context.Context) error {
-	log.Printf(
-		"starting collator with ethereum address %s",
-		c.Config.EthereumAddress(),
-	)
-
-	dbpool, err := pgxpool.Connect(ctx, c.Config.DatabaseURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to database")
-	}
-	defer dbpool.Close()
-	c.dbpool = dbpool
-	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
-
-	ethereumClient, err := ethclient.Dial(c.Config.EthereumURL)
-	if err != nil {
-		return err
-	}
-	contracts, err := deployment.NewContracts(ethereumClient, c.Config.DeploymentDir)
-	if err != nil {
-		return err
-	}
-	c.contracts = contracts
-
-	err = cltrdb.ValidateDB(ctx, dbpool)
-	if err != nil {
-		return err
-	}
-	db := cltrdb.New(dbpool)
-	c.db = db
-
+func (c *collator) run(ctx context.Context) error {
 	httpServer := &http.Server{
 		Addr:    c.Config.HTTPListenAddress,
 		Handler: c.setupRouter(),
@@ -160,7 +159,7 @@ func (c *Collator) Run(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
-func (c *Collator) processEpochLoop(ctx context.Context) error {
+func (c *collator) processEpochLoop(ctx context.Context) error {
 	sleepDuration := c.Config.EpochDuration
 
 	for {
@@ -176,7 +175,7 @@ func (c *Collator) processEpochLoop(ctx context.Context) error {
 	}
 }
 
-func (c *Collator) newEpoch(ctx context.Context) error {
+func (c *collator) newEpoch(ctx context.Context) error {
 	tx, err := c.dbpool.Begin(ctx)
 	if err != nil {
 		return err
@@ -199,7 +198,7 @@ func (c *Collator) newEpoch(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
+func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")

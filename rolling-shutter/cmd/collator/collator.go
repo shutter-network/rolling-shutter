@@ -185,9 +185,7 @@ func main() error {
 		cancel()
 	}()
 
-	c := collator.New(config)
-
-	err = c.Run(ctx)
+	err = collator.Run(ctx, config)
 	if err == context.Canceled {
 		log.Printf("Bye.")
 		return nil

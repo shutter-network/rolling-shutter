@@ -12,8 +12,8 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
-type Server struct {
-	c *Collator
+type server struct {
+	c *collator
 }
 
 func sendError(w http.ResponseWriter, code int, message string) {
@@ -27,11 +27,11 @@ func sendError(w http.ResponseWriter, code int, message string) {
 	_ = json.NewEncoder(w).Encode(e)
 }
 
-func (srv *Server) Ping(w http.ResponseWriter, _ *http.Request) {
+func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("pong"))
 }
 
-func (srv *Server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
+func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	epoch, err := getNextEpochID(req.Context(), srv.c.db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
@@ -42,7 +42,7 @@ func (srv *Server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func (srv *Server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
+func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	var x oapi.SubmitTransactionJSONBody
 	if err := json.NewDecoder(r.Body).Decode(&x); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid format for SubmitTransaction")
