@@ -3,7 +3,6 @@ package keyper
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v4"
@@ -148,24 +147,24 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, peerID peer.ID
 	blk := medley.ActivationBlockNumberFromEpochID(t.EpochID)
 	collatorString, err := kpr.db.GetChainCollator(ctx, blk)
 	if err == pgx.ErrNoRows {
-		fmt.Printf("got decryption trigger with no collators for given block number: %d", blk)
+		log.Printf("got decryption trigger with no collators for given block number: %d", blk)
 		return false
 	}
 	if err != nil {
-		fmt.Printf("error while getting collator from db for block nubmer: %d", blk)
+		log.Printf("error while getting collator from db for block nubmer: %d", blk)
 		return false
 	}
 
 	collator, err := shdb.DecodeAddress(collatorString)
 	if err != nil {
-		fmt.Printf("error while converting collator from string to address: %s", collatorString)
+		log.Printf("error while converting collator from string to address: %s", collatorString)
 		return false
 	}
 
 	trigger := (*shmsg.DecryptionTrigger)(t)
 	signatureValid, err := trigger.VerifySignature(collator)
 	if err != nil {
-		fmt.Printf("error while verifying decryption trigger signature for epoch: %d", t.EpochID)
+		log.Printf("error while verifying decryption trigger signature for epoch: %d", t.EpochID)
 		return false
 	}
 
