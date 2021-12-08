@@ -13,6 +13,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -23,6 +24,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -68,6 +70,12 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
+
+	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts)
+	if err != nil {
+		return err
+	}
+
 	c := collator{
 		Config: config,
 
@@ -82,6 +90,23 @@ func Run(ctx context.Context, config Config) error {
 		dbpool: dbpool,
 	}
 	return c.run(ctx)
+}
+
+// initializeEpochID populate the epoch_id table with a valid value if it is empty.
+func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
+	_, err := db.GetBiggestEpochID(ctx)
+	if err == pgx.ErrNoRows {
+		blk, err := contracts.Client.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		epochID, err := medley.EncodeEpochID(0, blk)
+		if err != nil {
+			return err
+		}
+		return db.InsertEpochID(ctx, shdb.EncodeUint64(epochID))
+	}
+	return nil
 }
 
 func (c *collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
@@ -184,11 +209,19 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		return err
 	}
 
-	outMessages, err := startNextEpoch(ctx, c.Config, cltrdb.New(c.dbpool).WithTx(tx))
+	db := cltrdb.New(c.dbpool).WithTx(tx)
+	outMessages, err := startNextEpoch(ctx, c.Config, db)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
+
+	err = c.generateNextEpochID(ctx, db)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		return err
@@ -210,4 +243,35 @@ func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 	log.Printf("sending message %T{%v}", msg, msg)
 
 	return c.p2p.Publish(ctx, msg.Topic(), msgBytes)
+}
+
+// getNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
+func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
+	epochID, err := db.GetBiggestEpochID(ctx)
+	if err != nil {
+		// There should already be an epochID in the database so not finding a row is an error
+		return 0, err
+	}
+	return shdb.DecodeUint64(epochID), nil
+}
+
+// generateNextEpochID creates the next epochID that should be used.
+func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries) error {
+	blk, err := c.contracts.Client.BlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
+	epochIDBytes, err := db.GetBiggestEpochID(ctx)
+	if err != nil {
+		return err
+	}
+
+	epochID := shdb.DecodeUint64(epochIDBytes)
+	sequenceNumber := medley.SequenceNumberFromEpochID(epochID)
+	epochID, err = medley.EncodeEpochID(uint64(sequenceNumber)+1, blk)
+	if err != nil {
+		return err
+	}
+	return db.InsertEpochID(ctx, shdb.EncodeUint64(epochID))
 }

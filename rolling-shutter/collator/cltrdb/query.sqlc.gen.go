@@ -7,6 +7,17 @@ import (
 	"context"
 )
 
+const getBiggestEpochID = `-- name: GetBiggestEpochID :one
+SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id LIMIT 1
+`
+
+func (q *Queries) GetBiggestEpochID(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getBiggestEpochID)
+	var epoch_id []byte
+	err := row.Scan(&epoch_id)
+	return epoch_id, err
+}
+
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
 SELECT epoch_id FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `
@@ -62,6 +73,15 @@ func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (CollatorDecry
 	var i CollatorDecryptionTrigger
 	err := row.Scan(&i.EpochID, &i.BatchHash)
 	return i, err
+}
+
+const insertEpochID = `-- name: InsertEpochID :exec
+INSERT INTO collator.epoch_id (epoch_id) VALUES ($1)
+`
+
+func (q *Queries) InsertEpochID(ctx context.Context, epochID []byte) error {
+	_, err := q.db.Exec(ctx, insertEpochID, epochID)
+	return err
 }
 
 const insertMeta = `-- name: InsertMeta :exec

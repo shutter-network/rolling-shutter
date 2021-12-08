@@ -20,3 +20,7 @@ CREATE TABLE collator.transaction(
        epoch_id bytea,
        encrypted_tx bytea
 );
+
+CREATE TABLE collator.epoch_id(
+    epoch_id bytea PRIMARY KEY
+);

@@ -42,6 +42,8 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	nextEpochID := uint64(0)
+	err = db.InsertEpochID(ctx, shdb.EncodeUint64(nextEpochID))
+	assert.NilError(t, err)
 	transactionsHash := shmsg.HashTransactions([][]byte{{'f', 'o', 'o', 'b', 'a', 'r'}})
 
 	msgs, err := startNextEpoch(ctx, config, db)
