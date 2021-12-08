@@ -97,9 +97,12 @@ func (m *MockNode) Run(ctx context.Context) error {
 	g.Go(func() error {
 		return m.sendMessages(errctx)
 	})
-	g.Go(func() error {
-		return m.sendTransactions(errctx)
-	})
+
+	if m.Config.SendTransactions {
+		g.Go(func() error {
+			return m.sendTransactions(errctx)
+		})
+	}
 	return g.Wait()
 }
 
