@@ -24,6 +24,7 @@ type Config struct {
 	SendDecryptionTriggers bool
 	SendCipherBatches      bool
 	SendDecryptionKeys     bool
+	SendTransactions       bool
 
 	DecryptorPublicKeys []*shbls.PublicKey // public keys of decryptors in order of their index
 	EonKeySeed          int64              // a seed value used to generate the eon key
@@ -47,6 +48,7 @@ Rate                    = {{ .Rate }}
 SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
 SendCipherBatches       = {{ .SendCipherBatches }}
 SendDecryptionKeys      = {{ .SendDecryptionKeys }}
+SendTransactions        = {{ .SendTransactions }}
 
 DecryptorPublicKeys = {{ .DecryptorPublicKeys | BLSPublicKeys }}
 EonKeySeed         = {{ .EonKeySeed }}

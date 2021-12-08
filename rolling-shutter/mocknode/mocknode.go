@@ -97,9 +97,12 @@ func (m *MockNode) Run(ctx context.Context) error {
 	g.Go(func() error {
 		return m.sendMessages(errctx)
 	})
-	g.Go(func() error {
-		return m.sendTransactions(errctx)
-	})
+
+	if m.Config.SendTransactions {
+		g.Go(func() error {
+			return m.sendTransactions(errctx)
+		})
+	}
 	return g.Wait()
 }
 
@@ -215,9 +218,8 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {
-	sleepDuration := 1500 * time.Millisecond // TODO: make this configurable
-
 	for {
+		sleepDuration := time.Duration(rand.ExpFloat64() / m.Config.Rate * float64(time.Second))
 		select {
 		case <-time.After(sleepDuration):
 			httpResponse, err := m.collatorClient.GetNextEpoch(ctx)
@@ -241,8 +243,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 			}
 
 			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
-			encryptedTx := []byte("tx XXXXX")
-			_, err = rand.Read(encryptedTx[3:])
+			_, encryptedTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
 			if err != nil {
 				return err
 			}

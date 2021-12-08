@@ -108,6 +108,7 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendDecryptionTriggers: true,
 		SendCipherBatches:      true,
 		SendDecryptionKeys:     true,
+		SendTransactions:       true,
 
 		DecryptorPublicKeys: []*shbls.PublicKey{},
 		EonKeySeed:          0,
