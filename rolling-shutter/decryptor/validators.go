@@ -56,6 +56,10 @@ func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMe
 		log.Printf("error getting collator from db: %s", err)
 		return false
 	}
+	if len(collatorDBEntry.Collator) == 0 {
+		log.Printf("no collator for activation block number %d", activationBlockNumber)
+		return false
+	}
 	collator, err := shdb.DecodeAddress(collatorDBEntry.Collator)
 	if err != nil {
 		log.Printf("invalid collator entry: %+v", collatorDBEntry)

@@ -147,7 +147,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, peerID peer.ID
 	blk := medley.ActivationBlockNumberFromEpochID(t.EpochID)
 	collatorString, err := kpr.db.GetChainCollator(ctx, blk)
 	if err == pgx.ErrNoRows {
-		log.Printf("got decryption trigger with no collators for given block number: %d", blk)
+		log.Printf("got decryption trigger with no collator for given block number: %d", blk)
 		return false
 	}
 	if err != nil {
