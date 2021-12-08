@@ -218,9 +218,8 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {
-	sleepDuration := 1500 * time.Millisecond // TODO: make this configurable
-
 	for {
+		sleepDuration := time.Duration(rand.ExpFloat64() / m.Config.Rate * float64(time.Second))
 		select {
 		case <-time.After(sleepDuration):
 			httpResponse, err := m.collatorClient.GetNextEpoch(ctx)
