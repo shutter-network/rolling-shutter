@@ -1,0 +1,26 @@
+#! /usr/bin/env bash
+#
+# Run babashka tasks from anywhere. This script is meant to be symlinked into
+# your PATH with something like
+#
+#   ln -s $(pwd)/rsbb ~/bin
+#
+# It will chdir to the play directory and run babashka's task runner with
+# additional arguments passed through, e.g. the following will start the first
+# keyper:
+#
+#   rsbb k 0
+#
+
+set -euo pipefail
+
+DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+cd -- "${DIR}"
+
+if [[ -z $* ]]; then
+    exec bb run build
+elif [[ "$1" = "tasks" ]]; then
+    exec bb tasks
+else
+    exec bb run "$@"
+fi
