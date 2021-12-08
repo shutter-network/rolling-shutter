@@ -243,8 +243,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 			}
 
 			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
-			encryptedTx := []byte("tx XXXXX")
-			_, err = rand.Read(encryptedTx[3:])
+			_, encryptedTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
 			if err != nil {
 				return err
 			}
