@@ -15,7 +15,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -144,7 +143,7 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
-	decryptorIndexes := bitfield.GetIndexes(signature.SignerBitfield)
+	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) != 1 {
 		return false
 	}
@@ -190,7 +189,7 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
-	decryptorIndexes := bitfield.GetIndexes(signature.signerBitfield)
+	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) == 0 {
 		return false
 	}

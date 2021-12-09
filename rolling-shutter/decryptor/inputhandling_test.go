@@ -136,18 +136,18 @@ func TestHandleSignatureIntegration(t *testing.T) {
 	bf2 := bitfield.MakeBitfieldFromIndex(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
-		epochID:        0,
-		instanceID:     config.InstanceID,
-		signedHash:     hash,
-		signature:      shbls.Sign(hash.Bytes(), config.SigningKey),
-		SignerBitfield: bf,
+		epochID:    0,
+		instanceID: config.InstanceID,
+		signedHash: hash,
+		signature:  shbls.Sign(hash.Bytes(), config.SigningKey),
+		signers:    bf,
 	}
 	signature2 := &decryptionSignature{
-		epochID:        0,
-		instanceID:     config.InstanceID,
-		signedHash:     hash,
-		signature:      shbls.Sign(hash.Bytes(), signingKey2),
-		SignerBitfield: bf2,
+		epochID:    0,
+		instanceID: config.InstanceID,
+		signedHash: hash,
+		signature:  shbls.Sign(hash.Bytes(), signingKey2),
+		signers:    bf2,
 	}
 
 	tests := []struct {
@@ -232,18 +232,18 @@ func TestInsertAggregatedSignatureIntegration(t *testing.T) {
 	bf2 := bitfield.MakeBitfieldFromIndex(2)
 	hash := common.BytesToHash([]byte("Hello"))
 	signature := &decryptionSignature{
-		epochID:        0,
-		instanceID:     config.InstanceID,
-		signedHash:     hash,
-		signature:      shbls.Sign(hash.Bytes(), config.SigningKey),
-		SignerBitfield: bf,
+		epochID:    0,
+		instanceID: config.InstanceID,
+		signedHash: hash,
+		signature:  shbls.Sign(hash.Bytes(), config.SigningKey),
+		signers:    bf,
 	}
 	signature2 := &decryptionSignature{
-		epochID:        0,
-		instanceID:     config.InstanceID,
-		signedHash:     hash,
-		signature:      shbls.Sign(hash.Bytes(), signingKey2),
-		SignerBitfield: bf2,
+		epochID:    0,
+		instanceID: config.InstanceID,
+		signedHash: hash,
+		signature:  shbls.Sign(hash.Bytes(), signingKey2),
+		signers:    bf2,
 	}
 
 	msgs, err := handleSignatureInput(ctx, config, db, signature)

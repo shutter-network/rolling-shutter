@@ -176,7 +176,8 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 		return
 	}
 
-	signerIndices := bitfield.GetIndexes(msg.SignerBitfield)
+	signers := bitfield.Bitfield(msg.SignerBitfield)
+	signerIndices := signers.GetIndexes()
 	signerKeys := []*shbls.PublicKey{}
 	for _, i := range signerIndices {
 		signerKeys = append(signerKeys, m.Config.DecryptorPublicKeys[i])
