@@ -106,7 +106,7 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 		}
 		return db.InsertEpochID(ctx, shdb.EncodeUint64(epochID))
 	}
-	return nil
+	return err
 }
 
 func (c *collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
