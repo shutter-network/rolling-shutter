@@ -22,7 +22,8 @@ func TestBitfield(t *testing.T) {
 		{0, 1, 2, 3, 4, 5, 6, 7},
 	}
 	for _, test := range tests {
-		roundTripSet := GetIndexes(MakeBitfieldFromIndex(test...))
+		bf := MakeBitfieldFromIndex(test...)
+		roundTripSet := bf.GetIndexes()
 		if roundTripSet == nil {
 			roundTripSet = []int32{}
 		}

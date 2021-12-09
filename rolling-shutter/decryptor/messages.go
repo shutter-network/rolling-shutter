@@ -10,6 +10,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -19,7 +20,7 @@ type decryptionSignature struct {
 	epochID        uint64
 	signedHash     common.Hash
 	signature      *shbls.Signature
-	SignerBitfield []byte
+	SignerBitfield bitfield.Bitfield
 }
 
 type aggregatedDecryptionSignature struct {
@@ -27,7 +28,7 @@ type aggregatedDecryptionSignature struct {
 	epochID        uint64
 	signedHash     common.Hash
 	signature      *shbls.Signature
-	signerBitfield []byte
+	signerBitfield bitfield.Bitfield
 }
 
 type decryptionKey struct {
@@ -95,7 +96,7 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 			epochID:        decryptionSignatureMsg.EpochID,
 			signedHash:     common.BytesToHash(decryptionSignatureMsg.SignedHash),
 			signature:      signature,
-			SignerBitfield: decryptionSignatureMsg.SignerBitfield,
+			SignerBitfield: bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
 		}, nil
 	case dcrtopics.AggregatedDecryptionSignature:
 		decryptionSignatureMsg := shmsg.AggregatedDecryptionSignature{}
@@ -111,7 +112,7 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 			epochID:        decryptionSignatureMsg.EpochID,
 			signedHash:     common.BytesToHash(decryptionSignatureMsg.SignedHash),
 			signature:      signature,
-			signerBitfield: decryptionSignatureMsg.SignerBitfield,
+			signerBitfield: bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
 		}, nil
 
 	default:
