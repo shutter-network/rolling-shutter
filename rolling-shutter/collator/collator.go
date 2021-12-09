@@ -210,7 +210,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 			return err
 		}
 
-		db := cltrdb.New(c.dbpool).WithTx(tx)
+		db := cltrdb.New(tx)
 		outMessages, err = startNextEpoch(ctx, c.Config, db)
 		if err != nil {
 			return err
