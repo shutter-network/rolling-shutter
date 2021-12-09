@@ -1,3 +1,27 @@
+// Package chaintesthelpers provides functions to write tests that uses a blockchain node with
+// deployed rolling-shutter related contracts.
+// Testing functions should be skipped if `NodeURLEnv` or `DeploymentsDirEnv` env are not set.
+// Test functions should look like:
+//
+//     func Test(t *testinng.T) {
+//       SkipChainTests(t)
+//       ctx := context.Background()
+//       contracts, cleanup := NewTestContracts(t, ctx)
+//       defer cleanup()
+//     }
+//
+// Or if snapshots need to be taken during the test:
+//
+//     func Test(t *testing.T) {
+//       SkipChainTests(t)
+//       ctx := context.Background()
+//       client := GetChainClient(t, ctx)
+//       contracts := client.NewTestContracts(t)
+//
+//       snapshotID := client.TakeSnapshot(t, ctx)
+//       client.RevertToSnapshot(t, ctx, snapshotID)
+//     }
+//
 package chaintesthelpers
 
 import (
@@ -11,30 +35,6 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 )
-
-// Provides functions to write tests that uses a blockchain node with deployed rolling-shutter related contracts
-// Testing functions should be skipped if `NodeURLEnv` or `DeploymentsDirEnv` env are not set.
-// Test functions should look like:
-//
-// func Test(t *testinng.T) {
-//   SkipChainTests(t)
-//   ctx := context.Background()
-//   contracts, cleanup := NewTestContracts(t, ctx)
-//   defer cleanup()
-// }
-//
-// Or if snapshots need to be taken during the test:
-//
-// func Test(t *testing.T) {
-//   SkipChainTests(t)
-//   ctx := context.Background()
-//   client := GetChainClient(t, ctx)
-//   contracts := client.NewTestContracts(t)
-//
-//   snapshotID := client.TakeSnapshot(t, ctx)
-//   client.RevertToSnapshot(t, ctx, snapshotID)
-// }
-//
 
 const (
 	NodeURLEnv        = "ROLLING_SHUTTER_TEST_NODE_URL"
