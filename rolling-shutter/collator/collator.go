@@ -199,6 +199,11 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
+	blockNumber, err := c.contracts.Client.BlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
 	tx, err := c.dbpool.Begin(ctx)
 	if err != nil {
 		return err
@@ -216,7 +221,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 			return err
 		}
 
-		err = c.generateNextEpochID(ctx, db)
+		err = c.generateNextEpochID(ctx, db, blockNumber)
 		if err != nil {
 			return err
 		}
@@ -260,12 +265,7 @@ func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
 }
 
 // generateNextEpochID creates the next epochID that should be used.
-func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries) error {
-	blk, err := c.contracts.Client.BlockNumber(ctx)
-	if err != nil {
-		return err
-	}
-
+func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries, blockNumber uint64) error {
 	epochIDBytes, err := db.GetBiggestEpochID(ctx)
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries) 
 
 	epochID := shdb.DecodeUint64(epochIDBytes)
 	sequenceNumber := medley.SequenceNumberFromEpochID(epochID)
-	epochID, err = medley.EncodeEpochID(uint64(sequenceNumber)+1, blk)
+	epochID, err = medley.EncodeEpochID(uint64(sequenceNumber)+1, blockNumber)
 	if err != nil {
 		return err
 	}
