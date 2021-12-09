@@ -29,7 +29,7 @@ func sendError(w http.ResponseWriter, code int, message string) {
 }
 
 func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
-	w.Write([]byte("pong"))
+	_, _ = w.Write([]byte("pong"))
 }
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {

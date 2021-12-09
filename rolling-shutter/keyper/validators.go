@@ -27,7 +27,7 @@ func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	return validators
 }
 
-func (kpr *keyper) validateDecryptionKey(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
@@ -71,7 +71,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, peerID peer.ID, li
 	return ok
 }
 
-func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
@@ -115,7 +115,7 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, peerID peer.I
 	return ok
 }
 
-func (kpr *keyper) validateEonPublicKey(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+func (kpr *keyper) validateEonPublicKey(_ context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
@@ -127,7 +127,7 @@ func (kpr *keyper) validateEonPublicKey(ctx context.Context, peerID peer.ID, lib
 	return msg.GetInstanceID() == kpr.config.InstanceID
 }
 
-func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, peerID peer.ID, libp2pMessage *pubsub.Message) bool {
+func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
 	p2pMessage := new(p2p.Message)
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false

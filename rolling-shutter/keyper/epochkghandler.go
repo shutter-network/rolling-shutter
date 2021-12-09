@@ -174,7 +174,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 
 	// fetch dkg result from db
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(msg.epochID)
-	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
+	eon, err := h.db.GetEonForBlockNumber(ctx, activationBlockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.epochID)
 	}

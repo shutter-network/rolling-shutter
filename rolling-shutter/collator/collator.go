@@ -136,7 +136,7 @@ func (c *collator) setupRouter() *chi.Mux {
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(apiJSON)
+		_, _ = w.Write(apiJSON)
 	})
 
 	/*
