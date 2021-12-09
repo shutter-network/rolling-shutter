@@ -54,11 +54,7 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			handler, err := d.newContractEventHandler(errorctx)
-			if err != nil {
-				return err
-			}
-			if err := handler.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
+			if err := d.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
 				return err
 			}
 		}
@@ -66,66 +62,41 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
-// eventHandler isolates the parts of a decryptor that can be accessed when handling an event. For
-// each new event, a new handler should be created and the handleEventSyncUpdate method be called
-// once.
 type eventHandler struct {
 	tx        pgx.Tx
 	db        *dcrdb.Queries
 	contracts *deployment.Contracts
 }
 
-func (d *Decryptor) newContractEventHandler(ctx context.Context) (*eventHandler, error) {
-	tx, err := d.dbpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, err
-	}
-	dbWithTx := d.db.WithTx(tx)
-	return &eventHandler{
-		tx:        tx,
-		db:        dbWithTx,
-		contracts: d.contracts,
-	}, nil
-}
-
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
 // on failure.
-func (h *eventHandler) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
-	err := h.handleEventSyncUpdateDirty(ctx, eventSyncUpdate)
+func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) (rErr error) {
+	// Create a db tx that we either commit or rollback at the end of the function, depending on if
+	// an error is returned or not.
+	tx, err := d.dbpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		errRollback := h.tx.Rollback(ctx)
-		if errRollback != nil {
-			log.Printf("error rolling back db transaction: %s", errRollback)
+		return errors.Wrapf(err, "error committing db transaction")
+	}
+	defer func() {
+		if rErr == nil {
+			rErr = tx.Commit(ctx)
+			return
 		}
-		return err
-	}
-	err = h.tx.Commit(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "failed to commit db tx after event was handled")
-	}
-	return nil
-}
+		if err := tx.Rollback(ctx); err != nil {
+			log.Printf("error rolling back db transaction after failed event handling: %s", err)
+		}
+	}()
+	dbWithTx := d.db.WithTx(tx)
 
-// handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will
-// neither be committed nor rolled back at the end.
-func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
-	var err error
-	switch event := eventSyncUpdate.Event.(type) {
-	case contract.KeypersConfigsListNewConfig:
-		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
-	case contract.DecryptorsConfigsListNewConfig:
-		err = h.handleDecryptorsConfigsListNewConfigEvent(ctx, event)
-	case contract.RegistryRegistered:
-		err = h.handleBLSRegistryRegistered(ctx, event)
-	case contract.CollatorConfigsListNewConfig:
-		err = h.handleCollatorConfigsListNewConfigEvent(ctx, event)
-	case nil:
-		// event is nil if no event is found for some time
-	default:
-		log.Printf("ignoring unknown event %+v %T", event, event)
-	}
-	if err != nil {
-		return err
+	if eventSyncUpdate.Event != nil {
+		handler := &eventHandler{
+			tx:        tx,
+			db:        dbWithTx,
+			contracts: d.contracts,
+		}
+		if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
+			return err
+		}
 	}
 
 	var nextBlockNumber uint64
@@ -137,13 +108,30 @@ func (h *eventHandler) handleEventSyncUpdateDirty(ctx context.Context, eventSync
 		nextBlockNumber = eventSyncUpdate.BlockNumber
 		nextLogIndex = eventSyncUpdate.LogIndex + 1
 	}
-	if err := h.db.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
+	if err := dbWithTx.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
 		NextBlockNumber: int32(nextBlockNumber),
 		NextLogIndex:    int32(nextLogIndex),
 	}); err != nil {
 		return errors.Wrap(err, "failed to update last synced event")
 	}
 	return nil
+}
+
+func (h *eventHandler) handleEvent(ctx context.Context, event interface{}) error {
+	var err error
+	switch event := event.(type) {
+	case contract.KeypersConfigsListNewConfig:
+		err = h.handleKeypersConfigsListNewConfigEvent(ctx, event)
+	case contract.DecryptorsConfigsListNewConfig:
+		err = h.handleDecryptorsConfigsListNewConfigEvent(ctx, event)
+	case contract.RegistryRegistered:
+		err = h.handleBLSRegistryRegistered(ctx, event)
+	case contract.CollatorConfigsListNewConfig:
+		err = h.handleCollatorConfigsListNewConfigEvent(ctx, event)
+	default:
+		log.Printf("ignoring unknown event %+v %T", event, event)
+	}
+	return err
 }
 
 func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Context, event contract.KeypersConfigsListNewConfig) error {
