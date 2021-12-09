@@ -197,31 +197,35 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 }
 
 func (c *collator) newEpoch(ctx context.Context) error {
+	var outMessages []shmsg.P2PMessage
+
 	tx, err := c.dbpool.Begin(ctx)
 	if err != nil {
 		return err
 	}
+	err = func() error {
+		// Disallow submitting transactions at the same time.
+		_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
+		if err != nil {
+			return err
+		}
 
-	// Disallow submitting transactions at the same time.
-	_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
+		db := cltrdb.New(c.dbpool).WithTx(tx)
+		outMessages, err = startNextEpoch(ctx, c.Config, db)
+		if err != nil {
+			return err
+		}
+
+		err = c.generateNextEpochID(ctx, db)
+		if err != nil {
+			return err
+		}
+		return nil
+	}()
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
-
-	db := cltrdb.New(c.dbpool).WithTx(tx)
-	outMessages, err := startNextEpoch(ctx, c.Config, db)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	err = c.generateNextEpochID(ctx, db)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
 	err = tx.Commit(ctx)
 	if err != nil {
 		return err
