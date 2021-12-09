@@ -16,19 +16,19 @@ import (
 )
 
 type decryptionSignature struct {
-	instanceID     uint64
-	epochID        uint64
-	signedHash     common.Hash
-	signature      *shbls.Signature
-	SignerBitfield bitfield.Bitfield
+	instanceID uint64
+	epochID    uint64
+	signedHash common.Hash
+	signature  *shbls.Signature
+	signers    bitfield.Bitfield
 }
 
 type aggregatedDecryptionSignature struct {
-	instanceID     uint64
-	epochID        uint64
-	signedHash     common.Hash
-	signature      *shbls.Signature
-	signerBitfield bitfield.Bitfield
+	instanceID uint64
+	epochID    uint64
+	signedHash common.Hash
+	signature  *shbls.Signature
+	signers    bitfield.Bitfield
 }
 
 type decryptionKey struct {
@@ -92,11 +92,11 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption signature")
 		}
 		return &decryptionSignature{
-			instanceID:     decryptionSignatureMsg.InstanceID,
-			epochID:        decryptionSignatureMsg.EpochID,
-			signedHash:     common.BytesToHash(decryptionSignatureMsg.SignedHash),
-			signature:      signature,
-			SignerBitfield: bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
+			instanceID: decryptionSignatureMsg.InstanceID,
+			epochID:    decryptionSignatureMsg.EpochID,
+			signedHash: common.BytesToHash(decryptionSignatureMsg.SignedHash),
+			signature:  signature,
+			signers:    bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
 		}, nil
 	case dcrtopics.AggregatedDecryptionSignature:
 		decryptionSignatureMsg := shmsg.AggregatedDecryptionSignature{}
@@ -108,11 +108,11 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption signature")
 		}
 		return &aggregatedDecryptionSignature{
-			instanceID:     decryptionSignatureMsg.InstanceID,
-			epochID:        decryptionSignatureMsg.EpochID,
-			signedHash:     common.BytesToHash(decryptionSignatureMsg.SignedHash),
-			signature:      signature,
-			signerBitfield: bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
+			instanceID: decryptionSignatureMsg.InstanceID,
+			epochID:    decryptionSignatureMsg.EpochID,
+			signedHash: common.BytesToHash(decryptionSignatureMsg.SignedHash),
+			signature:  signature,
+			signers:    bitfield.Bitfield(decryptionSignatureMsg.SignerBitfield),
 		}, nil
 
 	default:

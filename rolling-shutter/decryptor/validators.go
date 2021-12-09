@@ -143,7 +143,7 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
-	decryptorIndexes := signature.SignerBitfield.GetIndexes()
+	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) != 1 {
 		return false
 	}
@@ -189,7 +189,7 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 	}
 
 	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
-	decryptorIndexes := signature.signerBitfield.GetIndexes()
+	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) == 0 {
 		return false
 	}
