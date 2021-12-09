@@ -158,7 +158,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	activationBlk1 := int64(0)
 	epochID1 := uint64(0)
 	activationBlk2 := int64(123)
-	epochID2, err := medley.EncodeActivationBlockNumberInEpochID(0, uint64(activationBlk2))
+	epochID2, err := medley.EncodeEpochID(0, uint64(activationBlk2))
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
