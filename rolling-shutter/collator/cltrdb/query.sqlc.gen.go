@@ -8,7 +8,7 @@ import (
 )
 
 const getBiggestEpochID = `-- name: GetBiggestEpochID :one
-SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id LIMIT 1
+SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1
 `
 
 func (q *Queries) GetBiggestEpochID(ctx context.Context) ([]byte, error) {

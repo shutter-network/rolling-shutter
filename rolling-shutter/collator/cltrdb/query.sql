@@ -23,4 +23,4 @@ SELECT encrypted_tx FROM collator.transaction WHERE epoch_id = $1 ORDER BY tx_id
 INSERT INTO collator.epoch_id (epoch_id) VALUES ($1);
 
 -- name: GetBiggestEpochID :one
-SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id LIMIT 1;
+SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1;
