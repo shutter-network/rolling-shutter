@@ -38,7 +38,7 @@ coverage:
 clean:
 	rm -f ${EXECUTABLE}
 
-install-tools: install-abigen install-sqlc install-protoc-gen-go  install-oabi-codegen install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
+install-tools: install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
 
 install-sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc
