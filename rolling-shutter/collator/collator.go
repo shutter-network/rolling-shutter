@@ -94,7 +94,7 @@ func Run(ctx context.Context, config Config) error {
 
 // initializeEpochID populate the epoch_id table with a valid value if it is empty.
 func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
-	_, err := db.GetBiggestEpochID(ctx)
+	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
 		blk, err := contracts.Client.BlockNumber(ctx)
 		if err != nil {
@@ -104,7 +104,7 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 		if err != nil {
 			return err
 		}
-		return db.InsertEpochID(ctx, shdb.EncodeUint64(epochID))
+		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 	}
 	return err
 }
@@ -256,7 +256,7 @@ func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 
 // getNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
 func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
-	epochID, err := db.GetBiggestEpochID(ctx)
+	epochID, err := db.GetNextEpochID(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error
 		return 0, err
@@ -266,7 +266,7 @@ func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
 
 // generateNextEpochID creates the next epochID that should be used.
 func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries, blockNumber uint64) error {
-	epochIDBytes, err := db.GetBiggestEpochID(ctx)
+	epochIDBytes, err := db.GetNextEpochID(ctx)
 	if err != nil {
 		return err
 	}
@@ -277,5 +277,5 @@ func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries, 
 	if err != nil {
 		return err
 	}
-	return db.InsertEpochID(ctx, shdb.EncodeUint64(epochID))
+	return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 }

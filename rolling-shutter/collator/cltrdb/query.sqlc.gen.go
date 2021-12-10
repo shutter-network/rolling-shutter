@@ -7,17 +7,6 @@ import (
 	"context"
 )
 
-const getBiggestEpochID = `-- name: GetBiggestEpochID :one
-SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1
-`
-
-func (q *Queries) GetBiggestEpochID(ctx context.Context) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getBiggestEpochID)
-	var epoch_id []byte
-	err := row.Scan(&epoch_id)
-	return epoch_id, err
-}
-
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
 SELECT epoch_id FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `
@@ -38,6 +27,17 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (CollatorMetaInf, err
 	var i CollatorMetaInf
 	err := row.Scan(&i.Key, &i.Value)
 	return i, err
+}
+
+const getNextEpochID = `-- name: GetNextEpochID :one
+SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1
+`
+
+func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getNextEpochID)
+	var epoch_id []byte
+	err := row.Scan(&epoch_id)
+	return epoch_id, err
 }
 
 const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
@@ -73,15 +73,6 @@ func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (CollatorDecry
 	var i CollatorDecryptionTrigger
 	err := row.Scan(&i.EpochID, &i.BatchHash)
 	return i, err
-}
-
-const insertEpochID = `-- name: InsertEpochID :exec
-INSERT INTO collator.epoch_id (epoch_id) VALUES ($1)
-`
-
-func (q *Queries) InsertEpochID(ctx context.Context, epochID []byte) error {
-	_, err := q.db.Exec(ctx, insertEpochID, epochID)
-	return err
 }
 
 const insertMeta = `-- name: InsertMeta :exec
@@ -124,5 +115,14 @@ type InsertTxParams struct {
 
 func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
 	_, err := q.db.Exec(ctx, insertTx, arg.TxID, arg.EpochID, arg.EncryptedTx)
+	return err
+}
+
+const setNextEpochID = `-- name: SetNextEpochID :exec
+INSERT INTO collator.epoch_id (epoch_id) VALUES ($1)
+`
+
+func (q *Queries) SetNextEpochID(ctx context.Context, epochID []byte) error {
+	_, err := q.db.Exec(ctx, setNextEpochID, epochID)
 	return err
 }
