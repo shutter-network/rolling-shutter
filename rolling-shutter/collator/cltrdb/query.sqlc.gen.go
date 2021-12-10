@@ -30,7 +30,7 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (CollatorMetaInf, err
 }
 
 const getNextEpochID = `-- name: GetNextEpochID :one
-SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1
+SELECT epoch_id FROM collator.next_epoch LIMIT 1
 `
 
 func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
@@ -119,7 +119,9 @@ func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
 }
 
 const setNextEpochID = `-- name: SetNextEpochID :exec
-INSERT INTO collator.epoch_id (epoch_id) VALUES ($1)
+INSERT INTO collator.next_epoch (epoch_id) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET epoch_id = $1
 `
 
 func (q *Queries) SetNextEpochID(ctx context.Context, epochID []byte) error {

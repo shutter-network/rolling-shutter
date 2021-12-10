@@ -9,13 +9,14 @@ type CollatorDecryptionTrigger struct {
 	BatchHash []byte
 }
 
-type CollatorEpochID struct {
-	EpochID []byte
-}
-
 type CollatorMetaInf struct {
 	Key   string
 	Value string
+}
+
+type CollatorNextEpoch struct {
+	EnforceOneRow bool
+	EpochID       []byte
 }
 
 type CollatorTransaction struct {

@@ -1,4 +1,4 @@
--- schema-version: 4 --
+-- schema-version: 5 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -21,6 +21,7 @@ CREATE TABLE collator.transaction(
        encrypted_tx bytea
 );
 
-CREATE TABLE collator.epoch_id(
-    epoch_id bytea PRIMARY KEY
+CREATE TABLE collator.next_epoch(
+    enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
+    epoch_id bytea NOT NULL
 );

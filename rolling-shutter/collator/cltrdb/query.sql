@@ -20,7 +20,9 @@ INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2,
 SELECT encrypted_tx FROM collator.transaction WHERE epoch_id = $1 ORDER BY tx_id;
 
 -- name: SetNextEpochID :exec
-INSERT INTO collator.epoch_id (epoch_id) VALUES ($1);
+INSERT INTO collator.next_epoch (epoch_id) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET epoch_id = $1;
 
 -- name: GetNextEpochID :one
-SELECT epoch_id FROM collator.epoch_id ORDER BY epoch_id DESC LIMIT 1;
+SELECT epoch_id FROM collator.next_epoch LIMIT 1;
