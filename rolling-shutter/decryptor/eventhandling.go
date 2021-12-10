@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -14,6 +15,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/blsregistry"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
@@ -146,10 +148,14 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 		BlockNumber: nil,
 		Context:     ctx,
 	}
-	addrs, err := h.contracts.Keypers.GetAddrs(callOpts, event.Index)
+	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		return h.contracts.Keypers.GetAddrs(callOpts, event.Index)
+	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to query keyper addrs set from contract")
 	}
+	addrs := addrsUntyped.([]common.Address)
+
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
@@ -176,10 +182,13 @@ func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Con
 		BlockNumber: nil,
 		Context:     ctx,
 	}
-	addrs, err := h.contracts.Decryptors.GetAddrs(callOpts, event.Index)
+	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		return h.contracts.Decryptors.GetAddrs(callOpts, event.Index)
+	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to query decryptor addrs set from contract")
 	}
+	addrs := addrsUntyped.([]common.Address)
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
@@ -243,10 +252,13 @@ func (h *eventHandler) handleCollatorConfigsListNewConfigEvent(ctx context.Conte
 		BlockNumber: nil,
 		Context:     ctx,
 	}
-	addrs, err := h.contracts.Collators.GetAddrs(callOpts, event.Index)
+	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		return h.contracts.Collators.GetAddrs(callOpts, event.Index)
+	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to query addrs set from contract")
 	}
+	addrs := addrsUntyped.([]common.Address)
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
