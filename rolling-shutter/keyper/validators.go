@@ -46,7 +46,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pM
 	}
 
 	activationBlockNumber := epochid.BlockNumber(key.epochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
+	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
 		return false
 	}
@@ -90,7 +90,7 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, li
 	}
 
 	activationBlockNumber := epochid.BlockNumber(keyShare.epochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
+	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
 		return false
 	}
@@ -145,7 +145,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 		return false
 	}
 	blk := epochid.BlockNumber(t.EpochID)
-	collatorString, err := kpr.db.GetChainCollator(ctx, blk)
+	collatorString, err := kpr.db.GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		log.Printf("got decryption trigger with no collator for given block number: %d", blk)
 		return false

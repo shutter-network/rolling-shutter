@@ -75,8 +75,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 		[]byte("tx2"),
 		[]byte("tx3"),
 	}
-	epochID, err := epochid.New(0, 1)
-	assert.NilError(t, err)
+	epochID := epochid.New(0, 1)
 
 	trigger, err := shmsg.NewSignedDecryptionTrigger(d.Config.InstanceID, epochID, txs, config.EthereumKey)
 	assert.NilError(t, err)
@@ -87,8 +86,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 		config.EthereumKey,
 	)
 	assert.NilError(t, err)
-	wrongCollatorEpochID, err := epochid.New(0, 20)
-	assert.NilError(t, err)
+	wrongCollatorEpochID := epochid.New(0, 20)
 	triggerWrongCollator, err := shmsg.NewSignedDecryptionTrigger(
 		d.Config.InstanceID,
 		wrongCollatorEpochID,

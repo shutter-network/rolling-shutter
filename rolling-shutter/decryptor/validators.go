@@ -50,7 +50,7 @@ func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMe
 
 	// check that it's signed by the collator
 	activationBlockNumber := epochid.BlockNumber(cipherBatch.DecryptionTrigger.EpochID)
-	collatorDBEntry, err := d.db.GetChainCollator(ctx, activationBlockNumber)
+	collatorDBEntry, err := d.db.GetChainCollator(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
 		log.Printf("error getting collator from db: %s", err)
 		return false
@@ -100,7 +100,7 @@ func (d *Decryptor) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2p
 	}
 
 	activationBlockNumber := epochid.BlockNumber(key.epochID)
-	eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, activationBlockNumber)
+	eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
 		log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
 		return false
@@ -148,7 +148,7 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 		return false
 	}
 	decryptorSetMember, err := d.db.GetDecryptorSetMember(ctx, dcrdb.GetDecryptorSetMemberParams{
-		ActivationBlockNumber: activationBlockNumber,
+		ActivationBlockNumber: int64(activationBlockNumber),
 		Index:                 decryptorIndexes[0],
 	})
 	if err == pgx.ErrNoRows {
@@ -193,7 +193,7 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 	if len(decryptorIndexes) == 0 {
 		return false
 	}
-	decryptorSet, err := d.db.GetDecryptorSet(ctx, activationBlockNumber)
+	decryptorSet, err := d.db.GetDecryptorSet(ctx, int64(activationBlockNumber))
 	if err != nil {
 		log.Printf("failed to get decryptor set from db for block number %d", activationBlockNumber)
 		return false

@@ -105,7 +105,7 @@ func handleSignatureInput(
 	}
 
 	activationBlockNumber := epochid.BlockNumber(signature.epochID)
-	decryptorSet, err := db.GetDecryptorSet(ctx, activationBlockNumber)
+	decryptorSet, err := db.GetDecryptorSet(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query decryptor set from db")
 	}

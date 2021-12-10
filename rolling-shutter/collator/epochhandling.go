@@ -10,16 +10,16 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func computeNextEpochID(epochID uint64, blockNumber uint64) (uint64, error) {
-	if uint64(epochid.BlockNumber(epochID)) > blockNumber {
+func computeNextEpochID(epochID uint64, blockNumber uint32) (uint64, error) {
+	if epochid.BlockNumber(epochID) > blockNumber {
 		return 0, errors.New("blockNumber must not decrease")
 	}
 	sequenceNumber := epochid.SequenceNumber(epochID)
-	return epochid.New(uint64(sequenceNumber)+1, blockNumber)
+	return epochid.New(sequenceNumber+1, blockNumber), nil
 }
 
 func startNextEpoch(
-	ctx context.Context, config Config, db *cltrdb.Queries, blockNumber uint64,
+	ctx context.Context, config Config, db *cltrdb.Queries, blockNumber uint32,
 ) ([]shmsg.P2PMessage, error) {
 	epochID, err := getNextEpochID(ctx, db)
 	if err != nil {

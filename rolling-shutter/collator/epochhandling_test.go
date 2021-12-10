@@ -35,7 +35,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
-	nextEpochID, _ := epochid.New(41, 101)
+	nextEpochID := epochid.New(41, 101)
 	err := db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
 	assert.NilError(t, err)
 

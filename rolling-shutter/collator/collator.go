@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -97,13 +98,13 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
 		blk, err := contracts.Client.BlockNumber(ctx)
+		if blk > math.MaxUint32 {
+			return errors.Errorf("block number too big: %d", blk)
+		}
 		if err != nil {
 			return err
 		}
-		epochID, err := epochid.New(0, blk)
-		if err != nil {
-			return err
-		}
+		epochID := epochid.New(0, uint32(blk))
 		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 	}
 	return err
@@ -200,6 +201,10 @@ func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
 	blockNumber, err := c.contracts.Client.BlockNumber(ctx)
+	if blockNumber > math.MaxUint32 {
+		return errors.Errorf("block number too big: %d", blockNumber)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -216,7 +221,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		}
 
 		db := cltrdb.New(tx)
-		outMessages, err = startNextEpoch(ctx, c.Config, db, blockNumber)
+		outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
 		if err != nil {
 			return err
 		}

@@ -21,7 +21,7 @@ type epochKGHandler struct {
 
 func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *decryptionTrigger) ([]shmsg.P2PMessage, error) {
 	activationBlockNumber := epochid.BlockNumber(msg.EpochID)
-	eon, err := h.db.GetEonForBlockNumber(ctx, activationBlockNumber)
+	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.EpochID)
 	}
@@ -174,7 +174,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 
 	// fetch dkg result from db
 	activationBlockNumber := epochid.BlockNumber(msg.epochID)
-	eon, err := h.db.GetEonForBlockNumber(ctx, activationBlockNumber)
+	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", msg.epochID)
 	}
