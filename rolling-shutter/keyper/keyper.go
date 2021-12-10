@@ -242,6 +242,7 @@ func (kpr *keyper) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")
 	}
+	log.Printf("sending %s", msg.ProtoReflect().Descriptor().FullName().Name())
 
 	return kpr.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
