@@ -59,13 +59,13 @@ func Cmd() *cobra.Command {
 		"long",
 		"set log format, possible values:  min, short, long, max",
 	)
-	cmd.AddCommand(chain.Cmd())
-	cmd.AddCommand(keyper.Cmd())
 	cmd.AddCommand(bootstrap.Cmd())
-	cmd.AddCommand(decryptor.Cmd())
+	cmd.AddCommand(chain.Cmd())
 	cmd.AddCommand(collator.Cmd())
-	cmd.AddCommand(mocknode.Cmd())
 	cmd.AddCommand(completion.Cmd())
+	cmd.AddCommand(decryptor.Cmd())
+	cmd.AddCommand(keyper.Cmd())
+	cmd.AddCommand(mocknode.Cmd())
 	cmd.AddCommand(snapshot.Cmd())
 	return cmd
 }
