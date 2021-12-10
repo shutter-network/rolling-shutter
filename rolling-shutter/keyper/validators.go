@@ -11,7 +11,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -45,7 +45,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pM
 		return false
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
+	activationBlockNumber := epochid.BlockNumber(key.epochID)
 	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
 	if err == pgx.ErrNoRows {
 		return false
@@ -89,7 +89,7 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, li
 		return false
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(keyShare.epochID)
+	activationBlockNumber := epochid.BlockNumber(keyShare.epochID)
 	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, activationBlockNumber)
 	if err == pgx.ErrNoRows {
 		return false
@@ -144,7 +144,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 	if !ok {
 		return false
 	}
-	blk := medley.ActivationBlockNumberFromEpochID(t.EpochID)
+	blk := epochid.BlockNumber(t.EpochID)
 	collatorString, err := kpr.db.GetChainCollator(ctx, blk)
 	if err == pgx.ErrNoRows {
 		log.Printf("got decryption trigger with no collator for given block number: %d", blk)

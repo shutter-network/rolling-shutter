@@ -16,6 +16,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -158,7 +159,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	activationBlk1 := int64(0)
 	epochID1 := uint64(0)
 	activationBlk2 := int64(123)
-	epochID2, err := medley.EncodeEpochID(0, uint64(activationBlk2))
+	epochID2, err := epochid.New(0, uint64(activationBlk2))
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)

@@ -14,7 +14,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -49,7 +49,7 @@ func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMe
 	}
 
 	// check that it's signed by the collator
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(cipherBatch.DecryptionTrigger.EpochID)
+	activationBlockNumber := epochid.BlockNumber(cipherBatch.DecryptionTrigger.EpochID)
 	collatorDBEntry, err := d.db.GetChainCollator(ctx, activationBlockNumber)
 	if err == pgx.ErrNoRows {
 		log.Printf("error getting collator from db: %s", err)
@@ -99,7 +99,7 @@ func (d *Decryptor) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2p
 		return false
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(key.epochID)
+	activationBlockNumber := epochid.BlockNumber(key.epochID)
 	eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, activationBlockNumber)
 	if err == pgx.ErrNoRows {
 		log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
@@ -142,7 +142,7 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 		return false
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
+	activationBlockNumber := epochid.BlockNumber(signature.epochID)
 	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) != 1 {
 		return false
@@ -188,7 +188,7 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 		return false
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
+	activationBlockNumber := epochid.BlockNumber(signature.epochID)
 	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) == 0 {
 		return false

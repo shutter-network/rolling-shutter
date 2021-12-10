@@ -24,7 +24,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -100,7 +100,7 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 		if err != nil {
 			return err
 		}
-		epochID, err := medley.EncodeEpochID(0, blk)
+		epochID, err := epochid.New(0, blk)
 		if err != nil {
 			return err
 		}
@@ -272,8 +272,8 @@ func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries, 
 	}
 
 	epochID := shdb.DecodeUint64(epochIDBytes)
-	sequenceNumber := medley.SequenceNumberFromEpochID(epochID)
-	epochID, err = medley.EncodeEpochID(uint64(sequenceNumber)+1, blockNumber)
+	sequenceNumber := epochid.SequenceNumber(epochID)
+	epochID, err = epochid.New(uint64(sequenceNumber)+1, blockNumber)
 	if err != nil {
 		return err
 	}

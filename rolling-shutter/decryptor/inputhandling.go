@@ -12,8 +12,8 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -104,7 +104,7 @@ func handleSignatureInput(
 		return nil, nil
 	}
 
-	activationBlockNumber := medley.ActivationBlockNumberFromEpochID(signature.epochID)
+	activationBlockNumber := epochid.BlockNumber(signature.epochID)
 	decryptorSet, err := db.GetDecryptorSet(ctx, activationBlockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query decryptor set from db")

@@ -18,6 +18,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -74,7 +75,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 		[]byte("tx2"),
 		[]byte("tx3"),
 	}
-	epochID, err := medley.EncodeEpochID(0, 1)
+	epochID, err := epochid.New(0, 1)
 	assert.NilError(t, err)
 
 	trigger, err := shmsg.NewSignedDecryptionTrigger(d.Config.InstanceID, epochID, txs, config.EthereumKey)
@@ -86,7 +87,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 		config.EthereumKey,
 	)
 	assert.NilError(t, err)
-	wrongCollatorEpochID, err := medley.EncodeEpochID(0, 20)
+	wrongCollatorEpochID, err := epochid.New(0, 20)
 	assert.NilError(t, err)
 	triggerWrongCollator, err := shmsg.NewSignedDecryptionTrigger(
 		d.Config.InstanceID,
