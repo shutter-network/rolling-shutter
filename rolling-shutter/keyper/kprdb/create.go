@@ -48,10 +48,10 @@ func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start tx")
 	}
-	queries := New(dbpool).WithTx(tx)
+	defer tx.Rollback(ctx)
+	queries := New(tx)
 	err = initKeyperDB(ctx, tx, queries)
 	if err != nil {
-		_ = tx.Rollback(ctx)
 		return err
 	}
 	return tx.Commit(ctx)

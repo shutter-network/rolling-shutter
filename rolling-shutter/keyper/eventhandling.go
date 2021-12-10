@@ -69,22 +69,14 @@ type eventHandler struct {
 
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
 // on failure.
-func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) (rErr error) {
+func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) error {
 	// Create a db tx that we either commit or rollback at the end of the function, depending on if
 	// an error is returned or not.
 	tx, err := kpr.dbpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "error committing db transaction")
 	}
-	defer func() {
-		if rErr == nil {
-			rErr = tx.Commit(ctx)
-			return
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			log.Printf("error rolling back db transaction after failed event handling: %s", err)
-		}
-	}()
+	defer tx.Rollback(ctx)
 	dbWithTx := kpr.db.WithTx(tx)
 
 	if eventSyncUpdate.Event != nil {
@@ -113,7 +105,7 @@ func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate ev
 	}); err != nil {
 		return errors.Wrap(err, "failed to update last synced event")
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 // handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will

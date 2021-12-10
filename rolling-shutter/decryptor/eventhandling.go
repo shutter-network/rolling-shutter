@@ -79,15 +79,8 @@ func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate e
 	if err != nil {
 		return errors.Wrapf(err, "error committing db transaction")
 	}
-	defer func() {
-		if rErr == nil {
-			rErr = tx.Commit(ctx)
-			return
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			log.Printf("error rolling back db transaction after failed event handling: %s", err)
-		}
-	}()
+	defer tx.Rollback(ctx)
+
 	dbWithTx := d.db.WithTx(tx)
 
 	if eventSyncUpdate.Event != nil {
@@ -116,7 +109,7 @@ func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate e
 	}); err != nil {
 		return errors.Wrap(err, "failed to update last synced event")
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (h *eventHandler) handleEvent(ctx context.Context, event interface{}) error {

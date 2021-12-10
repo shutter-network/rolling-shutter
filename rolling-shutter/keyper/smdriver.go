@@ -197,11 +197,15 @@ func (smdrv *ShuttermintDriver) handleTransactions(
 	if err != nil {
 		return errors.Wrap(err, "failed to start tx")
 	}
-	queries := kprdb.New(smdrv.dbpool).WithTx(tx)
+	defer func() {
+		err = tx.Rollback(ctx)
+		if !errors.Is(err, pgx.ErrTxClosed) {
+			smdrv.shuttermintState.Invalidate()
+		}
+	}()
+	queries := kprdb.New(tx)
 	err = smdrv.innerHandleTransactions(ctx, queries, txs, oldCurrentBlock, newCurrentBlock, lastCommittedHeight)
 	if err != nil {
-		smdrv.shuttermintState.Invalidate()
-		_ = tx.Rollback(ctx)
 		return err
 	}
 	return tx.Commit(ctx)

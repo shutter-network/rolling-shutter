@@ -20,26 +20,23 @@ func insertTx(ctx context.Context, dbpool *pgxpool.Pool, insertTxParams cltrdb.I
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 	db := cltrdb.New(tx)
 
-	err = func() error {
-		// Disallow starting the next epoch
-		_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE MODE")
-		if err != nil {
-			return err
-		}
-		epoch, err := getNextEpochID(ctx, db)
-		if err != nil {
-			return err
-		}
-		if txEpoch < epoch {
-			return errors.Errorf("transaction for past epoch")
-		}
-		return db.InsertTx(ctx, insertTxParams)
-	}()
-
+	// Disallow starting the next epoch
+	_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE MODE")
 	if err != nil {
-		_ = tx.Rollback(ctx)
+		return err
+	}
+	epoch, err := getNextEpochID(ctx, db)
+	if err != nil {
+		return err
+	}
+	if txEpoch < epoch {
+		return errors.Errorf("transaction for past epoch")
+	}
+	err = db.InsertTx(ctx, insertTxParams)
+	if err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
