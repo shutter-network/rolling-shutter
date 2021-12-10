@@ -3,17 +3,22 @@ package snapshot
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
+	lip2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/snapshot"
 	"github.com/shutter-network/shutter/shuttermint/snapshot/snpdb"
@@ -95,6 +100,14 @@ func initDB() error {
 
 func readConfig() (snapshot.Config, error) {
 	viper.SetEnvPrefix("SNAPSHOT")
+	viper.BindEnv("EthereumURL")
+	viper.BindEnv("ListenAddress")
+	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("SnapshotHubURL")
+
+	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip6/::1/tcp/2000")
+	viper.SetDefault("ListenAddress", defaultListenAddress)
+	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
 
 	config := snapshot.Config{}
 
@@ -122,7 +135,25 @@ func readConfig() (snapshot.Config, error) {
 }
 
 func exampleConfig() (*snapshot.Config, error) {
-	return &snapshot.Config{}, nil
+	ethereumKey, err := ethcrypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	p2pkey, _, err := lip2pcrypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return &snapshot.Config{
+		EthereumURL:    "http://[::1]:8545/",
+		ListenAddress:  p2p.MustMultiaddr("/ip6/::1/tcp/2000"),
+		PeerMultiaddrs: []multiaddr.Multiaddr{},
+		DatabaseURL:    "",
+		SnapshotHubURL: "",
+
+		EthereumKey: ethereumKey,
+		P2PKey:      p2pkey,
+	}, nil
 }
 
 func generateConfig() error {
