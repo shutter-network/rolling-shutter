@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -34,19 +35,21 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 
-	err := db.InsertTx(ctx, cltrdb.InsertTxParams{
+	nextEpochID, _ := epochid.New(41, 101)
+	err := db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
+	assert.NilError(t, err)
+
+	encryptedTX := []byte("foobar")
+	err = db.InsertTx(ctx, cltrdb.InsertTxParams{
 		TxID:        []byte{'a'},
-		EpochID:     shdb.EncodeUint64(0),
-		EncryptedTx: []byte("foobar"),
+		EpochID:     shdb.EncodeUint64(nextEpochID),
+		EncryptedTx: encryptedTX,
 	})
 	assert.NilError(t, err)
 
-	nextEpochID := uint64(0)
-	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
-	assert.NilError(t, err)
-	transactionsHash := shmsg.HashTransactions([][]byte{{'f', 'o', 'o', 'b', 'a', 'r'}})
+	transactionsHash := shmsg.HashTransactions([][]byte{encryptedTX})
 
-	msgs, err := startNextEpoch(ctx, config, db)
+	msgs, err := startNextEpoch(ctx, config, db, 102)
 	assert.NilError(t, err)
 
 	// make sure decryption trigger is stored in db
@@ -57,7 +60,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 
 	batchMsg := msgs[0].(*shmsg.CipherBatch)
 	assert.Equal(t, batchMsg.DecryptionTrigger.InstanceID, config.InstanceID)
-	assert.Equal(t, batchMsg.DecryptionTrigger.EpochID, uint64(0))
+	assert.Equal(t, batchMsg.DecryptionTrigger.EpochID, nextEpochID)
 	assert.DeepEqual(t, batchMsg.Transactions, [][]byte{{'f', 'o', 'o', 'b', 'a', 'r'}})
 
 	// make sure output is trigger message

@@ -216,12 +216,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		}
 
 		db := cltrdb.New(tx)
-		outMessages, err = startNextEpoch(ctx, c.Config, db)
-		if err != nil {
-			return err
-		}
-
-		err = c.generateNextEpochID(ctx, db, blockNumber)
+		outMessages, err = startNextEpoch(ctx, c.Config, db, blockNumber)
 		if err != nil {
 			return err
 		}
@@ -262,20 +257,4 @@ func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
 		return 0, err
 	}
 	return shdb.DecodeUint64(epochID), nil
-}
-
-// generateNextEpochID creates the next epochID that should be used.
-func (c *collator) generateNextEpochID(ctx context.Context, db *cltrdb.Queries, blockNumber uint64) error {
-	epochIDBytes, err := db.GetNextEpochID(ctx)
-	if err != nil {
-		return err
-	}
-
-	epochID := shdb.DecodeUint64(epochIDBytes)
-	sequenceNumber := epochid.SequenceNumber(epochID)
-	epochID, err = epochid.New(uint64(sequenceNumber)+1, blockNumber)
-	if err != nil {
-		return err
-	}
-	return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 }
