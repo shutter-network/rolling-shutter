@@ -25,6 +25,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -97,13 +98,17 @@ func Run(ctx context.Context, config Config) error {
 func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
-		blk, err := contracts.Client.BlockNumber(ctx)
-		if blk > math.MaxUint32 {
-			return errors.Errorf("block number too big: %d", blk)
-		}
+		blkUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+			return contracts.Client.BlockNumber(ctx)
+		})
 		if err != nil {
 			return err
 		}
+		blk := blkUntyped.(uint64)
+		if blk > math.MaxUint32 {
+			return errors.Errorf("block number too big: %d", blk)
+		}
+
 		epochID := epochid.New(0, uint32(blk))
 		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 	}
@@ -200,13 +205,15 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
-	blockNumber, err := c.contracts.Client.BlockNumber(ctx)
-	if blockNumber > math.MaxUint32 {
-		return errors.Errorf("block number too big: %d", blockNumber)
-	}
-
+	blockNumberUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		return c.contracts.Client.BlockNumber(ctx)
+	})
 	if err != nil {
 		return err
+	}
+	blockNumber := blockNumberUntyped.(uint64)
+	if blockNumber > math.MaxUint32 {
+		return errors.Errorf("block number too big: %d", blockNumber)
 	}
 
 	tx, err := c.dbpool.Begin(ctx)
