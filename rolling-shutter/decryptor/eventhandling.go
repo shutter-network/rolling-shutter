@@ -141,20 +141,10 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 		"handling NewConfig event from keypers config contract in block %d (index %d, activation block number %d)",
 		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
 	)
-	callOpts := &bind.CallOpts{
-		Pending: false,
-		// We call for the current height instead of the height at which the event was emitted,
-		// because the sets cannot change retroactively and we won't need an archive node.
-		BlockNumber: nil,
-		Context:     ctx,
-	}
-	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-		return h.contracts.Keypers.GetAddrs(callOpts, event.Index)
-	})
+	addrs, err := retryGetAddrs(ctx, h.contracts.Keypers, event.Index)
 	if err != nil {
-		return errors.Wrapf(err, "failed to query keyper addrs set from contract")
+		return err
 	}
-	addrs := addrsUntyped.([]common.Address)
 
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
@@ -170,11 +160,7 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	return nil
 }
 
-func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Context, event contract.DecryptorsConfigsListNewConfig) error {
-	log.Printf(
-		"handling NewConfig event from decryptors config contract in block %d (index %d, activation block number %d)",
-		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
-	)
+func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) ([]common.Address, error) {
 	callOpts := &bind.CallOpts{
 		Pending: false,
 		// We call for the current height instead of the height at which the event was emitted,
@@ -183,12 +169,24 @@ func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Con
 		Context:     ctx,
 	}
 	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-		return h.contracts.Decryptors.GetAddrs(callOpts, event.Index)
+		return addrsSeq.GetAddrs(callOpts, n)
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to query decryptor addrs set from contract")
+		return []common.Address{}, errors.Wrapf(err, "failed to query decryptor addrs set from contract")
 	}
 	addrs := addrsUntyped.([]common.Address)
+	return addrs, nil
+}
+
+func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Context, event contract.DecryptorsConfigsListNewConfig) error {
+	log.Printf(
+		"handling NewConfig event from decryptors config contract in block %d (index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+	)
+	addrs, err := retryGetAddrs(ctx, h.contracts.Decryptors, event.Index)
+	if err != nil {
+		return err
+	}
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
@@ -245,20 +243,10 @@ func (h *eventHandler) handleCollatorConfigsListNewConfigEvent(ctx context.Conte
 		"handling NewConfig event from collator config contract in block %d (index %d, activation block number %d)",
 		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
 	)
-	callOpts := &bind.CallOpts{
-		Pending: false,
-		// We call for the current height instead of the height at which the event was emitted,
-		// because the sets cannot change retroactively and we won't need an archive node.
-		BlockNumber: nil,
-		Context:     ctx,
-	}
-	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-		return h.contracts.Collators.GetAddrs(callOpts, event.Index)
-	})
+	addrs, err := retryGetAddrs(ctx, h.contracts.Collators, event.Index)
 	if err != nil {
-		return errors.Wrapf(err, "failed to query addrs set from contract")
+		return err
 	}
-	addrs := addrsUntyped.([]common.Address)
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
