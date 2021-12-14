@@ -31,17 +31,12 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 	}
 
 	eventSyncProgress, err := d.db.GetEventSyncProgress(ctx)
-	var fromBlock uint64
-	var fromLogIndex uint64
-	if err == pgx.ErrNoRows {
-		fromBlock = 0
-		fromLogIndex = 0
-	} else if err == nil {
-		fromBlock = uint64(eventSyncProgress.NextBlockNumber)
-		fromLogIndex = uint64(eventSyncProgress.NextLogIndex)
-	} else {
+	if err != nil {
 		return errors.Wrap(err, "failed to get last synced event from db")
 	}
+
+	fromBlock := uint64(eventSyncProgress.NextBlockNumber)
+	fromLogIndex := uint64(eventSyncProgress.NextLogIndex)
 
 	log.Printf("starting event syncing from block %d log %d", fromBlock, fromLogIndex)
 	syncer := eventsyncer.New(d.contracts.Client, finalityOffset, events, fromBlock, fromLogIndex)

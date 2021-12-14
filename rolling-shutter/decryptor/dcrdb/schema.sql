@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS decryptor.event_sync_progress (
        next_block_number integer NOT NULL,
        next_log_index integer NOT NULL
 );
+INSERT INTO decryptor.event_sync_progress (next_block_number, next_log_index) VALUES (0,0);
+
 CREATE TABLE decryptor.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL
