@@ -171,7 +171,7 @@ ON CONFLICT (id) DO UPDATE
         next_log_index = $2;
 
 -- name: GetEventSyncProgress :one
-SELECT * FROM decryptor.event_sync_progress LIMIT 1;
+SELECT next_block_number, next_log_index FROM decryptor.event_sync_progress LIMIT 1;
 
 -- name: InsertChainKeyperSet :exec
 INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2);

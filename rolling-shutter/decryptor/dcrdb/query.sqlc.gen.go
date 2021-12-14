@@ -294,13 +294,18 @@ func (q *Queries) GetEonPublicKey(ctx context.Context, activationBlockNumber int
 }
 
 const getEventSyncProgress = `-- name: GetEventSyncProgress :one
-SELECT id, next_block_number, next_log_index FROM decryptor.event_sync_progress LIMIT 1
+SELECT next_block_number, next_log_index FROM decryptor.event_sync_progress LIMIT 1
 `
 
-func (q *Queries) GetEventSyncProgress(ctx context.Context) (DecryptorEventSyncProgress, error) {
+type GetEventSyncProgressRow struct {
+	NextBlockNumber int32
+	NextLogIndex    int32
+}
+
+func (q *Queries) GetEventSyncProgress(ctx context.Context) (GetEventSyncProgressRow, error) {
 	row := q.db.QueryRow(ctx, getEventSyncProgress)
-	var i DecryptorEventSyncProgress
-	err := row.Scan(&i.ID, &i.NextBlockNumber, &i.NextLogIndex)
+	var i GetEventSyncProgressRow
+	err := row.Scan(&i.NextBlockNumber, &i.NextLogIndex)
 	return i, err
 }
 
