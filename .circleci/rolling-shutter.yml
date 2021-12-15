@@ -62,12 +62,12 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
-      - run: go get -d ./
+            - go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - run: go get -d ./...
       - save_cache:
-          key: go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
-            - ~/go/pkg/mod
+            - ~/go/pkg/
       - restore_cache:
           keys:
             - rs-build-<< parameters.go-version >>-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
