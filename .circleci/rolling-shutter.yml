@@ -20,7 +20,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v8-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v9-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -44,7 +44,7 @@ jobs:
             find . -name '*.gen.go' |xargs rm
       - run: make generate
       - save_cache:
-          key: rs-generate-v8-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v9-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
@@ -70,7 +70,7 @@ jobs:
             - ~/go/pkg/
       - restore_cache:
           keys:
-            - rs-build-<< parameters.go-version >>-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-build-<< parameters.go-version >>-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: make build wasm
       - run:
           name: "Run unit tests with gotestsum"
@@ -90,7 +90,7 @@ jobs:
       - store_test_results:
           path: report
       - save_cache:
-          key: rs-build-<< parameters.go-version >>-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-build-<< parameters.go-version >>-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
 
@@ -102,7 +102,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-build-go-integration-v1-{{ checksum "go.sum" }}
+            - rs-build-go-integration-v3-{{ checksum "go.sum" }}
       - run: env VERSION=${CIRCLE_TAG} ./build-release
       - run: go install github.com/tcnksm/ghr@v0.13.0
       - attach_workspace:
@@ -121,10 +121,10 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v2-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
-            - rs-lint-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-lint-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - install-asdf
       - run:
           name: "Install golangci-lint"
@@ -134,7 +134,7 @@ jobs:
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-lint-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"

@@ -24,13 +24,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.17.1@sha256:3da5986fd03f5de041bca5006a8205c538f6a467df1e421e593d6b991341355d
+      - image: cimg/go:1.17.5@sha256:03bc021893b54e1f7c981dc3a391df868a01e24899044d382f068d2014b80348
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.17.1@sha256:3da5986fd03f5de041bca5006a8205c538f6a467df1e421e593d6b991341355d
+      - image: cimg/go:1.17.5@sha256:03bc021893b54e1f7c981dc3a391df868a01e24899044d382f068d2014b80348
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -42,7 +42,7 @@ executors:
           POSTGRES_DB: testdb
   go116:
     docker:
-      - image: cimg/go:1.16.8@sha256:09ede9df1890b43520ee6a994f7e3e795c8fdb48f6e5f2552439a3f4bbc82e12
+      - image: cimg/go:1.16.128@sha256:810440a9128875dcf397e7c23e487977159d9e6d98b58b24183dffabdee30ee6
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
