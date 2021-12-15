@@ -31,7 +31,6 @@ require (
 	github.com/labstack/gommon v0.3.1 // indirect
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
-	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-noise v0.2.2 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.2.10 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.5.6
