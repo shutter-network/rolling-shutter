@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	libp2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -27,7 +27,7 @@ type Config struct {
 	HTTPListenAddress string
 
 	EthereumKey *ecdsa.PrivateKey
-	P2PKey      libp2pcrypto.PrivKey
+	P2PKey      p2pcrypto.PrivKey
 
 	InstanceID uint64
 

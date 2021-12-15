@@ -4,7 +4,7 @@ import (
 	"io"
 	"text/template"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
@@ -17,7 +17,7 @@ import (
 type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
-	P2PKey         crypto.PrivKey
+	P2PKey         p2pcrypto.PrivKey
 
 	InstanceID             uint64
 	Rate                   float64

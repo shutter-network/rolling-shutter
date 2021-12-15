@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -93,7 +93,7 @@ func exampleConfig() (*mocknode.Config, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid default listen address")
 	}
-	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	p2pkey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate random p2p key")
 	}

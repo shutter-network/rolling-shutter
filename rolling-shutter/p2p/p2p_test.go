@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
@@ -26,12 +26,12 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	defer cancel()
 
 	numPeers := 2
-	privKeys := []crypto.PrivKey{}
+	privKeys := []p2pcrypto.PrivKey{}
 	listenAddrs := []multiaddr.Multiaddr{}
 	nodeAddrs := []multiaddr.Multiaddr{}
 	firstPort := 2000
 	for i := 0; i < numPeers; i++ {
-		privKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+		privKey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 		assert.NilError(t, err)
 		privKeys = append(privKeys, privKey)
 

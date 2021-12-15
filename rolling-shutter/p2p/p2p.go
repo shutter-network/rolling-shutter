@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -33,7 +33,7 @@ type P2P struct {
 type Config struct {
 	ListenAddr     multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
-	PrivKey        crypto.PrivKey
+	PrivKey        p2pcrypto.PrivKey
 }
 
 func New(config Config) *P2P {
@@ -108,7 +108,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 	}
 	privKey := p.Config.PrivKey
 	if privKey == nil {
-		privKey, _, err = crypto.GenerateEd25519Key(rand.Reader)
+		privKey, _, err = p2pcrypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
 			return err
 		}

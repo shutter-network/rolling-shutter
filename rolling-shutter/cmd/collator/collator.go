@@ -12,7 +12,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
-	lip2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -139,7 +139,7 @@ func exampleConfig() (*collator.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	p2pkey, _, err := lip2pcrypto.GenerateEd25519Key(rand.Reader)
+	p2pkey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
