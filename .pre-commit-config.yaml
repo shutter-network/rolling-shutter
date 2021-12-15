@@ -60,8 +60,8 @@ repos:
     hooks:
       - id: eslint
 
-  - repo: https://github.com/schmir-at-bb/gci
-    rev: "9283498f6ee8b0be960df5bf6bca058422eb971b"
+  - repo: https://github.com/shutter-network/pre-commit-go-hooks
+    rev: "f8085838811ba386a473e6e0b8ed6ef1c7eccfe8"
     hooks:
       - id: gci
         args: ["-local", "github.com/shutter-network/shutter"]
@@ -71,10 +71,6 @@ repos:
               ^rolling-shutter/shmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
-
-  - repo: https://github.com/schmir-at-bb/gofumpt
-    rev: "45be18d02b08dbeeb38ce0b092ba41fef322b482"
-    hooks:
       - id: gofumpt
         exclude: |
           (?x)(
