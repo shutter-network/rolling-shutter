@@ -157,12 +157,6 @@ SELECT (
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1;
 
--- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2);
-
--- name: GetMeta :one
-SELECT * FROM meta_inf WHERE key = $1;
-
 -- name: UpdateEventSyncProgress :exec
 INSERT INTO event_sync_progress (next_block_number, next_log_index)
 VALUES ($1, $2)

@@ -18,17 +18,6 @@ func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
 	return epoch_id, err
 }
 
-const getMeta = `-- name: GetMeta :one
-SELECT key, value FROM meta_inf WHERE key = $1
-`
-
-func (q *Queries) GetMeta(ctx context.Context, key string) (MetaInf, error) {
-	row := q.db.QueryRow(ctx, getMeta, key)
-	var i MetaInf
-	err := row.Scan(&i.Key, &i.Value)
-	return i, err
-}
-
 const getNextEpochID = `-- name: GetNextEpochID :one
 SELECT epoch_id FROM next_epoch LIMIT 1
 `
@@ -73,20 +62,6 @@ func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (DecryptionTri
 	var i DecryptionTrigger
 	err := row.Scan(&i.EpochID, &i.BatchHash)
 	return i, err
-}
-
-const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2)
-`
-
-type InsertMetaParams struct {
-	Key   string
-	Value string
-}
-
-func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
-	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
-	return err
 }
 
 const insertTrigger = `-- name: InsertTrigger :exec

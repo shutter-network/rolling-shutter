@@ -9,11 +9,12 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
+	"github.com/shutter-network/shutter/shuttermint/commondb"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 //go:embed schema.sql
-// CreateDecryptorTables contains the SQL statements to create the decryptor namespace and tables.
+// CreateDecryptorTables contains the SQL statements to create the decryptor tables.
 var CreateDecryptorTables string
 
 // schemaVersion is used to check that we use the right schema.
@@ -29,6 +30,11 @@ func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create decryptor tables")
 	}
+	_, err = tx.Exec(ctx, commondb.CreateMetaInf)
+	if err != nil {
+		return errors.Wrap(err, "failed to create meta_inf table")
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		return err
@@ -48,8 +54,8 @@ func ValidateDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get schema version from meta_inf table")
 	}
-	if m.Value != schemaVersion {
-		return errors.Errorf("database has wrong schema version: expected %s, got %s", schemaVersion, m.Value)
+	if m != schemaVersion {
+		return errors.Errorf("database has wrong schema version: expected %s, got %s", schemaVersion, m)
 	}
 	return nil
 }

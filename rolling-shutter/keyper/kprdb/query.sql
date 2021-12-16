@@ -37,12 +37,6 @@ SELECT EXISTS (
 SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1;
 
--- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2);
-
--- name: GetMeta :one
-SELECT value FROM meta_inf WHERE key = $1;
-
 -- name: InsertBatchConfig :exec
 INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
 VALUES ($1, $2, $3, $4);

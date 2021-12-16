@@ -20,10 +20,6 @@ CREATE TABLE event_sync_progress (
        next_block_number integer NOT NULL,
        next_log_index integer NOT NULL
 );
-CREATE TABLE meta_inf(
-       key text PRIMARY KEY,
-       value text NOT NULL
-);
 
 ----- tendermint events
 

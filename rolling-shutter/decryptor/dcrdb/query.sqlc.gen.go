@@ -315,17 +315,6 @@ func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64)
 	return column_1, err
 }
 
-const getMeta = `-- name: GetMeta :one
-SELECT key, value FROM meta_inf WHERE key = $1
-`
-
-func (q *Queries) GetMeta(ctx context.Context, key string) (MetaInf, error) {
-	row := q.db.QueryRow(ctx, getMeta, key)
-	var i MetaInf
-	err := row.Scan(&i.Key, &i.Value)
-	return i, err
-}
-
 const insertAggregatedSignature = `-- name: InsertAggregatedSignature :execresult
 INSERT INTO aggregated_signature (
     epoch_id, signed_hash, signers_bitfield, signature
@@ -508,20 +497,6 @@ type InsertKeyperSetParams struct {
 
 func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams) error {
 	_, err := q.db.Exec(ctx, insertKeyperSet, arg.ActivationBlockNumber, arg.Keypers, arg.Threshold)
-	return err
-}
-
-const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2)
-`
-
-type InsertMetaParams struct {
-	Key   string
-	Value string
-}
-
-func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
-	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
 	return err
 }
 

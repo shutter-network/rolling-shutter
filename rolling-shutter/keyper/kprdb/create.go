@@ -11,11 +11,12 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
+	"github.com/shutter-network/shutter/shuttermint/commondb"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 //go:embed schema.sql
-// CreateKeyperTables contains the SQL statements to create the keyper namespace and tables.
+// CreateKeyperTables contains the SQL statements to create the keyper tables.
 var CreateKeyperTables string
 
 // schemaVersion is used to check that we use the right schema.
@@ -25,6 +26,10 @@ func initKeyperDB(ctx context.Context, tx pgx.Tx, queries *Queries) error {
 	_, err := tx.Exec(ctx, CreateKeyperTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
+	}
+	_, err = tx.Exec(ctx, commondb.CreateMetaInf)
+	if err != nil {
+		return errors.Wrap(err, "failed to create meta_inf table")
 	}
 
 	err = queries.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})

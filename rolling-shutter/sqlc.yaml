@@ -2,8 +2,8 @@ version: 1
 packages:
   - path: "keyper/kprdb"
     name: "kprdb"
-    schema: "keyper/kprdb/schema.sql"
-    queries: "keyper/kprdb/query.sql"
+    schema: ["keyper/kprdb/schema.sql", "commondb/meta-schema.sql"]
+    queries: ["keyper/kprdb/query.sql", "commondb/meta-query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
@@ -12,8 +12,8 @@ packages:
 
   - path: "decryptor/dcrdb"
     name: "dcrdb"
-    schema: "decryptor/dcrdb/schema.sql"
-    queries: "decryptor/dcrdb/query.sql"
+    schema: ["decryptor/dcrdb/schema.sql", "commondb/meta-schema.sql"]
+    queries: ["decryptor/dcrdb/query.sql", "commondb/meta-query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
@@ -22,8 +22,8 @@ packages:
 
   - path: "collator/cltrdb"
     name: "cltrdb"
-    schema: "collator/cltrdb/schema.sql"
-    queries: "collator/cltrdb/query.sql"
+    schema: ["collator/cltrdb/schema.sql", "commondb/meta-schema.sql"]
+    queries: ["collator/cltrdb/query.sql", "commondb/meta-query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"

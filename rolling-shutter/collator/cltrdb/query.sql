@@ -1,9 +1,3 @@
--- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2);
-
--- name: GetMeta :one
-SELECT * FROM meta_inf WHERE key = $1;
-
 -- name: InsertTrigger :exec
 INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 

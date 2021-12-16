@@ -380,17 +380,6 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConf
 	return i, err
 }
 
-const getMeta = `-- name: GetMeta :one
-SELECT value FROM meta_inf WHERE key = $1
-`
-
-func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
-	row := q.db.QueryRow(ctx, getMeta, key)
-	var value string
-	err := row.Scan(&value)
-	return value, err
-}
-
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one
 SELECT id, description, msg from tendermint_outgoing_messages
 ORDER BY id
@@ -558,20 +547,6 @@ type InsertEonPublicKeyParams struct {
 
 func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) error {
 	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.EonPublicKey, arg.Eon)
-	return err
-}
-
-const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO meta_inf (key, value) VALUES ($1, $2)
-`
-
-type InsertMetaParams struct {
-	Key   string
-	Value string
-}
-
-func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
-	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
 	return err
 }
 
