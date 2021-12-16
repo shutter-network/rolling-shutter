@@ -33,7 +33,7 @@ func ConnectionInfo(dbpool *pgxpool.Pool) string {
 // -- schema-version: 23 --
 // It aborts the program, if the version cannot be determined.
 func MustFindSchemaVersion(schema, path string) string {
-	rx := "-- schema-version: ([0-9]+) --"
+	rx := "-- schema-version: ([-a-z0-9]+) --"
 	matches := regexp.MustCompile(rx).FindStringSubmatch(schema)
 	if len(matches) != 2 {
 		log.Fatalf("malformed schema in %s, cannot find regular expression %s", path, rx)
