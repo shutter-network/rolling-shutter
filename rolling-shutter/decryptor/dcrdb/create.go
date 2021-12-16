@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
@@ -20,13 +21,8 @@ var CreateDecryptorTables string
 // schemaVersion is used to check that we use the right schema.
 var schemaVersion = shdb.MustFindSchemaVersion(CreateDecryptorTables, "dcrdb/schema.sql")
 
-// InitDecryptorDB initializes the database of the decryptor. It is assumed that the db is empty.
-func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	tx, err := dbpool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, CreateDecryptorTables)
+func initDecryptorDB(ctx context.Context, tx pgx.Tx) error {
+	_, err := tx.Exec(ctx, CreateDecryptorTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create decryptor tables")
 	}
@@ -35,17 +31,19 @@ func InitDecryptorDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 		return errors.Wrap(err, "failed to create meta_inf table")
 	}
 
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = New(dbpool).InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+	err = New(tx).InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
 
 	return nil
+}
+
+// InitDB initializes the database of the decryptor. It is assumed that the db is empty.
+func InitDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		return initDecryptorDB(ctx, tx)
+	})
 }
 
 // ValidateDecryptorDB checks that the database schema is compatible.

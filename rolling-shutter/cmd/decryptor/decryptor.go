@@ -142,7 +142,7 @@ func initDB() error {
 	defer dbpool.Close()
 
 	// initialize the db
-	err = dcrdb.InitDecryptorDB(ctx, dbpool)
+	err = dcrdb.InitDB(ctx, dbpool)
 	if err != nil {
 		return err
 	}

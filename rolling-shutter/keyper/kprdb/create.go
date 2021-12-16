@@ -22,7 +22,7 @@ var CreateKeyperTables string
 // schemaVersion is used to check that we use the right schema.
 var schemaVersion = shdb.MustFindSchemaVersion(CreateKeyperTables, "kprdb/schema.sql")
 
-func initKeyperDB(ctx context.Context, tx pgx.Tx, queries *Queries) error {
+func initDB(ctx context.Context, tx pgx.Tx) error {
 	_, err := tx.Exec(ctx, CreateKeyperTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
@@ -32,6 +32,7 @@ func initKeyperDB(ctx context.Context, tx pgx.Tx, queries *Queries) error {
 		return errors.Wrap(err, "failed to create meta_inf table")
 	}
 
+	queries := New(tx)
 	err = queries.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
@@ -47,19 +48,11 @@ func initKeyperDB(ctx context.Context, tx pgx.Tx, queries *Queries) error {
 	return nil
 }
 
-// InitKeyperDB initializes the database of the keyper. It is assumed that the db is empty.
-func InitKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	tx, err := dbpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return errors.Wrap(err, "failed to start tx")
-	}
-	queries := New(dbpool).WithTx(tx)
-	err = initKeyperDB(ctx, tx, queries)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-	return tx.Commit(ctx)
+// InitDB initializes the database of the keyper. It is assumed that the db is empty.
+func InitDB(ctx context.Context, dbpool *pgxpool.Pool) error {
+	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		return initDB(ctx, tx)
+	})
 }
 
 // ValidateKeyperDB checks that the database schema is compatible.

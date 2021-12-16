@@ -166,7 +166,7 @@ func initDB() error {
 	defer dbpool.Close()
 
 	// initialize the db
-	err = kprdb.InitKeyperDB(ctx, dbpool)
+	err = kprdb.InitDB(ctx, dbpool)
 	if err != nil {
 		return err
 	}

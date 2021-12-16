@@ -89,7 +89,7 @@ func initDB() error {
 	defer dbpool.Close()
 
 	// initialize the db
-	err = snpdb.InitSnapshotDB(ctx, dbpool)
+	err = snpdb.InitDB(ctx, dbpool)
 	if err != nil {
 		return err
 	}

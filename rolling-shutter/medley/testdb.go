@@ -67,7 +67,7 @@ func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, func())
 
 	dbpool, closedb := NewTestDBPool(ctx, t)
 	db := kprdb.New(dbpool)
-	err := kprdb.InitKeyperDB(ctx, dbpool)
+	err := kprdb.InitDB(ctx, dbpool)
 	if err != nil {
 		closedb()
 		t.Fatalf("failed to initialize keyper db")
@@ -80,7 +80,7 @@ func NewDecryptorTestDB(ctx context.Context, t *testing.T) (*dcrdb.Queries, func
 
 	dbpool, closedb := NewTestDBPool(ctx, t)
 	db := dcrdb.New(dbpool)
-	err := dcrdb.InitDecryptorDB(ctx, dbpool)
+	err := dcrdb.InitDB(ctx, dbpool)
 	if err != nil {
 		closedb()
 		t.Fatalf("failed to initialize decryptor db")
