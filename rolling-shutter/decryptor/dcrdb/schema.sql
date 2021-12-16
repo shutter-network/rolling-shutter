@@ -58,10 +58,6 @@ CREATE TABLE decryptor.meta_inf(
        key text PRIMARY KEY,
        value text NOT NULL
 );
-CREATE TABLE decryptor.chain_keyper_set(
-       n integer PRIMARY KEY,
-       addresses text[] NOT NULL
-);
 
 CREATE TABLE decryptor.chain_collator(
        activation_block_number bigint PRIMARY KEY,

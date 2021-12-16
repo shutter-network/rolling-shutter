@@ -16,11 +16,6 @@ type DecryptorChainCollator struct {
 	Collator              string
 }
 
-type DecryptorChainKeyperSet struct {
-	N         int32
-	Addresses []string
-}
-
 type DecryptorCipherBatch struct {
 	EpochID      []byte
 	Transactions [][]byte

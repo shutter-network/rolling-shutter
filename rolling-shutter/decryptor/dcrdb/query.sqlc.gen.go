@@ -50,17 +50,6 @@ func (q *Queries) GetChainCollator(ctx context.Context, activationBlockNumber in
 	return i, err
 }
 
-const getChainKeyperSet = `-- name: GetChainKeyperSet :one
-SELECT n, addresses FROM decryptor.chain_keyper_set LIMIT 1
-`
-
-func (q *Queries) GetChainKeyperSet(ctx context.Context) (DecryptorChainKeyperSet, error) {
-	row := q.db.QueryRow(ctx, getChainKeyperSet)
-	var i DecryptorChainKeyperSet
-	err := row.Scan(&i.N, &i.Addresses)
-	return i, err
-}
-
 const getCipherBatch = `-- name: GetCipherBatch :one
 SELECT epoch_id, transactions FROM decryptor.cipher_batch
 WHERE epoch_id = $1
@@ -374,20 +363,6 @@ type InsertChainCollatorParams struct {
 
 func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollatorParams) error {
 	_, err := q.db.Exec(ctx, insertChainCollator, arg.ActivationBlockNumber, arg.Collator)
-	return err
-}
-
-const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
-INSERT INTO decryptor.chain_keyper_set (n, addresses) VALUES ($1, $2)
-`
-
-type InsertChainKeyperSetParams struct {
-	N         int32
-	Addresses []string
-}
-
-func (q *Queries) InsertChainKeyperSet(ctx context.Context, arg InsertChainKeyperSetParams) error {
-	_, err := q.db.Exec(ctx, insertChainKeyperSet, arg.N, arg.Addresses)
 	return err
 }
 
