@@ -1,0 +1,23 @@
+#! /usr/bin/env bash
+#
+# Run rolling-shutter and make sure it's up to date.
+#
+
+set -euo pipefail
+
+fail() {
+  echo >&2 -e "$*"
+  exit 1
+}
+
+DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+
+(
+    exec 1>&2
+    cd -- "${DIR}"/../../play
+    exec bb run build
+) || (
+    fail "ERROR: build failed"
+)
+
+exec "${DIR}/rolling-shutter" "$@"
