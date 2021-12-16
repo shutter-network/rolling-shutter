@@ -178,7 +178,7 @@ func (h *eventHandler) handleCollatorConfigsListNewConfigEvent(ctx context.Conte
 		Context:     ctx,
 	}
 	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-		return h.contracts.Keypers.GetAddrs(callOpts, event.Index)
+		return h.contracts.Collators.GetAddrs(callOpts, event.Index)
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to query keyper addrs set from contract")
