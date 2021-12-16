@@ -69,51 +69,40 @@ type eventHandler struct {
 
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
 // on failure.
-func (kpr *keyper) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) (rErr error) {
-	// Create a db tx that we either commit or rollback at the end of the function, depending on if
-	// an error is returned or not.
-	tx, err := kpr.dbpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "error committing db transaction")
-	}
-	defer func() {
-		if rErr == nil {
-			rErr = tx.Commit(ctx)
-			return
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			log.Printf("error rolling back db transaction after failed event handling: %s", err)
-		}
-	}()
-	dbWithTx := kpr.db.WithTx(tx)
+func (kpr *keyper) handleEventSyncUpdate(
+	ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate,
+) error {
+	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		dbWithTx := kpr.db.WithTx(tx)
 
-	if eventSyncUpdate.Event != nil {
-		handler := &eventHandler{
-			tx:        tx,
-			db:        dbWithTx,
-			contracts: kpr.contracts,
+		if eventSyncUpdate.Event != nil {
+			handler := &eventHandler{
+				tx:        tx,
+				db:        dbWithTx,
+				contracts: kpr.contracts,
+			}
+			if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
+				return err
+			}
 		}
-		if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
-			return err
-		}
-	}
 
-	var nextBlockNumber uint64
-	var nextLogIndex uint64
-	if eventSyncUpdate.Event == nil {
-		nextBlockNumber = eventSyncUpdate.BlockNumber + 1
-		nextLogIndex = 0
-	} else {
-		nextBlockNumber = eventSyncUpdate.BlockNumber
-		nextLogIndex = eventSyncUpdate.LogIndex + 1
-	}
-	if err := dbWithTx.UpdateEventSyncProgress(ctx, kprdb.UpdateEventSyncProgressParams{
-		NextBlockNumber: int32(nextBlockNumber),
-		NextLogIndex:    int32(nextLogIndex),
-	}); err != nil {
-		return errors.Wrap(err, "failed to update last synced event")
-	}
-	return nil
+		var nextBlockNumber uint64
+		var nextLogIndex uint64
+		if eventSyncUpdate.Event == nil {
+			nextBlockNumber = eventSyncUpdate.BlockNumber + 1
+			nextLogIndex = 0
+		} else {
+			nextBlockNumber = eventSyncUpdate.BlockNumber
+			nextLogIndex = eventSyncUpdate.LogIndex + 1
+		}
+		if err := dbWithTx.UpdateEventSyncProgress(ctx, kprdb.UpdateEventSyncProgressParams{
+			NextBlockNumber: int32(nextBlockNumber),
+			NextLogIndex:    int32(nextLogIndex),
+		}); err != nil {
+			return errors.Wrap(err, "failed to update last synced event")
+		}
+		return nil
+	})
 }
 
 // handleEventSyncUpdateDirty handles events and advances the sync state. The db transaction will

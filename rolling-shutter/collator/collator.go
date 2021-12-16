@@ -216,11 +216,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		return errors.Errorf("block number too big: %d", blockNumber)
 	}
 
-	tx, err := c.dbpool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	err = func() error {
+	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow submitting transactions at the same time.
 		_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
 		if err != nil {
@@ -229,16 +225,8 @@ func (c *collator) newEpoch(ctx context.Context) error {
 
 		db := cltrdb.New(tx)
 		outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil {
-		_ = tx.Rollback(ctx)
 		return err
-	}
-	err = tx.Commit(ctx)
+	})
 	if err != nil {
 		return err
 	}

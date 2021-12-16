@@ -194,20 +194,13 @@ func (smdrv *ShuttermintDriver) handleTransactions(
 	txs []*coretypes.ResultTx,
 	oldCurrentBlock, newCurrentBlock, lastCommittedHeight int64,
 ) error {
-	tx, err := smdrv.dbpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return errors.Wrap(err, "failed to start tx")
-	}
-	err = smdrv.innerHandleTransactions(
-		ctx, kprdb.New(tx), txs, oldCurrentBlock, newCurrentBlock, lastCommittedHeight,
-	)
-	if err == nil {
-		err = tx.Commit(ctx)
-	}
+	err := smdrv.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		return smdrv.innerHandleTransactions(
+			ctx, kprdb.New(tx), txs, oldCurrentBlock, newCurrentBlock, lastCommittedHeight,
+		)
+	})
 	if err != nil {
 		smdrv.shuttermintState.Invalidate()
-		_ = tx.Rollback(ctx)
-		return err
 	}
-	return nil
+	return err
 }

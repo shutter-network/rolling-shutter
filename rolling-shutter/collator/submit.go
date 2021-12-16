@@ -3,6 +3,7 @@ package collator
 import (
 	"context"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
@@ -16,15 +17,11 @@ func insertTx(ctx context.Context, dbpool *pgxpool.Pool, insertTxParams cltrdb.I
 	}
 	txEpoch := shdb.DecodeUint64(insertTxParams.EpochID)
 
-	tx, err := dbpool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	db := cltrdb.New(tx)
+	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		db := cltrdb.New(tx)
 
-	err = func() error {
 		// Disallow starting the next epoch
-		_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE MODE")
+		_, err := tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE MODE")
 		if err != nil {
 			return err
 		}
@@ -36,11 +33,5 @@ func insertTx(ctx context.Context, dbpool *pgxpool.Pool, insertTxParams cltrdb.I
 			return errors.Errorf("transaction for past epoch")
 		}
 		return db.InsertTx(ctx, insertTxParams)
-	}()
-
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-	return tx.Commit(ctx)
+	})
 }

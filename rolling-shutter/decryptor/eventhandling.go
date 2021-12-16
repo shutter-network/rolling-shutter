@@ -67,51 +67,40 @@ type eventHandler struct {
 
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
 // on failure.
-func (d *Decryptor) handleEventSyncUpdate(ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate) (rErr error) {
-	// Create a db tx that we either commit or rollback at the end of the function, depending on if
-	// an error is returned or not.
-	tx, err := d.dbpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "error committing db transaction")
-	}
-	defer func() {
-		if rErr == nil {
-			rErr = tx.Commit(ctx)
-			return
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			log.Printf("error rolling back db transaction after failed event handling: %s", err)
-		}
-	}()
-	dbWithTx := d.db.WithTx(tx)
+func (d *Decryptor) handleEventSyncUpdate(
+	ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate,
+) error {
+	return d.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		dbWithTx := d.db.WithTx(tx)
 
-	if eventSyncUpdate.Event != nil {
-		handler := &eventHandler{
-			tx:        tx,
-			db:        dbWithTx,
-			contracts: d.contracts,
+		if eventSyncUpdate.Event != nil {
+			handler := &eventHandler{
+				tx:        tx,
+				db:        dbWithTx,
+				contracts: d.contracts,
+			}
+			if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
+				return err
+			}
 		}
-		if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
-			return err
-		}
-	}
 
-	var nextBlockNumber uint64
-	var nextLogIndex uint64
-	if eventSyncUpdate.Event == nil {
-		nextBlockNumber = eventSyncUpdate.BlockNumber + 1
-		nextLogIndex = 0
-	} else {
-		nextBlockNumber = eventSyncUpdate.BlockNumber
-		nextLogIndex = eventSyncUpdate.LogIndex + 1
-	}
-	if err := dbWithTx.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
-		NextBlockNumber: int32(nextBlockNumber),
-		NextLogIndex:    int32(nextLogIndex),
-	}); err != nil {
-		return errors.Wrap(err, "failed to update last synced event")
-	}
-	return nil
+		var nextBlockNumber uint64
+		var nextLogIndex uint64
+		if eventSyncUpdate.Event == nil {
+			nextBlockNumber = eventSyncUpdate.BlockNumber + 1
+			nextLogIndex = 0
+		} else {
+			nextBlockNumber = eventSyncUpdate.BlockNumber
+			nextLogIndex = eventSyncUpdate.LogIndex + 1
+		}
+		if err := dbWithTx.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
+			NextBlockNumber: int32(nextBlockNumber),
+			NextLogIndex:    int32(nextLogIndex),
+		}); err != nil {
+			return errors.Wrap(err, "failed to update last synced event")
+		}
+		return nil
+	})
 }
 
 func (h *eventHandler) handleEvent(ctx context.Context, event interface{}) error {
