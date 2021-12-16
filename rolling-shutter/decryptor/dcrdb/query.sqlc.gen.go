@@ -10,7 +10,7 @@ import (
 )
 
 const existsAggregatedSignature = `-- name: ExistsAggregatedSignature :one
-SELECT EXISTS(SELECT 1 FROM decryptor.aggregated_signature WHERE signed_hash = $1)
+SELECT EXISTS(SELECT 1 FROM aggregated_signature WHERE signed_hash = $1)
 `
 
 func (q *Queries) ExistsAggregatedSignature(ctx context.Context, signedHash []byte) (bool, error) {
@@ -21,13 +21,13 @@ func (q *Queries) ExistsAggregatedSignature(ctx context.Context, signedHash []by
 }
 
 const getAggregatedSignature = `-- name: GetAggregatedSignature :one
-SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.aggregated_signature
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM aggregated_signature
 WHERE signed_hash = $1
 `
 
-func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte) (DecryptorAggregatedSignature, error) {
+func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte) (AggregatedSignature, error) {
 	row := q.db.QueryRow(ctx, getAggregatedSignature, signedHash)
-	var i DecryptorAggregatedSignature
+	var i AggregatedSignature
 	err := row.Scan(
 		&i.EpochID,
 		&i.SignedHash,
@@ -38,44 +38,44 @@ func (q *Queries) GetAggregatedSignature(ctx context.Context, signedHash []byte)
 }
 
 const getChainCollator = `-- name: GetChainCollator :one
-SELECT activation_block_number, collator FROM decryptor.chain_collator
+SELECT activation_block_number, collator FROM chain_collator
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetChainCollator(ctx context.Context, activationBlockNumber int64) (DecryptorChainCollator, error) {
+func (q *Queries) GetChainCollator(ctx context.Context, activationBlockNumber int64) (ChainCollator, error) {
 	row := q.db.QueryRow(ctx, getChainCollator, activationBlockNumber)
-	var i DecryptorChainCollator
+	var i ChainCollator
 	err := row.Scan(&i.ActivationBlockNumber, &i.Collator)
 	return i, err
 }
 
 const getCipherBatch = `-- name: GetCipherBatch :one
-SELECT epoch_id, transactions FROM decryptor.cipher_batch
+SELECT epoch_id, transactions FROM cipher_batch
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetCipherBatch(ctx context.Context, epochID []byte) (DecryptorCipherBatch, error) {
+func (q *Queries) GetCipherBatch(ctx context.Context, epochID []byte) (CipherBatch, error) {
 	row := q.db.QueryRow(ctx, getCipherBatch, epochID)
-	var i DecryptorCipherBatch
+	var i CipherBatch
 	err := row.Scan(&i.EpochID, &i.Transactions)
 	return i, err
 }
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
-SELECT epoch_id, key FROM decryptor.decryption_key
+SELECT epoch_id, key FROM decryption_key
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptorDecryptionKey, error) {
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptionKey, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
-	var i DecryptorDecryptionKey
+	var i DecryptionKey
 	err := row.Scan(&i.EpochID, &i.Key)
 	return i, err
 }
 
 const getDecryptionSignature = `-- name: GetDecryptionSignature :one
-SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.decryption_signature
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryption_signature
 WHERE epoch_id = $1 AND signers_bitfield = $2
 `
 
@@ -84,9 +84,9 @@ type GetDecryptionSignatureParams struct {
 	SignersBitfield []byte
 }
 
-func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionSignatureParams) (DecryptorDecryptionSignature, error) {
+func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionSignatureParams) (DecryptionSignature, error) {
 	row := q.db.QueryRow(ctx, getDecryptionSignature, arg.EpochID, arg.SignersBitfield)
-	var i DecryptorDecryptionSignature
+	var i DecryptionSignature
 	err := row.Scan(
 		&i.EpochID,
 		&i.SignedHash,
@@ -97,7 +97,7 @@ func (q *Queries) GetDecryptionSignature(ctx context.Context, arg GetDecryptionS
 }
 
 const getDecryptionSignatures = `-- name: GetDecryptionSignatures :many
-SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryptor.decryption_signature
+SELECT epoch_id, signed_hash, signers_bitfield, signature FROM decryption_signature
 WHERE epoch_id = $1 AND signed_hash = $2
 `
 
@@ -106,15 +106,15 @@ type GetDecryptionSignaturesParams struct {
 	SignedHash []byte
 }
 
-func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryptionSignaturesParams) ([]DecryptorDecryptionSignature, error) {
+func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryptionSignaturesParams) ([]DecryptionSignature, error) {
 	rows, err := q.db.Query(ctx, getDecryptionSignatures, arg.EpochID, arg.SignedHash)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []DecryptorDecryptionSignature
+	var items []DecryptionSignature
 	for rows.Next() {
-		var i DecryptorDecryptionSignature
+		var i DecryptionSignature
 		if err := rows.Scan(
 			&i.EpochID,
 			&i.SignedHash,
@@ -132,13 +132,13 @@ func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryption
 }
 
 const getDecryptorIdentity = `-- name: GetDecryptorIdentity :one
-SELECT address, bls_public_key, bls_signature, signature_valid FROM decryptor.decryptor_identity
+SELECT address, bls_public_key, bls_signature, signature_valid FROM decryptor_identity
 WHERE address = $1
 `
 
-func (q *Queries) GetDecryptorIdentity(ctx context.Context, address string) (DecryptorDecryptorIdentity, error) {
+func (q *Queries) GetDecryptorIdentity(ctx context.Context, address string) (DecryptorIdentity, error) {
 	row := q.db.QueryRow(ctx, getDecryptorIdentity, address)
-	var i DecryptorDecryptorIdentity
+	var i DecryptorIdentity
 	err := row.Scan(
 		&i.Address,
 		&i.BlsPublicKey,
@@ -161,17 +161,17 @@ FROM (
         activation_block_number,
         index,
         address
-    FROM decryptor.decryptor_set_member
+    FROM decryptor_set_member
     WHERE activation_block_number = (
         SELECT
             m.activation_block_number
-        FROM decryptor.decryptor_set_member AS m
+        FROM decryptor_set_member AS m
         WHERE m.activation_block_number <= $1
         ORDER BY m.activation_block_number DESC
         LIMIT 1
     )
 ) AS member
-LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+LEFT OUTER JOIN decryptor_identity AS identity
 ON member.address = identity.address
 ORDER BY index
 `
@@ -225,17 +225,17 @@ FROM (
         m2.activation_block_number,
         m2.index,
         m2.address
-    FROM decryptor.decryptor_set_member AS m2
+    FROM decryptor_set_member AS m2
     WHERE activation_block_number = (
         SELECT
             m3.activation_block_number
-        FROM decryptor.decryptor_set_member AS m3
+        FROM decryptor_set_member AS m3
         WHERE m3.activation_block_number <= $1
         ORDER BY m3.activation_block_number DESC
         LIMIT 1
     ) AND m2.index = $2
 ) AS m1
-LEFT OUTER JOIN decryptor.decryptor_identity AS identity
+LEFT OUTER JOIN decryptor_identity AS identity
 ON m1.address = identity.address
 ORDER BY index
 `
@@ -270,7 +270,7 @@ func (q *Queries) GetDecryptorSetMember(ctx context.Context, arg GetDecryptorSet
 
 const getEonPublicKey = `-- name: GetEonPublicKey :one
 SELECT eon_public_key
-FROM decryptor.eon_public_key
+FROM eon_public_key
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
@@ -283,7 +283,7 @@ func (q *Queries) GetEonPublicKey(ctx context.Context, activationBlockNumber int
 }
 
 const getEventSyncProgress = `-- name: GetEventSyncProgress :one
-SELECT next_block_number, next_log_index FROM decryptor.event_sync_progress LIMIT 1
+SELECT next_block_number, next_log_index FROM event_sync_progress LIMIT 1
 `
 
 type GetEventSyncProgressRow struct {
@@ -303,7 +303,7 @@ SELECT (
     activation_block_number,
     keypers,
     threshold
-) FROM decryptor.keyper_set
+) FROM keyper_set
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
@@ -316,18 +316,18 @@ func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64)
 }
 
 const getMeta = `-- name: GetMeta :one
-SELECT key, value FROM decryptor.meta_inf WHERE key = $1
+SELECT key, value FROM meta_inf WHERE key = $1
 `
 
-func (q *Queries) GetMeta(ctx context.Context, key string) (DecryptorMetaInf, error) {
+func (q *Queries) GetMeta(ctx context.Context, key string) (MetaInf, error) {
 	row := q.db.QueryRow(ctx, getMeta, key)
-	var i DecryptorMetaInf
+	var i MetaInf
 	err := row.Scan(&i.Key, &i.Value)
 	return i, err
 }
 
 const insertAggregatedSignature = `-- name: InsertAggregatedSignature :execresult
-INSERT INTO decryptor.aggregated_signature (
+INSERT INTO aggregated_signature (
     epoch_id, signed_hash, signers_bitfield, signature
 ) VALUES (
     $1, $2, $3, $4
@@ -352,7 +352,7 @@ func (q *Queries) InsertAggregatedSignature(ctx context.Context, arg InsertAggre
 }
 
 const insertChainCollator = `-- name: InsertChainCollator :exec
-INSERT INTO decryptor.chain_collator (activation_block_number, collator)
+INSERT INTO chain_collator (activation_block_number, collator)
 VALUES ($1, $2)
 `
 
@@ -367,7 +367,7 @@ func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollat
 }
 
 const insertCipherBatch = `-- name: InsertCipherBatch :execresult
-INSERT INTO decryptor.cipher_batch (
+INSERT INTO cipher_batch (
     epoch_id, transactions
 ) VALUES (
     $1, $2
@@ -385,7 +385,7 @@ func (q *Queries) InsertCipherBatch(ctx context.Context, arg InsertCipherBatchPa
 }
 
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
-INSERT INTO decryptor.decryption_key (
+INSERT INTO decryption_key (
     epoch_id, key
 ) VALUES (
     $1, $2
@@ -403,7 +403,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 }
 
 const insertDecryptionSignature = `-- name: InsertDecryptionSignature :execresult
-INSERT INTO decryptor.decryption_signature (
+INSERT INTO decryption_signature (
     epoch_id, signed_hash, signers_bitfield, signature
 ) VALUES (
     $1, $2, $3, $4
@@ -428,7 +428,7 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 }
 
 const insertDecryptorIdentity = `-- name: InsertDecryptorIdentity :exec
-INSERT INTO decryptor.decryptor_identity (
+INSERT INTO decryptor_identity (
     address, bls_public_key, bls_signature, signature_valid
 ) VALUES (
     $1, $2, $3, $4
@@ -453,7 +453,7 @@ func (q *Queries) InsertDecryptorIdentity(ctx context.Context, arg InsertDecrypt
 }
 
 const insertDecryptorSetMember = `-- name: InsertDecryptorSetMember :exec
-INSERT INTO decryptor.decryptor_set_member (
+INSERT INTO decryptor_set_member (
     activation_block_number, index, address
 ) VALUES (
     $1, $2, $3
@@ -472,7 +472,7 @@ func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryp
 }
 
 const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
-INSERT INTO decryptor.eon_public_key (
+INSERT INTO eon_public_key (
     activation_block_number,
     eon_public_key
 ) VALUES (
@@ -491,7 +491,7 @@ func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKey
 }
 
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
-INSERT INTO decryptor.keyper_set (
+INSERT INTO keyper_set (
     activation_block_number,
     keypers,
     threshold
@@ -512,7 +512,7 @@ func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams
 }
 
 const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO decryptor.meta_inf (key, value) VALUES ($1, $2)
+INSERT INTO meta_inf (key, value) VALUES ($1, $2)
 `
 
 type InsertMetaParams struct {
@@ -526,7 +526,7 @@ func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 }
 
 const updateEventSyncProgress = `-- name: UpdateEventSyncProgress :exec
-INSERT INTO decryptor.event_sync_progress (next_block_number, next_log_index)
+INSERT INTO event_sync_progress (next_block_number, next_log_index)
 VALUES ($1, $2)
 ON CONFLICT (id) DO UPDATE
     SET next_block_number = $1,

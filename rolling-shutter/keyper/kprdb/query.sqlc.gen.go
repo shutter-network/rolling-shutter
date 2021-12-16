@@ -12,7 +12,7 @@ import (
 )
 
 const countBatchConfigs = `-- name: CountBatchConfigs :one
-SELECT count(*) FROM keyper.tendermint_batch_config
+SELECT count(*) FROM tendermint_batch_config
 `
 
 func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
@@ -23,7 +23,7 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 }
 
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
-SELECT count(*) FROM keyper.decryption_key_share
+SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1
 `
 
@@ -36,7 +36,7 @@ func (q *Queries) CountDecryptionKeyShares(ctx context.Context, epochID []byte) 
 
 const deletePolyEval = `-- name: DeletePolyEval :exec
 
-DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2
+DELETE FROM poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2
 `
 
 type DeletePolyEvalParams struct {
@@ -53,7 +53,7 @@ func (q *Queries) DeletePolyEval(ctx context.Context, arg DeletePolyEvalParams) 
 }
 
 const deletePolyEvalByEon = `-- name: DeletePolyEvalByEon :execresult
-DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1
+DELETE FROM poly_evals ev WHERE ev.eon=$1
 `
 
 func (q *Queries) DeletePolyEvalByEon(ctx context.Context, eon int64) (pgconn.CommandTag, error) {
@@ -61,7 +61,7 @@ func (q *Queries) DeletePolyEvalByEon(ctx context.Context, eon int64) (pgconn.Co
 }
 
 const deletePureDKG = `-- name: DeletePureDKG :exec
-DELETE FROM keyper.puredkg WHERE eon=$1
+DELETE FROM puredkg WHERE eon=$1
 `
 
 func (q *Queries) DeletePureDKG(ctx context.Context, eon int64) error {
@@ -70,7 +70,7 @@ func (q *Queries) DeletePureDKG(ctx context.Context, eon int64) error {
 }
 
 const deleteShutterMessage = `-- name: DeleteShutterMessage :exec
-DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1
+DELETE FROM tendermint_outgoing_messages WHERE id=$1
 `
 
 func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
@@ -81,7 +81,7 @@ func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
 const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1
-    FROM keyper.decryption_key
+    FROM decryption_key
     WHERE epoch_id = $1
 )
 `
@@ -96,7 +96,7 @@ func (q *Queries) ExistsDecryptionKey(ctx context.Context, epochID []byte) (bool
 const existsDecryptionKeyShare = `-- name: ExistsDecryptionKeyShare :one
 SELECT EXISTS (
     SELECT 1
-    FROM keyper.decryption_key_share
+    FROM decryption_key_share
     WHERE epoch_id = $1 AND keyper_index = $2
 )
 `
@@ -114,18 +114,18 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 }
 
 const getAndDeleteEonPublicKeys = `-- name: GetAndDeleteEonPublicKeys :many
-DELETE FROM keyper.outgoing_eon_keys RETURNING eon_public_key, eon
+DELETE FROM outgoing_eon_keys RETURNING eon_public_key, eon
 `
 
-func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]KeyperOutgoingEonKey, error) {
+func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]OutgoingEonKey, error) {
 	rows, err := q.db.Query(ctx, getAndDeleteEonPublicKeys)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []KeyperOutgoingEonKey
+	var items []OutgoingEonKey
 	for rows.Next() {
-		var i KeyperOutgoingEonKey
+		var i OutgoingEonKey
 		if err := rows.Scan(&i.EonPublicKey, &i.Eon); err != nil {
 			return nil, err
 		}
@@ -139,13 +139,13 @@ func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]KeyperOutgoi
 
 const getBatchConfig = `-- name: GetBatchConfig :one
 SELECT config_index, height, keypers, threshold
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 WHERE config_index = $1
 `
 
-func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (KeyperTendermintBatchConfig, error) {
+func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (TendermintBatchConfig, error) {
 	row := q.db.QueryRow(ctx, getBatchConfig, configIndex)
-	var i KeyperTendermintBatchConfig
+	var i TendermintBatchConfig
 	err := row.Scan(
 		&i.ConfigIndex,
 		&i.Height,
@@ -157,19 +157,19 @@ func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (Keyper
 
 const getBatchConfigs = `-- name: GetBatchConfigs :many
 SELECT config_index, height, keypers, threshold
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 ORDER BY config_index
 `
 
-func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchConfig, error) {
+func (q *Queries) GetBatchConfigs(ctx context.Context) ([]TendermintBatchConfig, error) {
 	rows, err := q.db.Query(ctx, getBatchConfigs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []KeyperTendermintBatchConfig
+	var items []TendermintBatchConfig
 	for rows.Next() {
-		var i KeyperTendermintBatchConfig
+		var i TendermintBatchConfig
 		if err := rows.Scan(
 			&i.ConfigIndex,
 			&i.Height,
@@ -187,7 +187,7 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]KeyperTendermintBatchC
 }
 
 const getChainCollator = `-- name: GetChainCollator :one
-SELECT collator FROM keyper.chain_collator
+SELECT collator FROM chain_collator
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
@@ -200,26 +200,26 @@ func (q *Queries) GetChainCollator(ctx context.Context, blockNumber int64) (stri
 }
 
 const getChainKeyperSet = `-- name: GetChainKeyperSet :one
-SELECT activation_block_number, keypers, threshold FROM keyper.chain_keyper_set
+SELECT activation_block_number, keypers, threshold FROM chain_keyper_set
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetChainKeyperSet(ctx context.Context, blockNumber int64) (KeyperChainKeyperSet, error) {
+func (q *Queries) GetChainKeyperSet(ctx context.Context, blockNumber int64) (ChainKeyperSet, error) {
 	row := q.db.QueryRow(ctx, getChainKeyperSet, blockNumber)
-	var i KeyperChainKeyperSet
+	var i ChainKeyperSet
 	err := row.Scan(&i.ActivationBlockNumber, &i.Keypers, &i.Threshold)
 	return i, err
 }
 
 const getDKGResult = `-- name: GetDKGResult :one
-SELECT eon, success, error, pure_result FROM keyper.dkg_result
+SELECT eon, success, error, pure_result FROM dkg_result
 WHERE eon = $1
 `
 
-func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult, error) {
+func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (DkgResult, error) {
 	row := q.db.QueryRow(ctx, getDKGResult, eon)
-	var i KeyperDkgResult
+	var i DkgResult
 	err := row.Scan(
 		&i.Eon,
 		&i.Success,
@@ -230,15 +230,15 @@ func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (KeyperDkgResult,
 }
 
 const getDKGResultForBlockNumber = `-- name: GetDKGResultForBlockNumber :one
-SELECT eon, success, error, pure_result FROM keyper.dkg_result
-WHERE eon = (SELECT eon FROM keyper.eons WHERE activation_block_number <= $1
+SELECT eon, success, error, pure_result FROM dkg_result
+WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1)
 `
 
-func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber int64) (KeyperDkgResult, error) {
+func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber int64) (DkgResult, error) {
 	row := q.db.QueryRow(ctx, getDKGResultForBlockNumber, blockNumber)
-	var i KeyperDkgResult
+	var i DkgResult
 	err := row.Scan(
 		&i.Eon,
 		&i.Success,
@@ -249,19 +249,19 @@ func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber in
 }
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
-SELECT epoch_id, decryption_key FROM keyper.decryption_key
+SELECT epoch_id, decryption_key FROM decryption_key
 WHERE epoch_id = $1
 `
 
-func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (KeyperDecryptionKey, error) {
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptionKey, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
-	var i KeyperDecryptionKey
+	var i DecryptionKey
 	err := row.Scan(&i.EpochID, &i.DecryptionKey)
 	return i, err
 }
 
 const getDecryptionKeyShare = `-- name: GetDecryptionKeyShare :one
-SELECT epoch_id, keyper_index, decryption_key_share FROM keyper.decryption_key_share
+SELECT epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
 WHERE epoch_id = $1 AND keyper_index = $2
 `
 
@@ -270,26 +270,26 @@ type GetDecryptionKeyShareParams struct {
 	KeyperIndex int64
 }
 
-func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKeyShareParams) (KeyperDecryptionKeyShare, error) {
+func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKeyShareParams) (DecryptionKeyShare, error) {
 	row := q.db.QueryRow(ctx, getDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
-	var i KeyperDecryptionKeyShare
+	var i DecryptionKeyShare
 	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare)
 	return i, err
 }
 
 const getEncryptionKeys = `-- name: GetEncryptionKeys :many
-SELECT address, encryption_public_key FROM keyper.tendermint_encryption_key
+SELECT address, encryption_public_key FROM tendermint_encryption_key
 `
 
-func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncryptionKey, error) {
+func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]TendermintEncryptionKey, error) {
 	rows, err := q.db.Query(ctx, getEncryptionKeys)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []KeyperTendermintEncryptionKey
+	var items []TendermintEncryptionKey
 	for rows.Next() {
-		var i KeyperTendermintEncryptionKey
+		var i TendermintEncryptionKey
 		if err := rows.Scan(&i.Address, &i.EncryptionPublicKey); err != nil {
 			return nil, err
 		}
@@ -302,12 +302,12 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]KeyperTendermintEncr
 }
 
 const getEon = `-- name: GetEon :one
-SELECT eon, height, activation_block_number, config_index FROM keyper.eons WHERE eon=$1
+SELECT eon, height, activation_block_number, config_index FROM eons WHERE eon=$1
 `
 
-func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
+func (q *Queries) GetEon(ctx context.Context, eon int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEon, eon)
-	var i KeyperEon
+	var i Eon
 	err := row.Scan(
 		&i.Eon,
 		&i.Height,
@@ -318,15 +318,15 @@ func (q *Queries) GetEon(ctx context.Context, eon int64) (KeyperEon, error) {
 }
 
 const getEonForBlockNumber = `-- name: GetEonForBlockNumber :one
-SELECT eon, height, activation_block_number, config_index FROM keyper.eons
+SELECT eon, height, activation_block_number, config_index FROM eons
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1
 `
 
-func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (KeyperEon, error) {
+func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEonForBlockNumber, blockNumber)
-	var i KeyperEon
+	var i Eon
 	err := row.Scan(
 		&i.Eon,
 		&i.Height,
@@ -337,19 +337,19 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 }
 
 const getEventSyncProgress = `-- name: GetEventSyncProgress :one
-SELECT id, next_block_number, next_log_index FROM keyper.event_sync_progress LIMIT 1
+SELECT id, next_block_number, next_log_index FROM event_sync_progress LIMIT 1
 `
 
-func (q *Queries) GetEventSyncProgress(ctx context.Context) (KeyperEventSyncProgress, error) {
+func (q *Queries) GetEventSyncProgress(ctx context.Context) (EventSyncProgress, error) {
 	row := q.db.QueryRow(ctx, getEventSyncProgress)
-	var i KeyperEventSyncProgress
+	var i EventSyncProgress
 	err := row.Scan(&i.ID, &i.NextBlockNumber, &i.NextLogIndex)
 	return i, err
 }
 
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
-FROM keyper.tendermint_sync_meta
+FROM tendermint_sync_meta
 ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1
 `
@@ -363,14 +363,14 @@ func (q *Queries) GetLastCommittedHeight(ctx context.Context) (int64, error) {
 
 const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
 SELECT config_index, height, keypers, threshold
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1
 `
 
-func (q *Queries) GetLatestBatchConfig(ctx context.Context) (KeyperTendermintBatchConfig, error) {
+func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConfig, error) {
 	row := q.db.QueryRow(ctx, getLatestBatchConfig)
-	var i KeyperTendermintBatchConfig
+	var i TendermintBatchConfig
 	err := row.Scan(
 		&i.ConfigIndex,
 		&i.Height,
@@ -381,7 +381,7 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (KeyperTendermintBat
 }
 
 const getMeta = `-- name: GetMeta :one
-SELECT value FROM keyper.meta_inf WHERE key = $1
+SELECT value FROM meta_inf WHERE key = $1
 `
 
 func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
@@ -392,20 +392,20 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
 }
 
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one
-SELECT id, description, msg from keyper.tendermint_outgoing_messages
+SELECT id, description, msg from tendermint_outgoing_messages
 ORDER BY id
 LIMIT 1
 `
 
-func (q *Queries) GetNextShutterMessage(ctx context.Context) (KeyperTendermintOutgoingMessage, error) {
+func (q *Queries) GetNextShutterMessage(ctx context.Context) (TendermintOutgoingMessage, error) {
 	row := q.db.QueryRow(ctx, getNextShutterMessage)
-	var i KeyperTendermintOutgoingMessage
+	var i TendermintOutgoingMessage
 	err := row.Scan(&i.ID, &i.Description, &i.Msg)
 	return i, err
 }
 
 const insertBatchConfig = `-- name: InsertBatchConfig :exec
-INSERT INTO keyper.tendermint_batch_config (config_index, height, keypers, threshold)
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
 VALUES ($1, $2, $3, $4)
 `
 
@@ -427,7 +427,7 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 }
 
 const insertChainCollator = `-- name: InsertChainCollator :exec
-INSERT INTO keyper.chain_collator (activation_block_number, collator)
+INSERT INTO chain_collator (activation_block_number, collator)
 VALUES ($1, $2)
 `
 
@@ -442,7 +442,7 @@ func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollat
 }
 
 const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
-INSERT INTO keyper.chain_keyper_set (activation_block_number, keypers, threshold)
+INSERT INTO chain_keyper_set (activation_block_number, keypers, threshold)
 VALUES ($1, $2, $3)
 `
 
@@ -458,7 +458,7 @@ func (q *Queries) InsertChainKeyperSet(ctx context.Context, arg InsertChainKeype
 }
 
 const insertDKGResult = `-- name: InsertDKGResult :exec
-INSERT INTO keyper.dkg_result (eon,success,error,pure_result)
+INSERT INTO dkg_result (eon,success,error,pure_result)
 VALUES ($1,$2,$3,$4)
 `
 
@@ -480,7 +480,7 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 }
 
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
-INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
+INSERT INTO decryption_key (epoch_id, decryption_key)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
@@ -495,7 +495,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 }
 
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
-INSERT INTO keyper.decryption_key_share (epoch_id, keyper_index, decryption_key_share)
+INSERT INTO decryption_key_share (epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3)
 `
 
@@ -511,7 +511,7 @@ func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryp
 }
 
 const insertEncryptionKey = `-- name: InsertEncryptionKey :exec
-INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2)
+INSERT INTO tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2)
 `
 
 type InsertEncryptionKeyParams struct {
@@ -525,7 +525,7 @@ func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionK
 }
 
 const insertEon = `-- name: InsertEon :exec
-INSERT INTO keyper.eons (eon, height, activation_block_number, config_index)
+INSERT INTO eons (eon, height, activation_block_number, config_index)
 VALUES ($1, $2, $3, $4)
 `
 
@@ -547,7 +547,7 @@ func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 }
 
 const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
-INSERT INTO keyper.outgoing_eon_keys (eon_public_key, eon)
+INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2)
 `
 
@@ -562,7 +562,7 @@ func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKey
 }
 
 const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2)
+INSERT INTO meta_inf (key, value) VALUES ($1, $2)
 `
 
 type InsertMetaParams struct {
@@ -576,7 +576,7 @@ func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 }
 
 const insertPolyEval = `-- name: InsertPolyEval :exec
-INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
+INSERT INTO poly_evals (eon, receiver_address, eval)
 VALUES ($1, $2, $3)
 `
 
@@ -592,7 +592,7 @@ func (q *Queries) InsertPolyEval(ctx context.Context, arg InsertPolyEvalParams) 
 }
 
 const insertPureDKG = `-- name: InsertPureDKG :exec
-INSERT INTO keyper.puredkg (eon, puredkg) VALUES ($1, $2)
+INSERT INTO puredkg (eon, puredkg) VALUES ($1, $2)
 ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg
 `
 
@@ -610,10 +610,10 @@ const polyEvalsWithEncryptionKeys = `-- name: PolyEvalsWithEncryptionKeys :many
 SELECT ev.eon, ev.receiver_address, ev.eval,
        k.encryption_public_key,
        eons.height
-FROM keyper.poly_evals ev
-INNER JOIN keyper.tendermint_encryption_key k
+FROM poly_evals ev
+INNER JOIN tendermint_encryption_key k
       ON ev.receiver_address = k.address
-INNER JOIN keyper.eons eons
+INNER JOIN eons eons
       ON ev.eon = eons.eon
 ORDER BY ev.eon
 `
@@ -653,7 +653,7 @@ func (q *Queries) PolyEvalsWithEncryptionKeys(ctx context.Context) ([]PolyEvalsW
 }
 
 const scheduleShutterMessage = `-- name: ScheduleShutterMessage :one
-INSERT INTO keyper.tendermint_outgoing_messages (description, msg)
+INSERT INTO tendermint_outgoing_messages (description, msg)
 VALUES ($1, $2)
 RETURNING id
 `
@@ -671,19 +671,19 @@ func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutte
 }
 
 const selectDecryptionKeyShares = `-- name: SelectDecryptionKeyShares :many
-SELECT epoch_id, keyper_index, decryption_key_share FROM keyper.decryption_key_share
+SELECT epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
 WHERE epoch_id = $1
 `
 
-func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte) ([]KeyperDecryptionKeyShare, error) {
+func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte) ([]DecryptionKeyShare, error) {
 	rows, err := q.db.Query(ctx, selectDecryptionKeyShares, epochID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []KeyperDecryptionKeyShare
+	var items []DecryptionKeyShare
 	for rows.Next() {
-		var i KeyperDecryptionKeyShare
+		var i DecryptionKeyShare
 		if err := rows.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare); err != nil {
 			return nil, err
 		}
@@ -696,18 +696,18 @@ func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte)
 }
 
 const selectPureDKG = `-- name: SelectPureDKG :many
-SELECT eon, puredkg FROM keyper.puredkg
+SELECT eon, puredkg FROM puredkg
 `
 
-func (q *Queries) SelectPureDKG(ctx context.Context) ([]KeyperPuredkg, error) {
+func (q *Queries) SelectPureDKG(ctx context.Context) ([]Puredkg, error) {
 	rows, err := q.db.Query(ctx, selectPureDKG)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []KeyperPuredkg
+	var items []Puredkg
 	for rows.Next() {
-		var i KeyperPuredkg
+		var i Puredkg
 		if err := rows.Scan(&i.Eon, &i.Puredkg); err != nil {
 			return nil, err
 		}
@@ -721,20 +721,20 @@ func (q *Queries) SelectPureDKG(ctx context.Context) ([]KeyperPuredkg, error) {
 
 const tMGetSyncMeta = `-- name: TMGetSyncMeta :one
 SELECT current_block, last_committed_height, sync_timestamp
-FROM keyper.tendermint_sync_meta
+FROM tendermint_sync_meta
 ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1
 `
 
-func (q *Queries) TMGetSyncMeta(ctx context.Context) (KeyperTendermintSyncMetum, error) {
+func (q *Queries) TMGetSyncMeta(ctx context.Context) (TendermintSyncMetum, error) {
 	row := q.db.QueryRow(ctx, tMGetSyncMeta)
-	var i KeyperTendermintSyncMetum
+	var i TendermintSyncMetum
 	err := row.Scan(&i.CurrentBlock, &i.LastCommittedHeight, &i.SyncTimestamp)
 	return i, err
 }
 
 const tMSetSyncMeta = `-- name: TMSetSyncMeta :exec
-INSERT INTO keyper.tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
+INSERT INTO tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
 VALUES ($1, $2, $3)
 `
 
@@ -750,7 +750,7 @@ func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) er
 }
 
 const updateEventSyncProgress = `-- name: UpdateEventSyncProgress :exec
-INSERT INTO keyper.event_sync_progress (next_block_number, next_log_index)
+INSERT INTO event_sync_progress (next_block_number, next_log_index)
 VALUES ($1, $2)
 ON CONFLICT (id) DO UPDATE
     SET next_block_number = $1,

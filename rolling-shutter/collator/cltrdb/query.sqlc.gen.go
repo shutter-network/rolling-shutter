@@ -8,7 +8,7 @@ import (
 )
 
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
-SELECT epoch_id FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1
+SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `
 
 func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
@@ -19,18 +19,18 @@ func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
 }
 
 const getMeta = `-- name: GetMeta :one
-SELECT key, value FROM collator.meta_inf WHERE key = $1
+SELECT key, value FROM meta_inf WHERE key = $1
 `
 
-func (q *Queries) GetMeta(ctx context.Context, key string) (CollatorMetaInf, error) {
+func (q *Queries) GetMeta(ctx context.Context, key string) (MetaInf, error) {
 	row := q.db.QueryRow(ctx, getMeta, key)
-	var i CollatorMetaInf
+	var i MetaInf
 	err := row.Scan(&i.Key, &i.Value)
 	return i, err
 }
 
 const getNextEpochID = `-- name: GetNextEpochID :one
-SELECT epoch_id FROM collator.next_epoch LIMIT 1
+SELECT epoch_id FROM next_epoch LIMIT 1
 `
 
 func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
@@ -41,7 +41,7 @@ func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
 }
 
 const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
-SELECT encrypted_tx FROM collator.transaction WHERE epoch_id = $1 ORDER BY tx_id
+SELECT encrypted_tx FROM transaction WHERE epoch_id = $1 ORDER BY tx_id
 `
 
 func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([][]byte, error) {
@@ -65,18 +65,18 @@ func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([
 }
 
 const getTrigger = `-- name: GetTrigger :one
-SELECT epoch_id, batch_hash FROM collator.decryption_trigger WHERE epoch_id = $1
+SELECT epoch_id, batch_hash FROM decryption_trigger WHERE epoch_id = $1
 `
 
-func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (CollatorDecryptionTrigger, error) {
+func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (DecryptionTrigger, error) {
 	row := q.db.QueryRow(ctx, getTrigger, epochID)
-	var i CollatorDecryptionTrigger
+	var i DecryptionTrigger
 	err := row.Scan(&i.EpochID, &i.BatchHash)
 	return i, err
 }
 
 const insertMeta = `-- name: InsertMeta :exec
-INSERT INTO collator.meta_inf (key, value) VALUES ($1, $2)
+INSERT INTO meta_inf (key, value) VALUES ($1, $2)
 `
 
 type InsertMetaParams struct {
@@ -90,7 +90,7 @@ func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 }
 
 const insertTrigger = `-- name: InsertTrigger :exec
-INSERT INTO collator.decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2)
+INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2)
 `
 
 type InsertTriggerParams struct {
@@ -104,7 +104,7 @@ func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) er
 }
 
 const insertTx = `-- name: InsertTx :exec
-INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3)
+INSERT INTO transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3)
 `
 
 type InsertTxParams struct {
@@ -119,7 +119,7 @@ func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
 }
 
 const setNextEpochID = `-- name: SetNextEpochID :exec
-INSERT INTO collator.next_epoch (epoch_id) VALUES ($1)
+INSERT INTO next_epoch (epoch_id) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
 SET epoch_id = $1
 `

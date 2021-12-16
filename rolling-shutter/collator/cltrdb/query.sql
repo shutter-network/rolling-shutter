@@ -1,28 +1,28 @@
 -- name: InsertMeta :exec
-INSERT INTO collator.meta_inf (key, value) VALUES ($1, $2);
+INSERT INTO meta_inf (key, value) VALUES ($1, $2);
 
 -- name: GetMeta :one
-SELECT * FROM collator.meta_inf WHERE key = $1;
+SELECT * FROM meta_inf WHERE key = $1;
 
 -- name: InsertTrigger :exec
-INSERT INTO collator.decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
+INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 
 -- name: GetTrigger :one
-SELECT * FROM collator.decryption_trigger WHERE epoch_id = $1;
+SELECT * FROM decryption_trigger WHERE epoch_id = $1;
 
 -- name: GetLastBatchEpochID :one
-SELECT epoch_id FROM collator.decryption_trigger ORDER BY epoch_id DESC LIMIT 1;
+SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1;
 
 -- name: InsertTx :exec
-INSERT INTO collator.transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3);
+INSERT INTO transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3);
 
 -- name: GetTransactionsByEpoch :many
-SELECT encrypted_tx FROM collator.transaction WHERE epoch_id = $1 ORDER BY tx_id;
+SELECT encrypted_tx FROM transaction WHERE epoch_id = $1 ORDER BY tx_id;
 
 -- name: SetNextEpochID :exec
-INSERT INTO collator.next_epoch (epoch_id) VALUES ($1)
+INSERT INTO next_epoch (epoch_id) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
 SET epoch_id = $1;
 
 -- name: GetNextEpochID :one
-SELECT epoch_id FROM collator.next_epoch LIMIT 1;
+SELECT epoch_id FROM next_epoch LIMIT 1;

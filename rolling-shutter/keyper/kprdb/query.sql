@@ -1,141 +1,141 @@
 -- name: InsertDecryptionKey :execresult
-INSERT INTO keyper.decryption_key (epoch_id, decryption_key)
+INSERT INTO decryption_key (epoch_id, decryption_key)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
 
 -- name: GetDecryptionKey :one
-SELECT * FROM keyper.decryption_key
+SELECT * FROM decryption_key
 WHERE epoch_id = $1;
 
 -- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1
-    FROM keyper.decryption_key
+    FROM decryption_key
     WHERE epoch_id = $1
 );
 
 -- name: InsertDecryptionKeyShare :exec
-INSERT INTO keyper.decryption_key_share (epoch_id, keyper_index, decryption_key_share)
+INSERT INTO decryption_key_share (epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3);
 
 -- name: SelectDecryptionKeyShares :many
-SELECT * FROM keyper.decryption_key_share
+SELECT * FROM decryption_key_share
 WHERE epoch_id = $1;
 
 -- name: GetDecryptionKeyShare :one
-SELECT * FROM keyper.decryption_key_share
+SELECT * FROM decryption_key_share
 WHERE epoch_id = $1 AND keyper_index = $2;
 
 -- name: ExistsDecryptionKeyShare :one
 SELECT EXISTS (
     SELECT 1
-    FROM keyper.decryption_key_share
+    FROM decryption_key_share
     WHERE epoch_id = $1 AND keyper_index = $2
 );
 
 -- name: CountDecryptionKeyShares :one
-SELECT count(*) FROM keyper.decryption_key_share
+SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1;
 
 -- name: InsertMeta :exec
-INSERT INTO keyper.meta_inf (key, value) VALUES ($1, $2);
+INSERT INTO meta_inf (key, value) VALUES ($1, $2);
 
 -- name: GetMeta :one
-SELECT value FROM keyper.meta_inf WHERE key = $1;
+SELECT value FROM meta_inf WHERE key = $1;
 
 -- name: InsertBatchConfig :exec
-INSERT INTO keyper.tendermint_batch_config (config_index, height, keypers, threshold)
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
 VALUES ($1, $2, $3, $4);
 
 -- name: CountBatchConfigs :one
-SELECT count(*) FROM keyper.tendermint_batch_config;
+SELECT count(*) FROM tendermint_batch_config;
 
 -- name: GetLatestBatchConfig :one
 SELECT *
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1;
 
 -- name: GetBatchConfigs :many
 SELECT *
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 ORDER BY config_index;
 
 -- name: GetBatchConfig :one
 SELECT *
-FROM keyper.tendermint_batch_config
+FROM tendermint_batch_config
 WHERE config_index = $1;
 
 -- name: TMSetSyncMeta :exec
-INSERT INTO keyper.tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
+INSERT INTO tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
 VALUES ($1, $2, $3);
 
 -- name: TMGetSyncMeta :one
 SELECT *
-FROM keyper.tendermint_sync_meta
+FROM tendermint_sync_meta
 ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1;
 
 -- name: GetLastCommittedHeight :one
 SELECT last_committed_height
-FROM keyper.tendermint_sync_meta
+FROM tendermint_sync_meta
 ORDER BY current_block DESC, last_committed_height DESC
 LIMIT 1;
 
 -- name: InsertPureDKG :exec
-INSERT INTO keyper.puredkg (eon, puredkg) VALUES ($1, $2)
+INSERT INTO puredkg (eon, puredkg) VALUES ($1, $2)
 ON CONFLICT (eon) DO UPDATE SET puredkg=EXCLUDED.puredkg;
 
 -- name: SelectPureDKG :many
-SELECT * FROM keyper.puredkg;
+SELECT * FROM puredkg;
 
 -- name: DeletePureDKG :exec
-DELETE FROM keyper.puredkg WHERE eon=$1;
+DELETE FROM puredkg WHERE eon=$1;
 
 -- name: InsertEncryptionKey :exec
-INSERT INTO keyper.tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
+INSERT INTO tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
 
 -- name: GetEncryptionKeys :many
-SELECT * FROM keyper.tendermint_encryption_key;
+SELECT * FROM tendermint_encryption_key;
 
 -- name: ScheduleShutterMessage :one
-INSERT INTO keyper.tendermint_outgoing_messages (description, msg)
+INSERT INTO tendermint_outgoing_messages (description, msg)
 VALUES ($1, $2)
 RETURNING id;
 
 -- name: GetNextShutterMessage :one
-SELECT * from keyper.tendermint_outgoing_messages
+SELECT * from tendermint_outgoing_messages
 ORDER BY id
 LIMIT 1;
 
 -- name: DeleteShutterMessage :exec
-DELETE FROM keyper.tendermint_outgoing_messages WHERE id=$1;
+DELETE FROM tendermint_outgoing_messages WHERE id=$1;
 
 -- name: InsertEon :exec
-INSERT INTO keyper.eons (eon, height, activation_block_number, config_index)
+INSERT INTO eons (eon, height, activation_block_number, config_index)
 VALUES ($1, $2, $3, $4);
 
 -- name: GetEon :one
-SELECT * FROM keyper.eons WHERE eon=$1;
+SELECT * FROM eons WHERE eon=$1;
 
 -- name: GetEonForBlockNumber :one
-SELECT * FROM keyper.eons
+SELECT * FROM eons
 WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1;
 
 -- name: InsertPolyEval :exec
-INSERT INTO keyper.poly_evals (eon, receiver_address, eval)
+INSERT INTO poly_evals (eon, receiver_address, eval)
 VALUES ($1, $2, $3);
 
 -- name: PolyEvalsWithEncryptionKeys :many
 SELECT ev.eon, ev.receiver_address, ev.eval,
        k.encryption_public_key,
        eons.height
-FROM keyper.poly_evals ev
-INNER JOIN keyper.tendermint_encryption_key k
+FROM poly_evals ev
+INNER JOIN tendermint_encryption_key k
       ON ev.receiver_address = k.address
-INNER JOIN keyper.eons eons
+INNER JOIN eons eons
       ON ev.eon = eons.eon
 ORDER BY ev.eon;
 
@@ -143,56 +143,56 @@ ORDER BY ev.eon;
 -- I wasn't able to make this work, because of bugs in sqlc
 
 -- name: DeletePolyEval :exec
-DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2;
+DELETE FROM poly_evals ev WHERE ev.eon=$1 AND ev.receiver_address=$2;
 
 -- name: DeletePolyEvalByEon :execresult
-DELETE FROM keyper.poly_evals ev WHERE ev.eon=$1;
+DELETE FROM poly_evals ev WHERE ev.eon=$1;
 
 -- name: InsertDKGResult :exec
-INSERT INTO keyper.dkg_result (eon,success,error,pure_result)
+INSERT INTO dkg_result (eon,success,error,pure_result)
 VALUES ($1,$2,$3,$4);
 
 -- name: GetDKGResult :one
-SELECT * FROM keyper.dkg_result
+SELECT * FROM dkg_result
 WHERE eon = $1;
 
 -- name: GetDKGResultForBlockNumber :one
-SELECT * FROM keyper.dkg_result
-WHERE eon = (SELECT eon FROM keyper.eons WHERE activation_block_number <= sqlc.arg(block_number)
+SELECT * FROM dkg_result
+WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
 -- name: UpdateEventSyncProgress :exec
-INSERT INTO keyper.event_sync_progress (next_block_number, next_log_index)
+INSERT INTO event_sync_progress (next_block_number, next_log_index)
 VALUES ($1, $2)
 ON CONFLICT (id) DO UPDATE
     SET next_block_number = $1,
         next_log_index = $2;
 
 -- name: GetEventSyncProgress :one
-SELECT * FROM keyper.event_sync_progress LIMIT 1;
+SELECT * FROM event_sync_progress LIMIT 1;
 
 -- name: InsertChainKeyperSet :exec
-INSERT INTO keyper.chain_keyper_set (activation_block_number, keypers, threshold)
+INSERT INTO chain_keyper_set (activation_block_number, keypers, threshold)
 VALUES ($1, $2, $3);
 
 -- name: GetChainKeyperSet :one
-SELECT * FROM keyper.chain_keyper_set
+SELECT * FROM chain_keyper_set
 WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC LIMIT 1;
 
 -- name: InsertEonPublicKey :exec
-INSERT INTO keyper.outgoing_eon_keys (eon_public_key, eon)
+INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
-DELETE FROM keyper.outgoing_eon_keys RETURNING *;
+DELETE FROM outgoing_eon_keys RETURNING *;
 
 -- name: InsertChainCollator :exec
-INSERT INTO keyper.chain_collator (activation_block_number, collator)
+INSERT INTO chain_collator (activation_block_number, collator)
 VALUES ($1, $2);
 
 -- name: GetChainCollator :one
-SELECT collator FROM keyper.chain_collator
+SELECT collator FROM chain_collator
 WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC LIMIT 1;

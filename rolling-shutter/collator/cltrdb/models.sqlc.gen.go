@@ -4,22 +4,22 @@ package cltrdb
 
 import ()
 
-type CollatorDecryptionTrigger struct {
+type DecryptionTrigger struct {
 	EpochID   []byte
 	BatchHash []byte
 }
 
-type CollatorMetaInf struct {
+type MetaInf struct {
 	Key   string
 	Value string
 }
 
-type CollatorNextEpoch struct {
+type NextEpoch struct {
 	EnforceOneRow bool
 	EpochID       []byte
 }
 
-type CollatorTransaction struct {
+type Transaction struct {
 	TxID        []byte
 	EpochID     []byte
 	EncryptedTx []byte

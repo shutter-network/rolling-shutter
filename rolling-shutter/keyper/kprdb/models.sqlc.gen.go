@@ -7,92 +7,92 @@ import (
 	"time"
 )
 
-type KeyperChainCollator struct {
+type ChainCollator struct {
 	ActivationBlockNumber int64
 	Collator              string
 }
 
-type KeyperChainKeyperSet struct {
+type ChainKeyperSet struct {
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }
 
-type KeyperDecryptionKey struct {
+type DecryptionKey struct {
 	EpochID       []byte
 	DecryptionKey []byte
 }
 
-type KeyperDecryptionKeyShare struct {
+type DecryptionKeyShare struct {
 	EpochID            []byte
 	KeyperIndex        int64
 	DecryptionKeyShare []byte
 }
 
-type KeyperDecryptionTrigger struct {
+type DecryptionTrigger struct {
 	EpochID []byte
 }
 
-type KeyperDkgResult struct {
+type DkgResult struct {
 	Eon        int64
 	Success    bool
 	Error      sql.NullString
 	PureResult []byte
 }
 
-type KeyperEon struct {
+type Eon struct {
 	Eon                   int64
 	Height                int64
 	ActivationBlockNumber int64
 	ConfigIndex           int64
 }
 
-type KeyperEventSyncProgress struct {
+type EventSyncProgress struct {
 	ID              bool
 	NextBlockNumber int32
 	NextLogIndex    int32
 }
 
-type KeyperMetaInf struct {
+type MetaInf struct {
 	Key   string
 	Value string
 }
 
-type KeyperOutgoingEonKey struct {
+type OutgoingEonKey struct {
 	EonPublicKey []byte
 	Eon          int64
 }
 
-type KeyperPolyEval struct {
+type PolyEval struct {
 	Eon             int64
 	ReceiverAddress string
 	Eval            []byte
 }
 
-type KeyperPuredkg struct {
+type Puredkg struct {
 	Eon     int64
 	Puredkg []byte
 }
 
-type KeyperTendermintBatchConfig struct {
+type TendermintBatchConfig struct {
 	ConfigIndex int32
 	Height      int64
 	Keypers     []string
 	Threshold   int32
 }
 
-type KeyperTendermintEncryptionKey struct {
+type TendermintEncryptionKey struct {
 	Address             string
 	EncryptionPublicKey []byte
 }
 
-type KeyperTendermintOutgoingMessage struct {
+type TendermintOutgoingMessage struct {
 	ID          int32
 	Description string
 	Msg         []byte
 }
 
-type KeyperTendermintSyncMetum struct {
+type TendermintSyncMetum struct {
 	CurrentBlock        int64
 	LastCommittedHeight int64
 	SyncTimestamp       time.Time

@@ -6,7 +6,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
-func (bc *KeyperTendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool) {
+func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool) {
 	hexaddr := shdb.EncodeAddress(addr)
 	for i, a := range bc.Keypers {
 		if a == hexaddr {

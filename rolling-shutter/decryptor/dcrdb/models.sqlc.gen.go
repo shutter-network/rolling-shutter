@@ -4,66 +4,66 @@ package dcrdb
 
 import ()
 
-type DecryptorAggregatedSignature struct {
+type AggregatedSignature struct {
 	EpochID         []byte
 	SignedHash      []byte
 	SignersBitfield []byte
 	Signature       []byte
 }
 
-type DecryptorChainCollator struct {
+type ChainCollator struct {
 	ActivationBlockNumber int64
 	Collator              string
 }
 
-type DecryptorCipherBatch struct {
+type CipherBatch struct {
 	EpochID      []byte
 	Transactions [][]byte
 }
 
-type DecryptorDecryptionKey struct {
+type DecryptionKey struct {
 	EpochID []byte
 	Key     []byte
 }
 
-type DecryptorDecryptionSignature struct {
+type DecryptionSignature struct {
 	EpochID         []byte
 	SignedHash      []byte
 	SignersBitfield []byte
 	Signature       []byte
 }
 
-type DecryptorDecryptorIdentity struct {
+type DecryptorIdentity struct {
 	Address        string
 	BlsPublicKey   []byte
 	BlsSignature   []byte
 	SignatureValid bool
 }
 
-type DecryptorDecryptorSetMember struct {
+type DecryptorSetMember struct {
 	ActivationBlockNumber int64
 	Index                 int32
 	Address               string
 }
 
-type DecryptorEonPublicKey struct {
+type EonPublicKey struct {
 	ActivationBlockNumber int64
 	EonPublicKey          []byte
 }
 
-type DecryptorEventSyncProgress struct {
+type EventSyncProgress struct {
 	ID              bool
 	NextBlockNumber int32
 	NextLogIndex    int32
 }
 
-type DecryptorKeyperSet struct {
+type KeyperSet struct {
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }
 
-type DecryptorMetaInf struct {
+type MetaInf struct {
 	Key   string
 	Value string
 }
