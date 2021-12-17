@@ -11,9 +11,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
+	"github.com/shutter-network/shutter/shuttermint/chainobserver"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -100,6 +102,16 @@ func (d *Decryptor) Run(ctx context.Context) error {
 		return d.p2p.Run(errorctx, gossipTopicNames[:], topicValidators)
 	})
 	return errorgroup.Wait()
+}
+
+func (d *Decryptor) handleContractEvents(ctx context.Context) error {
+	events := []*eventsyncer.EventType{
+		d.contracts.KeypersConfigsListNewConfig,
+		d.contracts.DecryptorsConfigsListNewConfig,
+		d.contracts.BLSRegistryRegistered,
+		d.contracts.CollatorConfigsListNewConfig,
+	}
+	return chainobserver.New(d.contracts, d.dbpool).Observe(ctx, events)
 }
 
 func (d *Decryptor) handleMessages(ctx context.Context) error {
