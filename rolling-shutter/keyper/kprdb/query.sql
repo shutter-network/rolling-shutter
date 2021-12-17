@@ -156,37 +156,9 @@ WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(bloc
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
--- name: UpdateEventSyncProgress :exec
-INSERT INTO event_sync_progress (next_block_number, next_log_index)
-VALUES ($1, $2)
-ON CONFLICT (id) DO UPDATE
-    SET next_block_number = $1,
-        next_log_index = $2;
-
--- name: GetEventSyncProgress :one
-SELECT * FROM event_sync_progress LIMIT 1;
-
--- name: InsertChainKeyperSet :exec
-INSERT INTO chain_keyper_set (activation_block_number, keypers, threshold)
-VALUES ($1, $2, $3);
-
--- name: GetChainKeyperSet :one
-SELECT * FROM chain_keyper_set
-WHERE activation_block_number <= sqlc.arg(block_number)
-ORDER BY activation_block_number DESC LIMIT 1;
-
 -- name: InsertEonPublicKey :exec
 INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
 DELETE FROM outgoing_eon_keys RETURNING *;
-
--- name: InsertChainCollator :exec
-INSERT INTO chain_collator (activation_block_number, collator)
-VALUES ($1, $2);
-
--- name: GetChainCollator :one
-SELECT collator FROM chain_collator
-WHERE activation_block_number <= sqlc.arg(block_number)
-ORDER BY activation_block_number DESC LIMIT 1;

@@ -15,10 +15,12 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/shutter/shuttermint/chainobserver"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -139,6 +141,14 @@ func (kpr *keyper) run(ctx context.Context) error {
 		return kpr.handleContractEvents(ctx)
 	})
 	return group.Wait()
+}
+
+func (kpr *keyper) handleContractEvents(ctx context.Context) error {
+	events := []*eventsyncer.EventType{
+		kpr.contracts.KeypersConfigsListNewConfig,
+		kpr.contracts.CollatorConfigsListNewConfig,
+	}
+	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
 func (kpr *keyper) operateShuttermint(ctx context.Context) error {

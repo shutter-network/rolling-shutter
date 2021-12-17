@@ -2,8 +2,18 @@ version: 1
 packages:
   - path: "keyper/kprdb"
     name: "kprdb"
-    schema: ["keyper/kprdb/schema.sql", "commondb/meta-schema.sql"]
-    queries: ["keyper/kprdb/query.sql", "commondb/meta-query.sql"]
+    schema:
+      [
+        "keyper/kprdb/schema.sql",
+        "commondb/meta-schema.sql",
+        "commondb/observe-schema.sql",
+      ]
+    queries:
+      [
+        "keyper/kprdb/query.sql",
+        "commondb/meta-query.sql",
+        "commondb/observe-query.sql",
+      ]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
