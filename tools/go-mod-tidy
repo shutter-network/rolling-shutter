@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-cd ${1}
+cd "${1}"
 
 if go mod tidy -v 2>&1 | grep -q 'updates to go.mod needed'; then
     exit 1
