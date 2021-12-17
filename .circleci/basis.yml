@@ -69,7 +69,7 @@ jobs:
             if [[ -e ~/.local/bin/pre-commit ]]; then
               echo "pre-commit already installed"
             else
-              pip install --user https://github.com/schmir/pre-commit/archive/379db4cb880b30b05863035d2d29a1f66b5795d9.zip
+              pip install --user https://github.com/pre-commit/pre-commit/archive/379db4cb880b30b05863035d2d29a1f66b5795d9.zip
             fi
       - run: pre-commit install-hooks
       - save_cache:
