@@ -186,32 +186,6 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]TendermintBatchConfig,
 	return items, nil
 }
 
-const getChainCollator = `-- name: GetChainCollator :one
-SELECT collator FROM chain_collator
-WHERE activation_block_number <= $1
-ORDER BY activation_block_number DESC LIMIT 1
-`
-
-func (q *Queries) GetChainCollator(ctx context.Context, blockNumber int64) (string, error) {
-	row := q.db.QueryRow(ctx, getChainCollator, blockNumber)
-	var collator string
-	err := row.Scan(&collator)
-	return collator, err
-}
-
-const getChainKeyperSet = `-- name: GetChainKeyperSet :one
-SELECT activation_block_number, keypers, threshold FROM chain_keyper_set
-WHERE activation_block_number <= $1
-ORDER BY activation_block_number DESC LIMIT 1
-`
-
-func (q *Queries) GetChainKeyperSet(ctx context.Context, blockNumber int64) (ChainKeyperSet, error) {
-	row := q.db.QueryRow(ctx, getChainKeyperSet, blockNumber)
-	var i ChainKeyperSet
-	err := row.Scan(&i.ActivationBlockNumber, &i.Keypers, &i.Threshold)
-	return i, err
-}
-
 const getDKGResult = `-- name: GetDKGResult :one
 SELECT eon, success, error, pure_result FROM dkg_result
 WHERE eon = $1
@@ -336,17 +310,6 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 	return i, err
 }
 
-const getEventSyncProgress = `-- name: GetEventSyncProgress :one
-SELECT id, next_block_number, next_log_index FROM event_sync_progress LIMIT 1
-`
-
-func (q *Queries) GetEventSyncProgress(ctx context.Context) (EventSyncProgress, error) {
-	row := q.db.QueryRow(ctx, getEventSyncProgress)
-	var i EventSyncProgress
-	err := row.Scan(&i.ID, &i.NextBlockNumber, &i.NextLogIndex)
-	return i, err
-}
-
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM tendermint_sync_meta
@@ -412,37 +375,6 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Keypers,
 		arg.Threshold,
 	)
-	return err
-}
-
-const insertChainCollator = `-- name: InsertChainCollator :exec
-INSERT INTO chain_collator (activation_block_number, collator)
-VALUES ($1, $2)
-`
-
-type InsertChainCollatorParams struct {
-	ActivationBlockNumber int64
-	Collator              string
-}
-
-func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollatorParams) error {
-	_, err := q.db.Exec(ctx, insertChainCollator, arg.ActivationBlockNumber, arg.Collator)
-	return err
-}
-
-const insertChainKeyperSet = `-- name: InsertChainKeyperSet :exec
-INSERT INTO chain_keyper_set (activation_block_number, keypers, threshold)
-VALUES ($1, $2, $3)
-`
-
-type InsertChainKeyperSetParams struct {
-	ActivationBlockNumber int64
-	Keypers               []string
-	Threshold             int32
-}
-
-func (q *Queries) InsertChainKeyperSet(ctx context.Context, arg InsertChainKeyperSetParams) error {
-	_, err := q.db.Exec(ctx, insertChainKeyperSet, arg.ActivationBlockNumber, arg.Keypers, arg.Threshold)
 	return err
 }
 
@@ -721,23 +653,5 @@ type TMSetSyncMetaParams struct {
 
 func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) error {
 	_, err := q.db.Exec(ctx, tMSetSyncMeta, arg.CurrentBlock, arg.LastCommittedHeight, arg.SyncTimestamp)
-	return err
-}
-
-const updateEventSyncProgress = `-- name: UpdateEventSyncProgress :exec
-INSERT INTO event_sync_progress (next_block_number, next_log_index)
-VALUES ($1, $2)
-ON CONFLICT (id) DO UPDATE
-    SET next_block_number = $1,
-        next_log_index = $2
-`
-
-type UpdateEventSyncProgressParams struct {
-	NextBlockNumber int32
-	NextLogIndex    int32
-}
-
-func (q *Queries) UpdateEventSyncProgress(ctx context.Context, arg UpdateEventSyncProgressParams) error {
-	_, err := q.db.Exec(ctx, updateEventSyncProgress, arg.NextBlockNumber, arg.NextLogIndex)
 	return err
 }

@@ -1,5 +1,5 @@
 -- name: InsertKeyperSet :exec
-INSERT INTO decryptor.keyper_set (
+INSERT INTO keyper_set (
     activation_block_number,
     keypers,
     threshold

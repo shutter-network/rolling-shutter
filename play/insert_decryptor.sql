@@ -1,6 +1,6 @@
 -- add a decryptor to the decryptor set starting at epoch 0
 
-INSERT INTO decryptor.decryptor_identity (
+INSERT INTO decryptor_identity (
     address,
     bls_public_key
 ) VALUES (
@@ -8,7 +8,7 @@ INSERT INTO decryptor.decryptor_identity (
     :key
 ) ON CONFLICT DO NOTHING;
 
-INSERT INTO decryptor.decryptor_set_member (
+INSERT INTO decryptor_set_member (
     activation_block_number,
     index,
     address
@@ -17,7 +17,7 @@ INSERT INTO decryptor.decryptor_set_member (
     (
         SELECT
             count(1)
-        FROM decryptor.decryptor_set_member
+        FROM decryptor_set_member
         WHERE activation_block_number = 0
     ),
     :address

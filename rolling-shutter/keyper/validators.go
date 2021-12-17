@@ -145,7 +145,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 		return false
 	}
 	blk := epochid.BlockNumber(t.EpochID)
-	collatorString, err := kpr.db.GetChainCollator(ctx, int64(blk))
+	chainCollator, err := kpr.db.GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		log.Printf("got decryption trigger with no collator for given block number: %d", blk)
 		return false
@@ -155,9 +155,9 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 		return false
 	}
 
-	collator, err := shdb.DecodeAddress(collatorString)
+	collator, err := shdb.DecodeAddress(chainCollator.Collator)
 	if err != nil {
-		log.Printf("error while converting collator from string to address: %s", collatorString)
+		log.Printf("error while converting collator from string to address: %s", chainCollator.Collator)
 		return false
 	}
 

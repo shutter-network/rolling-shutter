@@ -2,8 +2,18 @@ version: 1
 packages:
   - path: "keyper/kprdb"
     name: "kprdb"
-    schema: ["keyper/kprdb/schema.sql", "commondb/meta-schema.sql"]
-    queries: ["keyper/kprdb/query.sql", "commondb/meta-query.sql"]
+    schema:
+      [
+        "keyper/kprdb/schema.sql",
+        "commondb/meta-schema.sql",
+        "commondb/observe-schema.sql",
+      ]
+    queries:
+      [
+        "keyper/kprdb/query.sql",
+        "commondb/meta-query.sql",
+        "commondb/observe-query.sql",
+      ]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
@@ -12,8 +22,18 @@ packages:
 
   - path: "decryptor/dcrdb"
     name: "dcrdb"
-    schema: ["decryptor/dcrdb/schema.sql", "commondb/meta-schema.sql"]
-    queries: ["decryptor/dcrdb/query.sql", "commondb/meta-query.sql"]
+    schema:
+      [
+        "decryptor/dcrdb/schema.sql",
+        "commondb/meta-schema.sql",
+        "commondb/observe-schema.sql",
+      ]
+    queries:
+      [
+        "decryptor/dcrdb/query.sql",
+        "commondb/meta-query.sql",
+        "commondb/observe-query.sql",
+      ]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
@@ -24,6 +44,16 @@ packages:
     name: "cltrdb"
     schema: ["collator/cltrdb/schema.sql", "commondb/meta-schema.sql"]
     queries: ["collator/cltrdb/query.sql", "commondb/meta-query.sql"]
+    engine: "postgresql"
+    sql_package: "pgx/v4"
+    output_db_file_name: "db.sqlc.gen.go"
+    output_models_file_name: "models.sqlc.gen.go"
+    output_files_suffix: "c.gen"
+
+  - path: "commondb"
+    name: "commondb"
+    schema: ["commondb/meta-schema.sql", "commondb/observe-schema.sql"]
+    queries: ["commondb/meta-query.sql", "commondb/observe-query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"

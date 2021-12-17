@@ -15,11 +15,6 @@ CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,
        decryption_key bytea
 );
-CREATE TABLE event_sync_progress (
-       id bool UNIQUE NOT NULL DEFAULT true,
-       next_block_number integer NOT NULL,
-       next_log_index integer NOT NULL
-);
 
 ----- tendermint events
 
@@ -84,19 +79,8 @@ CREATE TABLE dkg_result(
        pure_result BYTEA  -- shdb.EncodePureDKGResult/shdb.DecodePureDKGResult
 );
 
-CREATE TABLE chain_keyper_set(
-       activation_block_number bigint PRIMARY KEY,
-       keypers text[] NOT NULL,
-       threshold integer NOT NULL
-);
-
 -- outgoing_eon_keys contains the eon public key(s) that should be broadcast as a result of a successful DKG
 CREATE TABLE outgoing_eon_keys(
        eon_public_key bytea,
        eon bigint NOT NULL PRIMARY KEY
-);
-
-CREATE TABLE chain_collator(
-       activation_block_number bigint PRIMARY KEY,
-       collator text NOT NULL
 );

@@ -12,12 +12,6 @@ type ChainCollator struct {
 	Collator              string
 }
 
-type ChainKeyperSet struct {
-	ActivationBlockNumber int64
-	Keypers               []string
-	Threshold             int32
-}
-
 type DecryptionKey struct {
 	EpochID       []byte
 	DecryptionKey []byte
@@ -31,6 +25,19 @@ type DecryptionKeyShare struct {
 
 type DecryptionTrigger struct {
 	EpochID []byte
+}
+
+type DecryptorIdentity struct {
+	Address        string
+	BlsPublicKey   []byte
+	BlsSignature   []byte
+	SignatureValid bool
+}
+
+type DecryptorSetMember struct {
+	ActivationBlockNumber int64
+	Index                 int32
+	Address               string
 }
 
 type DkgResult struct {
@@ -51,6 +58,12 @@ type EventSyncProgress struct {
 	ID              bool
 	NextBlockNumber int32
 	NextLogIndex    int32
+}
+
+type KeyperSet struct {
+	ActivationBlockNumber int64
+	Keypers               []string
+	Threshold             int32
 }
 
 type MetaInf struct {
