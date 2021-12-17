@@ -11,10 +11,10 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/shutter-network/shutter/shuttermint/commondb"
 	"github.com/shutter-network/shutter/shuttermint/contract"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/blsregistry"
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
@@ -61,7 +61,7 @@ func (d *Decryptor) handleContractEvents(ctx context.Context) error {
 
 type eventHandler struct {
 	tx        pgx.Tx
-	db        *dcrdb.Queries
+	db        *commondb.Queries
 	contracts *deployment.Contracts
 }
 
@@ -71,12 +71,12 @@ func (d *Decryptor) handleEventSyncUpdate(
 	ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate,
 ) error {
 	return d.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		dbWithTx := d.db.WithTx(tx)
+		db := commondb.New(tx)
 
 		if eventSyncUpdate.Event != nil {
 			handler := &eventHandler{
 				tx:        tx,
-				db:        dbWithTx,
+				db:        db,
 				contracts: d.contracts,
 			}
 			if err := handler.handleEvent(ctx, eventSyncUpdate.Event); err != nil {
@@ -93,7 +93,7 @@ func (d *Decryptor) handleEventSyncUpdate(
 			nextBlockNumber = eventSyncUpdate.BlockNumber
 			nextLogIndex = eventSyncUpdate.LogIndex + 1
 		}
-		if err := dbWithTx.UpdateEventSyncProgress(ctx, dcrdb.UpdateEventSyncProgressParams{
+		if err := db.UpdateEventSyncProgress(ctx, commondb.UpdateEventSyncProgressParams{
 			NextBlockNumber: int32(nextBlockNumber),
 			NextLogIndex:    int32(nextLogIndex),
 		}); err != nil {
@@ -133,7 +133,7 @@ func (h *eventHandler) handleKeypersConfigsListNewConfigEvent(ctx context.Contex
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d from config contract would overflow int64", event.ActivationBlockNumber)
 	}
-	err = h.db.InsertKeyperSet(ctx, dcrdb.InsertKeyperSetParams{
+	err = h.db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
 		Keypers:               shdb.EncodeAddresses(addrs),
 		Threshold:             int32(event.Threshold),
@@ -176,7 +176,7 @@ func (h *eventHandler) handleDecryptorsConfigsListNewConfigEvent(ctx context.Con
 	}
 	for i, addr := range addrs {
 		encodedAddress := shdb.EncodeAddress(addr)
-		err = h.db.InsertDecryptorSetMember(ctx, dcrdb.InsertDecryptorSetMemberParams{
+		err = h.db.InsertDecryptorSetMember(ctx, commondb.InsertDecryptorSetMemberParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
 			Index:                 int32(i),
 			Address:               encodedAddress,
@@ -201,7 +201,7 @@ func (h *eventHandler) handleBLSRegistryRegistered(ctx context.Context, event co
 	key, signature, err := rawIdentity.GetKeyAndSignature()
 	if err != nil {
 		log.Printf("Decryptor %s registered invalid BLS key and signature: %s", event.A, err)
-		err = h.db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+		err = h.db.InsertDecryptorIdentity(ctx, commondb.InsertDecryptorIdentityParams{
 			Address:        encodedAddress,
 			BlsPublicKey:   []byte{},
 			BlsSignature:   []byte{},
@@ -209,7 +209,7 @@ func (h *eventHandler) handleBLSRegistryRegistered(ctx context.Context, event co
 		})
 	} else {
 		log.Printf("Decryptor %s successfully registered their BLS key", event.A)
-		err = h.db.InsertDecryptorIdentity(ctx, dcrdb.InsertDecryptorIdentityParams{
+		err = h.db.InsertDecryptorIdentity(ctx, commondb.InsertDecryptorIdentityParams{
 			Address:        encodedAddress,
 			BlsPublicKey:   shdb.EncodeBLSPublicKey(key),
 			BlsSignature:   shdb.EncodeBLSSignature(signature),
@@ -237,7 +237,7 @@ func (h *eventHandler) handleCollatorConfigsListNewConfigEvent(ctx context.Conte
 	if len(addrs) > 1 {
 		return errors.Errorf("got multiple collators from collator addrs set contract: %s", addrs)
 	} else if len(addrs) == 1 {
-		err = h.db.InsertChainCollator(ctx, dcrdb.InsertChainCollatorParams{
+		err = h.db.InsertChainCollator(ctx, commondb.InsertChainCollatorParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
 			Collator:              shdb.EncodeAddress(addrs[0]),
 		})
