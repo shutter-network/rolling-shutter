@@ -1,0 +1,135 @@
+openapi: "3.0.0"
+info:
+  version: 0.1.0
+  title: rolling shutter keyper
+  description: This describes the rolling shutter's keyper API
+  contact:
+    name: shutter-network
+    url: http://shutter.network/
+  license:
+    name: MIT
+paths:
+  /ping:
+    get:
+      description: |
+        Pings the server
+      operationId: ping
+      parameters:
+
+  /eons:
+    get:
+      description: |
+        Get information about all started
+      operationId: getEons
+      parameters:
+      responses:
+        "200":
+          description: Information about all started eons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Eons"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /decryptionKey/{epochID}:
+    get:
+      description: Get the decryption key for an epoch ID
+      operationId: getDecryptionKey
+      parameters:
+        - name: epochID
+          in: path
+          description: Epoch ID of the decryption key to get
+          required: true
+          schema:
+            $ref: "#/components/schemas/EpochID"
+      responses:
+        "200":
+          description: The decryption key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecryptionKey"
+        "404":
+          description: error if the decryption key has not been generated yet
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /decryptionTrigger:
+    post:
+      description: Trigger decryption key generation for an epoch
+      operationId: SubmitDecryptionTrigger
+      requestBody:
+        description: Hex encoded ID of the epoch whose decryption key to generate
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EpochID"
+      responses:
+        "200":
+          description: success
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    EpochID:
+      type: string
+      pattern: "^0x[0-9a-f]{16}$"
+
+    DecryptionKey:
+      type: string
+      pattern: "^0x[0-9a-f]{16}$"
+
+    Eon:
+      type: object
+      required:
+        - index
+        - activation_block_number
+        - eon_key
+        - finished
+        - successful
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        activation_block_number:
+          type: integer
+          minimum: 0
+        eon_key:
+          type: string
+          pattern: "^0x[0-9a-f]{16}$"
+        finished:
+          type: boolean
+        successful:
+          type: boolean
+
+    Eons:
+      type: array
+      items:
+        $ref: "#/components/schemas/Eon"
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string

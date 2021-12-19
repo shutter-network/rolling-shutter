@@ -118,6 +118,9 @@ WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1;
 
+-- name: GetAllEons :many
+SELECT * FROM eons ORDER BY eon;
+
 -- name: InsertPolyEval :exec
 INSERT INTO poly_evals (eon, receiver_address, eval)
 VALUES ($1, $2, $3);

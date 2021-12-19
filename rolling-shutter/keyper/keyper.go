@@ -3,15 +3,22 @@ package keyper
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"net/http"
+	"os"
 	"time"
 
+	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
-	"github.com/tendermint/tendermint/rpc/client/http"
+	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
@@ -19,6 +26,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/shutter/shuttermint/keyper/kproapi"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
@@ -96,7 +104,7 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	shuttermintClient, err := http.New(config.ShuttermintURL, "/websocket")
+	shuttermintClient, err := tmhttp.New(config.ShuttermintURL, "/websocket")
 	if err != nil {
 		return err
 	}
@@ -120,10 +128,71 @@ func Run(ctx context.Context, config Config) error {
 	return k.run(ctx)
 }
 
+func (kpr *keyper) setupAPIRouter(swagger *openapi3.T) http.Handler {
+	router := chi.NewRouter()
+
+	router.Use(chimiddleware.OapiRequestValidator(swagger))
+
+	_ = kproapi.HandlerFromMux(&server{kpr: kpr}, router)
+
+	return router
+}
+
+func (kpr *keyper) setupRouter() *chi.Mux {
+	swagger, err := kproapi.GetSwagger()
+	if err != nil {
+		panic(err)
+	}
+	swagger.Servers = nil
+
+	router := chi.NewRouter()
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Mount("/v1", http.StripPrefix("/v1", kpr.setupAPIRouter(swagger)))
+	apiJSON, _ := json.Marshal(swagger)
+	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(apiJSON)
+	})
+
+	/*
+	   The following enables the swagger ui. Run the following to use it:
+
+	     npm pack swagger-ui-dist@4.1.2
+	     tar -xf swagger-ui-dist-4.1.2.tgz
+	     export SWAGGER_UI=$(pwd)/package
+	*/
+	swaggerUI := os.Getenv("SWAGGER_UI")
+	if swaggerUI != "" {
+		log.Printf("Enabling the swagger ui at /ui/")
+		fs := http.FileServer(http.Dir(os.Getenv("SWAGGER_UI")))
+		router.Mount("/ui/", http.StripPrefix("/ui/", fs))
+	}
+
+	return router
+}
+
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 
 	topicValidators := kpr.makeMessagesValidators()
+
+	if kpr.config.HTTPEnabled {
+		httpServer := &http.Server{
+			Addr:    kpr.config.HTTPListenAddress,
+			Handler: kpr.setupRouter(),
+		}
+		group.Go(httpServer.ListenAndServe)
+		group.Go(func() error {
+			<-ctx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return httpServer.Shutdown(shutdownCtx)
+		})
+	}
 
 	group.Go(func() error {
 		return kpr.p2p.Run(ctx, GossipTopicNames, topicValidators)
