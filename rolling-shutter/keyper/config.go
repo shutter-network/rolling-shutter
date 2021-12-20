@@ -34,6 +34,9 @@ type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 
+	HTTPEnabled       bool
+	HTTPListenAddress string
+
 	InstanceID uint64
 }
 
@@ -59,6 +62,10 @@ EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
 SigningKey	= "{{ .SigningKey | FromECDSA | printf "%x" }}"
 ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
+
+# HTTP interface
+HTTPEnabled       = {{ .HTTPEnabled }}
+HTTPListenAddress = "{{ .HTTPListenAddress }}"
 
 InstanceID = {{ .InstanceID }}
 `

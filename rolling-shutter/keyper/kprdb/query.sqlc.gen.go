@@ -113,6 +113,35 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	return exists, err
 }
 
+const getAllEons = `-- name: GetAllEons :many
+SELECT eon, height, activation_block_number, config_index FROM eons ORDER BY eon
+`
+
+func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
+	rows, err := q.db.Query(ctx, getAllEons)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Eon
+	for rows.Next() {
+		var i Eon
+		if err := rows.Scan(
+			&i.Eon,
+			&i.Height,
+			&i.ActivationBlockNumber,
+			&i.ConfigIndex,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAndDeleteEonPublicKeys = `-- name: GetAndDeleteEonPublicKeys :many
 DELETE FROM outgoing_eon_keys RETURNING eon_public_key, eon
 `
