@@ -80,11 +80,57 @@ func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*events
 	return errorgroup.Wait()
 }
 
+type newKeyperConfig struct {
+	contract.KeypersConfigsListNewConfig
+	addrs []common.Address
+}
+
+type newDecryptorConfig struct {
+	contract.DecryptorsConfigsListNewConfig
+	addrs []common.Address
+}
+
+type newCollatorConfig struct {
+	contract.CollatorConfigsListNewConfig
+	addrs []common.Address
+}
+
+func (chainobs *ChainObserver) amendEvent(
+	ctx context.Context, event interface{},
+) (interface{}, error) {
+	switch event := event.(type) {
+	case contract.KeypersConfigsListNewConfig:
+		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.Index)
+		if err != nil {
+			return nil, err
+		}
+		return newKeyperConfig{KeypersConfigsListNewConfig: event, addrs: addrs}, nil
+	case contract.DecryptorsConfigsListNewConfig:
+		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Decryptors, event.Index)
+		if err != nil {
+			return nil, err
+		}
+		return newDecryptorConfig{DecryptorsConfigsListNewConfig: event, addrs: addrs}, nil
+	case contract.CollatorConfigsListNewConfig:
+		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.Index)
+		if err != nil {
+			return nil, err
+		}
+		return newCollatorConfig{CollatorConfigsListNewConfig: event, addrs: addrs}, nil
+	}
+	return event, nil
+}
+
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
 // on failure.
 func (chainobs *ChainObserver) handleEventSyncUpdate(
 	ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate,
 ) error {
+	var err error
+	eventSyncUpdate.Event, err = chainobs.amendEvent(ctx, eventSyncUpdate.Event)
+	if err != nil {
+		return err
+	}
 	return chainobs.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := commondb.New(tx)
 
@@ -118,13 +164,13 @@ func (chainobs *ChainObserver) handleEvent(
 ) error {
 	var err error
 	switch event := event.(type) {
-	case contract.KeypersConfigsListNewConfig:
+	case newKeyperConfig:
 		err = chainobs.handleKeypersConfigsListNewConfigEvent(ctx, db, event)
-	case contract.DecryptorsConfigsListNewConfig:
+	case newDecryptorConfig:
 		err = chainobs.handleDecryptorsConfigsListNewConfigEvent(ctx, db, event)
 	case contract.RegistryRegistered:
 		err = chainobs.handleBLSRegistryRegistered(ctx, db, event)
-	case contract.CollatorConfigsListNewConfig:
+	case newCollatorConfig:
 		err = chainobs.handleCollatorConfigsListNewConfigEvent(ctx, db, event)
 	default:
 		log.Printf("ignoring unknown event %+v %T", event, event)
@@ -133,25 +179,20 @@ func (chainobs *ChainObserver) handleEvent(
 }
 
 func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
-	ctx context.Context, db *commondb.Queries, event contract.KeypersConfigsListNewConfig,
+	ctx context.Context, db *commondb.Queries, event newKeyperConfig,
 ) error {
 	log.Printf(
 		"handling NewConfig event from keypers config contract in block %d (index %d, activation block number %d)",
 		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
 	)
-	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.Index)
-	if err != nil {
-		return err
-	}
-
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
 			"activation block number %d from config contract would overflow int64",
 			event.ActivationBlockNumber)
 	}
-	err = db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
+	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
-		Keypers:               shdb.EncodeAddresses(addrs),
+		Keypers:               shdb.EncodeAddresses(event.addrs),
 		Threshold:             int32(event.Threshold),
 	})
 	if err != nil {
@@ -161,27 +202,22 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 }
 
 func (chainobs *ChainObserver) handleDecryptorsConfigsListNewConfigEvent(
-	ctx context.Context, db *commondb.Queries, event contract.DecryptorsConfigsListNewConfig,
+	ctx context.Context, db *commondb.Queries, event newDecryptorConfig,
 ) error {
 	log.Printf(
 		"handling NewConfig event from decryptors config contract in block %d (index %d, activation block number %d)",
 		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
 	)
-	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Decryptors, event.Index)
-	if err != nil {
-		return err
-	}
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
 			"activation block number %d from config contract would overflow int64",
 			event.ActivationBlockNumber)
 	}
-	for i, addr := range addrs {
-		encodedAddress := shdb.EncodeAddress(addr)
-		err = db.InsertDecryptorSetMember(ctx, commondb.InsertDecryptorSetMemberParams{
+	for i, addr := range event.addrs {
+		err := db.InsertDecryptorSetMember(ctx, commondb.InsertDecryptorSetMemberParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
 			Index:                 int32(i),
-			Address:               encodedAddress,
+			Address:               shdb.EncodeAddress(addr),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert decryptor set member into db")
@@ -229,28 +265,24 @@ func (chainobs *ChainObserver) handleBLSRegistryRegistered(
 }
 
 func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
-	ctx context.Context, db *commondb.Queries, event contract.CollatorConfigsListNewConfig,
+	ctx context.Context, db *commondb.Queries, event newCollatorConfig,
 ) error {
 	log.Printf(
 		"handling NewConfig event from collator config contract in block %d (index %d, activation block number %d)",
 		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
 	)
-	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.Index)
-	if err != nil {
-		return err
-	}
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
 			"activation block number %d from config contract would overflow int64",
 			event.ActivationBlockNumber,
 		)
 	}
-	if len(addrs) > 1 {
-		return errors.Errorf("got multiple collators from collator addrs set contract: %s", addrs)
-	} else if len(addrs) == 1 {
-		err = db.InsertChainCollator(ctx, commondb.InsertChainCollatorParams{
+	if len(event.addrs) > 1 {
+		return errors.Errorf("got multiple collators from collator addrs set contract: %s", event.addrs)
+	} else if len(event.addrs) == 1 {
+		err := db.InsertChainCollator(ctx, commondb.InsertChainCollatorParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
-			Collator:              shdb.EncodeAddress(addrs[0]),
+			Collator:              shdb.EncodeAddress(event.addrs[0]),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert collator into db")
