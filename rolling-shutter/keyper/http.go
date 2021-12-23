@@ -1,11 +1,13 @@
 package keyper
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
@@ -36,7 +38,7 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epoc
 	ctx := r.Context()
 	db := kprdb.New(srv.kpr.dbpool)
 
-	epochIDBytes, err := hexutil.Decode(string(epochID))
+	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(epochID), "0x"))
 	if err != nil {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
@@ -51,7 +53,10 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epoc
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	_, _ = w.Write([]byte(hexutil.Encode(decryptionKey.DecryptionKey)))
+
+	res := "0x" + hex.EncodeToString(decryptionKey.DecryptionKey)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(res)
 }
 
 func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +101,7 @@ func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
 		res = append(res, kproapi.Eon{
 			Index:                 int(eon.Eon),
 			ActivationBlockNumber: int(eon.ActivationBlockNumber),
-			EonKey:                hexutil.Encode(eonKey),
+			EonKey:                "0x" + hex.EncodeToString(eonKey),
 			Finished:              finished,
 			Successful:            successful,
 		})
@@ -112,11 +117,12 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, "Invalid request for SubmitDecryptionTrigger")
 		return
 	}
-	epochID, err := hexutil.DecodeUint64(string(requestBody))
+	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(requestBody), "0x"))
 	if err != nil {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	epochID := binary.BigEndian.Uint64(epochIDBytes)
 
 	ctx := r.Context()
 	handler := epochKGHandler{
