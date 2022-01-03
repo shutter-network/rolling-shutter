@@ -15,6 +15,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -49,7 +50,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
 	tkg := medley.NewTestKeyGenerator(t, 1, 1)
@@ -83,7 +84,7 @@ func TestInsertCipherBatchIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
 
@@ -190,7 +191,7 @@ func TestHandleSignatureIntegration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			db, closedb := medley.NewDecryptorTestDB(ctx, t)
+			db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 			defer closedb()
 			populateDBWithDecryptors(ctx, t, db, map[int32]*shbls.SecretKey{config.SignerIndex: config.SigningKey, 2: signingKey2})
 			for i, input := range test.inputs {
@@ -218,7 +219,7 @@ func TestInsertAggregatedSignatureIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
@@ -266,7 +267,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
 	config.RequiredSignatures = 2 // prevent generation of polluting signatures

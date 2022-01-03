@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -52,7 +53,7 @@ func TestCipherBatchValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
@@ -162,7 +163,7 @@ func TestSignatureValidatorsIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	var peerID peer.ID
@@ -281,7 +282,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	var peerID peer.ID

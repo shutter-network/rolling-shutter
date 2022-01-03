@@ -15,8 +15,8 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -28,7 +28,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	db, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
@@ -141,7 +141,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	db, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)

@@ -12,6 +12,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -86,7 +87,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	db, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	epochID := uint64(50)
@@ -130,7 +131,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	db, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	epochID := uint64(50)
@@ -176,7 +177,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, closedb := medley.NewKeyperTestDB(ctx, t)
+	db, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	epochID := uint64(50)

@@ -9,7 +9,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 )
 
 func TestGetDecryptorSetIntegration(t *testing.T) {
@@ -17,7 +17,7 @@ func TestGetDecryptorSetIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	addresses := []string{"address1", "address2", "address3"}
@@ -108,7 +108,7 @@ func TestEonPublicKeyIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, closedb := medley.NewDecryptorTestDB(ctx, t)
+	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 
 	key1 := []byte("key1")

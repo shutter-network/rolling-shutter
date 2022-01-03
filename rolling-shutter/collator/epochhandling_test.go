@@ -8,8 +8,8 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -31,7 +31,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := medley.NewCollatorTestDB(ctx, t)
+	db, closedb := testdb.NewCollatorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
 
