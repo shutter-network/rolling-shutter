@@ -11,8 +11,8 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
+	"github.com/shutter-network/shutter/shuttermint/medley/testkeygen"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -28,7 +28,7 @@ func newTestConfig(t *testing.T) Config {
 	return c
 }
 
-func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config Config, keyperIndex uint64) *medley.TestKeyGenerator {
+func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config Config, keyperIndex uint64) *testkeygen.TestKeyGenerator {
 	t.Helper()
 
 	eon := uint64(0)
@@ -38,7 +38,7 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 		"0x1111111111111111111111111111111111111111",
 	}
 
-	tkg := medley.NewTestKeyGenerator(t, 3, 2)
+	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
 	for i := uint64(0); i < tkg.NumKeypers; i++ {
 		share := tkg.EonPublicKeyShare(0, i)

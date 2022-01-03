@@ -1,4 +1,4 @@
-package medley
+package testkeygen
 
 import (
 	"io"

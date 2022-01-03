@@ -13,9 +13,9 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
+	"github.com/shutter-network/shutter/shuttermint/medley/testkeygen"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -53,7 +53,7 @@ func TestInsertDecryptionKeyIntegration(t *testing.T) {
 	db, closedb := testdb.NewDecryptorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
-	tkg := medley.NewTestKeyGenerator(t, 1, 1)
+	tkg := testkeygen.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
 		ActivationBlockNumber: 0,
@@ -271,7 +271,7 @@ func TestHandleEpochIntegration(t *testing.T) {
 	defer closedb()
 	config := newTestConfig(t)
 	config.RequiredSignatures = 2 // prevent generation of polluting signatures
-	tkg := medley.NewTestKeyGenerator(t, 1, 1)
+	tkg := testkeygen.NewTestKeyGenerator(t, 1, 1)
 
 	err := db.InsertEonPublicKey(ctx, dcrdb.InsertEonPublicKeyParams{
 		ActivationBlockNumber: 0,
