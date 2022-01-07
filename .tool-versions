@@ -1,4 +1,4 @@
-babashka 0.6.8
+babashka 0.7.3
 circleci 0.1.16535
 clojure 1.10.3.1040
 golang 1.17.5

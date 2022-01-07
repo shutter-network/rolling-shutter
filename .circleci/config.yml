@@ -21,7 +21,7 @@ jobs:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v6
+          key: gen-clj-v7
       - run:
           name: Install babashka with asdf
           command: |
@@ -39,7 +39,7 @@ jobs:
           command: |
             bb -gen-ci
       - save_cache:
-          key: gen-clj-v6
+          key: gen-clj-v7
           paths:
             - ~/.asdf
       - continuation/continue:

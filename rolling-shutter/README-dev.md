@@ -69,7 +69,8 @@ git repository:
 asdf install
 ```
 
-Optionally you may also install clojure and java:
+If you want to run the whole system tests inside the play directory, you also
+have to install clojure and java:
 
 ```
 asdf plugin add java

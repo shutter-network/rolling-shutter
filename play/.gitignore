@@ -6,3 +6,6 @@
 /play.json
 /testchain/
 /deployments
+/.nrepl*
+/.cpcache
+/work/

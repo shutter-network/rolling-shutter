@@ -1,0 +1,11 @@
+{:paths ["src"]
+ :resource-paths []
+ :deps {org.clojure/clojure {:mvn/version "1.10.3"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.2.761"}
+        org.postgresql/postgresql {:mvn/version "42.2.10"}
+        com.taoensso/timbre {:mvn/version "5.1.2"}
+        mvxcvi/puget {:mvn/version "1.3.2"}
+        babashka/fs {:mvn/version "0.1.2"}
+        babashka/process {:mvn/version "0.1.0"}}
+ :aliases {:run-tests {:exec-fn sht.core/run-tests}
+           :dev {:extra-paths ["dev"]}}}

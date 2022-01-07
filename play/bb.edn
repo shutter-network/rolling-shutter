@@ -1,4 +1,5 @@
-{:min-bb-version "0.6.7"
+{:min-bb-version "0.7.3"
+ :paths ["src"]
  :tasks
  {:requires ([babashka.fs :as fs :refer [which]]
              [babashka.core]
@@ -6,12 +7,18 @@
              [clojure.java.browse :as browse]
              [clojure.java.io :as io]
              [babashka.curl :as curl]
-             [cheshire.core :as json])
+             [cheshire.core :as json]
+             [sht.play :as play :refer [keyper-db decryptor-db]])
 
   :init
   (do
-    (def num-keypers 3)
-    (def num-decryptors 3)
+    (defn long-from-env
+      [s default]
+      (Long/valueOf (or (System/getenv s) default)))
+
+    (def num-keypers (long-from-env "PLAY_NUM_KEYPERS" "3"))
+    (def num-decryptors (long-from-env "PLAY_NUM_DECRYPTORS" "3"))
+
     (def windows? (babashka.core/windows?))
     (def no-color? windows?)
     (defn inside-asdf?
@@ -101,14 +108,6 @@
 
     (def mock-cfg "mock.toml")
     (def collator-cfg "collator.toml")
-
-    (defn keyper-db
-      [n]
-      (format "keyper-db-%d" n))
-
-    (defn decryptor-db
-      [n]
-      (format "decryptor-db-%d" n))
 
     (defn keyper-port
       [n]
@@ -262,6 +261,12 @@
   {:doc "Run all tests"
    :depends [test test-integration contracts:test]}
 
+  test-system
+  {:doc "Run whole system tests"
+   :depends [build]
+   :task (myshell {:dir (-> repo-root (fs/path "play") str)}
+                  "clojure -X:run-tests")}
+
   lint
   {:doc "Run linter"
    :depends []
@@ -393,7 +398,7 @@
            (rs "decryptor" "initdb" "--config" cfgfile))}
 
   init:collatordb
-  {:doc "Initialize the colllator database"
+  {:doc "Initialize the collator database"
    :depends [build genconfig:collator]
    :task (let [db "collator"]
            (dropdb db)
