@@ -531,4 +531,5 @@
            (doseq [cfgfile (concat (map keyper-cfg (range num-keypers))
                                    (map decryptor-cfg (range num-decryptors))
                                    [mock-cfg collator-cfg])]
-             (fs/delete-if-exists cfgfile)))}}}
+             (fs/delete-if-exists cfgfile)))}
+  ci-gen sht.play/ci-gen}}

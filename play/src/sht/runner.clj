@@ -69,7 +69,7 @@
                     {:dir (:cwd sys)}
                     opts)
         cmd (if (= 'bb (first cmd))
-              (concat ["bb" "--config" (:bb.edn sys)]
+              (concat ["bb" "--config" (:bb-edn sys)]
                       (rest cmd))
               cmd)
         proc (p/process cmd opts)]
@@ -253,8 +253,12 @@
             *process-map* (atom {})]
     (let [cwd (-> "work" (fs/path (name id)) str)
           log-dir (-> cwd (fs/path "logs") str)
+          bb-edn (spy (if (fs/exists? "ci-bb.edn")
+                       "ci-bb.edn"
+                       "bb.edn"))
+          bb-edn (-> bb-edn fs/absolutize str)
           sys {:conf (merge default-conf conf)
-               :bb.edn (-> (fs/path "bb.edn") fs/absolutize str)
+               :bb-edn bb-edn
                :exception nil
                :procs (atom {})
                :id id

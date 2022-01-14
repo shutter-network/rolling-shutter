@@ -1,16 +1,3 @@
-commands:
-  install-asdf:
-    steps:
-      - run:
-          name: Install asdf
-          command: |
-            if [[ -e ~/.asdf ]]; then
-              echo "asdf already installed"
-            else
-              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
-            fi
-            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
-
 jobs:
   rs-generate:
     executor: go
@@ -29,7 +16,7 @@ jobs:
             asdf plugin add nodejs || true
             asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git || true
       - run:
-          name: "Install asdf managed executable"
+          name: "Install asdf managed executables"
           command: |
             asdf install protoc
             asdf install nodejs

@@ -27,6 +27,7 @@
   (println "Choose yml files based on" kws)
   (remove nil?
           ["basis.yml"
+           "test-system.yml"
            (when (or contracts-changed? build-all?)
              "contracts.yml")
            (when (or rolling-shutter-changed? build-all?)

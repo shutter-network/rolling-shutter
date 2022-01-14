@@ -1,0 +1,64 @@
+jobs:
+  test-system:
+    executor: system-tests
+    working_directory: ~/src/play
+    steps:
+      - checkout:
+          path: ~/src
+      - install-asdf
+      - run:
+          name: "Install asdf plugins"
+          command: |
+            asdf plugin add nodejs || true
+            asdf plugin add golang || true
+            asdf plugin add babashka
+            asdf plugin add java
+            asdf plugin add clojure
+      - run:
+          name: "Install asdf managed executables"
+          command: |
+            asdf install nodejs
+            asdf install golang
+            asdf install babashka
+            asdf install java
+            asdf install clojure
+      - run:
+          name: "Configure environment"
+          command: |
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_ROOT=${HOME}/src
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
+      - run:
+          name: "Building rolling-shutter"
+          command: |
+            bb ci-gen
+            bb --config ci-bb.edn build
+            bb --config ci-bb.edn contracts:install
+      - run:
+          name: "Downloading clojure dependencies"
+          command: |
+            clojure -P
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: "Run whole system tests"
+          command: |
+            clojure -X:run-tests
+      - run:
+          name: "Tar work folder"
+          command: |
+            tar -czf work.tgz work
+          when: always
+      - store_artifacts:
+          path: work.tgz
+          destination: work.tgz
+      - store_artifacts:
+          path: work
+          destination: work
+
+workflows:
+  test-system:
+    jobs:
+      - test-system

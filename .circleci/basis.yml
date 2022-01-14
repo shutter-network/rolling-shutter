@@ -9,10 +9,36 @@ commands:
             curl -sSL "https://go.dev/dl/go1.18beta1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
+
+  install-asdf:
+    steps:
+      - run:
+          name: Install asdf
+          command: |
+            if [[ -e ~/.asdf ]]; then
+              echo "asdf already installed"
+            else
+              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
+            fi
+            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
+
 orbs:
   node: circleci/node@4.7
 
 executors:
+  system-tests:
+    docker:
+      - image: cimg/openjdk:17.0.1
+        environment:
+          PGHOST: localhost
+          PGUSER: circleci
+          PLAY_DB_PASSWORD: xxx
+
+      - image: circleci/postgres:12
+        environment:
+          POSTGRES_USER: circleci
+          POSTGRES_PASSWORD: xxx
+          POSTGRES_DB: testdb
   py:
     docker:
       - image: cimg/python:3.9.7-node@sha256:f014580897eea0a92ef30b79aefd2fd58c09853e4d1bcd1e0578a9c67681d183
