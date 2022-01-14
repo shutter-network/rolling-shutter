@@ -6,6 +6,7 @@
             [babashka.process :as p]
             [babashka.fs :as fs]
             [taoensso.encore :as enc]
+            [taoensso.timbre.appenders.core]
             [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -246,16 +247,29 @@
   (sanity-check-step steps))
 
 
+(defn- sys-run-test
+  [{:keys [description cwd] :as sys} {:test/keys [steps] :as tc}]
+  (binding [*process-map* (atom {})]
+    (try
+      (sanity-check-test tc)
+      (spit (-> cwd (fs/path "test.edn") str) (puget/pprint-str tc))
+      (dispatch sys steps)
+      (catch Exception err
+        (error err)
+        (assoc sys :exception err))
+      (finally
+        (cleanup-processes sys)))))
+
 (def ^:dynamic *current-test-id* nil)
 (defn run-test
-  [{:test/keys [id description steps conf] :as tc}]
-  (binding [*current-test-id* id
-            *process-map* (atom {})]
+  [{:test/keys [id description conf] :as tc}]
+  (binding [*current-test-id* id]
     (let [cwd (-> "work" (fs/path (name id)) str)
           log-dir (-> cwd (fs/path "logs") str)
-          bb-edn (spy (if (fs/exists? "ci-bb.edn")
-                       "ci-bb.edn"
-                       "bb.edn"))
+          log-file (-> cwd (fs/path "test-log.txt") str)
+          bb-edn (if (fs/exists? "ci-bb.edn")
+                   "ci-bb.edn"
+                   "bb.edn")
           bb-edn (-> bb-edn fs/absolutize str)
           sys {:conf (merge default-conf conf)
                :bb-edn bb-edn
@@ -266,18 +280,14 @@
                :cwd cwd
                :log-dir log-dir
                :report empty-report}]
-      (try
-        (sanity-check-test tc)
+      (fs/delete-tree cwd)
+      (fs/create-dirs log-dir)
+      (timbre/with-merged-config
+        {:appenders {:test-logs (taoensso.timbre.appenders.core/spit-appender {:fname log-file})}}
         (info (format "Start running test: %s" description) tc)
-        (fs/delete-tree cwd)
-        (fs/create-dirs log-dir)
-        (spit (-> cwd (fs/path "test.edn") str) (puget/pprint-str tc))
-        (dispatch sys steps)
-        (catch Exception err
-          (error err)
-          (assoc sys :exception err))
-        (finally
-          (cleanup-processes sys))))))
+        (let [sys (sys-run-test sys tc)]
+          (info (format "Finished test: %s" description) (-> sys :report (dissoc :report/checks)))
+          sys)))))
 
 ;;; --- Configure logging using puget to pretty print data structures
 (defn- indent

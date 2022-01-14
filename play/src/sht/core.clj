@@ -212,8 +212,8 @@
                   ": "
                   (:description sys)))
     (println "     " num-checks-failed "failed," num-checks-succeeded "succeeded")
-    (doseq [c failed-checks]
-      (println "     " c))))
+    (doseq [c (->> failed-checks (map :chk/description) distinct)]
+      (println "      -" c))))
 
 (defn sys-succeeded?
   [sys]
@@ -234,6 +234,7 @@
   [opts]
   (let [test-cases (sanity-check-cases (generate-tests))
         sysv (mapv runner/run-test test-cases)]
+    (println "\n\n=============================================================================\n")
     (report-result sysv)
     (if (every? sys-succeeded? sysv)
       (exit 0 "OK")
