@@ -1,24 +1,6 @@
-const { ethers } = require("hardhat");
+const { configure_keypers } = require("../lib/configure-keypers.js");
 
 module.exports = async function (hre) {
   var keyperAddrs = await hre.getKeyperAddresses();
-  const keypers = await ethers.getContract("Keypers");
-  const index = await keypers.count();
-  await keypers.add(keyperAddrs);
-  await keypers.append();
-
-  const cfg = await ethers.getContract("KeyperConfig");
-  const currentBlock = await ethers.provider.getBlockNumber();
-  const activationBlockNumber = currentBlock + 10;
-
-  await cfg.addNewCfg({
-    activationBlockNumber: activationBlockNumber,
-    setIndex: index,
-    threshold: Math.ceil((keyperAddrs.length / 3) * 2),
-  });
-  console.log(
-    "configure keypers: activationBlockNumber %s keypers: %s",
-    activationBlockNumber,
-    keyperAddrs
-  );
+  await configure_keypers(keyperAddrs);
 };
