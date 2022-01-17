@@ -494,11 +494,8 @@
 
   boot
   {:doc "Bootstrap shuttermint node"
-   :depends [build -keypers]
-   :task (->> -keypers
-              (interleave (repeat "-K"))
-              (concat [exe "bootstrap"])
-              (apply myshell))}
+   :depends [build -deployments]
+   :task (rs "bootstrap")}
 
   k
   {:doc "Run keyper"
