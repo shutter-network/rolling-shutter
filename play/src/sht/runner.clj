@@ -1,4 +1,53 @@
 (ns sht.runner
+  "sht.runner provides the means to run sytem tests. Each test is just a simple map, with the
+  following fields:
+
+  - test/id:            a keyword identifying the test
+  - test/description:   a textual description of what we test
+  - test/steps:         a sequence of steps to execute
+
+  Each step can be a list of steps, which are are then recursively executed, or a map containing
+  either an `:run` step or an `:check` step. The former describes an action to be executed, which
+  changes the state of the running system. The latter describes an observation to be made about the
+  system, these should not change the state of the system. Normally we observe the state by
+  executing queries against the different postgresql databases.
+
+  `:run` steps
+  A `:run` step is a map with a `:run` key. The test runner will call the `sht.runner/run`
+  multimethod, which dispatches via the value of the `:run` key. One common `:run` step is to start
+  external processes. An example map looks like:
+
+    {:run :process/run
+     :process/id :node
+     :process/cmd '[bb node]
+     :process/port 8545
+     :process/port-timeout (+ 5000 (* num-keypers 2000))}
+
+  This starts 'bb node', and waits with the given timeout for the node process to start listening
+  on the given port.
+
+  `:check` steps
+  A `:check` step is a map with a `:check` key. The test runner will call the `sht.runner/check`
+  multimethod, which dispatches via the value of the `:check` key. The method must return a map
+  with the following keys describing the observation:
+
+  - chk/ok?:           a boolean, whether the check has been successful
+  - chk/description:   a textual description of what we checked
+  - chk/info:          arbitrary data about the check
+
+  One common `:check` step is to wait for a sequence of `:check` substeps with a timeout:
+
+    {:check :loop/until
+     :loop/description \"eon should exist for all keypers\"
+     :loop/timeout-ms (* 60 1000)
+     :loop/checks (for [keyper (range (dec threshold))]
+                     {:check :keyper/eon-exists
+                      :keyper/num keyper
+                      :keyper/eon 1})}
+
+  Using multimethods gives us the ability to extend the set of possible `:run` and `:check` steps
+  easily.
+"
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [clojure.java.io :as io]
