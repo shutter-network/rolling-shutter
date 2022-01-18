@@ -54,6 +54,7 @@
             [puget.printer :as puget]
             [babashka.process :as p]
             [babashka.fs :as fs]
+            [sht.play :as play]
             [taoensso.encore :as enc]
             [taoensso.timbre.appenders.core]
             [taoensso.timbre :as timbre
@@ -134,6 +135,19 @@
     (p/check proc)
     sys))
 
+(defn wait-file-forever
+  [p]
+  (when-not (fs/exists? p)
+    (Thread/sleep 50)
+    (recur p)))
+
+(defn wait-file
+  [p timeout-ms]
+  (when (= ::timed-out (timeout timeout-ms (partial wait-file-forever p)))
+     (throw (ex-info (format "Timeout waiting for file %s" p)
+                     {:path p
+                      :timeout-ms timeout-ms}))))
+
 (defn- wait-port-forever
   [host port]
   (when (try
@@ -179,10 +193,12 @@
   sys)
 
 (defmethod run :process/run run-process-run
-  [sys {:process/keys [id cmd port port-timeout wait opts] :or {port-timeout 5000}}]
+  [sys {:process/keys [id cmd port port-timeout file file-timeout wait opts] :or {port-timeout 5000}}]
   (start-proc! sys id cmd opts)
   (when port
     (wait-port sys port {:timeout-ms port-timeout}))
+  (when file
+    (wait-file file file-timeout))
   (when wait
     (wait-proc! sys id))
   sys)
@@ -323,7 +339,6 @@
           sys {:conf (merge default-conf conf)
                :bb-edn bb-edn
                :exception nil
-               :procs (atom {})
                :id id
                :description description
                :cwd cwd
@@ -331,12 +346,13 @@
                :report empty-report}]
       (fs/delete-tree cwd)
       (fs/create-dirs log-dir)
-      (timbre/with-merged-config
-        {:appenders {:test-logs (taoensso.timbre.appenders.core/spit-appender {:fname log-file})}}
-        (info (format "Start running test: %s" description) tc)
-        (let [sys (sys-run-test sys tc)]
-          (info (format "Finished test: %s" description) (-> sys :report (dissoc :report/checks)))
-          sys)))))
+      (binding [play/*cwd* cwd]
+        (timbre/with-merged-config
+          {:appenders {:test-logs (taoensso.timbre.appenders.core/spit-appender {:fname log-file})}}
+          (info (format "Start running test: %s" description) tc)
+          (let [sys (sys-run-test sys tc)]
+            (info (format "Finished test: %s" description) (-> sys :report (dissoc :report/checks)))
+            sys))))))
 
 ;;; --- Configure logging using puget to pretty print data structures
 (defn- indent

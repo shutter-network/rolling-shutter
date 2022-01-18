@@ -84,12 +84,7 @@
                  :process/cmd '[bb chain]
                  :process/port 26657}
 
-                {:run :process/run
-                 :process/id :node
-                 :process/cmd '[bb node]
-                 :process/port 8545
-                 :process/port-timeout (+ 5000 (* num-keypers 2000))}
-
+                (build/run-node conf)
                 (build/run-keypers conf)
 
                 {:run :process/run
@@ -133,11 +128,7 @@
                  :process/cmd '[bb chain]
                  :process/port 26657}
 
-                {:run :process/run
-                 :process/id :node
-                 :process/cmd '[bb node]
-                 :process/port 8545
-                 :process/port-timeout (+ 5000 (* num-keypers 2000))}
+                (build/run-node conf)
 
                 (mapv build/run-keyper (range (dec threshold)))
 

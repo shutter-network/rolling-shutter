@@ -8,10 +8,11 @@
              [clojure.java.io :as io]
              [babashka.curl :as curl]
              [cheshire.core :as json]
-             [sht.play :as play :refer [keyper-db decryptor-db]])
+             [sht.play :as play])
 
   :init
   (do
+
     (defn long-from-env
       [s default]
       (Long/valueOf (or (System/getenv s) default)))
@@ -21,6 +22,13 @@
 
     (def windows? (babashka.core/windows?))
     (def no-color? windows?)
+
+    (defn decryptor-db [n]
+      (format "decryptor-db-%d" n))
+
+    (defn keyper-port [n]
+      (-> n play/keyper-subcommand :subcommand/p2p-port))
+
     (defn inside-asdf?
       [path]
       (let [asdf-dir (some-> "ASDF_DIR" System/getenv fs/canonicalize (str "/"))
@@ -52,7 +60,7 @@
       (print ansi-green (format "==> [%s] " (:name (current-task))))
       (apply print args)
       (println ansi-reset))
-
+    (play/set-bb-log! log)
     (defn download-to
       [url path]
       (log "Downloading" url "to" path)
@@ -97,11 +105,6 @@
       [filename m]
       (spit filename (toml-edit-string (slurp filename) m)))
 
-
-    (defn keyper-cfg
-      [n]
-      (format "keyper-%s.toml" n))
-
     (defn decryptor-cfg
       [n]
       (format "decryptor-%s.toml" n))
@@ -109,19 +112,6 @@
     (def mock-cfg "mock.toml")
     (def collator-cfg "collator.toml")
 
-    (defn keyper-port
-      [n]
-      (+ 2000 n))
-
-    (defn collator-port
-      []
-      (dec (keyper-port 0)))
-
-    (defn decryptor-port
-      [n]
-      (+ (keyper-port num-keypers) n))
-
-    (def mock-port (decryptor-port num-keypers))
 
     (defn myshell
       [& args]
@@ -158,16 +148,7 @@
     (defn rs
       [& args]
       (apply myshell exe args))
-    (def dropdb-with-force?
-      (delay
-        (str/includes? (:out (clojure.java.shell/sh "dropdb" "--help"))
-                       "--force")))
-    (defn dropdb
-      [db]
-      (apply myshell "dropdb" "--if-exists"
-             (if (deref dropdb-with-force?)
-               ["--force" db]
-               [db])))
+
     (defn psql
       [db & args]
       (apply (partial myshell "psql -d" db) args)))
@@ -307,55 +288,83 @@
                                      "go build -o bin/rolling-shutter.exe"
                                      "make")))}
 
+  ;; --------------------------------------
+  ;; -- collator
+
+  -collator-subcommand (play/collator-subcommand)
+
   genconfig:collator
   {:doc "Generate collator config"
-   :depends [build]
-   :task (when-not (fs/exists? collator-cfg)
-           (rs "collator" "generate-config" "--output" collator-cfg)
-           (toml-edit-file collator-cfg
-                           {"DatabaseURL" (format "postgres:///collator")
-                            "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" (collator-port))}))}
+   :depends [build -collator-subcommand]
+   :task (play/generate-config -collator-subcommand)}
+
+  init:collatordb
+  {:doc "Initialize the collator database"
+   :depends [build genconfig:collator]
+   :task (play/initdb genconfig:collator)}
+
+  -collator
+  {:depends [genconfig:collator]
+   :doc "Collator addresses"
+   :task (-> genconfig:collator :subcommand/cfg :eth-address)}
+
+  collator
+  {:doc "Run collator"
+   :depends [build genconfig:collator -deployments]
+   :task (apply myshell (play/subcommand-run genconfig:collator))}
+
+  ;; --------------------------------------
+  ;; -- keyper
+  -keyper-subcommands (mapv play/keyper-subcommand (range num-keypers))
 
   genconfig:keypers
   {:doc "Generate keyper configs"
-   :depends [build]
-   :task (doseq [n (range num-keypers)
-                 :let [cfgfile (keyper-cfg n)
-                       db (keyper-db n)
-                       port (keyper-port n)]]
-           (when-not (fs/exists? cfgfile)
-             (rs "keyper" "generate-config" "--output" cfgfile)
-             (toml-edit-file cfgfile
-                             {"DatabaseURL" (format "postgres:///%s" db)
-                              "DKGPhaseLength" 5
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" port)})))}
+   :depends [build -keyper-subcommands]
+   :task (mapv play/generate-config -keyper-subcommands)}
+
+  init:kprdb
+  {:doc "Initialize the keyper database"
+   :depends [build genconfig:keypers]
+   :task (mapv play/initdb genconfig:keypers)}
+
+  -keypers
+  {:depends [genconfig:keypers]
+   :doc "List of keyper addresses"
+   :task (mapv (comp :eth-address :subcommand/cfg) genconfig:keypers)}
+
+  ;; --------------------------------------
+  ;; -- decryptor
+  -decryptor-subcommands (mapv (partial play/decryptor-subcommand num-decryptors)
+                               (range num-decryptors))
 
   genconfig:decryptors
   {:doc "Generate decryptor configs"
-   :depends [build]
-   :task (doseq [n (range num-decryptors)
-                 :let [cfgfile (decryptor-cfg n)
-                       db (decryptor-db n)
-                       port (decryptor-port n)]]
-           (when-not (fs/exists? cfgfile)
-             (rs "decryptor" "generate-config" "--output" cfgfile)
-             (toml-edit-file cfgfile
-                             {"DatabaseURL" (format "postgres:///%s" db)
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" port)
-                              "SignerIndex" n
-                              "requiredSignatures" (inc (quot num-decryptors 3))})))}
+   :depends [build -decryptor-subcommands]
+   :task (mapv play/generate-config -decryptor-subcommands)}
+
+  init:decryptors
+  {:doc "Initialize decryptor databases"
+   :depends [build genconfig:decryptors]
+   :task (mapv play/initdb genconfig:decryptors)}
+
+  -decryptors
+  {:depends [genconfig:decryptors]
+   :doc "List of decryptor addresses"
+   :task (mapv (comp :eth-address :subcommand/cfg) genconfig:decryptors)}
+
+  ;; --------------------------------------
+  ;; -- mocknode
+
+  -mocknode-subcommand
+  {:depends [genconfig:decryptors]
+   :task (play/mocknode-subcommand genconfig:decryptors)}
 
   genconfig:mock
   {:doc "Generate mocknode config"
-   :depends [build genconfig:decryptors]
-   :task (when-not (fs/exists? mock-cfg)
-           (rs "mocknode" "generate-config" "--output" mock-cfg)
-           (toml-edit-file mock-cfg
-                           {"ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" mock-port)
-                            "DecryptorPublicKeys" (->> (range num-decryptors)
-                                                       (map decryptor-cfg)
-                                                       (map extract-bls-key))}))}
+   :depends [build -mocknode-subcommand]
+   :task (play/generate-config -mocknode-subcommand)}
 
+  ;; -- general tasks
   genconfig
   {:doc "Generate configs"
    :depends [genconfig:keypers genconfig:decryptors genconfig:mock]}
@@ -378,51 +387,9 @@
            (fs/delete-tree "testchain")
            (rs "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"))}
 
-  init:kprdb
-  {:doc "Initialize the keyper database"
-   :depends [build]
-   :task (doseq [n (range num-keypers)
-                 :let [db (keyper-db n)]]
-           (dropdb db)
-           (myshell "createdb" db)
-           (rs "keyper" "initdb" "--config" (keyper-cfg n)))}
-
-  init:decryptors
-  {:doc "Initialize decryptor databases"
-   :depends [build genconfig:decryptors]
-   :task (doseq [n (range num-decryptors)
-                 :let [cfgfile (decryptor-cfg n)
-                       db (decryptor-db n)]]
-           (dropdb db)
-           (myshell "createdb" db)
-           (rs "decryptor" "initdb" "--config" cfgfile))}
-
-  init:collatordb
-  {:doc "Initialize the collator database"
-   :depends [build genconfig:collator]
-   :task (let [db "collator"]
-           (dropdb db)
-           (myshell "createdb" db)
-           (rs "collator" "initdb" "--config" collator-cfg))}
-
   init
   {:doc "Initialize keyper and decryptor databases as well as shuttermint"
    :depends [genconfig init:testchain init:kprdb init:decryptors init:collatordb]}
-
-  -keypers
-  {:depends [genconfig:keypers]
-   :doc "List of keyper addresses"
-   :task (mapv (comp extract-address keyper-cfg) (range num-keypers))}
-
-  -decryptors
-  {:depends [genconfig:decryptors]
-   :doc "List of decryptor addresses"
-   :task (mapv (comp extract-address decryptor-cfg) (range num-decryptors))}
-
-  -collator
-  {:depends [genconfig:collator]
-   :doc "Collator addresses"
-   :task (extract-address collator-cfg)}
 
   -deploy-conf
   {:doc "Generate a deploy config"
@@ -464,7 +431,7 @@
   populate:ds-with-ds
   {:doc "Populate decryptor dbs with decryptor set"
    :depends [genconfig:decryptors]
-   :task (doseq [db (map decryptor-db (range num-keypers))
+   :task (doseq [{:subcommand/keys [db]} genconfig:decryptors
                  i (range num-decryptors)
                  :let [cfg (decryptor-cfg i)
                        addr (extract-address cfg)
@@ -477,8 +444,8 @@
   populate:ds-with-eon-key
   {:doc "Populate decryptor dbs with eon key from mocknode"
    :depends [genconfig:decryptors genconfig:mock]
-   :task (let [key (extract-eon-key mock-cfg)]
-           (doseq [db (map decryptor-db (range num-keypers))]
+   :task (let [key (-> genconfig:mock :subcommand/cfg :eon-key)]
+           (doseq [{:subcommand/keys [db]} genconfig:decryptors]
              (psql db
                    "-f" insert-eon-key-sql
                    (format "-veon_public_key=E'\\\\x%s'" key))))}
@@ -501,32 +468,32 @@
   {:doc "Run keyper"
    :depends [build genconfig:keypers -deployments]
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
-               cfgfile (keyper-cfg n)]
-           (rs "keyper" "--config" cfgfile))}
+               subcommand (nth genconfig:keypers n)
+               cmd (play/subcommand-run subcommand)]
+           (apply myshell cmd))}
 
   d
   {:doc "Run decryptor"
    :depends [build genconfig:decryptors -deployments]
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
-               cfgfile (decryptor-cfg n)]
-           (rs "decryptor" "--config" cfgfile))}
+               subcommand (nth genconfig:decryptors n)
+               cmd (play/subcommand-run subcommand)]
+           (apply myshell cmd))}
 
   m
   {:doc "Run mocknode"
    :depends [build genconfig:mock]
-   :task (rs "mocknode" "--config" mock-cfg)}
+   :task (apply myshell (play/subcommand-run genconfig:mock))}
 
-  collator
-  {:doc "Run collator"
-   :depends [build genconfig:collator -deployments]
-   :task (rs "collator" "--config" collator-cfg)}
 
   clean
   {:doc "Remove config files and chain related files"
+   :depends [-keyper-subcommands -decryptor-subcommands -collator-subcommand]
    :task (do
            (fs/delete-tree "testchain")
-           (doseq [cfgfile (concat (map keyper-cfg (range num-keypers))
-                                   (map decryptor-cfg (range num-decryptors))
-                                   [mock-cfg collator-cfg])]
+           (doseq [{:subcommand/keys [cfgfile]} (concat -keyper-subcommands
+                                                        -decryptor-subcommands
+                                                        [(play/mocknode-subcommand [])
+                                                         -collator-subcommand])]
              (fs/delete-if-exists cfgfile)))}
   ci-gen sht.play/ci-gen}}

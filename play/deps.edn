@@ -1,6 +1,7 @@
 {:paths ["src"]
  :resource-paths []
  :deps {org.clojure/clojure {:mvn/version "1.10.3"}
+        cheshire/cheshire {:mvn/version "5.10.1"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.2.761"}
         org.postgresql/postgresql {:mvn/version "42.2.10"}
         com.taoensso/timbre {:mvn/version "5.1.2"}
