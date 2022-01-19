@@ -123,7 +123,10 @@ func (p *P2P) createHost(ctx context.Context) error {
 	log.Println("libp2p node address:", p.p2pAddress())
 
 	// create a new PubSub service using the GossipSub router
-	pubSub, err := pubsub.NewGossipSub(ctx, p.host)
+	options := []pubsub.Option{
+		pubsub.WithPeerScore(peerScoreParams(), peerScoreThresholds()),
+	}
+	pubSub, err := pubsub.NewGossipSub(ctx, p.host, options...)
 	if err != nil {
 		return err
 	}
@@ -172,6 +175,12 @@ func (p *P2P) joinTopic(topicName string) error {
 	topic, err := p.pubSub.Join(topicName)
 	if err != nil {
 		return err
+	}
+
+	// set peer scoring parameters
+	err = topic.SetScoreParams(topicScoreParams())
+	if err != nil {
+		return errors.Wrapf(err, "failed to set peer scoring parameters")
 	}
 
 	// and subscribe to it
