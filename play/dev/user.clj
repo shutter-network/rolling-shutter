@@ -9,13 +9,14 @@
             [sht.play :as play]
             [sht.core :as core]))
 
-(def db {:dbtype "postgresql"
-         :dbname (play/keyper-db 0)
-         :password core/play-db-password})
-
-(def ds (jdbc/get-datasource db))
 
 (comment
+  (def db {:dbtype "postgresql"
+           :dbname (play/keyper-db 0)
+           :password core/play-db-password})
+
+  (def ds (jdbc/get-datasource db))
+
   (jdbc/execute! ds ["select * from tendermint_batch_config"])
   (jdbc/execute-one! ds ["select * from meta_inf"])
   (jdbc/execute! ds ["select * from eons"])

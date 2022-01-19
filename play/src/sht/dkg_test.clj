@@ -115,7 +115,7 @@
 
 (defn test-dkg-keypers-join-late
   [{:keys [num-keypers threshold] :as conf}]
-  {:test/id :keyper-dkg-works-keyper-joins-late
+  {:test/id :late-keyper-dkg-works
    :test/conf conf
    :test/description "distributed key generation should work when a keyper joins late"
    :test/steps [(build/init conf)

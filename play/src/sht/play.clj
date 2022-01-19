@@ -185,8 +185,9 @@
   []
   (let [src "bb.edn"
         dst "ci-bb.edn"
-        bb (edn/read-string (slurp src))
-        bb (assoc-in bb [:tasks 'build :depends] ['-go-files])]
+        bb (-> (edn/read-string (slurp src))
+               (assoc-in [:tasks 'build] :do-nothing)
+               (assoc-in [:tasks 'contracts:install] :do-nothing))]
     (with-open [w (io/writer dst)]
       (pprint/pprint bb w))
     (println "Created simpified config in" dst)))

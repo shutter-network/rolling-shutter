@@ -1,7 +1,12 @@
+executors:
+  base:
+    docker:
+      - image: cimg/base:2022.01
+
 jobs:
-  test-system:
-    executor: system-tests
-    working_directory: ~/src/play
+  prepare-contracts:
+    executor: base
+    working_directory: ~/src/contracts
     steps:
       - checkout:
           path: ~/src
@@ -10,7 +15,42 @@ jobs:
           name: "Install asdf plugins"
           command: |
             asdf plugin add nodejs || true
-            asdf plugin add golang || true
+      - run:
+          name: "Install asdf managed executables"
+          command: |
+            asdf install nodejs
+      - node/install-packages
+      - persist_to_workspace:
+          root: ~/src
+          paths: contracts/node_modules
+
+  build-exe:
+    executor: go
+    working_directory: ~/src/rolling-shutter
+    steps:
+      - checkout:
+          path: ~/src
+      - run: make
+      - persist_to_workspace:
+          root: ~/src
+          paths: rolling-shutter/bin
+
+  test-system:
+    executor: system-tests
+    working_directory: ~/src/play
+    steps:
+      - checkout:
+          path: ~/src
+      - install-asdf
+      - attach_workspace:
+          at: ~/src
+      - run: |
+          cd ~/src
+          git clean -xfdn
+      - run:
+          name: "Install asdf plugins"
+          command: |
+            asdf plugin add nodejs || true
             asdf plugin add babashka
             asdf plugin add java
             asdf plugin add clojure
@@ -18,7 +58,6 @@ jobs:
           name: "Install asdf managed executables"
           command: |
             asdf install nodejs
-            asdf install golang
             asdf install babashka
             asdf install java
             asdf install clojure
@@ -29,11 +68,10 @@ jobs:
             echo >>${BASH_ENV} export ROLLING_SHUTTER_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
             echo >>${BASH_ENV} export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
       - run:
-          name: "Building rolling-shutter"
+          name: "Simplify bb.edn"
           command: |
             bb ci-gen
-            bb --config ci-bb.edn build
-            bb --config ci-bb.edn contracts:install
+            rm bb.edn
       - run:
           name: "Downloading clojure dependencies"
           command: |
@@ -61,4 +99,9 @@ jobs:
 workflows:
   test-system:
     jobs:
-      - test-system
+      - prepare-contracts
+      - build-exe
+      - test-system:
+          requires:
+            - prepare-contracts
+            - build-exe
