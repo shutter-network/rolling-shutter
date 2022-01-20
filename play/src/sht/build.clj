@@ -70,8 +70,8 @@
   [{:run :process/run
     :process/wait true
     :process/id :init-chain
-    :process/cmd [play/rolling-shutter "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"]}
+    :process/cmd ['rolling-shutter "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"]}
    {:run :process/run
     :process/id :chain
-    :process/cmd [play/rolling-shutter "chain" "--config" "testchain/config/config.toml"]
+    :process/cmd ['rolling-shutter "chain" "--config" "testchain/config/config.toml"]
     :process/port 26657}])

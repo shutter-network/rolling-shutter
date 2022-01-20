@@ -2,17 +2,17 @@
  :paths ["src"]
  :tasks
  {:requires ([babashka.fs :as fs :refer [which]]
+             [babashka.process :as p]
              [babashka.core]
              [clojure.string :as str]
              [clojure.java.browse :as browse]
              [clojure.java.io :as io]
              [babashka.curl :as curl]
              [cheshire.core :as json]
-             [sht.play :as play])
+             [sht.play :as play :refer [run-process]])
 
   :init
   (do
-
     (defn long-from-env
       [s default]
       (Long/valueOf (or (System/getenv s) default)))
@@ -112,33 +112,19 @@
     (def mock-cfg "mock.toml")
     (def collator-cfg "collator.toml")
 
-
-    (defn myshell
-      [& args]
-      (log args)
-      (let [[opts args] (if (map? (first args))
-                          [(first args) (rest args)]
-                          [{} args])
-            dir (:dir opts)]
-        (when dir
-          (println (format "Entering directory '%s'" dir)))
-        (apply shell opts args)
-        (when dir
-          (println (format "Leaving directory '%s'" dir)))))
-
     (defn gotest
       [& args]
-      (let [args (concat ["gotestsum" (if no-color? " --no-color ") "--"]
-                         args
-                         (or *command-line-args* ["./..."]))
-            args (remove nil? args)]
-        (apply myshell {:dir src-dir} args)))
+      (let [cmd (concat ["gotestsum" (if no-color? "--no-color") "--"]
+                        args
+                        (or *command-line-args* ["./..."]))
+            cmd (remove nil? cmd)]
+        (run-process cmd {:dir src-dir})))
 
     (defn go-install
       ([pkg]
-       (myshell {:dir src-dir} "go" "install" pkg)
+       (run-process ["go" "install" pkg] {:dir src-dir})
        (when asdf-go?
-         (myshell "asdf" "reshim" "golang")))
+         (run-process ["asdf" "reshim" "golang"])))
       ([executable pkg]
        (when (nil? (which executable))
          (go-install pkg)
@@ -147,18 +133,18 @@
                            {:executable executable :pkg pkg}))))))
     (defn rs
       [& args]
-      (apply myshell exe args))
+      (run-process (cons 'rolling-shutter args)))
 
     (defn psql
       [db & args]
-      (apply (partial myshell "psql -d" db) args)))
+      (run-process (concat ["psql" "-d" db] args))))
 
 
   -godoc:idx
   {:depends [-install:godoc]
    :task (let [path (src-file "godoc.idx")]
            (when-not (fs/exists? path)
-             (myshell {:dir src-dir} "godoc -index -index_files=godoc.idx -write_index -v"))
+             (run-process '[godoc -index -index_files=godoc.idx -write_index -v] {:dir src-dir}))
            path)}
   ;; the computation of the relative path here seems excessive and it probably is, as it returns
   ;; "../contracts/deployments" unless we're not using the default directory structure.
@@ -210,7 +196,7 @@
            (when (seq (fs/modified-since anchor
                                          [(format "%s/package.json" contracts-dir)
                                           (format "%s/package-lock.json" contracts-dir)]))
-             (myshell {:dir contracts-dir} "npm install")
+             (run-process ["npm" "install"] {:dir contracts-dir})
              (if marker-exists?
                (fs/set-last-modified-time marker-file (System/currentTimeMillis))))
            (when-not marker-exists?
@@ -219,14 +205,14 @@
   contracts:test
   {:doc "Run hardhat tests in contracts directory"
    :depends [contracts:install]
-   :task (myshell {:dir contracts-dir} "npx hardhat test")}
+   :task (run-process '[npx hardhat test] {:dir contracts-dir})}
 
   build:abigen
   {:doc "Generate go bindings for the contracts"
    :depends [contracts:install -install:abigen]
    :task (when (seq (fs/modified-since (format "%s/combined.json" contracts-dir)
                                        (format "%s/src" contracts-dir)))
-           (myshell {:dir contracts-dir} "node" "scripts/abigen.js"))}
+           (run-process ["node" "scripts/abigen.js"] {:dir contracts-dir}))}
 
   test
   {:doc "Run tests"
@@ -245,25 +231,25 @@
   test-system
   {:doc "Run whole system tests"
    :depends [build]
-   :task (myshell {:dir (-> repo-root (fs/path "play") str)}
-                  "clojure -X:run-tests")}
+   :task (run-process ["clojure" "-X:run-tests"]
+                      {:dir (-> repo-root (fs/path "play") str)})}
 
   lint
   {:doc "Run linter"
    :depends []
-   :task (myshell {:dir src-dir} "golangci-lint run --tests")}
+   :task (run-process '[golangci-lint run --tests] {:dir src-dir})}
 
   lint-changes
   {:doc "Show only new linter warnings"
    :depends []
-   :task (myshell {:dir src-dir} "golangci-lint run --new-from-rev origin/main")}
+   :task (run-process '[golangci-lint run --new-from-rev origin/main] {:dir src-dir})}
 
   build:oapi-codegen
   {:doc "Run oapi-codegen"
    :depends [-oapi-files]
    :task (when (seq (fs/modified-since exe -oapi-files))
            (run '-install:oapi-codegen)
-           (myshell {:dir src-dir} "go generate -x ./collator/..."))}
+           (run-process ["go" "generate" "-x" "./collator/..."] {:dir src-dir}))}
 
   build:sqlc
   {:doc "Run sqlc"
@@ -271,22 +257,23 @@
    :task (when (and (not windows?)
                     (seq (fs/modified-since exe -sqlc-files)))
            (run '-install:sqlc)
-           (myshell {:dir src-dir} "sqlc generate"))}
+           (run-process '[sqlc generate] {:dir src-dir}))}
 
   build:protoc
   {:doc "Run protoc"
    :depends [-protoc-files]
    :task (when (seq (fs/modified-since exe -protoc-files))
            (run '-install:protoc-gen-go)
-           (myshell {:dir src-dir} "go generate ./shmsg"))}
+           (run-process ["go" "generate" "./shmsg"] {:dir src-dir}))}
 
   build
   {:doc "Build rolling-shutter executable"
    :depends [build:abigen build:sqlc build:protoc build:oapi-codegen -go-files]
    :task (when (seq (fs/modified-since exe -go-files))
-           (myshell {:dir src-dir} (if windows?
-                                     "go build -o bin/rolling-shutter.exe"
-                                     "make")))}
+           (run-process (if windows?
+                          '[go build -o bin/rolling-shutter.exe]
+                          '[make])
+            {:dir src-dir}))}
 
   build-all
   {:doc "Run all build/compile steps"
@@ -315,7 +302,7 @@
   collator
   {:doc "Run collator"
    :depends [build genconfig:collator -deployments]
-   :task (apply myshell (play/subcommand-run genconfig:collator))}
+   :task (run-process (play/subcommand-run genconfig:collator))}
 
   ;; --------------------------------------
   ;; -- keyper
@@ -414,13 +401,12 @@
            (future
              (Thread/sleep 4000)
              (browse/browse-url "http://localhost:6060/"))
-           (myshell {:dir src-dir} "godoc -index -index_files=godoc.idx -http=:6060"))}
+           (run-process '[godoc -index -index_files=godoc.idx -http=:6060] {:dir src-dir}))}
   node
   {:doc "Start a hardhat node"
    :depends [-deploy-conf contracts:install]
-   :task (myshell {:extra-env {"DEPLOY_CONF" -deploy-conf}
-                   :dir contracts-dir}
-                  "npx hardhat node")}
+   :task (run-process '[npx hardhat node] {:extra-env {"DEPLOY_CONF" -deploy-conf}
+                                           :dir contracts-dir})}
 
   populate:ds-with-ks
   {:doc "Populate decryptor dbs with keyper set"
@@ -474,7 +460,7 @@
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
                subcommand (nth genconfig:keypers n)
                cmd (play/subcommand-run subcommand)]
-           (apply myshell cmd))}
+           (run-process cmd))}
 
   d
   {:doc "Run decryptor"
@@ -482,12 +468,12 @@
    :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
                subcommand (nth genconfig:decryptors n)
                cmd (play/subcommand-run subcommand)]
-           (apply myshell cmd))}
+           (run-process cmd))}
 
   m
   {:doc "Run mocknode"
    :depends [build genconfig:mock]
-   :task (apply myshell (play/subcommand-run genconfig:mock))}
+   :task (run-process (play/subcommand-run genconfig:mock))}
 
 
   clean

@@ -119,6 +119,7 @@
                      :err (-> log-dir (fs/path (format "%s-err.txt" (name proc-id))) str io/file),}
                     {:dir (:cwd sys)}
                     opts)
+        cmd (play/replace-rolling-shutter-absolute-path cmd)
         cmd (if (= 'bb (first cmd))
               (concat ["bb" "--config" (:bb-edn sys)]
                       (rest cmd))

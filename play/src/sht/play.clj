@@ -47,13 +47,34 @@
   [log]
   (alter-var-root #'bb-log (fn [_] log)))
 
+(defn replace-rolling-shutter-absolute-path
+  [cmd]
+  (if (= (first cmd) 'rolling-shutter)
+    (cons rolling-shutter (rest cmd))
+    cmd))
+
 (defn process
   ([cmd]
    (process cmd {}))
   ([cmd opts]
    (let [opts (merge {:dir *cwd*} opts)]
-     (bb-log cmd opts)
-     (p/process cmd opts))))
+     (bb-log (seq cmd) opts)
+     (p/process (replace-rolling-shutter-absolute-path cmd) opts))))
+
+(defn run-process
+  ([cmd]
+   (run-process cmd {}))
+  ([cmd {:keys [dir] :as opts}]
+   (when dir
+     (println (format "Entering directory '%s'" dir)))
+   (try
+     (bb-log (seq cmd) opts)
+     (p/check (p/process (replace-rolling-shutter-absolute-path cmd)
+                         (merge {:out :inherit :err :inherit}
+                                opts)))
+     (finally
+       (when dir
+         (println (format "Leaving directory '%s'" dir)))))))
 
 (def dropdb-with-force?
   (delay
@@ -107,11 +128,11 @@
 
 (defn subcommand-run
   [{:subcommand/keys [cmd cfgfile]}]
-  [rolling-shutter (str cmd) "--config" cfgfile])
+  ['rolling-shutter (str cmd) "--config" cfgfile])
 
 (defn subcommand-genconfig
   [{:subcommand/keys [cmd cfgfile]}]
-  [rolling-shutter (str cmd) "generate-config" "--output" cfgfile])
+  ['rolling-shutter (str cmd) "generate-config" "--output" cfgfile])
 
 (defn generate-config
   [{:subcommand/keys [toml-edits cfgfile] :as subcommand}]
@@ -127,7 +148,7 @@
   [{:subcommand/keys [cmd cfgfile db] :as subcommand}]
   (dropdb db)
   (p/check (process ["createdb" db]))
-  (p/check (process [rolling-shutter (str cmd) "initdb" "--config" cfgfile]))
+  (p/check (process ['rolling-shutter cmd "initdb" "--config" cfgfile]))
   subcommand)
 
 ;; --- decryptor-subcommand
