@@ -203,6 +203,11 @@
     (wait-proc! sys id))
   sys)
 
+(defmethod sanity-check-run :process/run sanity-check-process-run
+  [{:process/keys [id cmd port port-timeout file file-timeout wait opts] :or {port-timeout 5000} :as m}]
+  (when (every? nil? [port file wait])
+    (throw (ex-info "must set :process/port, :process/file or :process/wait" {:m m}))))
+
 (defmulti check (fn [sys m] (:check m)))
 
 (defmulti sanity-check-check (fn [m] (:check m)))
