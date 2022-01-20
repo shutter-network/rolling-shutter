@@ -144,15 +144,16 @@ func exampleConfig() (*collator.Config, error) {
 		return nil, err
 	}
 	return &collator.Config{
-		EthereumURL:       "http://127.0.0.1:8545/",
-		DeploymentDir:     "./deployments/localhost/",
-		ListenAddress:     p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
-		PeerMultiaddrs:    []multiaddr.Multiaddr{},
-		DatabaseURL:       "",
-		HTTPListenAddress: ":3000",
-		EthereumKey:       ethereumKey,
-		P2PKey:            p2pkey,
-		EpochDuration:     5 * time.Second,
+		EthereumURL:         "http://127.0.0.1:8545/",
+		DeploymentDir:       "./deployments/localhost/",
+		ListenAddress:       p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		PeerMultiaddrs:      []multiaddr.Multiaddr{},
+		DatabaseURL:         "",
+		HTTPListenAddress:   ":3000",
+		EthereumKey:         ethereumKey,
+		P2PKey:              p2pkey,
+		EpochDuration:       5 * time.Second,
+		ExecutionBlockDelay: 5,
 	}, nil
 }
 

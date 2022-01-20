@@ -31,7 +31,8 @@ type Config struct {
 
 	InstanceID uint64
 
-	EpochDuration time.Duration
+	EpochDuration       time.Duration
+	ExecutionBlockDelay uint32
 }
 
 var configTemplate = `# Shutter collator config
@@ -60,6 +61,9 @@ InstanceID = {{ .InstanceID }}
 
 # The duration of an epoch
 EpochDuration = "{{ .EpochDuration }}"
+
+# Number of blocks to backdate batches
+ExecutionBlockDelay = {{ .ExecutionBlockDelay }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("collator", configTemplate)
