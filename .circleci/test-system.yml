@@ -41,12 +41,9 @@ jobs:
     steps:
       - checkout:
           path: ~/src
-      - install-asdf
       - attach_workspace:
           at: ~/src
-      - run: |
-          cd ~/src
-          git clean -xfdn
+      - install-asdf
       - run:
           name: "Install asdf plugins"
           command: |
