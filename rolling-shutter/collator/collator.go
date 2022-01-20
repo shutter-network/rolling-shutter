@@ -218,7 +218,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 
 	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow submitting transactions at the same time.
-		_, err = tx.Exec(ctx, "LOCK TABLE collator.decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
+		_, err = tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
 		if err != nil {
 			return err
 		}
