@@ -74,16 +74,13 @@
   {:test/id :keyper-dkg-works
    :test/conf conf
    :test/description "distributed key generation should work"
-   :test/steps [(build/init conf)
+   :test/steps [{:run :init/init
+                 :init/conf conf}
                 (for [keyper (range num-keypers)]
                   {:check :keyper/meta-inf
                    :keyper-num keyper})
 
-                {:run :process/run
-                 :process/id :chain
-                 :process/cmd '[bb chain]
-                 :process/port 26657}
-
+                (build/run-chain)
                 (build/run-node conf)
                 (build/run-keypers conf)
 
@@ -118,16 +115,12 @@
   {:test/id :late-keyper-dkg-works
    :test/conf conf
    :test/description "distributed key generation should work when a keyper joins late"
-   :test/steps [(build/init conf)
+   :test/steps [{:run :init/init
+                 :init/conf conf}
                 (for [keyper (range num-keypers)]
                   {:check :keyper/meta-inf
                    :keyper-num keyper})
-
-                {:run :process/run
-                 :process/id :chain
-                 :process/cmd '[bb chain]
-                 :process/port 26657}
-
+                (build/run-chain)
                 (build/run-node conf)
 
                 (mapv build/run-keyper (range (dec threshold)))

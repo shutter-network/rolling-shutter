@@ -274,7 +274,7 @@
         (throw (ex-info ":loop/timeout-ms must be a number" {:m m})))
   (sanity-check-step checks))
 
-(defn- dispatch
+(defn dispatch
   [sys d]
   (if (map? d)
     (cond

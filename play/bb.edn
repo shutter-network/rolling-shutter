@@ -288,6 +288,10 @@
                                      "go build -o bin/rolling-shutter.exe"
                                      "make")))}
 
+  build-all
+  {:doc "Run all build/compile steps"
+   :depends [build contracts:install]}
+
   ;; --------------------------------------
   ;; -- collator
 
