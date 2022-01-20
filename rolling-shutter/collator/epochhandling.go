@@ -2,7 +2,6 @@ package collator
 
 import (
 	"context"
-	"errors"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
@@ -10,16 +9,28 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-func computeNextEpochID(epochID uint64, blockNumber uint32) (uint64, error) {
-	if epochid.BlockNumber(epochID) > blockNumber {
-		return 0, errors.New("blockNumber must not decrease")
+// computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
+// The function also depends on the current mainchain block number and the configured execution
+// block delay. The result will encode a block number and a sequence number. The sequence number
+// will be the sequence number of the previous epoch id plus one. The block number will be
+// max(current block number - execution block delay, block number encoded in previous epoch id, 0).
+func computeNextEpochID(epochID uint64, currentBlockNumber uint32, executionBlockDelay uint32) uint64 {
+	executionBlockNumber := uint32(0)
+	if currentBlockNumber >= executionBlockDelay {
+		executionBlockNumber = currentBlockNumber - executionBlockDelay
 	}
+
+	previousExecutionBlockNumber := epochid.BlockNumber(epochID)
+	if executionBlockNumber < previousExecutionBlockNumber {
+		executionBlockNumber = previousExecutionBlockNumber
+	}
+
 	sequenceNumber := epochid.SequenceNumber(epochID)
-	return epochid.New(sequenceNumber+1, blockNumber), nil
+	return epochid.New(sequenceNumber+1, executionBlockNumber)
 }
 
 func startNextEpoch(
-	ctx context.Context, config Config, db *cltrdb.Queries, blockNumber uint32,
+	ctx context.Context, config Config, db *cltrdb.Queries, currentBlockNumber uint32,
 ) ([]shmsg.P2PMessage, error) {
 	epochID, err := getNextEpochID(ctx, db)
 	if err != nil {
@@ -47,10 +58,7 @@ func startNextEpoch(
 		return nil, err
 	}
 
-	nextEpochID, err := computeNextEpochID(epochID, blockNumber)
-	if err != nil {
-		return nil, err
-	}
+	nextEpochID := computeNextEpochID(epochID, currentBlockNumber, config.ExecutionBlockDelay)
 	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
 	if err != nil {
 		return nil, err
