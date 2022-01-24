@@ -11,21 +11,31 @@ contract EonKeyStorage is Ownable {
     event Inserted(uint64 activationBlockNumber, uint64 index, bytes key);
     error NotFound(uint64 blockNumber);
 
-    // Keys are stored as a linked list, sorted from greatest to smallest activation block number.
-    // The key with greatest activation block number is at index firstKeyIndex. nextIndex is the
-    // index of the key with the next smaller (or equal) activation block number. In case of a tie,
-    // keys added later come before older keys, effectively replacing them.
+    // Keys are stored as a linked list, sorted from greatest to smallest activation block
+    // number. The list has guard elements at the head and tail. The head element with activation
+    // block number uint64 max is stored at index 1, the tail lives at index 0 with activation
+    // block number 0. The guards allow us to simplify the code, because we always insert between
+    // two keys.
+
+    // nextIndex is the index of the key with the next smaller (or equal) activation block
+    // number. In case of a tie, keys added later come before older keys, effectively replacing
+    // them.
     struct Key {
         uint64 activationBlockNumber;
         uint64 nextIndex;
         bytes key;
     }
     Key[] public keys;
-    uint64 public firstKeyIndex;
+
+    constructor() {
+        bytes memory empty;
+        _insertKey(type(uint64).min, empty, 1);
+        _insertKey(type(uint64).max, empty, 0);
+    }
 
     /// @notice Get the number of keys in the storage.
     function num() external view returns (uint64) {
-        return uint64(keys.length);
+        return uint64(keys.length) - 2;
     }
 
     /// @notice Add a new key to the storage.
@@ -35,32 +45,13 @@ contract EonKeyStorage is Ownable {
         external
         onlyOwner
     {
-        // If it's the first key, simply insert it at the beginning. Set nextIndex to itself
-        // to mark the end of the list. firstKeyIndex is already 0, so no need to update it.
-        if (keys.length == 0) {
-            _insertKey(activationBlockNumber, serializedKey, 0);
-            return;
-        }
-
         uint64 newIndex;
-        uint64 index = firstKeyIndex;
+        uint64 index = 1;
         Key memory key = keys[index];
-
-        // If the new key has a greater (or equal) activation block number than the first key,
-        // make the new key the new head of the list.
-        if (key.activationBlockNumber <= activationBlockNumber) {
-            newIndex = _insertKey(
-                activationBlockNumber,
-                serializedKey,
-                firstKeyIndex
-            );
-            firstKeyIndex = newIndex;
-            return;
-        }
 
         // Search for the spot to insert the key, i.e., right before the first key with a smaller
         // (or equal) activation block number. Stop searching at the end of the list.
-        while (index != key.nextIndex) {
+        while (true) {
             Key memory nextKey = keys[key.nextIndex];
             if (nextKey.activationBlockNumber <= activationBlockNumber) {
                 // Insert between nextKey and key, udpating key's nextKey pointer to the newly
@@ -78,40 +69,20 @@ contract EonKeyStorage is Ownable {
             index = key.nextIndex;
             key = nextKey;
         }
-
-        // We've reached the first key and all keys have greater activation block numbers. Thus, we
-        // have to insert at the end of the list, pointing to ourselves.
-        newIndex = _insertKey(
-            activationBlockNumber,
-            serializedKey,
-            uint64(keys.length)
-        );
-        key.nextIndex = newIndex;
-        keys[index] = key;
-        return;
     }
 
     /// @notice Retrieve a key.
     /// @param blockNumber The block number for which the key shall be used. The returned key will
     /// have an activation block number smaller or equal to this block number.
     function get(uint64 blockNumber) external view returns (bytes memory) {
-        if (keys.length == 0) {
-            revert NotFound(blockNumber);
-        }
-
-        // Iterate through all keys, starting with firstKeyIndex. The keys are ordered by activation
-        // block number, so the first one with activation block number <= block number is the one
-        // we're looking for.
-        uint64 index = firstKeyIndex;
-        while (true) {
+        // Iterate through all keys, starting with the key following the head guard at index 1. The
+        // keys are ordered by activation block number, so the first one with activation block
+        // number <= block number is the one we're looking for.
+        uint64 index = keys[1].nextIndex;
+        while (index != 0) {
             Key memory key = keys[index];
             if (key.activationBlockNumber <= blockNumber) {
                 return key.key;
-            }
-            if (index == key.nextIndex) {
-                // Only the key with smallest activation block number is allowed to point at
-                // itself. Thus, we reached the first key and didn't find anything.
-                break;
             }
             index = key.nextIndex;
         }
@@ -131,11 +102,14 @@ contract EonKeyStorage is Ownable {
                 nextIndex: nextIndex
             })
         );
-        emit Inserted({
-            activationBlockNumber: activationBlockNumber,
-            key: key,
-            index: index
-        });
+        // Do not emit the event for guard elements
+        if (index >= 2) {
+            emit Inserted({
+                activationBlockNumber: activationBlockNumber,
+                key: key,
+                index: index
+            });
+        }
         return index;
     }
 }
