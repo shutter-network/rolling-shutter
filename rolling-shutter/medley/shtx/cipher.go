@@ -1,0 +1,74 @@
+package shtx
+
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/signer/core"
+)
+
+type CipherTransaction struct {
+	EncryptedPayload   []byte
+	GasLimit           *big.Int
+	InclusionFeePerGas *big.Int
+	ExecutionFeePerGas *big.Int
+	Nonce              *big.Int
+	Signature          []byte
+}
+
+var eip712CipherTransactionType = []core.Type{
+	{Name: "EncryptedPayload", Type: "bytes"},
+	{Name: "GasLimit", Type: "uint256"},
+	{Name: "InclusionFeePerGas", Type: "uint256"},
+	{Name: "ExecutionFeePerGas", Type: "uint256"},
+	{Name: "Nonce", Type: "uint256"},
+	{Name: "Signature", Type: "bytes"},
+}
+
+var eip712ShutterDomain = core.TypedDataDomain{
+	Name:    "shutter",
+	Version: "1",
+}
+
+func init() {
+}
+
+func decodeCipherTransactionPayload(payload []byte) (*CipherTransaction, error) {
+	return nil, nil
+}
+
+func (t *CipherTransaction) Type() uint8 {
+	return CipherTransactionType
+}
+
+func (t *CipherTransaction) Encode() ([]byte, error) {
+	// CipherTransaction consists only of byte slices and big ints, both of which are supported
+	// by rlp out of the box. An error is returned if one of the integers is negative
+	return rlp.EncodeToBytes(t)
+}
+
+func (t *CipherTransaction) EnvelopeSigner() (common.Address, error) {
+	return common.Address{}, nil
+}
+
+func (t *CipherTransaction) SigningHash() (common.Hash, error) {
+	typedDataTransaction := core.TypedData{
+		Types: core.Types{
+			EIP712Domain:        ShortEIP712DomainType,
+			"CipherTransaction": eip712CipherTransactionType,
+		},
+		PrimaryType: "CipherTransaction",
+		Domain:      eip712ShutterDomain,
+		Message: core.TypedDataMessage{
+			"EncryptedPayload":   t.EncryptedPayload,
+			"GasLimit":           (*math.HexOrDecimal256)(t.GasLimit),
+			"InclusionFeePerGas": (*math.HexOrDecimal256)(t.InclusionFeePerGas),
+			"ExecutionFeePerGas": (*math.HexOrDecimal256)(t.ExecutionFeePerGas),
+			"Nonce":              (*math.HexOrDecimal256)(t.Nonce),
+			"Signature":          t.Signature,
+		},
+	}
+	return HashForSigning(&typedDataTransaction)
+}

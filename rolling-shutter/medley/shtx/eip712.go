@@ -1,0 +1,46 @@
+package shtx
+
+import (
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/signer/core"
+)
+
+var EIP712DomainType = []core.Type{
+	{Name: "name", Type: "string"},
+	{Name: "version", Type: "string"},
+	{Name: "chainId", Type: "uint256"},
+	{Name: "verifyingContract", Type: "address"},
+}
+
+var ShortEIP712DomainType = []core.Type{
+	{Name: "name", Type: "string"},
+	{Name: "version", Type: "string"},
+}
+
+const EIP712Domain = "EIP712Domain"
+
+func EIP712Encode(typedData *core.TypedData) ([]byte, error) {
+	domainSeparator, err := typedData.HashStruct(EIP712Domain, typedData.Domain.Map())
+	if err != nil {
+		return nil, err
+	}
+
+	typedDataHash, err := typedData.HashStruct(typedData.PrimaryType, typedData.Message)
+	if err != nil {
+		return nil, err
+	}
+
+	rawData := []byte(fmt.Sprintf("\x19\x01%s%s", string(domainSeparator), string(typedDataHash)))
+	return rawData, nil
+}
+
+func HashForSigning(typedData *core.TypedData) (common.Hash, error) {
+	encodedData, err := EIP712Encode(typedData)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return crypto.Keccak256Hash(encodedData), nil
+}
