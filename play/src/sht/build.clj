@@ -17,6 +17,14 @@
                      :process/cmd '[bb build-all]
                      :process/wait true}]))
 
+(defn sys-write-config-files
+  "write config files of all subprocesses to disk.
+  This needs to be called, when :tom-edits has been modified."
+  [{:sys/keys [keypers decryptors collator] :as sys}]
+  (doseq [sub (concat keypers decryptors [collator])]
+      (play/toml-edit-file (:subcommand/cfgfile sub)
+                           (:subcommand/toml-edits sub))))
+
 (defmethod runner/run :init/init
   [sys {:init/keys [conf] :as m}]
   (info "Initializing system" m)
@@ -33,11 +41,24 @@
         collator (-> (play/collator-subcommand)
                      play/generate-config
                      play/initdb)
+
+        peers (->> (concat keypers decryptors [collator])
+                   (mapv (fn [sub]
+                          (str (get-in sub [:subcommand/toml-edits "ListenAddress"])
+                               "/p2p/"
+                               (get-in sub [:subcommand/cfg :peerid])))))
+        set-peers (fn [sub]
+                    (assoc-in sub  [:subcommand/toml-edits "PeerMultiaddrs"] peers))
+        keypers (map set-peers keypers)
+        decryptors (map set-peers decryptors)
+        collator (set-peers collator)
         res {:sys/keypers keypers
              :sys/decryptors decryptors
-             :sys/collator collator}]
+             :sys/collator collator}
+        sys (merge sys res)]
+    (sys-write-config-files sys)
     (info "Initialized system successfully" res)
-    (merge sys res)))
+    sys))
 
 (defn run-node
   [{:keys [num-keypers]}]
