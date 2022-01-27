@@ -49,7 +49,7 @@ extendEnvironment((hre) => {
   };
 
   hre.getCollatorAddress = async function () {
-    if (hre.deployConf.decryptors === null) {
+    if (hre.deployConf.collator === null) {
       const { collator } = await hre.getNamedAccounts();
       return collator;
     } else {
