@@ -4,8 +4,10 @@
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
+            [cheshire.core :as json]
             [sht.runner :as runner]
             [sht.build :as build]
+            [babashka.fs :as fs]
             [sht.play :as play]))
 
 (defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
@@ -109,6 +111,87 @@
                    :keyper/num keyper})
 
                 ]})
+
+
+(defmethod runner/run ::configure-keypers
+  [sys m]
+  (let [deploy-conf (build/sys-deploy-conf sys)
+        deploy-conf-path (-> sys :cwd (fs/path "deploy-config-configure-keypers.json") fs/absolutize str)]
+    (spit deploy-conf-path (json/encode deploy-conf {:pretty true}))
+    (runner/dispatch sys {:run :process/run
+                          :process/id :configure-keypers
+                          :process/wait true
+                          :process/opts {:dir (str (fs/path play/repo-root "contracts"))
+                                         :extra-env {"DEPLOY_CONF" deploy-conf-path}}
+                          :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/configure-keypers.js"]})))
+
+(defn test-change-keyper-set
+  []
+  (let [num-keypers 4
+        num-initial-keypers (dec num-keypers)
+        conf {:num-keypers num-keypers
+              :num-decryptors 0}]
+    {:test/id :change-keyper-set
+     :test/conf conf
+     :test/description "distributed key generation should work"
+     :test/steps [{:run :init/init
+                   :init/conf conf}
+                  (for [keyper (range num-keypers)]
+                    {:check :keyper/meta-inf
+                     :keyper-num keyper})
+
+                  (build/run-chain)
+                  [{:run :process/run
+                    :process/id :node
+                    :process/cmd '[bb node]
+                    :process/opts {:extra-env {"PLAY_NUM_KEYPERS" num-initial-keypers
+                                               "PLAY_NUM_DECRYPTORS" "0"}}
+                    :process/port 8545
+                    :process/port-timeout (+ 5000 (* num-keypers 2000))}
+
+                   {:run :process/run
+                    :process/wait true
+                    :process/id :symlink-deployments
+                    :process/cmd '[bb -deployments]}]
+                  ;; (build/run-node conf)
+
+                  (build/run-keypers conf)
+
+                  {:run :process/run
+                   :process/id :boot
+                   :process/cmd '[bb boot]
+                   :process/wait true}
+
+                  {:check :loop/until
+                   :loop/description "eon should exist for all keypers"
+                   :loop/timeout-ms (* 60 1000)
+                   :loop/checks (for [keyper (range num-initial-keypers)]
+                                  {:check :keyper/eon-exists
+                                   :keyper/num keyper
+                                   :keyper/eon 1})}
+
+                  {:check :loop/until
+                   :loop/description "all keypers should succeed with the dkg process"
+                   :loop/timeout-ms (* 60 1000)
+                   :loop/checks (for [keyper (range num-initial-keypers)]
+                                  {:check :keyper/dkg-success
+                                   :keyper/num keyper})}
+
+                  (for [keyper (range num-initial-keypers)]
+                    {:check :keyper/non-zero-activation-block
+                     :keyper/num keyper})
+
+                  {:run ::configure-keypers}
+
+                  {:check :loop/until
+                   :loop/description "eon 2 should exist for all keypers"
+                   :loop/timeout-ms (* 60 1000)
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :keyper/eon-exists
+                                   :keyper/num keyper
+                                   :keyper/eon 2})}
+
+                  ]}))
 
 (defn test-dkg-keypers-join-late
   [{:keys [num-keypers threshold] :as conf}]

@@ -13,6 +13,9 @@
 (defn doit []
   (core/report-result [(runner/run-test (first @dkg-test/tests))]))
 
+(defn doit2 []
+  (core/report-result [(runner/run-test (dkg-test/test-change-keyper-set))]))
+
 (comment
   (def db {:dbtype "postgresql"
            :dbname (play/keyper-db 0)

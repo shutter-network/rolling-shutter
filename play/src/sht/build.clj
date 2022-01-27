@@ -60,6 +60,15 @@
     (info "Initialized system successfully" res)
     sys))
 
+(defn sys-deploy-conf
+  "create a deploy conf structure as read by the 'hardhat node' command"
+  [sys]
+  (let [eth-address (fn [m] (get-in m [:subcommand/cfg :eth-address]))]
+    {:keypers (mapv eth-address (:sys/keypers sys))
+     :decryptors (mapv eth-address (:sys/decryptors sys))
+     :collator (eth-address (:sys/collator sys))
+     :fundValue "100"}))
+
 (defn run-node
   [{:keys [num-keypers]}]
   [{:run :process/run
