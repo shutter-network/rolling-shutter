@@ -25,8 +25,10 @@ module.exports = async function (hre) {
     console.log("Collator set already added");
     configSetIndex = lastSetIndex;
   } else {
-    await collator.add(collatorAddress);
-    await collator.append();
+    const addCollatorTx = await collator.add(collatorAddress);
+    await addCollatorTx.wait(hre.numConfirmations);
+    const appendTx = await collator.append();
+    await appendTx.wait(hre.numConfirmations);
     configSetIndex = lastSetIndex + 1;
   }
 
@@ -40,10 +42,12 @@ module.exports = async function (hre) {
     return;
   }
 
-  await cfg.addNewCfg({
+  const addCfgTx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
   });
+  await addCfgTx.wait(hre.numConfirmations);
+
   console.log(
     "configure collator: activationBlockNumber %s collator: %s",
     activationBlockNumber,

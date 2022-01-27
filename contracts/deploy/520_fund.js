@@ -34,6 +34,6 @@ module.exports = async function (hre) {
     txs.push(tx);
   }
   for (const tx of txs) {
-    await tx.wait();
+    await tx.wait(hre.numConfirmations);
   }
 };

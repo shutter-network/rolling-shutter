@@ -56,6 +56,13 @@ extendEnvironment((hre) => {
       return hre.deployConf.collator;
     }
   };
+
+  // the number of confirmations to wait when sending transactions
+  if (process.env.NUM_CONFIRMATIONS) {
+    hre.numConfirmations = parseInt(process.env.NUM_CONFIRMATIONS);
+  } else {
+    hre.numConfirmations = 0;
+  }
 });
 
 // You need to export an object to set up your config

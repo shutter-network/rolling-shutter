@@ -25,8 +25,10 @@ module.exports = async function (hre) {
     console.log("Decryptor set already added");
     configSetIndex = lastSetIndex;
   } else {
-    await decryptors.add(decryptorAddrs);
-    await decryptors.append();
+    const addDecryptorTx = await decryptors.add(decryptorAddrs);
+    await addDecryptorTx.wait(hre.numConfirmations);
+    const appendTx = await decryptors.append();
+    await appendTx.wait(hre.numConfirmations);
     configSetIndex = lastSetIndex + 1;
   }
 
@@ -40,10 +42,12 @@ module.exports = async function (hre) {
     return;
   }
 
-  await cfg.addNewCfg({
+  const addCfgTx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
   });
+  await addCfgTx.wait(hre.numConfirmations);
+
   console.log(
     "configure decryptors: activationBlockNumber %s decryptors: %s",
     activationBlockNumber,

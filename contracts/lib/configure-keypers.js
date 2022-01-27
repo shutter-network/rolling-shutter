@@ -2,7 +2,8 @@ module.exports = {
   configure_keypers: configure_keypers,
 };
 
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
+const ethers = hre.ethers;
 
 // const { inspect } = require("util");
 
@@ -28,8 +29,10 @@ async function configure_keypers(keyperAddrs) {
     console.log("Keyper set already added");
     configSetIndex = lastSetIndex;
   } else {
-    await keypers.add(keyperAddrs);
-    await keypers.append();
+    const addKeyperTx = await keypers.add(keyperAddrs);
+    await addKeyperTx.wait(hre.numConfirmations);
+    const appendTx = await keypers.append();
+    await appendTx.wait(hre.numConfirmations);
     configSetIndex = lastSetIndex + 1;
   }
 
@@ -43,11 +46,13 @@ async function configure_keypers(keyperAddrs) {
     return;
   }
 
-  await cfg.addNewCfg({
+  const addCfgTx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
     threshold: Math.ceil((keyperAddrs.length / 3) * 2),
   });
+  await addCfgTx.wait(hre.numConfirmations);
+
   console.log(
     "configure keypers: activationBlockNumber %s, setIndex: %d, keypers: %s",
     activationBlockNumber,
