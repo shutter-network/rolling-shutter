@@ -19,10 +19,11 @@
 (comment
   (def db {:dbtype "postgresql"
            :dbname (play/keyper-db 0)
-           :password core/play-db-password})
+           :password (System/getenv "PLAY_DB_PASSWORD")})
 
   (def ds (jdbc/get-datasource db))
 
+  (jdbc/execute! ds ["select * from keyper_set"])
 
 
   (jdbc/execute! ds ["select * from tendermint_batch_config"])

@@ -12,64 +12,67 @@
 
 (defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
 
-(defmethod runner/check :keyper/meta-inf
-  [sys {:keys [keyper-num]}]
-  (let [db {:dbtype "postgresql"
+(defn- check-query
+  [description sys opts query ok-rows?]
+  (let [keyper-num (or (:keyper-num opts) (:keyper/num opts))
+        db {:dbtype "postgresql"
             :dbname (play/keyper-db keyper-num)
             :password play-db-password}
         ds (jdbc/get-datasource db)
-        row (jdbc/execute-one! ds ["select * from meta_inf"])]
-    {:chk/ok? (some? row)
-     :chk/description "meta_inf table should be filled"
-     :chk/info row}))
-
-(defmethod runner/check :keyper/eon-exists
-  [sys {:keyper/keys [num eon]}]
-  (let [db {:dbtype "postgresql"
-            :dbname (play/keyper-db num)
-            :password play-db-password}
-        ds (jdbc/get-datasource db)
-        row (jdbc/execute-one! ds ["select * from eons where eon=?" eon])]
-    {:chk/ok? (some? row)
-     :chk/description "eon should exist"
-     :chk/info row
-     :keyper/num num}))
-
-(defmethod runner/check :keyper/dkg-success
-  [sys {:keyper/keys [num]}]
-  (let [db {:dbtype "postgresql"
-            :dbname (play/keyper-db num)
-            :password play-db-password}
-        ds (jdbc/get-datasource db)
-        rows (jdbc/execute-one! ds ["select * from dkg_result where success"])]
-    {:chk/ok? (not (empty? rows))
-     :chk/description "dkg should finish successfully"
+        query (if (vector? query)
+                query
+                (query sys opts))
+        description (if (string? description)
+                      description
+                      (description sys opts))
+        rows (jdbc/execute! ds query)]
+    {:chk/ok? (boolean (ok-rows? sys opts rows))
+     :chk/description description
      :chk/info rows
-     :keyper/num num}))
+     :keyper/num keyper-num}))
 
-(defmethod runner/check :keyper/dkg-failed
-  [sys {:keyper/keys [num]}]
-  (let [db {:dbtype "postgresql"
-            :dbname (play/keyper-db num)
-            :password play-db-password}
-        ds (jdbc/get-datasource db)
-        rows (jdbc/execute-one! ds ["select * from dkg_result where not success"])]
-    {:chk/ok? (not (empty? rows))
-     :chk/description "dkg should fail"
-     :chk/info rows
-     :keyper/num num}))
+(defmacro def-check-query
+  [id query ok-rows? description]
+  `(defmethod runner/check ~id
+     [sys# opts#]
+     (check-query ~description sys# opts# ~query ~ok-rows?)))
 
-(defmethod runner/check :keyper/non-zero-activation-block
-  [sys {:keyper/keys [num]}]
-  (let [db {:dbtype "postgresql"
-            :dbname (play/keyper-db num)
-            :password play-db-password}
-        ds (jdbc/get-datasource db)
-        rows (jdbc/execute-one! ds ["select * from eons where activation_block_number<=0"])]
-    {:chk/ok? (empty? rows)
-     :chk/description "activation block number must be positive"
-     :chk/info rows
-     :keyper/num num}))
+(defn rows-not-empty?
+  [sys opts rows]
+  (seq rows))
+
+(def-check-query :keyper/meta-inf
+  ["select * from meta_inf"]
+  rows-not-empty?
+  "meta_inf table should be filled")
+
+(def-check-query :keyper/eon-exists
+  (fn [sys {:keyper/keys [eon]}] ["select * from eons where eon=?" eon])
+  rows-not-empty?
+  "eon should exist")
+
+(def-check-query :keyper/dkg-success
+  ["select * from dkg_result where success"]
+  rows-not-empty?
+  "dkg should finish successfully")
+
+(def-check-query :keyper/dkg-failed
+  ["select * from dkg_result where not success"]
+  rows-not-empty?
+  "dkg should fail")
+
+(def-check-query :keyper/non-zero-activation-block
+  ["select * from eons where activation_block_number<=0"]
+  (fn [_ _ rows] (empty? rows))
+  "activation block number must be positive")
+
+(def-check-query :keyper/query
+  (fn [sys {:keyper/keys [query]}]
+    query)
+  (fn [sys {:keyper/keys [expected]} rows]
+    (= rows expected))
+  (fn [sys {:keyper/keys [description]}]
+    description))
 
 (defn test-keypers-dkg-generation
   [{:keys [num-keypers] :as conf}]
@@ -182,6 +185,16 @@
                      :keyper/num keyper})
 
                   {:run ::configure-keypers}
+
+                  {:check :loop/until
+                   :loop/description "All keypers should notice the configuration change"
+                   :loop/timeout-ms (* 20 1000)
+                   :loop/checks (for [keyper  (range num-keypers)]
+                                  {:check :keyper/query
+                                   :keyper/description "keyper should notice the configuration change"
+                                   :keyper/num keyper
+                                   :keyper/query ["select count(*) from keyper_set"]
+                                   :keyper/expected [{:count 3}]})}
 
                   {:check :loop/until
                    :loop/description "eon 2 should exist for all keypers"
