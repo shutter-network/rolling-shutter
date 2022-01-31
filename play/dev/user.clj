@@ -17,14 +17,13 @@
   (core/report-result [(runner/run-test (dkg-test/test-change-keyper-set))]))
 
 (comment
-  (def db {:dbtype "postgresql"
-           :dbname (play/keyper-db 0)
-           :password (System/getenv "PLAY_DB_PASSWORD")})
+  (do
+    (def db {:dbtype "postgresql"
+             :dbname (play/keyper-db 0)
+             :password (System/getenv "PLAY_DB_PASSWORD")})
 
-  (def ds (jdbc/get-datasource db))
-
+    (def ds (jdbc/get-datasource db)))
   (jdbc/execute! ds ["select * from keyper_set"])
-
 
   (jdbc/execute! ds ["select * from tendermint_batch_config"])
   (jdbc/execute-one! ds ["select * from meta_inf"])

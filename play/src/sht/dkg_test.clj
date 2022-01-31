@@ -66,6 +66,13 @@
   (fn [_ _ rows] (empty? rows))
   "activation block number must be positive")
 
+(def-check-query :keyper/keyper-set
+  ["select * from keyper_set"]
+  (fn [_ {:keyper/keys [expected-count]} rows]
+    (= expected-count (count rows)))
+  (fn [_ {:keyper/keys [expected-count]}]
+    (format "keyper_set table should have %d entries" expected-count)))
+
 (def-check-query :keyper/query
   (fn [sys {:keyper/keys [query]}]
     query)
@@ -166,6 +173,14 @@
                    :process/wait true}
 
                   {:check :loop/until
+                   :loop/description "All keypers should see the new keyper_set"
+                   :loop/timeout-ms (* 20 1000)
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :keyper/keyper-set
+                                   :keyper/num keyper
+                                   :keyper/expected-count 2})}
+
+                  {:check :loop/until
                    :loop/description "eon should exist for all keypers"
                    :loop/timeout-ms (* 60 1000)
                    :loop/checks (for [keyper (range num-initial-keypers)]
@@ -189,12 +204,10 @@
                   {:check :loop/until
                    :loop/description "All keypers should notice the configuration change"
                    :loop/timeout-ms (* 20 1000)
-                   :loop/checks (for [keyper  (range num-keypers)]
-                                  {:check :keyper/query
-                                   :keyper/description "keyper should notice the configuration change"
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :keyper/keyper-set
                                    :keyper/num keyper
-                                   :keyper/query ["select count(*) from keyper_set"]
-                                   :keyper/expected [{:count 3}]})}
+                                   :keyper/expected-count 3})}
 
                   {:check :loop/until
                    :loop/description "eon 2 should exist for all keypers"

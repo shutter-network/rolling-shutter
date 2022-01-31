@@ -224,9 +224,10 @@
     (warn (format "check failed: %s" description) chk)))
 
 (defn- loop-single-check
-  [sys loop-check]
+  [sys loop-check set-fail]
   (loop []
     (let [res (check sys loop-check)]
+      (set-fail res)
       (if (:chk/ok? res)
         (do
           (report-check res)
@@ -249,9 +250,11 @@
   [sys {:loop/keys [checks timeout-ms description] :or {description "loop/until"} :as m}]
   (let [stime (System/currentTimeMillis)
         end-time (+ stime timeout-ms)
-
-        futures (mapv (fn [loop-check]
-                        (future (loop-single-check sys loop-check)))
+        last-fails (atom {})
+        futures (mapv (fn [loop-check ]
+                        (future (loop-single-check sys
+                                                   loop-check
+                                                   (fn [res] (swap! last-fails assoc loop-check res)))))
                       checks)
         results (->> futures
                      (wait-futures end-time)
@@ -259,7 +262,7 @@
                             (if (identical? res ::timed-out)
                               {:chk/ok? false
                                :chk/description "timed out"
-                               :chk/info loop-check}
+                               :chk/info (get @last-fails loop-check)}
                               res))
                           checks))
         running-time (- (System/currentTimeMillis) stime)]
