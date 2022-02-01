@@ -339,6 +339,17 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 	return i, err
 }
 
+const getLastBatchConfigSent = `-- name: GetLastBatchConfigSent :one
+SELECT event_index FROM last_batch_config_sent LIMIT 1
+`
+
+func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastBatchConfigSent)
+	var event_index int64
+	err := row.Scan(&event_index)
+	return event_index, err
+}
+
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM tendermint_sync_meta
@@ -653,6 +664,17 @@ func (q *Queries) SelectPureDKG(ctx context.Context) ([]Puredkg, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const setLastBatchConfigSent = `-- name: SetLastBatchConfigSent :exec
+INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET event_index = $1
+`
+
+func (q *Queries) SetLastBatchConfigSent(ctx context.Context, eventIndex int64) error {
+	_, err := q.db.Exec(ctx, setLastBatchConfigSent, eventIndex)
+	return err
 }
 
 const tMGetSyncMeta = `-- name: TMGetSyncMeta :one

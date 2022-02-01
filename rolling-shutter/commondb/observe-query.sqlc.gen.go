@@ -190,6 +190,22 @@ func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64)
 	return column_1, err
 }
 
+const getKeyperSetByEventIndex = `-- name: GetKeyperSetByEventIndex :one
+SELECT event_index, activation_block_number, keypers, threshold FROM keyper_set WHERE event_index=$1
+`
+
+func (q *Queries) GetKeyperSetByEventIndex(ctx context.Context, eventIndex int64) (KeyperSet, error) {
+	row := q.db.QueryRow(ctx, getKeyperSetByEventIndex, eventIndex)
+	var i KeyperSet
+	err := row.Scan(
+		&i.EventIndex,
+		&i.ActivationBlockNumber,
+		&i.Keypers,
+		&i.Threshold,
+	)
+	return i, err
+}
+
 const insertChainCollator = `-- name: InsertChainCollator :exec
 INSERT INTO chain_collator (activation_block_number, collator)
 VALUES ($1, $2)

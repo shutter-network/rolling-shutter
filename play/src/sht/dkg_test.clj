@@ -52,8 +52,12 @@
   "eon should exist")
 
 (def-check-query :keyper/dkg-success
-  ["select * from dkg_result where success"]
-  rows-not-empty?
+  ["select * from dkg_result"]
+  (fn [_ {:keyper/keys [eon]} rows]
+    (->> rows
+         (filter (comp #{eon} :dkg_result/eon))
+         first
+         :dkg_result/success))
   "dkg should finish successfully")
 
 (def-check-query :keyper/dkg-failed
@@ -114,6 +118,7 @@
                  :loop/timeout-ms (* 60 1000)
                  :loop/checks (for [keyper (range num-keypers)]
                                 {:check :keyper/dkg-success
+                                 :keyper/eon 1
                                  :keyper/num keyper})}
 
                 (for [keyper (range num-keypers)]
@@ -193,6 +198,7 @@
                    :loop/timeout-ms (* 60 1000)
                    :loop/checks (for [keyper (range num-initial-keypers)]
                                   {:check :keyper/dkg-success
+                                   :keyper/eon 1
                                    :keyper/num keyper})}
 
                   (for [keyper (range num-initial-keypers)]
@@ -217,6 +223,13 @@
                                    :keyper/num keyper
                                    :keyper/eon 2})}
 
+                  {:check :loop/until
+                   :loop/description "all keypers should succeed with the dkg process"
+                   :loop/timeout-ms (* 60 1000)
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :keyper/dkg-success
+                                   :keyper/eon 2
+                                   :keyper/num keyper})}
                   ]}))
 
 (defn test-dkg-keypers-join-late
@@ -269,6 +282,7 @@
                  :loop/timeout-ms (* 60 1000)
                  :loop/checks (for [keyper (range num-keypers)]
                                 {:check :keyper/dkg-success
+                                 :keyper/eon 2
                                  :keyper/num keyper})}
 
                 (for [keyper (range num-keypers)]
@@ -279,9 +293,11 @@
 
 (defn generate-tests
   []
-  (for [conf [{:num-keypers 3, :num-decryptors 2, :threshold 2}]
-        f [test-keypers-dkg-generation
-           test-dkg-keypers-join-late]]
-    (f conf)))
+  (concat
+   [(test-change-keyper-set)]
+   (for [conf [{:num-keypers 3, :num-decryptors 2, :threshold 2}]
+         f [test-keypers-dkg-generation
+            test-dkg-keypers-join-late]]
+     (f conf))))
 
 (def tests (delay (generate-tests)))

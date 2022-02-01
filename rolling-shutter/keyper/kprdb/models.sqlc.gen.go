@@ -67,6 +67,11 @@ type KeyperSet struct {
 	Threshold             int32
 }
 
+type LastBatchConfigSent struct {
+	EnforceOneRow bool
+	EventIndex    int64
+}
+
 type MetaInf struct {
 	Key   string
 	Value string

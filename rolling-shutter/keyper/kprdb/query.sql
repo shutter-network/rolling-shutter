@@ -165,3 +165,11 @@ VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
 DELETE FROM outgoing_eon_keys RETURNING *;
+
+-- name: SetLastBatchConfigSent :exec
+INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET event_index = $1;
+
+-- name: GetLastBatchConfigSent :one
+SELECT event_index FROM last_batch_config_sent LIMIT 1;

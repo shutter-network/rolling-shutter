@@ -18,6 +18,9 @@ INSERT INTO keyper_set (
     $1, $2, $3, $4
 );
 
+-- name: GetKeyperSetByEventIndex :one
+SELECT * FROM keyper_set WHERE event_index=$1;
+
 -- name: GetKeyperSet :one
 SELECT (
     activation_block_number,

@@ -68,7 +68,7 @@ func (st *ShuttermintState) Load(ctx context.Context, queries *kprdb.Queries) er
 	if err != nil {
 		return err
 	}
-	st.isKeyper = numBatchConfigs > 0
+	st.isKeyper = numBatchConfigs > 0 // XXX need to look
 	err = st.loadEncryptionKeys(ctx, queries)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 			receivers = nil
 			encryptedEvals = nil
 		}()
-		return st.scheduleShutterMessage(
+		return scheduleShutterMessage(
 			ctx,
 			queries,
 			fmt.Sprintf("poly eval eon=%d", currentEon),
@@ -229,7 +229,7 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 	return send()
 }
 
-func (st *ShuttermintState) scheduleShutterMessage(
+func scheduleShutterMessage(
 	ctx context.Context,
 	queries *kprdb.Queries,
 	description string,
@@ -256,7 +256,7 @@ func (st *ShuttermintState) handleBatchConfig(
 			return nil
 		}
 		st.isKeyper = true
-		err := st.scheduleShutterMessage(
+		err := scheduleShutterMessage(
 			ctx,
 			queries,
 			"check-in",
@@ -357,7 +357,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 		log.Fatalf("Aborting due to unexpected error: %+v", err)
 	}
 	dkg.markDirty()
-	err = st.scheduleShutterMessage(
+	err = scheduleShutterMessage(
 		ctx,
 		queries,
 		fmt.Sprintf("poly commitment, eon=%d", eon),
@@ -389,7 +389,7 @@ func (st *ShuttermintState) startPhase2Accusing(
 		for _, a := range accusations {
 			accused = append(accused, dkg.keypers[a.Accused])
 		}
-		err := st.scheduleShutterMessage(
+		err := scheduleShutterMessage(
 			ctx,
 			queries,
 			fmt.Sprintf("accusations, eon=%d, count=%d", eon, len(accusations)),
@@ -418,7 +418,7 @@ func (st *ShuttermintState) startPhase3Apologizing(
 			polyEvals = append(polyEvals, a.Eval)
 		}
 
-		err := st.scheduleShutterMessage(
+		err := scheduleShutterMessage(
 			ctx, queries,
 			fmt.Sprintf("apologies, eon=%d, count=%d", eon, len(apologies)),
 			shmsg.NewApology(eon, accusers, polyEvals),
@@ -462,7 +462,7 @@ func (st *ShuttermintState) finalizeDKG(
 		if err != nil {
 			return err
 		}
-		err = st.scheduleShutterMessage(
+		err = scheduleShutterMessage(
 			ctx, queries,
 			"requesting DKG restart",
 			shmsg.NewEonStartVote(uint64(keyperEon.ActivationBlockNumber)),

@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/chainobserver"
+	"github.com/shutter-network/shutter/shuttermint/commondb"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
@@ -220,9 +221,68 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
+// handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
+func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx) error {
+	q := kprdb.New(tx)
+	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	cq := commondb.New(tx)
+	keyperSet, err := cq.GetKeyperSetByEventIndex(ctx, int64(latestBatchConfig.ConfigIndex)+1)
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	lastSent, err := q.GetLastBatchConfigSent(ctx)
+	if err != nil {
+		return err
+	}
+	if lastSent == keyperSet.EventIndex {
+		return nil
+	}
+	err = q.SetLastBatchConfigSent(ctx, keyperSet.EventIndex)
+	if err != nil {
+		return nil
+	}
+
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return err
+	}
+	log.Printf("have a new config to be scheduled: %v", keyperSet)
+	batchConfigMsg := shmsg.NewBatchConfig(
+		uint64(keyperSet.ActivationBlockNumber),
+		keypers,
+		uint64(keyperSet.Threshold),
+		uint64(keyperSet.EventIndex),
+		false,
+		false,
+	)
+	err = scheduleShutterMessage(ctx, q, "new batch config", batchConfigMsg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	for {
 		err := SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
+		if err != nil {
+			return err
+		}
+		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+			return kpr.handleOnChainKeyperSetChanges(ctx, tx)
+		})
 		if err != nil {
 			return err
 		}

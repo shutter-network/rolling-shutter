@@ -176,7 +176,7 @@
                  :p2p-port p2p-port
                  :cfgfile (format "keyper-%s.toml" n)
                  :toml-edits {"DatabaseURL" (format "postgres:///%s" db)
-                              "DKGPhaseLength" 5
+                              "DKGPhaseLength" 8
                               "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)}}))
 
 ;; -- mocknode-subcommand
