@@ -6,9 +6,11 @@ CREATE TABLE event_sync_progress (
 INSERT INTO event_sync_progress (next_block_number, next_log_index) VALUES (0,0);
 
 CREATE TABLE keyper_set(
+       event_index bigint NOT NULL,
        activation_block_number bigint NOT NULL,
        keypers text[] NOT NULL,
-       threshold integer NOT NULL
+       threshold integer NOT NULL,
+       PRIMARY KEY (event_index)
 );
 
 CREATE TABLE IF NOT EXISTS decryptor_set_member (

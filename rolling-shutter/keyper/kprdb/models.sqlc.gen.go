@@ -61,6 +61,7 @@ type EventSyncProgress struct {
 }
 
 type KeyperSet struct {
+	EventIndex            int64
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32

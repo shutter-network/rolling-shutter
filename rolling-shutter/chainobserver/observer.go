@@ -191,6 +191,7 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 			event.ActivationBlockNumber)
 	}
 	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
+		EventIndex:            int64(event.Index),
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
 		Keypers:               shdb.EncodeAddresses(event.addrs),
 		Threshold:             int32(event.Threshold),

@@ -251,22 +251,29 @@ func (q *Queries) InsertDecryptorSetMember(ctx context.Context, arg InsertDecryp
 
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
+    event_index,
     activation_block_number,
     keypers,
     threshold
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4
 )
 `
 
 type InsertKeyperSetParams struct {
+	EventIndex            int64
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
 }
 
 func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams) error {
-	_, err := q.db.Exec(ctx, insertKeyperSet, arg.ActivationBlockNumber, arg.Keypers, arg.Threshold)
+	_, err := q.db.Exec(ctx, insertKeyperSet,
+		arg.EventIndex,
+		arg.ActivationBlockNumber,
+		arg.Keypers,
+		arg.Threshold,
+	)
 	return err
 }
 
