@@ -231,7 +231,7 @@
   test-system
   {:doc "Run whole system tests"
    :depends [build]
-   :task (run-process ["clojure" "-X:run-tests"]
+   :task (run-process (apply vector "clojure" "-M:test" *command-line-args*)
                       {:dir (-> repo-root (fs/path "play") str)})}
 
   lint
