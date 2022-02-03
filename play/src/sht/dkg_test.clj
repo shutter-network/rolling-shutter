@@ -1,5 +1,8 @@
 (ns sht.dkg-test
   (:require [next.jdbc :as jdbc]
+            [clojure.string :as str]
+            [toml.core :as toml]
+            [sht.toml-writer :as toml-writer]
             [taoensso.timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -40,6 +43,12 @@
 (defn rows-not-empty?
   [sys opts rows]
   (seq rows))
+
+(def-check-query :keyper/tendermint-batch-config-started
+  ["select * from tendermint_batch_config"]
+  (fn [_ _ rows]
+    (empty? (remove :tendermint_batch_config/started rows)))
+  "all batch configs should have been started")
 
 (def-check-query :keyper/meta-inf
   ["select * from meta_inf"]
@@ -140,11 +149,151 @@
                                          :extra-env {"DEPLOY_CONF" deploy-conf-path}}
                           :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/configure-keypers.js"]})))
 
+(defn- chain-set-ports
+  [path seeds n]
+  (let [m (toml/read (slurp path) :keywordize true)
+        m (-> m
+              (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (+ 28000 n)))
+              (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
+              (assoc-in [:p2p :seeds] seeds))]
+    (spit path (toml-writer/dump m))))
+
+(defn sys-chain-config-path
+  [sys n & path-elems]
+  (str (apply fs/path (:cwd sys) (format "testchain-%d" n) "config", path-elems)))
+
+(defn init-chains
+  [sys]
+  (let [conf (:conf sys)
+        num-chains (:num-keypers conf)
+        num-initial-keypers  (:num-initial-keypers conf)
+        genesis-keypers (mapv (comp :eth-address :subcommand/cfg)
+                              (take num-initial-keypers (:sys/keypers sys)))
+        genesis-args (interleave (repeat "--genesis-keyper") genesis-keypers)
+        sys (runner/dispatch sys
+                             (mapv (fn [n] {:run :process/run
+                                            :process/wait true
+                                            :process/id (keyword (str "init-chain-" n))
+                                            :process/cmd (apply vector 'rolling-shutter "chain" "init"
+                                                                "--root" (format "testchain-%d" n)
+                                                                "--blocktime" "1"
+                                                                genesis-args)})
+                                   (range num-chains)))
+        seeds (->> (range num-chains)
+                   (mapv (fn [n]
+                           (format "%s@127.0.0.1:%d"
+                                   (slurp (sys-chain-config-path sys n "node_key.json.id"))
+                                   (+ 27000 n))))
+                   (str/join ","))]
+    (doseq [n (range num-chains)]
+      (chain-set-ports (sys-chain-config-path sys n "config.toml")
+                       seeds
+                       n))
+    sys))
+
+(defn base64-encode
+  "Encode an array of bytes into a base64 encoded string."
+  [^bytes unencoded]
+  (String. (.encode (java.util.Base64/getEncoder) unencoded)))
+
+(defn base64-decode
+  "Decode a base64 encoded string into an array of bytes."
+  [^String encoded]
+  (.decode (java.util.Base64/getDecoder) encoded))
+
+
+(defn get-private-key
+  [m]
+  (base64-decode (get-in m ["priv_key" "value"])))
+
+(defn seed-from-private-key
+  [pk]
+  (java.util.Arrays/copyOfRange pk 0 32))
+
+(defn read-private-key
+  [path]
+  (let [m (json/decode (slurp path))]
+    (get-private-key m)))
+
+
+
+(defn merge-genesis
+  [gens]
+  (let [res (first gens)
+        validators (distinct (mapcat (fn [m] (get m "validators")) gens))]
+    (assoc (first gens) "validators" validators)))
+
+(defn rewrite-genesis
+  ([cwd num-keypers num-initial-keypers]
+   (let [paths (mapv (fn [n]
+                       (-> cwd (fs/path (format "testchain-%d" n) "config" "genesis.json") str))
+                     (range num-keypers))
+         gens (mapv (fn [p] (-> p slurp json/decode)) (take num-initial-keypers paths))
+         genesis (merge-genesis gens)
+         genesis-str (json/encode genesis {:pretty true})]
+     (doseq [p paths]
+       (spit p genesis-str))))
+  ([{:keys [conf cwd] :as sys}]
+   (let [num-keypers (:num-keypers conf)
+         num-initial-keypers (:num-initial-keypers conf)]
+     (rewrite-genesis cwd num-keypers num-initial-keypers))))
+
+
+
+(defn set-seeds
+  "Set the ValidatorSeed value in the keyper's configs. They need to be written out with
+  build/sys-write-config-files afterwards."
+  [sys]
+  (let [keypers (:sys/keypers sys)
+        seeds (mapv (fn [n]
+                      (let [privkey (read-private-key
+                                     (sys-chain-config-path sys n "priv_validator_key.json"))
+                            seed (seed-from-private-key privkey)
+                            seed-str (.formatHex (java.util.HexFormat/of) seed)]
+                        seed-str))
+                    (range (count keypers)))
+        keypers (mapv (fn [k seed n]
+                        (-> k
+                            (assoc-in [:subcommand/toml-edits "ValidatorSeed"] seed)
+                            (assoc-in [:subcommand/toml-edits "ShuttermintURL"]
+                                      (format "http://localhost:%d" (+ 28000 n)))))
+                      keypers
+                      seeds
+                      (range (count keypers)))]
+    (assoc sys :sys/keypers keypers)))
+
+(defmethod runner/run :chain/run-chains
+  [sys m]
+  (let [num-chains (-> sys :conf :num-keypers)
+        sys (init-chains sys)
+        sys (set-seeds sys)]
+    (rewrite-genesis sys)
+    (build/sys-write-config-files sys)
+    (runner/dispatch sys
+                     (mapv (fn [n]
+                             {:run :process/run
+                              :process/wait false
+                              :process/id (keyword (str "chain-" n))
+                              :process/cmd ['rolling-shutter "chain" "--config"
+                                            (format "testchain-%d/config/config.toml" n)]})
+                           (range num-chains)))))
+
+(defmethod runner/run ::exit
+  [sys m]
+  (throw (ex-info "exit called" {})))
+
+(defmethod runner/run ::wait-forever
+  [sys m]
+  (info "waiting for one hour")
+  (Thread/sleep (* 3600 1000)))
+
 (defn test-change-keyper-set
   []
   (let [num-keypers 4
         num-initial-keypers (dec num-keypers)
+        devmode? false
         conf {:num-keypers num-keypers
+              :num-initial-keypers num-initial-keypers
               :num-decryptors 0}]
     {:test/id :change-keyper-set
      :test/conf conf
@@ -155,7 +304,10 @@
                     {:check :keyper/meta-inf
                      :keyper-num keyper})
 
-                  (build/run-chain)
+                  (if devmode?
+                    (build/run-chain)
+                    {:run :chain/run-chains})
+
                   [{:run :process/run
                     :process/id :node
                     :process/cmd '[bb node]
@@ -168,14 +320,13 @@
                     :process/wait true
                     :process/id :symlink-deployments
                     :process/cmd '[bb -deployments]}]
-                  ;; (build/run-node conf)
 
                   (build/run-keypers conf)
-
-                  {:run :process/run
-                   :process/id :boot
-                   :process/cmd '[bb boot]
-                   :process/wait true}
+                  (when devmode?
+                    {:run :process/run
+                     :process/id :boot
+                     :process/cmd '[bb boot]
+                     :process/wait true})
 
                   {:check :loop/until
                    :loop/description "All keypers should see the new keyper_set"
@@ -230,6 +381,9 @@
                                   {:check :keyper/dkg-success
                                    :keyper/eon 2
                                    :keyper/num keyper})}
+                  (for [keyper (range num-keypers)]
+                    {:check :keyper/tendermint-batch-config-started
+                     :keyper-num keyper})
                   ]}))
 
 (defn test-dkg-keypers-join-late
