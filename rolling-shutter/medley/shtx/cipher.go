@@ -32,11 +32,13 @@ var eip712ShutterDomain = core.TypedDataDomain{
 	Version: "1",
 }
 
-func init() {
-}
-
-func decodeCipherTransactionPayload(payload []byte) (*CipherTransaction, error) {
-	return nil, nil
+func DecodeCipherTransaction(input []byte) (*CipherTransaction, error) {
+	tx := &CipherTransaction{}
+	err := rlp.DecodeBytes(input[1:], tx)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (t *CipherTransaction) Type() uint8 {
@@ -46,7 +48,11 @@ func (t *CipherTransaction) Type() uint8 {
 func (t *CipherTransaction) Encode() ([]byte, error) {
 	// CipherTransaction consists only of byte slices and big ints, both of which are supported
 	// by rlp out of the box. An error is returned if one of the integers is negative
-	return rlp.EncodeToBytes(t)
+	rlpEncoded, err := rlp.EncodeToBytes(t)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte{CipherTransactionType}, rlpEncoded...), nil
 }
 
 func (t *CipherTransaction) EnvelopeSigner() (common.Address, error) {

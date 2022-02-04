@@ -28,13 +28,13 @@ func Decode(input []byte) (Transaction, error) {
 	}
 
 	typePrefix := input[0]
-	payload := input[1:]
 
 	switch typePrefix {
 	case CipherTransactionType:
-		return decodeCipherTransactionPayload(payload)
+		return DecodeCipherTransaction(input)
 	case PlaintextTransactionType:
-		return decodePlaintextTransactionPayload(payload)
+		decoded, err := DecodePlaintextTx(input)
+		return decoded, err
 	default:
 		return nil, ErrUnknownTransactionType
 	}
