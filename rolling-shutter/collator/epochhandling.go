@@ -2,6 +2,7 @@ package collator
 
 import (
 	"context"
+	"log"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
@@ -36,6 +37,7 @@ func startNextEpoch(
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("starting epoch %d", epochID)
 
 	transactions, err := db.GetTransactionsByEpoch(ctx, shdb.EncodeUint64(epochID))
 	if err != nil {
