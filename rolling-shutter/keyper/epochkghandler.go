@@ -222,7 +222,6 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 		return nil, errors.Wrapf(err, "failed to store decryption key for epoch %s in db", epochid.LogInfo(msg.EpochID))
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to insert decryption key for epoch %s, but it already exists", epochid.LogInfo(msg.EpochID))
 		return nil, nil
 	}
 	log.Printf("broadcasting decryption key for epoch %s", epochid.LogInfo(msg.EpochID))
@@ -238,18 +237,13 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
-	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
-		EpochID:       shdb.EncodeUint64(msg.EpochID),
-		DecryptionKey: msg.Key,
+	encodedKey := msg.key.Marshal()
+	_, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
+		EpochID:       shdb.EncodeUint64(msg.epochID),
+		DecryptionKey: encodedKey,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochid.LogInfo(msg.EpochID))
-	}
-	if tag.RowsAffected() == 0 {
-		log.Printf(
-			"attempted to insert decryption key for epoch %s, but it already exists",
-			epochid.LogInfo(msg.EpochID),
-		)
 	}
 	return nil, nil
 }
