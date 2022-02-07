@@ -144,10 +144,17 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 	if tmos.FileExists(nodeKeyFile) {
 		logger.Info("Found node key", "path", nodeKeyFile)
 	} else {
-		if _, err := p2p.LoadOrGenNodeKey(nodeKeyFile); err != nil {
+		nodeKey, err := p2p.LoadOrGenNodeKey(nodeKeyFile)
+		if err != nil {
 			return err
 		}
-		logger.Info("Generated node key", "path", nodeKeyFile)
+		idpath := nodeKeyFile + ".id"
+		err = os.WriteFile(idpath, []byte(nodeKey.ID()), 0o755)
+		if err != nil {
+			return errors.Wrapf(err, "Could not write to %s", idpath)
+		}
+
+		logger.Info("Generated node key", "path", nodeKeyFile, "id", nodeKey.ID())
 	}
 
 	// genesis file

@@ -49,6 +49,7 @@ func chainMain() {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(2)
 	}
+	stdlog.Printf("Id: %s", node.NodeInfo().ID())
 
 	err = node.Start()
 	if err != nil {
@@ -111,7 +112,6 @@ func newTendermint(configFile string) (*nm.Node, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
 	}
-
 	// create node
 	node, err := nm.NewNode(
 		config,
