@@ -124,7 +124,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 
 	// create a new PubSub service using the GossipSub router
 	options := []pubsub.Option{
-		pubsub.WithPeerScore(peerScoreParams(), peerScoreThresholds()),
+		// pubsub.WithPeerScore(peerScoreParams(), peerScoreThresholds()),
 	}
 	pubSub, err := pubsub.NewGossipSub(ctx, p.host, options...)
 	if err != nil {
@@ -178,10 +178,10 @@ func (p *P2P) joinTopic(topicName string) error {
 	}
 
 	// set peer scoring parameters
-	err = topic.SetScoreParams(topicScoreParams())
-	if err != nil {
-		return errors.Wrapf(err, "failed to set peer scoring parameters")
-	}
+	// err = topic.SetScoreParams(topicScoreParams())
+	// if err != nil {
+	// 	return errors.Wrapf(err, "failed to set peer scoring parameters")
+	// }
 
 	// and subscribe to it
 	sub, err := topic.Subscribe()
