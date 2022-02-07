@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -37,9 +38,22 @@ func (p *P2P) managePeers(ctx context.Context) error {
 func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 	candidates := make(map[peer.ID]*peer.AddrInfo)
 
+	indices := []int{}
+	for i := range p.Config.PeerMultiaddrs {
+		indices = append(indices, i)
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(indices), func(i, j int) { indices[i], indices[j] = indices[j], indices[i] })
+
+	n := 20
+	if n > len(indices) {
+		n = len(indices)
+	}
+
 	// fill candidates from config file, disregarding those without a peer id (as we can't check
 	// if we're already connected to them)
-	for _, m := range p.Config.PeerMultiaddrs {
+	for _, i := range indices[:n] {
+		m := p.Config.PeerMultiaddrs[i]
 		addrInfo, err := peer.AddrInfoFromP2pAddr(m)
 		if err != nil {
 			log.Printf("ignoring invalid address from config %s: %s", m, err)
