@@ -11,7 +11,8 @@ import (
 )
 
 func TestEncodeData(t *testing.T) {
-	// values taken from EIP712 example script https://github.com/ethereum/EIPs/blob/a2b62466f7b02edcdae5725dba028f4935f41ed5/assets/eip-712/Example.js#L116
+	// values taken from EIP712 example script
+	// see: https://github.com/ethereum/EIPs/blob/a2b62466f7b02edcdae5725dba028f4935f41ed5/assets/eip-712/Example.js#L116
 	testTypedData := core.TypedData{
 		Types: core.Types{
 			EIP712Domain: EIP712DomainType,

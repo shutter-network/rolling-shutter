@@ -18,8 +18,9 @@ type PlaintextTransaction struct {
 	Signature          []byte
 }
 
-func DecodePlaintextTx(input []byte) (*PlaintextTransaction, error) {
+func decodePlaintextTx(input []byte) (*PlaintextTransaction, error) {
 	tx := &PlaintextTransaction{}
+	// We cut out the first byte that represents the transaction type
 	err := rlp.DecodeBytes(input[1:], tx)
 	if err != nil {
 		return nil, err

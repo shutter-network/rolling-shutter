@@ -10,9 +10,18 @@ import (
 )
 
 func TestRoundTripEncodingPlaintext(t *testing.T) {
+	tx := makeExamplePlaintextTx()
+	encoded, err := tx.Encode()
+	assert.NilError(t, err)
+	decoded, err := decodePlaintextTx(encoded)
+	assert.NilError(t, err)
+	assertEqualPlaintextTx(t, tx, decoded)
+}
+
+func makeExamplePlaintextTx() *PlaintextTransaction {
 	exampleInt := big.NewInt(1234)
 	exampleBytes := []byte{1, 2, 3, 4}
-	tx := &PlaintextTransaction{
+	return &PlaintextTransaction{
 		Receiver:           common.Address{},
 		Calldata:           exampleBytes,
 		Value:              exampleInt,
@@ -22,14 +31,10 @@ func TestRoundTripEncodingPlaintext(t *testing.T) {
 		Nonce:              exampleInt,
 		Signature:          exampleBytes,
 	}
-	encoded, err := tx.Encode()
-	assert.NilError(t, err)
-	decoded, err := DecodePlaintextTx(encoded)
-	assert.NilError(t, err)
-	assertEqualPlaintextTx(t, tx, decoded)
 }
 
 func assertEqualPlaintextTx(t *testing.T, tx1 *PlaintextTransaction, tx2 *PlaintextTransaction) {
+	t.Helper()
 	if tx1.Nonce.Cmp(tx2.Nonce) != 0 {
 		t.Errorf("Nonce differ")
 	}
@@ -52,6 +57,6 @@ func assertEqualPlaintextTx(t *testing.T, tx1 *PlaintextTransaction, tx2 *Plaint
 		t.Errorf("Signature differ")
 	}
 	if !bytes.Equal(tx1.Receiver.Bytes(), tx2.Receiver.Bytes()) {
-		t.Errorf("Reciever differ")
+		t.Errorf("Receiver differ")
 	}
 }

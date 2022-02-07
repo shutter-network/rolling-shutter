@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/signer/core"
 )
@@ -24,7 +25,6 @@ var eip712CipherTransactionType = []core.Type{
 	{Name: "InclusionFeePerGas", Type: "uint256"},
 	{Name: "ExecutionFeePerGas", Type: "uint256"},
 	{Name: "Nonce", Type: "uint256"},
-	{Name: "Signature", Type: "bytes"},
 }
 
 var eip712ShutterDomain = core.TypedDataDomain{
@@ -32,8 +32,9 @@ var eip712ShutterDomain = core.TypedDataDomain{
 	Version: "1",
 }
 
-func DecodeCipherTransaction(input []byte) (*CipherTransaction, error) {
+func decodeCipherTransaction(input []byte) (*CipherTransaction, error) {
 	tx := &CipherTransaction{}
+	// We cut out the first byte that represents the transaction type
 	err := rlp.DecodeBytes(input[1:], tx)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,15 @@ func (t *CipherTransaction) Encode() ([]byte, error) {
 }
 
 func (t *CipherTransaction) EnvelopeSigner() (common.Address, error) {
-	return common.Address{}, nil
+	hash, err := t.SigningHash()
+	if err != nil {
+		return common.Address{}, err
+	}
+	publicKey, err := crypto.SigToPub(hash.Bytes(), t.Signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return crypto.PubkeyToAddress(*publicKey), nil
 }
 
 func (t *CipherTransaction) SigningHash() (common.Hash, error) {
@@ -73,7 +82,6 @@ func (t *CipherTransaction) SigningHash() (common.Hash, error) {
 			"InclusionFeePerGas": (*math.HexOrDecimal256)(t.InclusionFeePerGas),
 			"ExecutionFeePerGas": (*math.HexOrDecimal256)(t.ExecutionFeePerGas),
 			"Nonce":              (*math.HexOrDecimal256)(t.Nonce),
-			"Signature":          t.Signature,
 		},
 	}
 	return HashForSigning(&typedDataTransaction)
