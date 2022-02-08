@@ -19,17 +19,15 @@ func TestRoundTripEncodingPlaintext(t *testing.T) {
 }
 
 func makeExamplePlaintextTx() *PlaintextTransaction {
-	exampleInt := big.NewInt(1234)
-	exampleBytes := []byte{1, 2, 3, 4}
 	return &PlaintextTransaction{
 		Receiver:           common.Address{},
-		Calldata:           exampleBytes,
-		Value:              exampleInt,
-		GasLimit:           exampleInt,
-		InclusionFeePerGas: exampleInt,
-		ExecutionFeePerGas: exampleInt,
-		Nonce:              exampleInt,
-		Signature:          exampleBytes,
+		Calldata:           []byte{1, 2, 3, 4},
+		Value:              big.NewInt(1111),
+		GasLimit:           big.NewInt(222222),
+		InclusionFeePerGas: big.NewInt(3333),
+		ExecutionFeePerGas: big.NewInt(3456),
+		Nonce:              big.NewInt(999),
+		Signature:          []byte{8, 9, 10, 11},
 	}
 }
 

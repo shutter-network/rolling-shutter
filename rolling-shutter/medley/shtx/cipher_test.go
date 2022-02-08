@@ -45,14 +45,12 @@ func TestRoundTripEncodingCipher(t *testing.T) {
 }
 
 func makeExampleCipherTx() *CipherTransaction {
-	exampleInt := big.NewInt(1234)
-	exampleBytes := []byte{1, 2, 3, 4}
 	return &CipherTransaction{
-		EncryptedPayload:   exampleBytes,
-		GasLimit:           exampleInt,
-		InclusionFeePerGas: exampleInt,
-		ExecutionFeePerGas: exampleInt,
-		Nonce:              exampleInt,
+		EncryptedPayload:   []byte{1, 2, 3, 4},
+		GasLimit:           big.NewInt(33333),
+		InclusionFeePerGas: big.NewInt(4444),
+		ExecutionFeePerGas: big.NewInt(3333),
+		Nonce:              big.NewInt(55555),
 	}
 }
 
