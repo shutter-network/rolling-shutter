@@ -1,7 +1,7 @@
 package shtx
 
 import (
-	"fmt"
+	"bytes"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -32,8 +32,13 @@ func EIP712Encode(typedData *core.TypedData) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	rawData := []byte(fmt.Sprintf("\x19\x01%s%s", string(domainSeparator), string(typedDataHash)))
+	rawData := bytes.Join(
+		[][]byte{
+			{0x19, 0x01},
+			[]byte(domainSeparator),
+			typedDataHash,
+		},
+		nil)
 	return rawData, nil
 }
 
