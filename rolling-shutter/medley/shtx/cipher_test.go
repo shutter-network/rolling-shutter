@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	gocmp "github.com/google/go-cmp/cmp"
 	"gotest.tools/v3/assert"
+
+	"github.com/shutter-network/shutter/shlib/shtest"
 )
 
 func TestSigningHash(t *testing.T) {
@@ -41,7 +44,7 @@ func TestRoundTripEncodingCipher(t *testing.T) {
 	assert.NilError(t, err)
 	decoded, err := decodeCipherTransaction(encoded)
 	assert.NilError(t, err)
-	assertEqualCipherTx(t, tx, decoded)
+	assert.DeepEqual(t, tx, decoded, shtest.BigIntComparer, gocmp.Comparer(bytes.Equal))
 }
 
 func makeExampleCipherTx() *CipherTransaction {
@@ -51,27 +54,5 @@ func makeExampleCipherTx() *CipherTransaction {
 		InclusionFeePerGas: big.NewInt(4444),
 		ExecutionFeePerGas: big.NewInt(3333),
 		Nonce:              big.NewInt(55555),
-	}
-}
-
-func assertEqualCipherTx(t *testing.T, tx1 *CipherTransaction, tx2 *CipherTransaction) {
-	t.Helper()
-	if tx1.Nonce.Cmp(tx2.Nonce) != 0 {
-		t.Errorf("Nonce differ")
-	}
-	if tx1.GasLimit.Cmp(tx2.GasLimit) != 0 {
-		t.Errorf("GasLimit differ")
-	}
-	if tx1.InclusionFeePerGas.Cmp(tx2.InclusionFeePerGas) != 0 {
-		t.Errorf("InclusionFeePerGas differ")
-	}
-	if tx1.ExecutionFeePerGas.Cmp(tx2.ExecutionFeePerGas) != 0 {
-		t.Errorf("ExecutionFeePerGas differ")
-	}
-	if !bytes.Equal(tx1.Signature, tx2.Signature) {
-		t.Errorf("Signature differ")
-	}
-	if !bytes.Equal(tx1.EncryptedPayload, tx2.EncryptedPayload) {
-		t.Errorf("EncryptedPayload differ")
 	}
 }
