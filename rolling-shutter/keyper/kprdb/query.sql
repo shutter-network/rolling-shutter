@@ -38,8 +38,8 @@ SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1;
 
 -- name: InsertBatchConfig :exec
-INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
-VALUES ($1, $2, $3, $4);
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold, started, activation_block_number)
+VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: CountBatchConfigs :one
 SELECT count(*) FROM tendermint_batch_config;
@@ -48,6 +48,13 @@ SELECT count(*) FROM tendermint_batch_config;
 SELECT *
 FROM tendermint_batch_config
 ORDER BY config_index DESC
+LIMIT 1;
+
+-- name: GetNextBatchConfigToBeStarted :one
+SELECT *
+FROM tendermint_batch_config
+WHERE NOT started
+ORDER BY config_index
 LIMIT 1;
 
 -- name: GetBatchConfigs :many

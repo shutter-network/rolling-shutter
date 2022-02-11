@@ -276,10 +276,12 @@ func (st *ShuttermintState) handleBatchConfig(
 	return queries.InsertBatchConfig(
 		ctx,
 		kprdb.InsertBatchConfigParams{
-			ConfigIndex: int32(e.ConfigIndex),
-			Height:      e.Height,
-			Threshold:   int32(e.Threshold),
-			Keypers:     keypers,
+			ConfigIndex:           int32(e.ConfigIndex),
+			Height:                e.Height,
+			Threshold:             int32(e.Threshold),
+			Keypers:               keypers,
+			Started:               e.Started,
+			ActivationBlockNumber: int64(e.ActivationBlockNumber),
 		},
 	)
 }

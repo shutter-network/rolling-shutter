@@ -94,10 +94,12 @@ type Puredkg struct {
 }
 
 type TendermintBatchConfig struct {
-	ConfigIndex int32
-	Height      int64
-	Keypers     []string
-	Threshold   int32
+	ConfigIndex           int32
+	Height                int64
+	Keypers               []string
+	Threshold             int32
+	Started               bool
+	ActivationBlockNumber int64
 }
 
 type TendermintEncryptionKey struct {

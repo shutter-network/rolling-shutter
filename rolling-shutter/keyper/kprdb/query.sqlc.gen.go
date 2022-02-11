@@ -167,7 +167,7 @@ func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]OutgoingEonK
 }
 
 const getBatchConfig = `-- name: GetBatchConfig :one
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 WHERE config_index = $1
 `
@@ -180,12 +180,14 @@ func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (Tender
 		&i.Height,
 		&i.Keypers,
 		&i.Threshold,
+		&i.Started,
+		&i.ActivationBlockNumber,
 	)
 	return i, err
 }
 
 const getBatchConfigs = `-- name: GetBatchConfigs :many
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 ORDER BY config_index
 `
@@ -204,6 +206,8 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]TendermintBatchConfig,
 			&i.Height,
 			&i.Keypers,
 			&i.Threshold,
+			&i.Started,
+			&i.ActivationBlockNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -365,7 +369,7 @@ func (q *Queries) GetLastCommittedHeight(ctx context.Context) (int64, error) {
 }
 
 const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1
@@ -379,6 +383,30 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConf
 		&i.Height,
 		&i.Keypers,
 		&i.Threshold,
+		&i.Started,
+		&i.ActivationBlockNumber,
+	)
+	return i, err
+}
+
+const getNextBatchConfigToBeStarted = `-- name: GetNextBatchConfigToBeStarted :one
+SELECT config_index, height, keypers, threshold, started, activation_block_number
+FROM tendermint_batch_config
+WHERE NOT started
+ORDER BY config_index
+LIMIT 1
+`
+
+func (q *Queries) GetNextBatchConfigToBeStarted(ctx context.Context) (TendermintBatchConfig, error) {
+	row := q.db.QueryRow(ctx, getNextBatchConfigToBeStarted)
+	var i TendermintBatchConfig
+	err := row.Scan(
+		&i.ConfigIndex,
+		&i.Height,
+		&i.Keypers,
+		&i.Threshold,
+		&i.Started,
+		&i.ActivationBlockNumber,
 	)
 	return i, err
 }
@@ -397,15 +425,17 @@ func (q *Queries) GetNextShutterMessage(ctx context.Context) (TendermintOutgoing
 }
 
 const insertBatchConfig = `-- name: InsertBatchConfig :exec
-INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
-VALUES ($1, $2, $3, $4)
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold, started, activation_block_number)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertBatchConfigParams struct {
-	ConfigIndex int32
-	Height      int64
-	Keypers     []string
-	Threshold   int32
+	ConfigIndex           int32
+	Height                int64
+	Keypers               []string
+	Threshold             int32
+	Started               bool
+	ActivationBlockNumber int64
 }
 
 func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigParams) error {
@@ -414,6 +444,8 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Height,
 		arg.Keypers,
 		arg.Threshold,
+		arg.Started,
+		arg.ActivationBlockNumber,
 	)
 	return err
 }

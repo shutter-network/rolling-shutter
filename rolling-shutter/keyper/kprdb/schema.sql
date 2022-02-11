@@ -1,4 +1,4 @@
--- schema-version: keyper-14 --
+-- schema-version: keyper-15 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -50,7 +50,9 @@ CREATE TABLE tendermint_batch_config(
        config_index integer PRIMARY KEY,
        height bigint NOT NULL,
        keypers text[] NOT NULL,
-       threshold integer NOT NULL
+       threshold integer NOT NULL,
+       started boolean NOT NULL,
+       activation_block_number bigint NOT NULL
 );
 
 CREATE TABLE tendermint_encryption_key(
