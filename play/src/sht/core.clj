@@ -20,7 +20,11 @@
 (defn report-single-result
   [sys]
   (let [{:report/keys [num-checks-failed num-checks-succeeded checks]} (:report sys)
-        failed-checks (remove :chk/ok? checks)]
+        failed-checks (remove :chk/ok? checks)
+        fail-count-by-description (reduce (fn [m d]
+                                            (update m d (fnil inc 0)))
+                                          {}
+                                          (map :chk/description failed-checks))]
     (println (str (if (zero? num-checks-failed) "  OK" "FAIL")
                   "  "
                   (name (:id sys))
@@ -28,7 +32,7 @@
                   (:description sys)))
     (println "     " num-checks-failed "failed," num-checks-succeeded "succeeded")
     (doseq [c (->> failed-checks (map :chk/description) distinct)]
-      (println "      -" c))))
+      (printf "      - %s [%dx]\n" c (fail-count-by-description c)))))
 
 (defn sys-succeeded?
   [sys]
