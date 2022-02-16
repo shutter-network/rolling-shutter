@@ -104,6 +104,13 @@ func TestBatchConfig(t *testing.T) {
 	roundtrip(t, ev)
 }
 
+func TestBatchConfigStarted(t *testing.T) {
+	ev := &shutterevents.BatchConfigStarted{
+		ConfigIndex: uint64(0xffffffffffffffff),
+	}
+	roundtrip(t, ev)
+}
+
 func TestCheckIn(t *testing.T) {
 	privateKeyECDSA, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)

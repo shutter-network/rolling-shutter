@@ -71,7 +71,7 @@ func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
 		return nil
 	}
 
-	err = smdrv.fetchEvents(ctx, currentBlock, lastCommittedHeight)
+	err = smdrv.fetchEvents2(ctx, currentBlock, lastCommittedHeight)
 	return err
 }
 
@@ -86,6 +86,23 @@ func makeEvents(height int64, events []abcitypes.Event) []shutterevents.IEvent {
 		}
 	}
 	return res
+}
+
+func (smdrv *ShuttermintDriver) fetchEvents2(ctx context.Context, heightFrom, lastCommittedHeight int64) error {
+	for currentBlock := heightFrom + 1; currentBlock < lastCommittedHeight; currentBlock++ {
+		results, err := smdrv.shmcl.BlockResults(ctx, &currentBlock)
+		if err != nil {
+			return err
+		}
+		err = smdrv.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+			return smdrv.handleBlock(ctx, kprdb.New(tx), results, lastCommittedHeight)
+		})
+		if err != nil {
+			smdrv.shuttermintState.Invalidate()
+			return err
+		}
+	}
+	return nil
 }
 
 func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, lastCommittedHeight int64) error {
@@ -134,6 +151,67 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 			return err
 		}
 	}
+	return nil
+}
+
+func (smdrv *ShuttermintDriver) handleBlock(
+	ctx context.Context,
+	queries *kprdb.Queries,
+	block *coretypes.ResultBlockResults,
+	lastCommittedHeight int64,
+) error {
+	oldMeta, err := queries.TMGetSyncMeta(ctx)
+	if err != nil {
+		return err
+	}
+	if block.Height != oldMeta.CurrentBlock+1 {
+		return errors.Errorf(
+			"blocks should be handled in order, expected %d, got %d",
+			oldMeta.CurrentBlock+1,
+			block.Height,
+		)
+	}
+
+	err = queries.TMSetSyncMeta(ctx, kprdb.TMSetSyncMetaParams{
+		CurrentBlock:        block.Height,
+		LastCommittedHeight: lastCommittedHeight,
+		SyncTimestamp:       time.Now(),
+	})
+	if err != nil {
+		return err
+	}
+
+	err = smdrv.shuttermintState.shiftPhases(ctx, queries, block.Height)
+	if err != nil {
+		return err
+	}
+
+	handleEvents := func(abciEvents []abcitypes.Event) error {
+		events := makeEvents(block.Height, abciEvents)
+		for _, ev := range events {
+			err = smdrv.shuttermintState.HandleEvent(ctx, queries, ev)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	err = handleEvents(block.BeginBlockEvents)
+	if err != nil {
+		return err
+	}
+	for _, txres := range block.TxsResults {
+		err = handleEvents(txres.Events)
+		if err != nil {
+			return err
+		}
+	}
+	err = handleEvents(block.EndBlockEvents)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

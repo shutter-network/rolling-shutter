@@ -329,7 +329,6 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 			Code: 0,
 		}
 	}
-
 	err = app.checkConfig(bc)
 	if err != nil {
 		return makeErrorResponse(fmt.Sprintf("checkConfig: %s", err))
@@ -405,7 +404,6 @@ func (app *ShutterApp) deliverCheckIn(msg *shmsg.CheckIn, sender common.Address)
 	encryptionPublicKey := ecies.ImportECDSAPublic(encryptionPublicKeyECDSA)
 
 	app.Identities[sender] = validatorPublicKey
-
 	return abcitypes.ResponseDeliverTx{
 		Code: 0,
 		Events: []abcitypes.Event{
@@ -708,6 +706,8 @@ func (app *ShutterApp) countCheckedInKeypers(keypers []common.Address) uint64 {
 }
 
 func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	var events []abcitypes.Event
+
 	lastConfig := app.LastConfig()
 
 	// start last config if there are enough votes
@@ -717,6 +717,9 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 			log.Printf("starting config %d", lastConfig.ConfigIndex)
 			lastConfig.Started = true
 			app.StartedVotes = make(map[common.Address]struct{})
+			events = append(events, shutterevents.BatchConfigStarted{
+				ConfigIndex: lastConfig.ConfigIndex,
+			}.MakeABCIEvent())
 		}
 	}
 
@@ -732,12 +735,15 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 		if len(validatorUpdates) > 0 {
 			log.Printf("Ignoring %d validator updates in dev mode", len(validatorUpdates))
 		}
-		return abcitypes.ResponseEndBlock{}
+		return abcitypes.ResponseEndBlock{Events: events}
 	}
 	if len(validatorUpdates) > 0 {
 		log.Printf("Applying %d validator updates", len(validatorUpdates))
 	}
-	return abcitypes.ResponseEndBlock{ValidatorUpdates: validatorUpdates}
+	return abcitypes.ResponseEndBlock{
+		ValidatorUpdates: validatorUpdates,
+		Events:           events,
+	}
 }
 
 // persistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and

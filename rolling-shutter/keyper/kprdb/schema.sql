@@ -26,6 +26,13 @@ CREATE TABLE last_batch_config_sent(
 );
 INSERT INTO last_batch_config_sent (event_index) VALUES (0);
 
+-- store the last batch config started message we sent to shuttermint.
+CREATE TABLE last_batch_config_started(
+       enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
+       event_index bigint NOT NULL
+);
+INSERT INTO last_batch_config_started (event_index) VALUES (0);
+
 -- tendermint_sync_meta contains meta information about the synchronization process with the
 -- tendermint app. At the moment we just insert new entries into the table and sort by
 -- current_block to get the latest entry. When handling new events from shuttermint, we do that in

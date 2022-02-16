@@ -286,6 +286,14 @@ func (st *ShuttermintState) handleBatchConfig(
 	)
 }
 
+func (st *ShuttermintState) handleBatchConfigStarted(
+	ctx context.Context,
+	queries *kprdb.Queries,
+	e *shutterevents.BatchConfigStarted,
+) error {
+	return queries.SetBatchConfigStarted(ctx, int32(e.ConfigIndex))
+}
+
 func (st *ShuttermintState) handleEonStarted(
 	ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted) error {
 	if !st.isKeyper {
@@ -718,6 +726,8 @@ func (st *ShuttermintState) HandleEvent(
 		err = st.handleCheckIn(ctx, queries, e)
 	case *shutterevents.BatchConfig:
 		err = st.handleBatchConfig(ctx, queries, e)
+	case *shutterevents.BatchConfigStarted:
+		err = st.handleBatchConfigStarted(ctx, queries, e)
 	case *shutterevents.EonStarted:
 		err = st.handleEonStarted(ctx, queries, e)
 	case *shutterevents.PolyCommitment:
@@ -729,7 +739,7 @@ func (st *ShuttermintState) HandleEvent(
 	case *shutterevents.Apology:
 		err = st.handleApology(ctx, queries, e)
 	default:
-		log.Printf("HandleEvent not yet implemented for %s: %s",
+		log.Printf("HandleEvent not yet implemented for %s: %+v",
 			reflect.TypeOf(event), event)
 	}
 

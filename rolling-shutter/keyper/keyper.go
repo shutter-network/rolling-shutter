@@ -221,6 +221,58 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
+func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
+	err := kpr.handleOnChainKeyperSetChanges(ctx, tx)
+	if err != nil {
+		return err
+	}
+	err = kpr.sendBatchConfigStarted(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (kpr *keyper) sendBatchConfigStarted(ctx context.Context, tx pgx.Tx) error {
+	qc := commondb.New(tx)
+	q := kprdb.New(tx)
+	idx, err := q.GetLastBatchConfigStarted(ctx)
+	if err != nil {
+		return err
+	}
+
+	bc, err := q.GetNextBatchConfigToBeStarted(ctx)
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if int64(bc.ConfigIndex) <= idx {
+		return nil
+	}
+
+	nextBlock, err := qc.GetNextBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	if int64(nextBlock) <= bc.ActivationBlockNumber {
+		return nil
+	}
+
+	batchConfigStartedMsg := shmsg.NewBatchConfigStarted(uint64(bc.ConfigIndex))
+	err = scheduleShutterMessage(ctx, q, "batch config started", batchConfigStartedMsg)
+	if err != nil {
+		return err
+	}
+	err = q.SetLastBatchConfigStarted(ctx, int64(bc.ConfigIndex))
+	if err != nil {
+		return err
+	}
+	log.Printf("batch config starting %+v", bc)
+	return nil
+}
+
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
 func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx) error {
 	q := kprdb.New(tx)
@@ -280,7 +332,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			return kpr.handleOnChainKeyperSetChanges(ctx, tx)
+			return kpr.handleOnChainChanges(ctx, tx)
 		})
 		if err != nil {
 			return err

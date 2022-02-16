@@ -237,6 +237,40 @@ func makeBatchConfig(ev abcitypes.Event, height int64) (*BatchConfig, error) {
 	}, nil
 }
 
+type BatchConfigStarted struct {
+	Height      int64
+	ConfigIndex uint64
+}
+
+func (bcs BatchConfigStarted) MakeABCIEvent() abcitypes.Event {
+	return abcitypes.Event{
+		Type: evtype.BatchConfigStarted,
+		Attributes: []abcitypes.EventAttribute{
+			{
+				Key:   []byte("ConfigIndex"),
+				Value: []byte(fmt.Sprintf("%d", bcs.ConfigIndex)),
+			},
+		},
+	}
+}
+
+// makeBatchConfigStarted creates a BatchConfigEvent from the given tendermint event of type
+// "shutter.batch-config-started".
+func makeBatchConfigStarted(ev abcitypes.Event, height int64) (*BatchConfigStarted, error) {
+	err := expectAttributes(ev, "ConfigIndex")
+	if err != nil {
+		return nil, err
+	}
+	configIndex, err := decodeUint64(ev.Attributes[0].Value)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchConfigStarted{
+		Height:      height,
+		ConfigIndex: configIndex,
+	}, nil
+}
+
 // CheckIn is emitted by shuttermint when a keyper sends their check in message.
 type CheckIn struct {
 	Height              int64
@@ -461,6 +495,8 @@ func MakeEvent(ev abcitypes.Event, height int64) (IEvent, error) {
 		return makeCheckIn(ev, height)
 	case evtype.BatchConfig:
 		return makeBatchConfig(ev, height)
+	case evtype.BatchConfigStarted:
+		return makeBatchConfigStarted(ev, height)
 	case evtype.EonStarted:
 		return makeEonStarted(ev, height)
 	case evtype.PolyCommitment:

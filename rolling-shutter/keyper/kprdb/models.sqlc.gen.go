@@ -72,6 +72,11 @@ type LastBatchConfigSent struct {
 	EventIndex    int64
 }
 
+type LastBatchConfigStarted struct {
+	EnforceOneRow bool
+	EventIndex    int64
+}
+
 type MetaInf struct {
 	Key   string
 	Value string

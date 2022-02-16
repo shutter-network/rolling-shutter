@@ -354,6 +354,17 @@ func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
 	return event_index, err
 }
 
+const getLastBatchConfigStarted = `-- name: GetLastBatchConfigStarted :one
+SELECT event_index FROM last_batch_config_started LIMIT 1
+`
+
+func (q *Queries) GetLastBatchConfigStarted(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastBatchConfigStarted)
+	var event_index int64
+	err := row.Scan(&event_index)
+	return event_index, err
+}
+
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM tendermint_sync_meta
@@ -698,6 +709,16 @@ func (q *Queries) SelectPureDKG(ctx context.Context) ([]Puredkg, error) {
 	return items, nil
 }
 
+const setBatchConfigStarted = `-- name: SetBatchConfigStarted :exec
+UPDATE tendermint_batch_config SET started = TRUE
+WHERE config_index = $1
+`
+
+func (q *Queries) SetBatchConfigStarted(ctx context.Context, configIndex int32) error {
+	_, err := q.db.Exec(ctx, setBatchConfigStarted, configIndex)
+	return err
+}
+
 const setLastBatchConfigSent = `-- name: SetLastBatchConfigSent :exec
 INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
@@ -706,6 +727,17 @@ SET event_index = $1
 
 func (q *Queries) SetLastBatchConfigSent(ctx context.Context, eventIndex int64) error {
 	_, err := q.db.Exec(ctx, setLastBatchConfigSent, eventIndex)
+	return err
+}
+
+const setLastBatchConfigStarted = `-- name: SetLastBatchConfigStarted :exec
+INSERT INTO last_batch_config_started (event_index) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET event_index = $1
+`
+
+func (q *Queries) SetLastBatchConfigStarted(ctx context.Context, eventIndex int64) error {
+	_, err := q.db.Exec(ctx, setLastBatchConfigStarted, eventIndex)
 	return err
 }
 

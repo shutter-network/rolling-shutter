@@ -67,6 +67,10 @@ SELECT *
 FROM tendermint_batch_config
 WHERE config_index = $1;
 
+-- name: SetBatchConfigStarted :exec
+UPDATE tendermint_batch_config SET started = TRUE
+WHERE config_index = $1;
+
 -- name: TMSetSyncMeta :exec
 INSERT INTO tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
 VALUES ($1, $2, $3);
@@ -180,3 +184,12 @@ SET event_index = $1;
 
 -- name: GetLastBatchConfigSent :one
 SELECT event_index FROM last_batch_config_sent LIMIT 1;
+
+
+-- name: SetLastBatchConfigStarted :exec
+INSERT INTO last_batch_config_started (event_index) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET event_index = $1;
+
+-- name: GetLastBatchConfigStarted :one
+SELECT event_index FROM last_batch_config_started LIMIT 1;
