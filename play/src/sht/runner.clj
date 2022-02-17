@@ -334,6 +334,18 @@
       (finally
         (cleanup-processes sys)))))
 
+(defn- clean-workdir
+  "removes all files from the working directory, but keep the directory structure.
+  This is useful for those who tail the logfiles and cd to the working directory."
+  [root]
+  (when (fs/exists? root)
+    (fs/walk-file-tree root
+                    {:visit-file (fn [path _]
+                                   (fs/delete path)
+                                   :continue)
+                     :post-visit-dir (fn [path _]
+                                       :continue)})))
+
 (def ^:dynamic *current-test-id* nil)
 (defn run-test
   [{:test/keys [id description conf] :as tc}]
@@ -353,7 +365,7 @@
                :cwd cwd
                :log-dir log-dir
                :report empty-report}]
-      (fs/delete-tree cwd)
+      (clean-workdir cwd)
       (fs/create-dirs log-dir)
       (binding [play/*cwd* cwd]
         (timbre/with-merged-config
