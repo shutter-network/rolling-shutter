@@ -236,40 +236,37 @@ func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
 func (kpr *keyper) sendBatchConfigStarted(ctx context.Context, tx pgx.Tx) error {
 	qc := commondb.New(tx)
 	q := kprdb.New(tx)
-	idx, err := q.GetLastBatchConfigStarted(ctx)
+	lastBlock, err := q.GetLastBlockSeen(ctx)
 	if err != nil {
 		return err
 	}
-
-	bc, err := q.GetNextBatchConfigToBeStarted(ctx)
-	if err == pgx.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if int64(bc.ConfigIndex) <= idx {
-		return nil
-	}
-
 	nextBlock, err := qc.GetNextBlockNumber(ctx)
 	if err != nil {
 		return err
 	}
-	if int64(nextBlock) <= bc.ActivationBlockNumber {
+
+	count, err := q.CountBatchConfigsInBlockRange(ctx,
+		kprdb.CountBatchConfigsInBlockRangeParams{
+			StartBlock: lastBlock,
+			EndBlock:   int64(nextBlock),
+		})
+	if err != nil {
+		return err
+	}
+	if count == 0 {
 		return nil
 	}
 
-	batchConfigStartedMsg := shmsg.NewBatchConfigStarted(uint64(bc.ConfigIndex))
-	err = scheduleShutterMessage(ctx, q, "batch config started", batchConfigStartedMsg)
+	blockSeenMsg := shmsg.NewBlockSeen(uint64(nextBlock))
+	err = scheduleShutterMessage(ctx, q, "block seen", blockSeenMsg)
 	if err != nil {
 		return err
 	}
-	err = q.SetLastBatchConfigStarted(ctx, int64(bc.ConfigIndex))
+	err = q.SetLastBlockSeen(ctx, int64(nextBlock))
 	if err != nil {
 		return err
 	}
-	log.Printf("batch config starting %+v", bc)
+	log.Printf("block seen: %d", nextBlock)
 	return nil
 }
 

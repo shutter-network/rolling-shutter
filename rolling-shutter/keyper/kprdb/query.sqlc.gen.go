@@ -22,6 +22,24 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countBatchConfigsInBlockRange = `-- name: CountBatchConfigsInBlockRange :one
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE $1 <= activation_block_number AND activation_block_number < $2
+`
+
+type CountBatchConfigsInBlockRangeParams struct {
+	StartBlock interface{}
+	EndBlock   int64
+}
+
+func (q *Queries) CountBatchConfigsInBlockRange(ctx context.Context, arg CountBatchConfigsInBlockRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countBatchConfigsInBlockRange, arg.StartBlock, arg.EndBlock)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
 SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1
@@ -354,15 +372,15 @@ func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
 	return event_index, err
 }
 
-const getLastBatchConfigStarted = `-- name: GetLastBatchConfigStarted :one
-SELECT event_index FROM last_batch_config_started LIMIT 1
+const getLastBlockSeen = `-- name: GetLastBlockSeen :one
+SELECT block_number FROM last_block_seen LIMIT 1
 `
 
-func (q *Queries) GetLastBatchConfigStarted(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, getLastBatchConfigStarted)
-	var event_index int64
-	err := row.Scan(&event_index)
-	return event_index, err
+func (q *Queries) GetLastBlockSeen(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastBlockSeen)
+	var block_number int64
+	err := row.Scan(&block_number)
+	return block_number, err
 }
 
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
@@ -388,28 +406,6 @@ LIMIT 1
 
 func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConfig, error) {
 	row := q.db.QueryRow(ctx, getLatestBatchConfig)
-	var i TendermintBatchConfig
-	err := row.Scan(
-		&i.ConfigIndex,
-		&i.Height,
-		&i.Keypers,
-		&i.Threshold,
-		&i.Started,
-		&i.ActivationBlockNumber,
-	)
-	return i, err
-}
-
-const getNextBatchConfigToBeStarted = `-- name: GetNextBatchConfigToBeStarted :one
-SELECT config_index, height, keypers, threshold, started, activation_block_number
-FROM tendermint_batch_config
-WHERE NOT started
-ORDER BY config_index
-LIMIT 1
-`
-
-func (q *Queries) GetNextBatchConfigToBeStarted(ctx context.Context) (TendermintBatchConfig, error) {
-	row := q.db.QueryRow(ctx, getNextBatchConfigToBeStarted)
 	var i TendermintBatchConfig
 	err := row.Scan(
 		&i.ConfigIndex,
@@ -730,14 +726,14 @@ func (q *Queries) SetLastBatchConfigSent(ctx context.Context, eventIndex int64) 
 	return err
 }
 
-const setLastBatchConfigStarted = `-- name: SetLastBatchConfigStarted :exec
-INSERT INTO last_batch_config_started (event_index) VALUES ($1)
+const setLastBlockSeen = `-- name: SetLastBlockSeen :exec
+INSERT INTO last_block_seen (block_number) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET event_index = $1
+SET block_number = $1
 `
 
-func (q *Queries) SetLastBatchConfigStarted(ctx context.Context, eventIndex int64) error {
-	_, err := q.db.Exec(ctx, setLastBatchConfigStarted, eventIndex)
+func (q *Queries) SetLastBlockSeen(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, setLastBlockSeen, blockNumber)
 	return err
 }
 

@@ -50,12 +50,10 @@ FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1;
 
--- name: GetNextBatchConfigToBeStarted :one
-SELECT *
+-- name: CountBatchConfigsInBlockRange :one
+SELECT COUNT(*)
 FROM tendermint_batch_config
-WHERE NOT started
-ORDER BY config_index
-LIMIT 1;
+WHERE @start_block <= activation_block_number AND activation_block_number < @end_block;
 
 -- name: GetBatchConfigs :many
 SELECT *
@@ -186,10 +184,10 @@ SET event_index = $1;
 SELECT event_index FROM last_batch_config_sent LIMIT 1;
 
 
--- name: SetLastBatchConfigStarted :exec
-INSERT INTO last_batch_config_started (event_index) VALUES ($1)
+-- name: SetLastBlockSeen :exec
+INSERT INTO last_block_seen (block_number) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET event_index = $1;
+SET block_number = $1;
 
--- name: GetLastBatchConfigStarted :one
-SELECT event_index FROM last_batch_config_started LIMIT 1;
+-- name: GetLastBlockSeen :one
+SELECT block_number FROM last_block_seen LIMIT 1;

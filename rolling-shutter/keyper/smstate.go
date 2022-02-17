@@ -9,10 +9,12 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"os"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
@@ -720,6 +722,7 @@ func (st *ShuttermintState) handleApology(
 
 func (st *ShuttermintState) HandleEvent(
 	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
+	pretty.Fprintf(os.Stderr, "HandleEvent: %#v\n", event)
 	var err error
 	switch e := event.(type) {
 	case *shutterevents.CheckIn:

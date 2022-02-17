@@ -191,12 +191,13 @@ func NewEonStartVote(activationBlockNumber uint64) *Message {
 	}
 }
 
-// NewBatchConfigStarted creates a new BatchConfigStarted message.
-func NewBatchConfigStarted(configIndex uint64) *Message {
+// NewBlockSeen creates a new BlockSeen message. The keypers send this when they see a new block on
+// the main chain that possibly leads to starting a batch config.
+func NewBlockSeen(blockNumber uint64) *Message {
 	return &Message{
-		Payload: &Message_BatchConfigStarted{
-			BatchConfigStarted: &BatchConfigStarted{
-				BatchConfigIndex: configIndex,
+		Payload: &Message_BlockSeen{
+			BlockSeen: &BlockSeen{
+				BlockNumber: blockNumber,
 			},
 		},
 	}

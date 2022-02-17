@@ -72,9 +72,9 @@ type LastBatchConfigSent struct {
 	EventIndex    int64
 }
 
-type LastBatchConfigStarted struct {
+type LastBlockSeen struct {
 	EnforceOneRow bool
-	EventIndex    int64
+	BlockNumber   int64
 }
 
 type MetaInf struct {

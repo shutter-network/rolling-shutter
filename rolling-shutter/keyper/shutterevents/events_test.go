@@ -102,6 +102,9 @@ func TestBatchConfig(t *testing.T) {
 		ConfigIndex:           uint64(0xffffffffffffffff),
 	}
 	roundtrip(t, ev)
+	// XXX should we implement this or drop the field?
+	// ev.Started = true
+	// roundtrip(t, ev)
 }
 
 func TestBatchConfigStarted(t *testing.T) {

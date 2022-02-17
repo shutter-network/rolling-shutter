@@ -143,8 +143,8 @@ func bootstrap() error {
 		return errors.Errorf("Failed to send batch config message: %v", err)
 	}
 
-	batchConfigStartedMsg := shmsg.NewBatchConfigStarted(batchConfigIndex)
-	err = ms.SendMessage(ctx, batchConfigStartedMsg)
+	blockSeenMsg := shmsg.NewBlockSeen(activationBlockNumber)
+	err = ms.SendMessage(ctx, blockSeenMsg)
 	if err != nil {
 		return errors.Errorf("Failed to send start message: %v", err)
 	}
