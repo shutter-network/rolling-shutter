@@ -55,16 +55,16 @@ func init() {
 func (app *ShutterApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	signer, msg, err := app.decodeTx(req.Tx)
 	if err != nil {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "cannot decode message"}
 	}
 	if string(msg.ChainId) != app.ChainID {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "wrong chain"}
 	}
 	if !app.NonceTracker.Check(signer, msg.RandomNonce) {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "nonce already used"}
 	}
 	if !app.CheckTxState.AddTx(signer, msg) {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "not a keyper set member"}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0, GasWanted: 1}
 }
