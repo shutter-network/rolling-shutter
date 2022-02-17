@@ -253,8 +253,12 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	return abcitypes.ResponseInitChain{}
 }
 
-func (ShutterApp) BeginBlock(_ abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	return abcitypes.ResponseBeginBlock{}
+func (app *ShutterApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	var events []abcitypes.Event
+	if req.Header.Height == 1 {
+		events = append(events, app.Configs[0].MakeABCIEvent())
+	}
+	return abcitypes.ResponseBeginBlock{Events: events}
 }
 
 // decodeTx decodes the given transaction.  It's kind of strange that we have do URL decode the

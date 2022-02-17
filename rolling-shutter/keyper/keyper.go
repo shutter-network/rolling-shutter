@@ -279,6 +279,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
 		log.Print("no batch config found in tendermint")
+		return nil
 	} else if err != nil {
 		return err
 	}
