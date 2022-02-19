@@ -8,6 +8,9 @@ ON CONFLICT (id) DO UPDATE
 -- name: GetEventSyncProgress :one
 SELECT next_block_number, next_log_index FROM event_sync_progress LIMIT 1;
 
+-- name: GetNextBlockNumber :one
+SELECT next_block_number from event_sync_progress LIMIT 1;
+
 -- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
     event_index,

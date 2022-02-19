@@ -22,6 +22,24 @@ func (q *Queries) CountBatchConfigs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countBatchConfigsInBlockRange = `-- name: CountBatchConfigsInBlockRange :one
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE $1 <= activation_block_number AND activation_block_number < $2
+`
+
+type CountBatchConfigsInBlockRangeParams struct {
+	StartBlock interface{}
+	EndBlock   int64
+}
+
+func (q *Queries) CountBatchConfigsInBlockRange(ctx context.Context, arg CountBatchConfigsInBlockRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countBatchConfigsInBlockRange, arg.StartBlock, arg.EndBlock)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
 SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1
@@ -167,7 +185,7 @@ func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]OutgoingEonK
 }
 
 const getBatchConfig = `-- name: GetBatchConfig :one
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 WHERE config_index = $1
 `
@@ -180,12 +198,14 @@ func (q *Queries) GetBatchConfig(ctx context.Context, configIndex int32) (Tender
 		&i.Height,
 		&i.Keypers,
 		&i.Threshold,
+		&i.Started,
+		&i.ActivationBlockNumber,
 	)
 	return i, err
 }
 
 const getBatchConfigs = `-- name: GetBatchConfigs :many
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 ORDER BY config_index
 `
@@ -204,6 +224,8 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]TendermintBatchConfig,
 			&i.Height,
 			&i.Keypers,
 			&i.Threshold,
+			&i.Started,
+			&i.ActivationBlockNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -350,6 +372,17 @@ func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
 	return event_index, err
 }
 
+const getLastBlockSeen = `-- name: GetLastBlockSeen :one
+SELECT block_number FROM last_block_seen LIMIT 1
+`
+
+func (q *Queries) GetLastBlockSeen(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastBlockSeen)
+	var block_number int64
+	err := row.Scan(&block_number)
+	return block_number, err
+}
+
 const getLastCommittedHeight = `-- name: GetLastCommittedHeight :one
 SELECT last_committed_height
 FROM tendermint_sync_meta
@@ -365,7 +398,7 @@ func (q *Queries) GetLastCommittedHeight(ctx context.Context) (int64, error) {
 }
 
 const getLatestBatchConfig = `-- name: GetLatestBatchConfig :one
-SELECT config_index, height, keypers, threshold
+SELECT config_index, height, keypers, threshold, started, activation_block_number
 FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1
@@ -379,6 +412,8 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConf
 		&i.Height,
 		&i.Keypers,
 		&i.Threshold,
+		&i.Started,
+		&i.ActivationBlockNumber,
 	)
 	return i, err
 }
@@ -397,15 +432,17 @@ func (q *Queries) GetNextShutterMessage(ctx context.Context) (TendermintOutgoing
 }
 
 const insertBatchConfig = `-- name: InsertBatchConfig :exec
-INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
-VALUES ($1, $2, $3, $4)
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold, started, activation_block_number)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertBatchConfigParams struct {
-	ConfigIndex int32
-	Height      int64
-	Keypers     []string
-	Threshold   int32
+	ConfigIndex           int32
+	Height                int64
+	Keypers               []string
+	Threshold             int32
+	Started               bool
+	ActivationBlockNumber int64
 }
 
 func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigParams) error {
@@ -414,6 +451,8 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Height,
 		arg.Keypers,
 		arg.Threshold,
+		arg.Started,
+		arg.ActivationBlockNumber,
 	)
 	return err
 }
@@ -666,6 +705,16 @@ func (q *Queries) SelectPureDKG(ctx context.Context) ([]Puredkg, error) {
 	return items, nil
 }
 
+const setBatchConfigStarted = `-- name: SetBatchConfigStarted :exec
+UPDATE tendermint_batch_config SET started = TRUE
+WHERE config_index = $1
+`
+
+func (q *Queries) SetBatchConfigStarted(ctx context.Context, configIndex int32) error {
+	_, err := q.db.Exec(ctx, setBatchConfigStarted, configIndex)
+	return err
+}
+
 const setLastBatchConfigSent = `-- name: SetLastBatchConfigSent :exec
 INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
@@ -674,6 +723,17 @@ SET event_index = $1
 
 func (q *Queries) SetLastBatchConfigSent(ctx context.Context, eventIndex int64) error {
 	_, err := q.db.Exec(ctx, setLastBatchConfigSent, eventIndex)
+	return err
+}
+
+const setLastBlockSeen = `-- name: SetLastBlockSeen :exec
+INSERT INTO last_block_seen (block_number) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_number = $1
+`
+
+func (q *Queries) SetLastBlockSeen(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, setLastBlockSeen, blockNumber)
 	return err
 }
 

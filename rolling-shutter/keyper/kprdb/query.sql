@@ -38,8 +38,8 @@ SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1;
 
 -- name: InsertBatchConfig :exec
-INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold)
-VALUES ($1, $2, $3, $4);
+INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold, started, activation_block_number)
+VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: CountBatchConfigs :one
 SELECT count(*) FROM tendermint_batch_config;
@@ -50,6 +50,11 @@ FROM tendermint_batch_config
 ORDER BY config_index DESC
 LIMIT 1;
 
+-- name: CountBatchConfigsInBlockRange :one
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE @start_block <= activation_block_number AND activation_block_number < @end_block;
+
 -- name: GetBatchConfigs :many
 SELECT *
 FROM tendermint_batch_config
@@ -58,6 +63,10 @@ ORDER BY config_index;
 -- name: GetBatchConfig :one
 SELECT *
 FROM tendermint_batch_config
+WHERE config_index = $1;
+
+-- name: SetBatchConfigStarted :exec
+UPDATE tendermint_batch_config SET started = TRUE
 WHERE config_index = $1;
 
 -- name: TMSetSyncMeta :exec
@@ -173,3 +182,12 @@ SET event_index = $1;
 
 -- name: GetLastBatchConfigSent :one
 SELECT event_index FROM last_batch_config_sent LIMIT 1;
+
+
+-- name: SetLastBlockSeen :exec
+INSERT INTO last_block_seen (block_number) VALUES ($1)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_number = $1;
+
+-- name: GetLastBlockSeen :one
+SELECT block_number FROM last_block_seen LIMIT 1;

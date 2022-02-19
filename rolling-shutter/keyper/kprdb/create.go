@@ -43,7 +43,7 @@ func initDB(ctx context.Context, tx pgx.Tx) error {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
 	err = queries.TMSetSyncMeta(ctx, TMSetSyncMetaParams{
-		CurrentBlock:        -1,
+		CurrentBlock:        0,
 		LastCommittedHeight: -1,
 		SyncTimestamp:       time.Now(),
 	})

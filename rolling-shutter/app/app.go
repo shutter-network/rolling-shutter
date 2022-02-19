@@ -55,16 +55,16 @@ func init() {
 func (app *ShutterApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	signer, msg, err := app.decodeTx(req.Tx)
 	if err != nil {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "cannot decode message"}
 	}
 	if string(msg.ChainId) != app.ChainID {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "wrong chain"}
 	}
 	if !app.NonceTracker.Check(signer, msg.RandomNonce) {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "nonce already used"}
 	}
 	if !app.CheckTxState.AddTx(signer, msg) {
-		return abcitypes.ResponseCheckTx{Code: 1}
+		return abcitypes.ResponseCheckTx{Code: 1, Log: "not a keyper set member"}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0, GasWanted: 1}
 }
@@ -77,7 +77,7 @@ func NewShutterApp() *ShutterApp {
 		ConfigVoting:    NewConfigVoting(),
 		EonStartVotings: make(map[uint64]*EonStartVoting),
 		Identities:      make(map[common.Address]ValidatorPubkey),
-		StartedVotes:    make(map[common.Address]struct{}),
+		BlocksSeen:      make(map[common.Address]uint64),
 		CheckTxState:    NewCheckTxState(),
 		NonceTracker:    NewNonceTracker(),
 		ChainID:         "", // will be set in InitChain
@@ -253,8 +253,12 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	return abcitypes.ResponseInitChain{}
 }
 
-func (ShutterApp) BeginBlock(_ abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	return abcitypes.ResponseBeginBlock{}
+func (app *ShutterApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	var events []abcitypes.Event
+	if req.Header.Height == 1 {
+		events = append(events, app.Configs[0].MakeABCIEvent())
+	}
+	return abcitypes.ResponseBeginBlock{Events: events}
 }
 
 // decodeTx decodes the given transaction.  It's kind of strange that we have do URL decode the
@@ -329,7 +333,6 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 			Code: 0,
 		}
 	}
-
 	err = app.checkConfig(bc)
 	if err != nil {
 		return makeErrorResponse(fmt.Sprintf("checkConfig: %s", err))
@@ -405,7 +408,6 @@ func (app *ShutterApp) deliverCheckIn(msg *shmsg.CheckIn, sender common.Address)
 	encryptionPublicKey := ecies.ImportECDSAPublic(encryptionPublicKeyECDSA)
 
 	app.Identities[sender] = validatorPublicKey
-
 	return abcitypes.ResponseDeliverTx{
 		Code: 0,
 		Events: []abcitypes.Event{
@@ -417,26 +419,13 @@ func (app *ShutterApp) deliverCheckIn(msg *shmsg.CheckIn, sender common.Address)
 	}
 }
 
-func (app *ShutterApp) deliverBatchConfigStarted(msg *shmsg.BatchConfigStarted, sender common.Address) abcitypes.ResponseDeliverTx {
-	configIndex := msg.GetBatchConfigIndex()
-	lastBatchConfig := app.LastConfig()
-	if configIndex != lastBatchConfig.ConfigIndex {
-		return makeErrorResponse(fmt.Sprintf(
-			"can only start last config with index %d, got index %d",
-			lastBatchConfig.ConfigIndex, configIndex))
+func (app *ShutterApp) deliverBlockSeen(
+	msg *shmsg.BlockSeen,
+	sender common.Address,
+) abcitypes.ResponseDeliverTx {
+	if msg.BlockNumber > app.BlocksSeen[sender] {
+		app.BlocksSeen[sender] = msg.BlockNumber
 	}
-	if len(app.Configs) <= 1 {
-		return makeErrorResponse("no config to vote on")
-	}
-	// We have to look into the config before the last config to see if we're allowed to vote
-	if !app.Configs[len(app.Configs)-2].IsKeyper(sender) {
-		return notAKeyper(sender)
-	}
-
-	if !lastBatchConfig.Started {
-		app.StartedVotes[sender] = struct{}{}
-	}
-
 	return abcitypes.ResponseDeliverTx{
 		Code:   0,
 		Events: []abcitypes.Event{},
@@ -615,8 +604,8 @@ func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address)
 	if msg.GetBatchConfig() != nil {
 		return app.deliverBatchConfig(msg.GetBatchConfig(), sender)
 	}
-	if msg.GetBatchConfigStarted() != nil {
-		return app.deliverBatchConfigStarted(msg.GetBatchConfigStarted(), sender)
+	if msg.GetBlockSeen() != nil {
+		return app.deliverBlockSeen(msg.GetBlockSeen(), sender)
 	}
 	if msg.GetCheckIn() != nil {
 		return app.deliverCheckIn(msg.GetCheckIn(), sender)
@@ -708,20 +697,36 @@ func (app *ShutterApp) countCheckedInKeypers(keypers []common.Address) uint64 {
 }
 
 func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	lastConfig := app.LastConfig()
+	var events []abcitypes.Event
 
-	// start last config if there are enough votes
-	if len(app.Configs) >= 2 {
-		currentConfig := app.Configs[len(app.Configs)-2]
-		if uint64(len(app.StartedVotes)) >= currentConfig.Threshold {
-			log.Printf("starting config %d", lastConfig.ConfigIndex)
-			lastConfig.Started = true
-			app.StartedVotes = make(map[common.Address]struct{})
+	for configIndex, config := range app.Configs {
+		if !config.Started {
+			var allowanceConfigIndex int
+			if configIndex == 0 {
+				allowanceConfigIndex = 0
+			} else {
+				allowanceConfigIndex = configIndex - 1
+			}
+			numRequiredVotes := app.Configs[allowanceConfigIndex].Threshold
+
+			var numVotes uint64
+			for _, k := range app.Configs[allowanceConfigIndex].Keypers {
+				b, ok := app.BlocksSeen[k]
+				if ok && b >= config.ActivationBlockNumber {
+					numVotes++
+				}
+			}
+			if numVotes >= numRequiredVotes {
+				log.Printf("starting config %d", configIndex)
+				config.Started = true
+				events = append(events, shutterevents.BatchConfigStarted{
+					ConfigIndex: config.ConfigIndex,
+				}.MakeABCIEvent())
+			}
 		}
-	}
-
-	if lastConfig.Started && !lastConfig.ValidatorsUpdated && app.countCheckedInKeypers(lastConfig.Keypers) >= lastConfig.Threshold {
-		lastConfig.ValidatorsUpdated = true
+		if config.Started && !config.ValidatorsUpdated && app.countCheckedInKeypers(config.Keypers) >= config.Threshold {
+			config.ValidatorsUpdated = true
+		}
 	}
 
 	newValidators := app.CurrentValidators()
@@ -732,12 +737,15 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 		if len(validatorUpdates) > 0 {
 			log.Printf("Ignoring %d validator updates in dev mode", len(validatorUpdates))
 		}
-		return abcitypes.ResponseEndBlock{}
+		return abcitypes.ResponseEndBlock{Events: events}
 	}
 	if len(validatorUpdates) > 0 {
-		log.Printf("Applying %d validator updates", len(validatorUpdates))
+		log.Printf("Applying %d validator updates: %v", len(validatorUpdates), validatorUpdates)
 	}
-	return abcitypes.ResponseEndBlock{ValidatorUpdates: validatorUpdates}
+	return abcitypes.ResponseEndBlock{
+		ValidatorUpdates: validatorUpdates,
+		Events:           events,
+	}
 }
 
 // persistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and

@@ -12,8 +12,12 @@ message BatchConfig {
         bool validatorsUpdated = 7;
 }
 
-message BatchConfigStarted {
-        uint64 batch_config_index = 1;
+// message BatchConfigStarted {
+//         uint64 batch_config_index = 1;
+// }
+
+message BlockSeen {
+        uint64 block_number = 1;
 }
 
 message CheckIn {
@@ -51,7 +55,8 @@ message EonStartVote {
 message Message {
         oneof payload {
                 BatchConfig batch_config = 4;
-                BatchConfigStarted batch_config_started = 6;
+                // BatchConfigStarted batch_config_started = 6;
+                BlockSeen block_seen = 14;
                 CheckIn check_in = 7;
 
                 // DKG messages

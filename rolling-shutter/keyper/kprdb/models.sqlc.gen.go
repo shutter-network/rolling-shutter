@@ -72,6 +72,11 @@ type LastBatchConfigSent struct {
 	EventIndex    int64
 }
 
+type LastBlockSeen struct {
+	EnforceOneRow bool
+	BlockNumber   int64
+}
+
 type MetaInf struct {
 	Key   string
 	Value string
@@ -94,10 +99,12 @@ type Puredkg struct {
 }
 
 type TendermintBatchConfig struct {
-	ConfigIndex int32
-	Height      int64
-	Keypers     []string
-	Threshold   int32
+	ConfigIndex           int32
+	Height                int64
+	Keypers               []string
+	Threshold             int32
+	Started               bool
+	ActivationBlockNumber int64
 }
 
 type TendermintEncryptionKey struct {

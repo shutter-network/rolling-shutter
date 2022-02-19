@@ -9,10 +9,12 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"os"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
@@ -276,12 +278,22 @@ func (st *ShuttermintState) handleBatchConfig(
 	return queries.InsertBatchConfig(
 		ctx,
 		kprdb.InsertBatchConfigParams{
-			ConfigIndex: int32(e.ConfigIndex),
-			Height:      e.Height,
-			Threshold:   int32(e.Threshold),
-			Keypers:     keypers,
+			ConfigIndex:           int32(e.ConfigIndex),
+			Height:                e.Height,
+			Threshold:             int32(e.Threshold),
+			Keypers:               keypers,
+			Started:               e.Started,
+			ActivationBlockNumber: int64(e.ActivationBlockNumber),
 		},
 	)
+}
+
+func (st *ShuttermintState) handleBatchConfigStarted(
+	ctx context.Context,
+	queries *kprdb.Queries,
+	e *shutterevents.BatchConfigStarted,
+) error {
+	return queries.SetBatchConfigStarted(ctx, int32(e.ConfigIndex))
 }
 
 func (st *ShuttermintState) handleEonStarted(
@@ -710,12 +722,15 @@ func (st *ShuttermintState) handleApology(
 
 func (st *ShuttermintState) HandleEvent(
 	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
+	pretty.Fprintf(os.Stderr, "HandleEvent: %#v\n", event)
 	var err error
 	switch e := event.(type) {
 	case *shutterevents.CheckIn:
 		err = st.handleCheckIn(ctx, queries, e)
 	case *shutterevents.BatchConfig:
 		err = st.handleBatchConfig(ctx, queries, e)
+	case *shutterevents.BatchConfigStarted:
+		err = st.handleBatchConfigStarted(ctx, queries, e)
 	case *shutterevents.EonStarted:
 		err = st.handleEonStarted(ctx, queries, e)
 	case *shutterevents.PolyCommitment:
@@ -727,7 +742,7 @@ func (st *ShuttermintState) HandleEvent(
 	case *shutterevents.Apology:
 		err = st.handleApology(ctx, queries, e)
 	default:
-		log.Printf("HandleEvent not yet implemented for %s: %s",
+		log.Printf("HandleEvent not yet implemented for %s: %+v",
 			reflect.TypeOf(event), event)
 	}
 

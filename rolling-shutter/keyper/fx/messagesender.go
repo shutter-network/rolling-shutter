@@ -117,9 +117,16 @@ func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message)
 	if err != nil {
 		return err
 	}
+
+	if res.CheckTx.Code != 0 {
+		return &RemoteError{
+			msg: fmt.Sprintf("checktx: %s", res.CheckTx.Log),
+		}
+	}
+
 	if res.DeliverTx.Code != 0 {
 		return &RemoteError{
-			msg: res.DeliverTx.Log,
+			msg: fmt.Sprintf("delivertx: %s", res.DeliverTx.Log),
 		}
 	}
 	return nil

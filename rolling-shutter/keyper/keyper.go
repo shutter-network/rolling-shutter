@@ -221,14 +221,63 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
+func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
+	err := kpr.handleOnChainKeyperSetChanges(ctx, tx)
+	if err != nil {
+		return err
+	}
+	err = kpr.sendBatchConfigStarted(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (kpr *keyper) sendBatchConfigStarted(ctx context.Context, tx pgx.Tx) error {
+	qc := commondb.New(tx)
+	q := kprdb.New(tx)
+	lastBlock, err := q.GetLastBlockSeen(ctx)
+	if err != nil {
+		return err
+	}
+	nextBlock, err := qc.GetNextBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
+	count, err := q.CountBatchConfigsInBlockRange(ctx,
+		kprdb.CountBatchConfigsInBlockRangeParams{
+			StartBlock: lastBlock,
+			EndBlock:   int64(nextBlock),
+		})
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil
+	}
+
+	blockSeenMsg := shmsg.NewBlockSeen(uint64(nextBlock))
+	err = scheduleShutterMessage(ctx, q, "block seen", blockSeenMsg)
+	if err != nil {
+		return err
+	}
+	err = q.SetLastBlockSeen(ctx, int64(nextBlock))
+	if err != nil {
+		return err
+	}
+	log.Printf("block seen: %d", nextBlock)
+	return nil
+}
+
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
 func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx) error {
 	q := kprdb.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
+		log.Print("no batch config found in tendermint")
 		return nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return err
 	}
 
@@ -281,7 +330,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			return kpr.handleOnChainKeyperSetChanges(ctx, tx)
+			return kpr.handleOnChainChanges(ctx, tx)
 		})
 		if err != nil {
 			return err

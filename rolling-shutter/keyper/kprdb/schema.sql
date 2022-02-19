@@ -1,4 +1,4 @@
--- schema-version: keyper-14 --
+-- schema-version: keyper-15 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -26,6 +26,13 @@ CREATE TABLE last_batch_config_sent(
 );
 INSERT INTO last_batch_config_sent (event_index) VALUES (0);
 
+-- store the last block number seen we sent to shuttermint.
+CREATE TABLE last_block_seen(
+       enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
+       block_number bigint NOT NULL
+);
+INSERT INTO last_block_seen (block_number) VALUES (-1);
+
 -- tendermint_sync_meta contains meta information about the synchronization process with the
 -- tendermint app. At the moment we just insert new entries into the table and sort by
 -- current_block to get the latest entry. When handling new events from shuttermint, we do that in
@@ -50,7 +57,9 @@ CREATE TABLE tendermint_batch_config(
        config_index integer PRIMARY KEY,
        height bigint NOT NULL,
        keypers text[] NOT NULL,
-       threshold integer NOT NULL
+       threshold integer NOT NULL,
+       started boolean NOT NULL,
+       activation_block_number bigint NOT NULL
 );
 
 CREATE TABLE tendermint_encryption_key(

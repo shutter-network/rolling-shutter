@@ -206,6 +206,17 @@ func (q *Queries) GetKeyperSetByEventIndex(ctx context.Context, eventIndex int64
 	return i, err
 }
 
+const getNextBlockNumber = `-- name: GetNextBlockNumber :one
+SELECT next_block_number from event_sync_progress LIMIT 1
+`
+
+func (q *Queries) GetNextBlockNumber(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, getNextBlockNumber)
+	var next_block_number int32
+	err := row.Scan(&next_block_number)
+	return next_block_number, err
+}
+
 const insertChainCollator = `-- name: InsertChainCollator :exec
 INSERT INTO chain_collator (activation_block_number, collator)
 VALUES ($1, $2)
