@@ -64,7 +64,6 @@ type DeletePolyEvalParams struct {
 
 // PolyEvalsWithEncryptionKeys could probably already delete the entries from the poly_evals table.
 // I wasn't able to make this work, because of bugs in sqlc
-
 func (q *Queries) DeletePolyEval(ctx context.Context, arg DeletePolyEvalParams) error {
 	_, err := q.db.Exec(ctx, deletePolyEval, arg.Eon, arg.ReceiverAddress)
 	return err

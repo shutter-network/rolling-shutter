@@ -6,7 +6,7 @@ commands:
       - run:
           name: Install go
           command: |
-            curl -sSL "https://go.dev/dl/go1.18beta1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+            curl -sSL "https://go.dev/dl/go1.18rc1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
 
@@ -88,7 +88,7 @@ jobs:
           keys:
             - go-mod-v3-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
-          key: pre-commit-cache-v6-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v7-{{ checksum ".pre-commit-config.yaml" }}
       - run:
           name: Install pre-commit
           command: |
@@ -99,7 +99,7 @@ jobs:
             fi
       - run: pre-commit install-hooks
       - save_cache:
-          key: pre-commit-cache-v6-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v7-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local

@@ -7,7 +7,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v9-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v10-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -31,7 +31,7 @@ jobs:
             find . -name '*.gen.go' |xargs rm
       - run: make generate
       - save_cache:
-          key: rs-generate-v9-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v10-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
