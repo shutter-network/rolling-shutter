@@ -297,7 +297,7 @@
               :num-decryptors 0}]
     {:test/id :change-keyper-set
      :test/conf conf
-     :test/description "distributed key generation should work"
+     :test/description "changing the keyper set should work"
      :test/steps [{:run :init/init
                    :init/conf conf}
                   (for [keyper (range num-keypers)]
