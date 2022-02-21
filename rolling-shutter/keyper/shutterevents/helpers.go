@@ -13,7 +13,7 @@ import (
 
 func newAddressPair(key string, value common.Address) abcitypes.EventAttribute {
 	return abcitypes.EventAttribute{
-		Key:   []byte(key),
+		Key:   key,
 		Value: encodeAddress(value),
 		Index: true,
 	}
@@ -21,21 +21,21 @@ func newAddressPair(key string, value common.Address) abcitypes.EventAttribute {
 
 func newAddressesPair(key string, value []common.Address) abcitypes.EventAttribute {
 	return abcitypes.EventAttribute{
-		Key:   []byte(key),
+		Key:   key,
 		Value: encodeAddresses(value),
 	}
 }
 
 func newByteSequencePair(key string, value [][]byte) abcitypes.EventAttribute {
 	return abcitypes.EventAttribute{
-		Key:   []byte(key),
+		Key:   key,
 		Value: encodeByteSequence(value),
 	}
 }
 
 func newUintPair(key string, value uint64) abcitypes.EventAttribute {
 	return abcitypes.EventAttribute{
-		Key:   []byte(key),
+		Key:   key,
 		Value: encodeUint64(value),
 		Index: true,
 	}
@@ -43,7 +43,7 @@ func newUintPair(key string, value uint64) abcitypes.EventAttribute {
 
 func newGammas(key string, gammas *shcrypto.Gammas) abcitypes.EventAttribute {
 	return abcitypes.EventAttribute{
-		Key:   []byte(key),
+		Key:   key,
 		Value: encodeGammas(gammas),
 	}
 }

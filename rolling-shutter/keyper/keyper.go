@@ -105,7 +105,7 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	shuttermintClient, err := tmhttp.New(config.ShuttermintURL, "/websocket")
+	shuttermintClient, err := tmhttp.New(config.ShuttermintURL)
 	if err != nil {
 		return err
 	}

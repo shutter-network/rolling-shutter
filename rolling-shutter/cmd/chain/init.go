@@ -3,6 +3,7 @@ package chain
 // This has been copied from tendermint's own init command
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,16 +19,15 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
-	"github.com/tendermint/tendermint/p2p"
+	tmtime "github.com/tendermint/tendermint/libs/time"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 
 	"github.com/shutter-network/shutter/shuttermint/app"
 )
 
 var (
-	logger                 = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	logger                 = log.MustNewDefaultLogger(log.LogFormatPlain, log.LogLevelInfo, false)
 	rootDir                = ""
 	devMode                = false
 	index                  = 0
@@ -77,7 +77,7 @@ func initFiles(_ *cobra.Command, _ []string) error {
 	}
 
 	config := cfg.DefaultConfig()
-	config.LogLevel = "*:error"
+	config.LogLevel = log.LogLevelError
 	scaleToBlockTime(config, blockTime)
 	keyper0RPCAddress := config.RPC.ListenAddress
 	rpcAddress, err := adjustPort(keyper0RPCAddress, index)
@@ -94,7 +94,7 @@ func initFiles(_ *cobra.Command, _ []string) error {
 	config.P2P.ListenAddress = p2pAddress
 
 	config.P2P.AllowDuplicateIP = true
-
+	config.Mode = cfg.ModeValidator
 	config.SetRoot(rootDir)
 	if err := config.ValidateBasic(); err != nil {
 		return errors.Wrap(err, "error in config file")
@@ -103,7 +103,10 @@ func initFiles(_ *cobra.Command, _ []string) error {
 
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
-	cfg.WriteConfigFile(filepath.Join(rootDir, "config", "config.toml"), config)
+	err = cfg.WriteConfigFile(rootDir, config)
+	if err != nil {
+		return err
+	}
 	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3)
 
 	return initFilesWithConfig(config, appState)
@@ -126,15 +129,22 @@ func adjustPort(address string, keyperIndex int) (string, error) {
 
 func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error {
 	// private validator
-	privValKeyFile := config.PrivValidatorKeyFile()
-	privValStateFile := config.PrivValidatorStateFile()
+	privValKeyFile := config.PrivValidator.KeyFile()
+	privValStateFile := config.PrivValidator.StateFile()
 	var pv *privval.FilePV
+	var err error
 	if tmos.FileExists(privValKeyFile) {
-		pv = privval.LoadFilePV(privValKeyFile, privValStateFile)
+		pv, err = privval.LoadFilePV(privValKeyFile, privValStateFile)
+		if err != nil {
+			return err
+		}
 		logger.Info("Found private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
 	} else {
-		pv = privval.GenFilePV(privValKeyFile, privValStateFile)
+		pv, err = privval.GenFilePV(privValKeyFile, privValStateFile, types.ABCIPubKeyTypeEd25519)
+		if err != nil {
+			return err
+		}
 		pv.Save()
 		logger.Info("Generated private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
@@ -144,17 +154,17 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 	if tmos.FileExists(nodeKeyFile) {
 		logger.Info("Found node key", "path", nodeKeyFile)
 	} else {
-		nodeKey, err := p2p.LoadOrGenNodeKey(nodeKeyFile)
+		nodeid, err := config.LoadOrGenNodeKeyID()
 		if err != nil {
 			return err
 		}
 		idpath := nodeKeyFile + ".id"
-		err = os.WriteFile(idpath, []byte(nodeKey.ID()), 0o755)
+		err = os.WriteFile(idpath, []byte(nodeid), 0o755)
 		if err != nil {
 			return errors.Wrapf(err, "Could not write to %s", idpath)
 		}
 
-		logger.Info("Generated node key", "path", nodeKeyFile, "id", nodeKey.ID())
+		logger.Info("Generated node key", "path", nodeKeyFile, "id", nodeid)
 	}
 
 	// genesis file
@@ -172,7 +182,7 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 			ConsensusParams: types.DefaultConsensusParams(),
 			AppState:        appStateBytes,
 		}
-		pubKey, err := pv.GetPubKey()
+		pubKey, err := pv.GetPubKey(context.Background())
 		if err != nil {
 			return errors.Wrap(err, "can't get pubkey")
 		}
@@ -188,9 +198,9 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 		logger.Info("Generated genesis file", "path", genFile)
 	}
 	a := app.NewShutterApp()
-	a.Gobpath = filepath.Join(config.BaseConfig.DBDir(), "shutter.gob")
+	a.Gobpath = filepath.Join(config.DBDir(), "shutter.gob")
 	a.DevMode = devMode
-	err := a.PersistToDisk()
+	err = a.PersistToDisk()
 	if err != nil {
 		return err
 	}

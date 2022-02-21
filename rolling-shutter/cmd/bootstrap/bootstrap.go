@@ -95,7 +95,7 @@ func bootstrap() error {
 		return err
 	}
 
-	shmcl, err := http.New(bootstrapFlags.ShuttermintURL, "/websocket")
+	shmcl, err := http.New(bootstrapFlags.ShuttermintURL)
 	if err != nil {
 		log.Fatalf("Error connecting to Shuttermint node: %v", err)
 	}

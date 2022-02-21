@@ -114,7 +114,7 @@ func main() {
 	log.Printf("Starting testclient version %s", shversion.Version())
 
 	var cl client.Client
-	cl, err := http.New("http://localhost:26657", "/websocket")
+	cl, err := http.New("http://localhost:26657")
 	if err != nil {
 		panic(err)
 	}

@@ -182,21 +182,21 @@ func (bc BatchConfig) MakeABCIEvent() abcitypes.Event {
 		Type: evtype.BatchConfig,
 		Attributes: []abcitypes.EventAttribute{
 			{
-				Key:   []byte("ActivationBlockNumber"),
-				Value: []byte(fmt.Sprintf("%d", bc.ActivationBlockNumber)),
+				Key:   "ActivationBlockNumber",
+				Value: fmt.Sprintf("%d", bc.ActivationBlockNumber),
 				Index: true,
 			},
 			{
-				Key:   []byte("Threshold"),
-				Value: []byte(fmt.Sprintf("%d", bc.Threshold)),
+				Key:   "Threshold",
+				Value: fmt.Sprintf("%d", bc.Threshold),
 			},
 			{
-				Key:   []byte("Keypers"),
+				Key:   "Keypers",
 				Value: encodeAddresses(bc.Keypers),
 			},
 			{
-				Key:   []byte("ConfigIndex"),
-				Value: []byte(fmt.Sprintf("%d", bc.ConfigIndex)),
+				Key:   "ConfigIndex",
+				Value: fmt.Sprintf("%d", bc.ConfigIndex),
 			},
 		},
 	}
@@ -247,8 +247,8 @@ func (bcs BatchConfigStarted) MakeABCIEvent() abcitypes.Event {
 		Type: evtype.BatchConfigStarted,
 		Attributes: []abcitypes.EventAttribute{
 			{
-				Key:   []byte("ConfigIndex"),
-				Value: []byte(fmt.Sprintf("%d", bcs.ConfigIndex)),
+				Key:   "ConfigIndex",
+				Value: fmt.Sprintf("%d", bcs.ConfigIndex),
 			},
 		},
 	}
@@ -284,7 +284,7 @@ func (msg CheckIn) MakeABCIEvent() abcitypes.Event {
 		Attributes: []abcitypes.EventAttribute{
 			newAddressPair("Sender", msg.Sender),
 			{
-				Key:   []byte("EncryptionPublicKey"),
+				Key:   "EncryptionPublicKey",
 				Value: encodeECIESPublicKey(msg.EncryptionPublicKey),
 			},
 		},

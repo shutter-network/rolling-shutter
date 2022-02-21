@@ -198,10 +198,6 @@ func (ShutterApp) OfferSnapshot(abcitypes.RequestOfferSnapshot) abcitypes.Respon
 	return abcitypes.ResponseOfferSnapshot{}
 }
 
-func (ShutterApp) SetOption(_ abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
-	return abcitypes.ResponseSetOption{}
-}
-
 /* BlockExecution
 
 The first time a new blockchain is started, Tendermint calls InitChain. From then on, the following

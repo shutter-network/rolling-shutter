@@ -17,12 +17,12 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 )
 
-func encodeUint64(val uint64) []byte {
-	return []byte(strconv.FormatUint(val, 10))
+func encodeUint64(val uint64) string {
+	return strconv.FormatUint(val, 10)
 }
 
-func decodeUint64(val []byte) (uint64, error) {
-	v, err := strconv.ParseUint(string(val), 10, 64)
+func decodeUint64(val string) (uint64, error) {
+	v, err := strconv.ParseUint(val, 10, 64)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to parse event")
 	}
@@ -30,18 +30,17 @@ func decodeUint64(val []byte) (uint64, error) {
 }
 
 // encodeAddresses encodes the given slice of Addresses as comma-separated list of addresses.
-func encodeAddresses(addr []common.Address) []byte {
+func encodeAddresses(addr []common.Address) string {
 	var hexstrings []string
 	for _, a := range addr {
 		hexstrings = append(hexstrings, a.Hex())
 	}
-	return []byte(strings.Join(hexstrings, ","))
+	return strings.Join(hexstrings, ",")
 }
 
 // decodeAddresses reverses the encodeAddressesForEvent operation, i.e. it parses a list
 // of addresses from a comma-separated string.
-func decodeAddresses(val []byte) ([]common.Address, error) {
-	s := string(val)
+func decodeAddresses(s string) ([]common.Address, error) {
 	var res []common.Address
 	if s == "" {
 		return res, nil
@@ -57,17 +56,16 @@ func decodeAddresses(val []byte) ([]common.Address, error) {
 }
 
 // encodeByteSequence encodes a slice o byte strings as a comma separated string.
-func encodeByteSequence(v [][]byte) []byte {
+func encodeByteSequence(v [][]byte) string {
 	var hexstrings []string
 	for _, a := range v {
 		hexstrings = append(hexstrings, hexutil.Encode(a))
 	}
-	return []byte(strings.Join(hexstrings, ","))
+	return strings.Join(hexstrings, ",")
 }
 
 // decodeByteSequence parses a list of hex encoded, comma-separated byte slices.
-func decodeByteSequence(val []byte) ([][]byte, error) {
-	s := string(val)
+func decodeByteSequence(s string) ([][]byte, error) {
 	var res [][]byte
 	if s == "" {
 		return res, nil
@@ -84,31 +82,31 @@ func decodeByteSequence(val []byte) ([][]byte, error) {
 
 // encodePubkey encodes the PublicKey as a string suitable for putting it into a tendermint
 // event, i.e. an utf-8 compatible string.
-func encodePubkey(pubkey *ecdsa.PublicKey) []byte {
-	return []byte(base64.RawURLEncoding.EncodeToString(ethcrypto.FromECDSAPub(pubkey)))
+func encodePubkey(pubkey *ecdsa.PublicKey) string {
+	return base64.RawURLEncoding.EncodeToString(ethcrypto.FromECDSAPub(pubkey))
 }
 
 // decodePubkey decodes a public key from a tendermint event.
-func decodePubkey(val []byte) (*ecdsa.PublicKey, error) {
-	data, err := base64.RawURLEncoding.DecodeString(string(val))
+func decodePubkey(val string) (*ecdsa.PublicKey, error) {
+	data, err := base64.RawURLEncoding.DecodeString(val)
 	if err != nil {
 		return nil, err
 	}
 	return ethcrypto.UnmarshalPubkey(data)
 }
 
-func encodeGammas(gammas *shcrypto.Gammas) []byte {
+func encodeGammas(gammas *shcrypto.Gammas) string {
 	var encoded []string
 	if gammas != nil {
 		for _, g := range *gammas {
 			encoded = append(encoded, hex.EncodeToString(g.Marshal()))
 		}
 	}
-	return []byte(strings.Join(encoded, ","))
+	return strings.Join(encoded, ",")
 }
 
-func decodeGammas(eventValue []byte) (shcrypto.Gammas, error) {
-	parts := strings.Split(string(eventValue), ",")
+func decodeGammas(eventValue string) (shcrypto.Gammas, error) {
+	parts := strings.Split(eventValue, ",")
 	var res shcrypto.Gammas
 	for _, p := range parts {
 		marshaledG2, err := hex.DecodeString(p)
@@ -125,12 +123,11 @@ func decodeGammas(eventValue []byte) (shcrypto.Gammas, error) {
 	return res, nil
 }
 
-func encodeAddress(a common.Address) []byte {
-	return []byte(a.Hex())
+func encodeAddress(a common.Address) string {
+	return a.Hex()
 }
 
-func decodeAddress(v []byte) (common.Address, error) {
-	s := string(v)
+func decodeAddress(s string) (common.Address, error) {
 	a := common.HexToAddress(s)
 	if a.Hex() != s {
 		return common.Address{}, errors.Errorf("invalid address %s", s)
@@ -138,11 +135,11 @@ func decodeAddress(v []byte) (common.Address, error) {
 	return a, nil
 }
 
-func encodeECIESPublicKey(key *ecies.PublicKey) []byte {
+func encodeECIESPublicKey(key *ecies.PublicKey) string {
 	return encodePubkey(key.ExportECDSA())
 }
 
-func decodeECIESPublicKey(val []byte) (*ecies.PublicKey, error) {
+func decodeECIESPublicKey(val string) (*ecies.PublicKey, error) {
 	publicKeyECDSA, err := decodePubkey(val)
 	if err != nil {
 		return nil, err

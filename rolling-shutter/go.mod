@@ -36,20 +36,17 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/miekg/dns v1.1.46 // indirect
-	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multihash v0.0.16 // indirect
+	github.com/oasisprotocol/curve25519-voi v0.0.0-20220203144524-0945b39ce060 // indirect
 	github.com/petermattis/goid v0.0.0-20220111183729-e033e1e0bdb5 // indirect
 	github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.11.1 // indirect
-	github.com/prometheus/common v0.30.1 // indirect
+	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
-	github.com/rogpeppe/go-internal v1.8.1 // indirect
-	github.com/rs/cors v1.8.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shutter-network/shutter/shlib v0.1.9
 	github.com/spf13/afero v1.8.1 // indirect
@@ -59,11 +56,9 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20211109104530-b0e0482ba91d // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/tendermint/go-amino v0.16.0
-	github.com/tendermint/tendermint v0.34.15
+	github.com/tendermint/tendermint v0.35.1
 	github.com/tendermint/tm-db v0.6.7 // indirect
-	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -76,14 +71,3 @@ require (
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.3
 )
-
-// The exclude directive for tendermint/tm-db is needed because this
-// version is incompatible with tendermint 0.34.13 and it prevents us
-// from running 'go get -u=patch':
-// ,----
-// | % go get -u=patch
-// | # github.com/tendermint/tendermint/abci/example/kvstore
-// | ../../../go/pkg/mod/github.com/tendermint/tendermint@v0.34.13/abci/example/kvstore/kvstore.go:74:21: undefined: db.NewMemDB
-// | ../../../go/pkg/mod/github.com/tendermint/tendermint@v0.34.13/abci/example/kvstore/persistent_kvstore.go:40:13: undefined: db.NewGoLevelDB
-// `----
-exclude github.com/tendermint/tm-db v0.6.5

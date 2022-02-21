@@ -155,7 +155,7 @@
         m (-> m
               (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (+ 28000 n)))
               (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
-              (assoc-in [:p2p :seeds] seeds))]
+              (assoc-in [:p2p :persistent-peers] seeds))]
     (spit path (toml-writer/dump m))))
 
 (defn sys-chain-config-path
@@ -183,11 +183,10 @@
                    (mapv (fn [n]
                            (format "%s@127.0.0.1:%d"
                                    (slurp (sys-chain-config-path sys n "node_key.json.id"))
-                                   (+ 27000 n))))
-                   (str/join ","))]
+                                   (+ 27000 n)))))]
     (doseq [n (range num-chains)]
       (chain-set-ports (sys-chain-config-path sys n "config.toml")
-                       seeds
+                       (str/join "," (concat (take n seeds) (drop (inc n) seeds)))
                        n))
     sys))
 
