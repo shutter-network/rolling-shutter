@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/signer/core"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 type CipherTransaction struct {
@@ -19,7 +19,7 @@ type CipherTransaction struct {
 	Signature          []byte
 }
 
-var eip712CipherTransactionType = []core.Type{
+var eip712CipherTransactionType = []apitypes.Type{
 	{Name: "EncryptedPayload", Type: "bytes"},
 	{Name: "GasLimit", Type: "uint256"},
 	{Name: "InclusionFeePerGas", Type: "uint256"},
@@ -27,7 +27,7 @@ var eip712CipherTransactionType = []core.Type{
 	{Name: "Nonce", Type: "uint256"},
 }
 
-var eip712ShutterDomain = core.TypedDataDomain{
+var eip712ShutterDomain = apitypes.TypedDataDomain{
 	Name:    "shutter",
 	Version: "1",
 }
@@ -69,14 +69,14 @@ func (t *CipherTransaction) EnvelopeSigner() (common.Address, error) {
 }
 
 func (t *CipherTransaction) SigningHash() (common.Hash, error) {
-	typedDataTransaction := core.TypedData{
-		Types: core.Types{
+	typedDataTransaction := apitypes.TypedData{
+		Types: apitypes.Types{
 			EIP712Domain:        ShortEIP712DomainType,
 			"CipherTransaction": eip712CipherTransactionType,
 		},
 		PrimaryType: "CipherTransaction",
 		Domain:      eip712ShutterDomain,
-		Message: core.TypedDataMessage{
+		Message: apitypes.TypedDataMessage{
 			"EncryptedPayload":   t.EncryptedPayload,
 			"GasLimit":           (*math.HexOrDecimal256)(t.GasLimit),
 			"InclusionFeePerGas": (*math.HexOrDecimal256)(t.InclusionFeePerGas),

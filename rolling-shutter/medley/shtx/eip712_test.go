@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/signer/core"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"gotest.tools/assert"
 )
 
 func TestEncodeData(t *testing.T) {
 	// values taken from EIP712 example script
 	// see: https://github.com/ethereum/EIPs/blob/a2b62466f7b02edcdae5725dba028f4935f41ed5/assets/eip-712/Example.js#L116
-	testTypedData := core.TypedData{
-		Types: core.Types{
+	testTypedData := apitypes.TypedData{
+		Types: apitypes.Types{
 			EIP712Domain: EIP712DomainType,
 			"Person": {
 				{Name: "name", Type: "string"},
@@ -27,13 +27,13 @@ func TestEncodeData(t *testing.T) {
 			},
 		},
 		PrimaryType: "Mail",
-		Domain: core.TypedDataDomain{
+		Domain: apitypes.TypedDataDomain{
 			Name:              "Ether Mail",
 			Version:           "1",
 			ChainId:           math.NewHexOrDecimal256(1),
 			VerifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
 		},
-		Message: core.TypedDataMessage{
+		Message: apitypes.TypedDataMessage{
 			"from":     map[string]interface{}{"name": "Cow", "wallet": "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},
 			"to":       map[string]interface{}{"name": "Bob", "wallet": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},
 			"contents": "Hello, Bob!",
