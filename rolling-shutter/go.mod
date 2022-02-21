@@ -26,7 +26,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/kr/pretty v0.3.0
-	github.com/kyleconroy/sqlc v1.11.0
+	github.com/kyleconroy/sqlc v1.12.0
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-noise v0.2.2 // indirect
