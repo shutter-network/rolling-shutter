@@ -370,7 +370,10 @@
       (binding [play/*cwd* cwd]
         (timbre/with-merged-config
           {:appenders {:test-logs (taoensso.timbre.appenders.core/spit-appender {:fname log-file})}}
-          (info (format "Start running test: %s" description) tc)
+          (info (format "Start running test: %s\nYou can start this yourself by running `clojure -M:test %s` inside the play directory."
+                        description
+                        (name (:test/id tc)))
+                tc)
           (let [sys (sys-run-test sys tc)]
             (info (format "Finished test: %s" description) (-> sys :report (dissoc :report/checks)))
             sys))))))
