@@ -34,7 +34,6 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.5.6
 	github.com/libp2p/go-tcp-transport v0.2.8 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/miekg/dns v1.1.46 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
@@ -53,9 +52,10 @@ require (
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shutter-network/shutter/shlib v0.1.9
-	github.com/spf13/cobra v1.2.1
+	github.com/spf13/afero v1.8.1 // indirect
+	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.9.0
+	github.com/spf13/viper v1.10.1
 	github.com/status-im/keycard-go v0.0.0-20211109104530-b0e0482ba91d // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/tendermint/go-amino v0.16.0
@@ -72,6 +72,7 @@ require (
 	golang.org/x/tools v0.1.9
 	google.golang.org/genproto v0.0.0-20220218161850-94dd64e39d7c // indirect
 	google.golang.org/protobuf v1.27.1
+	gopkg.in/ini.v1 v1.66.4 // indirect
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.3
 )
