@@ -8,10 +8,13 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [cheshire.core :as json]
+            [sht.base64 :as base64]
             [sht.runner :as runner]
             [sht.build :as build]
             [babashka.fs :as fs]
             [sht.play :as play]))
+
+(set! *warn-on-reflection* true)
 
 (defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
 
@@ -94,6 +97,148 @@
   (fn [sys {:keyper/keys [description]}]
     description))
 
+(defmethod runner/run ::configure-keypers
+  [sys m]
+  (let [deploy-conf (build/sys-deploy-conf sys)
+        deploy-conf-path (-> sys :cwd (fs/path "deploy-config-configure-keypers.json") fs/absolutize str)]
+    (spit deploy-conf-path (json/encode deploy-conf {:pretty true}))
+    (runner/dispatch sys {:run :process/run
+                          :process/id :configure-keypers
+                          :process/wait true
+                          :process/opts {:dir (str (fs/path play/repo-root "contracts"))
+                                         :extra-env {"DEPLOY_CONF" deploy-conf-path}}
+                          :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/configure-keypers.js"]})))
+
+(defn- chain-set-ports
+  [path seeds n]
+  (let [m (toml/read (slurp path) :keywordize true)
+        m (-> m
+              (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (+ 28000 n)))
+              (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
+              (assoc-in [:p2p :persistent-peers] seeds))]
+    (spit path (toml-writer/dump m))))
+
+(defn- sys-chain-config-path
+  [sys n & path-elems]
+  (str (apply fs/path (:cwd sys) (format "testchain-%d" n) "config", path-elems)))
+
+(defn- init-chains
+  [sys]
+  (let [conf (:conf sys)
+        num-chains (:num-keypers conf)
+        num-initial-keypers  (:num-initial-keypers conf)
+        genesis-keypers (mapv (comp :eth-address :subcommand/cfg)
+                              (take num-initial-keypers (:sys/keypers sys)))
+        genesis-args (interleave (repeat "--genesis-keyper") genesis-keypers)
+        sys (runner/dispatch sys
+                             (mapv (fn [n] {:run :process/run
+                                            :process/wait true
+                                            :process/id (keyword (str "init-chain-" n))
+                                            :process/cmd (apply vector 'rolling-shutter "chain" "init"
+                                                                "--root" (format "testchain-%d" n)
+                                                                "--blocktime" "1"
+                                                                genesis-args)})
+                                   (range num-chains)))
+        seeds (->> (range num-chains)
+                   (mapv (fn [n]
+                           (format "%s@127.0.0.1:%d"
+                                   (slurp (sys-chain-config-path sys n "node_key.json.id"))
+                                   (+ 27000 n)))))]
+    (doseq [n (range num-chains)]
+      (chain-set-ports (sys-chain-config-path sys n "config.toml")
+                       (str/join "," (concat (take n seeds) (drop (inc n) seeds)))
+                       n))
+    sys))
+
+
+
+(defn get-private-validator-key
+  "get the private validator key from a priv_validator_key.json map"
+  [m]
+  (base64/decode (get-in m ["priv_key" "value"])))
+
+(defn seed-from-private-validator-key
+  [^bytes pk]
+  (java.util.Arrays/copyOfRange pk 0 32))
+
+(defn- read-private-validator-key
+  "read the validators private key from the given priv_validator_key.json file"
+  [path]
+  (let [m (json/decode (slurp path))]
+    (get-private-validator-key m)))
+
+(defn- merge-genesis
+  "merge multiple genesis.json maps. This returns the first map with the validators key set to the
+  concatenation of the validator keys in all given maps"
+  [genesis-maps]
+  (let [validators (->> genesis-maps
+                        (mapcat (fn [m] (get m "validators")))
+                        distinct)]
+    (assoc (first genesis-maps) "validators" validators)))
+
+(defn- rewrite-genesis
+  "rewrite genesis.json. This defines the first num-initial-keypers validators as genesis
+  validators and writes the genesis.json files"
+  ([cwd num-keypers num-initial-keypers]
+   (let [paths (mapv (fn [n]
+                       (-> cwd (fs/path (format "testchain-%d" n) "config" "genesis.json") str))
+                     (range num-keypers))
+         gens (mapv (fn [p] (-> p slurp json/decode)) (take num-initial-keypers paths))
+         genesis (merge-genesis gens)
+         genesis-str (json/encode genesis {:pretty true})]
+     (doseq [p paths]
+       (spit p genesis-str))))
+  ([{:keys [conf cwd] :as sys}]
+   (let [num-keypers (:num-keypers conf)
+         num-initial-keypers (:num-initial-keypers conf)]
+     (rewrite-genesis cwd num-keypers num-initial-keypers))))
+
+(defn- format-hex
+ [^bytes bs]
+  (.formatHex (java.util.HexFormat/of) bs))
+;; (format-hex (byte-array 5 [1 3 32 128 255]))
+
+(defn- set-seeds
+  "Set the ValidatorSeed value in the keyper's configs. They need to be written out with
+  build/sys-write-config-files afterwards."
+  [sys]
+  (let [keypers (:sys/keypers sys)
+        seeds (mapv (fn [n]
+                      (let [privkey (read-private-validator-key
+                                     (sys-chain-config-path sys n "priv_validator_key.json"))
+                            seed (seed-from-private-validator-key privkey)
+                            seed-str (format-hex seed)]
+                        seed-str))
+                    (range (count keypers)))
+        keypers (mapv (fn [k seed n]
+                        (-> k
+                            (assoc-in [:subcommand/toml-edits "ValidatorSeed"] seed)
+                            (assoc-in [:subcommand/toml-edits "ShuttermintURL"]
+                                      (format "http://localhost:%d" (+ 28000 n)))))
+                      keypers
+                      seeds
+                      (range (count keypers)))]
+    (assoc sys :sys/keypers keypers)))
+
+(defmethod runner/run :chain/run-chains
+  [sys m]
+  (let [num-chains (-> sys :conf :num-keypers)
+        sys (init-chains sys)
+        sys (set-seeds sys)]
+    (rewrite-genesis sys)
+    (build/sys-write-config-files sys)
+    (runner/dispatch sys
+                     (mapv (fn [n]
+                             {:run :process/run
+                              :process/wait false
+                              :process/id (keyword (str "chain-" n))
+                              :process/cmd ['rolling-shutter "chain" "--config"
+                                            (format "testchain-%d/config/config.toml" n)]})
+                           (range num-chains)))))
+
+;; ---
+;; --- Test definitions
+;; ---
 (defn test-keypers-dkg-generation
   [{:keys [num-keypers] :as conf}]
   {:test/id :keyper-dkg-works
@@ -135,156 +280,6 @@
                    :keyper/num keyper})
 
                 ]})
-
-
-(defmethod runner/run ::configure-keypers
-  [sys m]
-  (let [deploy-conf (build/sys-deploy-conf sys)
-        deploy-conf-path (-> sys :cwd (fs/path "deploy-config-configure-keypers.json") fs/absolutize str)]
-    (spit deploy-conf-path (json/encode deploy-conf {:pretty true}))
-    (runner/dispatch sys {:run :process/run
-                          :process/id :configure-keypers
-                          :process/wait true
-                          :process/opts {:dir (str (fs/path play/repo-root "contracts"))
-                                         :extra-env {"DEPLOY_CONF" deploy-conf-path}}
-                          :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/configure-keypers.js"]})))
-
-(defn- chain-set-ports
-  [path seeds n]
-  (let [m (toml/read (slurp path) :keywordize true)
-        m (-> m
-              (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (+ 28000 n)))
-              (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
-              (assoc-in [:p2p :persistent-peers] seeds))]
-    (spit path (toml-writer/dump m))))
-
-(defn sys-chain-config-path
-  [sys n & path-elems]
-  (str (apply fs/path (:cwd sys) (format "testchain-%d" n) "config", path-elems)))
-
-(defn init-chains
-  [sys]
-  (let [conf (:conf sys)
-        num-chains (:num-keypers conf)
-        num-initial-keypers  (:num-initial-keypers conf)
-        genesis-keypers (mapv (comp :eth-address :subcommand/cfg)
-                              (take num-initial-keypers (:sys/keypers sys)))
-        genesis-args (interleave (repeat "--genesis-keyper") genesis-keypers)
-        sys (runner/dispatch sys
-                             (mapv (fn [n] {:run :process/run
-                                            :process/wait true
-                                            :process/id (keyword (str "init-chain-" n))
-                                            :process/cmd (apply vector 'rolling-shutter "chain" "init"
-                                                                "--root" (format "testchain-%d" n)
-                                                                "--blocktime" "1"
-                                                                genesis-args)})
-                                   (range num-chains)))
-        seeds (->> (range num-chains)
-                   (mapv (fn [n]
-                           (format "%s@127.0.0.1:%d"
-                                   (slurp (sys-chain-config-path sys n "node_key.json.id"))
-                                   (+ 27000 n)))))]
-    (doseq [n (range num-chains)]
-      (chain-set-ports (sys-chain-config-path sys n "config.toml")
-                       (str/join "," (concat (take n seeds) (drop (inc n) seeds)))
-                       n))
-    sys))
-
-(defn base64-encode
-  "Encode an array of bytes into a base64 encoded string."
-  [^bytes unencoded]
-  (String. (.encode (java.util.Base64/getEncoder) unencoded)))
-
-(defn base64-decode
-  "Decode a base64 encoded string into an array of bytes."
-  [^String encoded]
-  (.decode (java.util.Base64/getDecoder) encoded))
-
-
-(defn get-private-key
-  [m]
-  (base64-decode (get-in m ["priv_key" "value"])))
-
-(defn seed-from-private-key
-  [pk]
-  (java.util.Arrays/copyOfRange pk 0 32))
-
-(defn read-private-key
-  [path]
-  (let [m (json/decode (slurp path))]
-    (get-private-key m)))
-
-
-
-(defn merge-genesis
-  [gens]
-  (let [res (first gens)
-        validators (distinct (mapcat (fn [m] (get m "validators")) gens))]
-    (assoc (first gens) "validators" validators)))
-
-(defn rewrite-genesis
-  ([cwd num-keypers num-initial-keypers]
-   (let [paths (mapv (fn [n]
-                       (-> cwd (fs/path (format "testchain-%d" n) "config" "genesis.json") str))
-                     (range num-keypers))
-         gens (mapv (fn [p] (-> p slurp json/decode)) (take num-initial-keypers paths))
-         genesis (merge-genesis gens)
-         genesis-str (json/encode genesis {:pretty true})]
-     (doseq [p paths]
-       (spit p genesis-str))))
-  ([{:keys [conf cwd] :as sys}]
-   (let [num-keypers (:num-keypers conf)
-         num-initial-keypers (:num-initial-keypers conf)]
-     (rewrite-genesis cwd num-keypers num-initial-keypers))))
-
-
-
-(defn set-seeds
-  "Set the ValidatorSeed value in the keyper's configs. They need to be written out with
-  build/sys-write-config-files afterwards."
-  [sys]
-  (let [keypers (:sys/keypers sys)
-        seeds (mapv (fn [n]
-                      (let [privkey (read-private-key
-                                     (sys-chain-config-path sys n "priv_validator_key.json"))
-                            seed (seed-from-private-key privkey)
-                            seed-str (.formatHex (java.util.HexFormat/of) seed)]
-                        seed-str))
-                    (range (count keypers)))
-        keypers (mapv (fn [k seed n]
-                        (-> k
-                            (assoc-in [:subcommand/toml-edits "ValidatorSeed"] seed)
-                            (assoc-in [:subcommand/toml-edits "ShuttermintURL"]
-                                      (format "http://localhost:%d" (+ 28000 n)))))
-                      keypers
-                      seeds
-                      (range (count keypers)))]
-    (assoc sys :sys/keypers keypers)))
-
-(defmethod runner/run :chain/run-chains
-  [sys m]
-  (let [num-chains (-> sys :conf :num-keypers)
-        sys (init-chains sys)
-        sys (set-seeds sys)]
-    (rewrite-genesis sys)
-    (build/sys-write-config-files sys)
-    (runner/dispatch sys
-                     (mapv (fn [n]
-                             {:run :process/run
-                              :process/wait false
-                              :process/id (keyword (str "chain-" n))
-                              :process/cmd ['rolling-shutter "chain" "--config"
-                                            (format "testchain-%d/config/config.toml" n)]})
-                           (range num-chains)))))
-
-(defmethod runner/run ::exit
-  [sys m]
-  (throw (ex-info "exit called" {})))
-
-(defmethod runner/run ::wait-forever
-  [sys m]
-  (info "waiting for one hour")
-  (Thread/sleep (* 3600 1000)))
 
 (defn test-change-keyper-set
   []
