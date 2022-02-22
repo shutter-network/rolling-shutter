@@ -50,12 +50,12 @@ func expectAttributes(ev abcitypes.Event, names ...string) error {
 	}
 
 	for i, n := range names {
-		if string(ev.Attributes[i].Key) != n {
+		if ev.Attributes[i].Key != n {
 			return errors.Errorf(
 				"bad attribute, parsing event %s: expected %s, got %s at position %d",
 				ev.Type,
 				n,
-				string(ev.Attributes[i].Key),
+				ev.Attributes[i].Key,
 				i,
 			)
 		}
