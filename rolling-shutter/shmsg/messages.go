@@ -1,6 +1,7 @@
 package shmsg
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,9 +20,14 @@ type P2PMessage interface {
 	ImplementsP2PMessage()
 	GetInstanceID() uint64
 	Topic() string
+	LogInfo() string
 }
 
 func (*DecryptionTrigger) ImplementsP2PMessage() {
+}
+
+func (trigger *DecryptionTrigger) LogInfo() string {
+	return fmt.Sprintf("DecryptionTrigger{epochid=%d}", trigger.EpochID)
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -31,6 +37,14 @@ func (*DecryptionTrigger) Topic() string {
 func (*DecryptionKeyShare) ImplementsP2PMessage() {
 }
 
+func (share *DecryptionKeyShare) LogInfo() string {
+	return fmt.Sprintf(
+		"DecryptionKeyShare{epochid=%d, keyperIndex=%d}",
+		share.EpochID,
+		share.KeyperIndex,
+	)
+}
+
 func (*DecryptionKeyShare) Topic() string {
 	return kprtopics.DecryptionKeyShare
 }
@@ -38,11 +52,23 @@ func (*DecryptionKeyShare) Topic() string {
 func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
+func (key *DecryptionKey) LogInfo() string {
+	return fmt.Sprintf("DecryptionKey{epochid=%d}", key.EpochID)
+}
+
 func (*DecryptionKey) Topic() string {
 	return dcrtopics.DecryptionKey
 }
 
 func (*CipherBatch) ImplementsP2PMessage() {
+}
+
+func (batch *CipherBatch) LogInfo() string {
+	return fmt.Sprintf(
+		"CipherBatch{epochid=%d, num tx=%d}",
+		batch.DecryptionTrigger.EpochID,
+		len(batch.Transactions),
+	)
 }
 
 func (*CipherBatch) Topic() string {
@@ -56,6 +82,13 @@ func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
 func (*DecryptionSignature) ImplementsP2PMessage() {
 }
 
+func (sig *DecryptionSignature) LogInfo() string {
+	return fmt.Sprintf(
+		"DecryptionSignature{epochid=%d}",
+		sig.EpochID,
+	)
+}
+
 func (*DecryptionSignature) Topic() string {
 	return dcrtopics.DecryptionSignature
 }
@@ -63,11 +96,25 @@ func (*DecryptionSignature) Topic() string {
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 }
 
+func (ads *AggregatedDecryptionSignature) LogInfo() string {
+	return fmt.Sprintf(
+		"AggregatedDecryptionSignature{epochid=%d}",
+		ads.EpochID,
+	)
+}
+
 func (*AggregatedDecryptionSignature) Topic() string {
 	return dcrtopics.AggregatedDecryptionSignature
 }
 
 func (*EonPublicKey) ImplementsP2PMessage() {
+}
+
+func (e *EonPublicKey) LogInfo() string {
+	return fmt.Sprintf(
+		"EonPublicKey{eon=%d}",
+		e.Eon,
+	)
 }
 
 func (*EonPublicKey) Topic() string {
