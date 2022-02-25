@@ -15,9 +15,15 @@ jobs:
       - checkout:
           path: ~/src
       - node/install-packages
+      - run:
+          name: "Compile contracts"
+          command: |
+            npx hardhat compile
       - persist_to_workspace:
           root: "~"
-          paths: src/contracts/node_modules
+          paths:
+            - "src/contracts/node_modules"
+            - ".cache/hardhat-nodejs"
 
   build-exe:
     executor: go
