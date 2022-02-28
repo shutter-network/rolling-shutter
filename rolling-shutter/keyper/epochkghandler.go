@@ -91,7 +91,7 @@ func (h *epochKGHandler) sendDecryptionKeyShare(ctx context.Context, epochID uin
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
-	log.Printf("sending decryption key share for epoch %d", epochID)
+	log.Printf("sending decryption key share for epoch %s", epochid.LogInfo(epochID))
 	return []shmsg.P2PMessage{
 		&shmsg.DecryptionKeyShare{
 			InstanceID:  h.config.InstanceID,
@@ -220,13 +220,13 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *decr
 		DecryptionKey: decryptionKeyEncoded,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to store decryption key for epoch %d in db", msg.epochID)
+		return nil, errors.Wrapf(err, "failed to store decryption key for epoch %s in db", epochid.LogInfo(msg.epochID))
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to insert decryption key for epoch %d, but it already exists", msg.epochID)
+		log.Printf("attempted to insert decryption key for epoch %s, but it already exists", epochid.LogInfo(msg.epochID))
 		return nil, nil
 	}
-	log.Printf("broadcasting decryption key for epoch %d", msg.epochID)
+	log.Printf("broadcasting decryption key for epoch %s", epochid.LogInfo(msg.epochID))
 	return []shmsg.P2PMessage{
 		&shmsg.DecryptionKey{
 			InstanceID: h.config.InstanceID,
@@ -245,10 +245,13 @@ func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *decryptio
 		DecryptionKey: encodedKey,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %d", msg.epochID)
+		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochid.LogInfo(msg.epochID))
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to insert decryption key for epoch %d, but it already exists", msg.epochID)
+		log.Printf(
+			"attempted to insert decryption key for epoch %s, but it already exists",
+			epochid.LogInfo(msg.epochID),
+		)
 	}
 	return nil, nil
 }

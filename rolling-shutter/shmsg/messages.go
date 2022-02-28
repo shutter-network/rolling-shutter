@@ -12,6 +12,7 @@ import (
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
 
 // P2PMessage can be send via the p2p protocol.
@@ -27,7 +28,7 @@ func (*DecryptionTrigger) ImplementsP2PMessage() {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	return fmt.Sprintf("DecryptionTrigger{epochid=%d}", trigger.EpochID)
+	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochid.LogInfo(trigger.EpochID))
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -39,8 +40,8 @@ func (*DecryptionKeyShare) ImplementsP2PMessage() {
 
 func (share *DecryptionKeyShare) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionKeyShare{epochid=%d, keyperIndex=%d}",
-		share.EpochID,
+		"DecryptionKeyShare{epochid=%s, keyperIndex=%d}",
+		epochid.LogInfo(share.EpochID),
 		share.KeyperIndex,
 	)
 }
@@ -53,7 +54,7 @@ func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%d}", key.EpochID)
+	return fmt.Sprintf("DecryptionKey{epochid=%s}", epochid.LogInfo(key.EpochID))
 }
 
 func (*DecryptionKey) Topic() string {
@@ -65,8 +66,8 @@ func (*CipherBatch) ImplementsP2PMessage() {
 
 func (batch *CipherBatch) LogInfo() string {
 	return fmt.Sprintf(
-		"CipherBatch{epochid=%d, num tx=%d}",
-		batch.DecryptionTrigger.EpochID,
+		"CipherBatch{epochid=%s, num tx=%d}",
+		epochid.LogInfo(batch.DecryptionTrigger.EpochID),
 		len(batch.Transactions),
 	)
 }
@@ -84,8 +85,8 @@ func (*DecryptionSignature) ImplementsP2PMessage() {
 
 func (sig *DecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionSignature{epochid=%d}",
-		sig.EpochID,
+		"DecryptionSignature{epochid=%s}",
+		epochid.LogInfo(sig.EpochID),
 	)
 }
 
@@ -98,8 +99,8 @@ func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 
 func (ads *AggregatedDecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
-		"AggregatedDecryptionSignature{epochid=%d}",
-		ads.EpochID,
+		"AggregatedDecryptionSignature{epochid=%s}",
+		epochid.LogInfo(ads.EpochID),
 	)
 }
 

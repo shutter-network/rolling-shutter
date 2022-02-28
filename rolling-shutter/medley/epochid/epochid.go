@@ -1,6 +1,7 @@
 package epochid
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -16,4 +17,8 @@ func SequenceNumber(epochID uint64) uint32 {
 
 func New(seq uint32, blk uint32) uint64 {
 	return uint64(blk)<<32 | uint64(seq)
+}
+
+func LogInfo(epochID uint64) string {
+	return fmt.Sprintf("(%d, block=%d, seq=%d)", epochID, BlockNumber(epochID), SequenceNumber(epochID))
 }
