@@ -151,7 +151,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 		return false
 	}
 	if err != nil {
-		log.Printf("error while getting collator from db for block nubmer: %d", blk)
+		log.Printf("error while getting collator from db for block number: %d", blk)
 		return false
 	}
 
