@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
@@ -50,6 +51,14 @@ func (*DecryptionKeyShare) Topic() string {
 	return kprtopics.DecryptionKeyShare
 }
 
+func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
+	epochSecretKeyShare := new(shcrypto.EpochSecretKeyShare)
+	if err := epochSecretKeyShare.Unmarshal(share.GetShare()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
+	}
+	return epochSecretKeyShare, nil
+}
+
 func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
@@ -59,6 +68,14 @@ func (key *DecryptionKey) LogInfo() string {
 
 func (*DecryptionKey) Topic() string {
 	return dcrtopics.DecryptionKey
+}
+
+func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
+	epochSecretKey := new(shcrypto.EpochSecretKey)
+	if err := epochSecretKey.Unmarshal(key.GetKey()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
+	}
+	return epochSecretKey, nil
 }
 
 func (*CipherBatch) ImplementsP2PMessage() {

@@ -402,11 +402,11 @@ func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error
 	}
 
 	switch typedMsg := unmarshalled.(type) {
-	case *decryptionTrigger:
+	case *shmsg.DecryptionTrigger:
 		msgsOut, err = handler.handleDecryptionTrigger(ctx, typedMsg)
-	case *decryptionKeyShare:
+	case *shmsg.DecryptionKeyShare:
 		msgsOut, err = handler.handleDecryptionKeyShare(ctx, typedMsg)
-	case *decryptionKey:
+	case *shmsg.DecryptionKey:
 		msgsOut, err = handler.handleDecryptionKey(ctx, typedMsg)
 	default:
 		log.Println("ignoring message received on topic", msg.Topic)
