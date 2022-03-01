@@ -101,7 +101,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	// send decryption key share when first trigger is received
-	trigger := &decryptionTrigger{
+	trigger := &shmsg.DecryptionTrigger{
 		EpochID:    epochID,
 		InstanceID: 0,
 	}
@@ -146,22 +146,22 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// threshold is two, so no outgoing message after first input
-	msgs, err := handler.handleDecryptionKeyShare(ctx, &decryptionKeyShare{
-		instanceID:  0,
-		epochID:     epochID,
-		keyperIndex: 0,
-		share:       tkg.EpochSecretKeyShare(epochID, 0),
+	msgs, err := handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
+		InstanceID:  0,
+		EpochID:     epochID,
+		KeyperIndex: 0,
+		Share:       tkg.EpochSecretKeyShare(epochID, 0).Marshal(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 
 	// second message pushes us over the threshold (note that we didn't send a trigger, so the
 	// share of the handler itself doesn't count)
-	msgs, err = handler.handleDecryptionKeyShare(ctx, &decryptionKeyShare{
-		instanceID:  0,
-		epochID:     epochID,
-		keyperIndex: 2,
-		share:       tkg.EpochSecretKeyShare(epochID, 2),
+	msgs, err = handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
+		InstanceID:  0,
+		EpochID:     epochID,
+		KeyperIndex: 2,
+		Share:       tkg.EpochSecretKeyShare(epochID, 2).Marshal(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 1)
@@ -192,10 +192,10 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// send a decryption key and check that it gets inserted
-	msgs, err := handler.handleDecryptionKey(ctx, &decryptionKey{
-		instanceID: 0,
-		epochID:    epochID,
-		key:        tkg.EpochSecretKey(epochID),
+	msgs, err := handler.handleDecryptionKey(ctx, &shmsg.DecryptionKey{
+		InstanceID: 0,
+		EpochID:    epochID,
+		Key:        tkg.EpochSecretKey(epochID).Marshal(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
