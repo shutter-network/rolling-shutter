@@ -8,24 +8,50 @@ const { ethers } = require("hardhat");
 
 async function configure_keypers(keyperAddrs) {
   const keypers = await ethers.getContract("Keypers");
+  const lastSetIndex = (await keypers.count()) - 1;
+  let configSetIndex;
 
-  const index = await keypers.count();
-  await keypers.add(keyperAddrs);
-  await keypers.append();
+  let keyperSetAdded = true;
+  if (
+    (await keypers.countNth(lastSetIndex)).toNumber() !== keyperAddrs.length
+  ) {
+    keyperSetAdded = false;
+  } else {
+    for (const i of Array(keyperAddrs.length).keys()) {
+      if ((await keypers.at(lastSetIndex, i)) !== keyperAddrs[i]) {
+        keyperSetAdded = false;
+        break;
+      }
+    }
+  }
+  if (keyperSetAdded) {
+    console.log("Keyper set already added");
+    configSetIndex = lastSetIndex;
+  } else {
+    await keypers.add(keyperAddrs);
+    await keypers.append();
+    configSetIndex = lastSetIndex + 1;
+  }
 
   const cfg = await ethers.getContract("KeyperConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
   const activationBlockNumber = currentBlock + 10;
 
+  const activeConfig = await cfg.getActiveConfig(activationBlockNumber);
+  if (activeConfig[1].toNumber() === configSetIndex) {
+    console.log("Keyper config already added");
+    return;
+  }
+
   await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
-    setIndex: index,
+    setIndex: configSetIndex,
     threshold: Math.ceil((keyperAddrs.length / 3) * 2),
   });
   console.log(
     "configure keypers: activationBlockNumber %s, setIndex: %d, keypers: %s",
     activationBlockNumber,
-    index,
+    configSetIndex,
     keyperAddrs
   );
 }
