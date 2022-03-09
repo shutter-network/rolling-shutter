@@ -44,7 +44,6 @@ require (
 	github.com/petermattis/goid v0.0.0-20220111183729-e033e1e0bdb5 // indirect
 	github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
@@ -56,7 +55,7 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20211109104530-b0e0482ba91d // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/tendermint/go-amino v0.16.0
-	github.com/tendermint/tendermint v0.35.1
+	github.com/tendermint/tendermint v0.35.2
 	github.com/tendermint/tm-db v0.6.7 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
