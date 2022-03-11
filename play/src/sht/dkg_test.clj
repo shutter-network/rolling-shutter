@@ -18,6 +18,11 @@
 
 (defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
 
+(defn decode-epochid
+  [^bytes epochid]
+  {:epochid/block (.getInt (java.nio.ByteBuffer/wrap (java.util.Arrays/copyOfRange epochid 0 4)))
+   :epochid/seq  (.getInt (java.nio.ByteBuffer/wrap (java.util.Arrays/copyOfRange epochid 4 8)))})
+
 (defn- check-query
   [description sys opts query ok-rows?]
   (let [keyper-num (or (:keyper-num opts) (:keyper/num opts))
