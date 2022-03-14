@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/tendermint/tendermint/rpc/client"
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
@@ -158,7 +159,7 @@ func (kpr *keyper) setupRouter() *chi.Mux {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(apiJSON)
 	})
-
+	router.Mount("/metrics", promhttp.Handler())
 	/*
 	   The following enables the swagger ui. Run the following to use it:
 

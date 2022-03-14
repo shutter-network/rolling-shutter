@@ -44,7 +44,7 @@ require (
 	github.com/petermattis/goid v0.0.0-20220111183729-e033e1e0bdb5 // indirect
 	github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.1 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
