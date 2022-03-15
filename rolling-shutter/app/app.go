@@ -720,7 +720,7 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 				}.MakeABCIEvent())
 			}
 		}
-		if config.Started && !config.ValidatorsUpdated && app.countCheckedInKeypers(config.Keypers) >= config.Threshold {
+		if config.Started && !config.ValidatorsUpdated && app.countCheckedInKeypers(config.Keypers) >= numRequiredTransitionValidators(config) {
 			config.ValidatorsUpdated = true
 		}
 	}
@@ -742,6 +742,24 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 		ValidatorUpdates: validatorUpdates,
 		Events:           events,
 	}
+}
+
+// numRequiredTransitionValidators returns the number of validators required to be online before
+// transitioning to a new config. This number is either the threshold value in the config or 2/3
+// of the validator set, whatever is greater. This makes sure that both the security assumption
+// defined by the threshold is met and that the chain is able to make progress.
+func numRequiredTransitionValidators(config *BatchConfig) uint64 {
+	n := len(config.Keypers)
+	if n == 0 {
+		// this case doesn't make much sense, but the normal path would return 1 which makes even
+		// less sense
+		return 0
+	}
+	defenders := uint64(n - (n+2)/3 + 1)
+	if config.Threshold >= defenders {
+		return config.Threshold
+	}
+	return defenders
 }
 
 // persistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and
