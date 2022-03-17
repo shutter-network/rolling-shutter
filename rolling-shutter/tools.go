@@ -9,6 +9,7 @@ package tools
 import (
 	_ "github.com/deepmap/oapi-codegen/cmd/oapi-codegen"
 	_ "github.com/ethereum/go-ethereum/cmd/abigen"
+	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "github.com/kyleconroy/sqlc/cmd/sqlc"
 	_ "golang.org/x/tools/cmd/stringer"
 	_ "google.golang.org/protobuf/cmd/protoc-gen-go"

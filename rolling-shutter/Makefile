@@ -53,7 +53,7 @@ install-oapi-codegen:
 	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen
 
 install-golangci-lint:
-	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint
 
 install-cobra:
 	${GO} install github.com/spf13/cobra/cobra@latest
