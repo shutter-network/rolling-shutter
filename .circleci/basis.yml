@@ -6,7 +6,7 @@ commands:
       - run:
           name: Install go
           command: |
-            curl -sSL "https://go.dev/dl/go1.18rc1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+            curl -sSL "https://go.dev/dl/go1.18.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
 
@@ -50,13 +50,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.17.5@sha256:03bc021893b54e1f7c981dc3a391df868a01e24899044d382f068d2014b80348
+      - image: cimg/go:1.18@sha256:05b92e78b7bd5e2fc5f34e54f44d38a8b6d406bdf9107be940d06a70fe9f0cb5
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.17.5@sha256:03bc021893b54e1f7c981dc3a391df868a01e24899044d382f068d2014b80348
+      - image: cimg/go:1.18@sha256:05b92e78b7bd5e2fc5f34e54f44d38a8b6d406bdf9107be940d06a70fe9f0cb5
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -66,12 +66,6 @@ executors:
           POSTGRES_USER: pguser
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
-  go116:
-    docker:
-      - image: cimg/go:1.16.12@sha256:810440a9128875dcf397e7c23e487977159d9e6d98b58b24183dffabdee30ee6
-        environment:
-          GO111MODULE: "on"
-          PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
   pre-commit:
