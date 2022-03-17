@@ -12,7 +12,8 @@ const (
 )
 
 // Retry calls the given function multiple times until it doesn't return an error.
-func Retry(ctx context.Context, f func() (interface{}, error)) (interface{}, error) {
+func Retry[T any](ctx context.Context, f func() (T, error)) (T, error) {
+	var null T
 	res, err := f()
 	if err == nil {
 		return res, nil
@@ -22,7 +23,7 @@ func Retry(ctx context.Context, f func() (interface{}, error)) (interface{}, err
 	for i := 0; i < numRetries-1; i++ {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return null, ctx.Err()
 		case <-time.After(retryInterval):
 		}
 		res, err = f()

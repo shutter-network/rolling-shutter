@@ -137,13 +137,12 @@ func (s *EventSyncer) Run(ctx context.Context) error {
 func (s *EventSyncer) sync(ctx context.Context) error {
 	fromBlock := s.FromBlock
 	for {
-		currentBlockUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		currentBlock, err := medley.Retry(ctx, func() (uint64, error) {
 			return s.Client.BlockNumber(ctx)
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to query current block number")
 		}
-		currentBlock := currentBlockUntyped.(uint64)
 
 		toBlock := fromBlock + pageSizeBlocks - 1
 		var maxToBlock uint64
@@ -231,13 +230,12 @@ func (s *EventSyncer) syncSingleInRange(ctx context.Context, event *EventType, f
 		Topics:    [][]common.Hash{{topic}},
 	}
 
-	logsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+	logs, err := medley.Retry(ctx, func() ([]types.Log, error) {
 		return s.Client.FilterLogs(ctx, query)
 	})
 	if err != nil {
 		return nil, errors.New("failed to filter event logs")
 	}
-	logs := logsUntyped.([]types.Log)
 
 	items := []logChannelItem{}
 	for i := range logs {

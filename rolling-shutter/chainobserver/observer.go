@@ -31,13 +31,12 @@ func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) (
 		BlockNumber: nil,
 		Context:     ctx,
 	}
-	addrsUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+	addrs, err := medley.Retry(ctx, func() ([]common.Address, error) {
 		return addrsSeq.GetAddrs(callOpts, n)
 	})
 	if err != nil {
 		return []common.Address{}, errors.Wrapf(err, "failed to query decryptor addrs set from contract")
 	}
-	addrs := addrsUntyped.([]common.Address)
 	return addrs, nil
 }
 

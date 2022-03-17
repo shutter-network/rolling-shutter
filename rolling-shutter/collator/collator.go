@@ -98,13 +98,12 @@ func Run(ctx context.Context, config Config) error {
 func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
-		blkUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+		blk, err := medley.Retry(ctx, func() (uint64, error) {
 			return contracts.Client.BlockNumber(ctx)
 		})
 		if err != nil {
 			return err
 		}
-		blk := blkUntyped.(uint64)
 		if blk > math.MaxUint32 {
 			return errors.Errorf("block number too big: %d", blk)
 		}
@@ -205,13 +204,12 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
-	blockNumberUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
+	blockNumber, err := medley.Retry(ctx, func() (uint64, error) {
 		return c.contracts.Client.BlockNumber(ctx)
 	})
 	if err != nil {
 		return err
 	}
-	blockNumber := blockNumberUntyped.(uint64)
 	if blockNumber > math.MaxUint32 {
 		return errors.Errorf("block number too big: %d", blockNumber)
 	}
