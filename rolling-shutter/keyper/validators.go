@@ -2,39 +2,81 @@ package keyper
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"log"
+	"reflect"
+	"strings"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
+
+func makeValidator[M shmsg.P2PMessage](registry map[string]pubsub.Validator, valFunc func(context.Context, M) bool) {
+	var messProto M
+	topic := messProto.Topic()
+
+	_, exists := registry[topic]
+	if exists {
+		// This is likely not intended and happens when different messages return the same P2PMessage.Topic().
+		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
+
+		// Instead of silently overwriting the old validator, rather panic.
+		// TODO maybe allow for chaining of successively registered validator functions per topic
+		panic(fmt.Sprintf("Can't register more than one validator per topic (topic: '%s', message-type: '%s')", topic, reflect.TypeOf(messProto)))
+	}
+
+	registry[topic] = func(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
+		var (
+			key M
+			ok  bool
+		)
+
+		message := p2p.Message{
+			Topic:    *libp2pMessage.Topic,
+			Message:  libp2pMessage.Data,
+			SenderID: libp2pMessage.GetFrom().Pretty(),
+		}
+		if strings.Compare(message.Topic, topic) != 0 {
+			// This should not happen, if so then we registered the validator function on the wrong topic
+			log.Printf("topic mismatch (message-topic: '%s', validator-topic: '%s')", message.Topic, topic)
+			return false
+		}
+		unmshl, err := message.Unmarshal()
+		if err != nil {
+			log.Printf("error while unmarshalling Message in validator (topic: '%s', error: '%s')", topic, err.Error())
+			return false
+		}
+
+		key, ok = unmshl.(M)
+		if !ok {
+			// Either this is a programming error or someone sent the wrong message for that topic.
+			log.Printf("type assertion failed while unmarshaling message (topic: '%s'). Received message of type '%s'. Is this a valid message with incorrect type for that topic?", topic, reflect.TypeOf(unmshl))
+			return false
+		}
+
+		return valFunc(ctx, key)
+	}
+}
 
 func (kpr *keyper) makeMessagesValidators() map[string]pubsub.Validator {
 	validators := make(map[string]pubsub.Validator)
-	validators[kprtopics.DecryptionKey] = kpr.validateDecryptionKey
-	validators[kprtopics.DecryptionKeyShare] = kpr.validateDecryptionKeyShare
-	validators[kprtopics.EonPublicKey] = kpr.validateEonPublicKey
-	validators[kprtopics.DecryptionTrigger] = kpr.validateDecryptionTrigger
+
+	makeValidator(validators, kpr.validateDecryptionKey)
+	makeValidator(validators, kpr.validateDecryptionKeyShare)
+	makeValidator(validators, kpr.validateEonPublicKey)
+	makeValidator(validators, kpr.validateDecryptionTrigger)
 
 	return validators
 }
 
-func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
-	p2pMessage := new(p2p.Message)
-	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-		return false
-	}
-	key, err := unmarshalDecryptionKey(p2pMessage)
-	if err != nil {
-		return false
-	}
+func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) bool {
 	if key.GetInstanceID() != kpr.config.InstanceID {
 		return false
 	}
@@ -69,15 +111,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pM
 	return ok
 }
 
-func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
-	p2pMessage := new(p2p.Message)
-	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-		return false
-	}
-	keyShare, err := unmarshalDecryptionKeyShare(p2pMessage)
-	if err != nil {
-		return false
-	}
+func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shmsg.DecryptionKeyShare) bool {
 	if keyShare.GetInstanceID() != kpr.config.InstanceID {
 		return false
 	}
@@ -110,27 +144,11 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, li
 	)
 }
 
-func (kpr *keyper) validateEonPublicKey(_ context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
-	p2pMessage := new(p2p.Message)
-	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-		return false
-	}
-	msg, err := p2pMessage.Unmarshal()
-	if err != nil {
-		return false
-	}
-	return msg.GetInstanceID() == kpr.config.InstanceID
+func (kpr *keyper) validateEonPublicKey(_ context.Context, key *shmsg.EonPublicKey) bool {
+	return key.GetInstanceID() == kpr.config.InstanceID
 }
 
-func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
-	p2pMessage := new(p2p.Message)
-	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
-		return false
-	}
-	trigger, err := unmarshalDecryptionTrigger(p2pMessage)
-	if err != nil {
-		return false
-	}
+func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) bool {
 	if trigger.GetInstanceID() != kpr.config.InstanceID {
 		return false
 	}
