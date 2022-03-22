@@ -60,6 +60,7 @@ asdf plugin add golangci-lint
 asdf plugin add nodejs
 asdf plugin add protoc
 asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git
+asdf plugin add solidity
 ```
 
 Finally, install the tools by running the following inside the rolling shutter

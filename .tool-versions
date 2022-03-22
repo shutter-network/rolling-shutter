@@ -6,5 +6,6 @@ golangci-lint 1.44.2
 java adoptopenjdk-17.0.2+8
 nodejs 16.14.0
 protoc 3.19.4
+postgres 14.2
 solidity 0.8.9
 sqlc 1.12.0
