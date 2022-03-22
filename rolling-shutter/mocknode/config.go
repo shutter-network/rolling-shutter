@@ -28,7 +28,6 @@ type Config struct {
 
 	DecryptorPublicKeys []*shbls.PublicKey // public keys of decryptors in order of their index
 	EonKeySeed          int64              // a seed value used to generate the eon key
-
 }
 
 var configTemplate = `# Shutter mock node config
