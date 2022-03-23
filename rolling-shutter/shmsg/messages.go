@@ -20,7 +20,7 @@ import (
 )
 
 // All messages to be used in the P2P Gossip have to be included in this slice,
-// otherwise they won't be known to the marshalling layer
+// otherwise they won't be known to the marshaling layer.
 var messageTypes = []P2PMessage{
 	// Keyper messages
 	new(DecryptionKey),

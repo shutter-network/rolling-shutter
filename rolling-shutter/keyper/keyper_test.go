@@ -119,7 +119,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		topic := tc.msg.Topic()
 		validator, ok := validators[topic]
 		if !ok {
-			t.Fatalf("No validator found for topic <%s>, maybe Keyper.makeMessagesValidators() does not register the corresponding Message validator?", topic)
+			t.Fatalf("No validator found for topic <%s>, maybe Keyper.makeMessagesValidators() "+
+				"does not register the corresponding Message validator?",
+				topic)
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			pubsubMessage, err := makePubSubMessage(tc.msg, topic)
@@ -229,7 +231,9 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 			topic := msg.Topic()
 			validator, ok := validators[topic]
 			if !ok {
-				t.Fatalf("No validator found for topic <%s>, maybe Keeper.makeMessagesValidators() does not register the corresponding Message validator?", topic)
+				t.Fatalf("No validator found for topic <%s>, maybe Keeper.makeMessagesValidators() "+
+					"does not register the corresponding Message validator?",
+					topic)
 			}
 			pubsubMsg, err := makePubSubMessage(msg, topic)
 			if err != nil {

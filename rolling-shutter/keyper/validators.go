@@ -28,7 +28,7 @@ func makeValidator[M shmsg.P2PMessage](registry map[string]pubsub.Validator, val
 		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
 
 		// Instead of silently overwriting the old validator, rather panic.
-		// TODO maybe allow for chaining of successively registered validator functions per topic
+		// (If feature needed, allow for chaining of successively registered validator functions per topic)
 		panic(fmt.Sprintf("Can't register more than one validator per topic (topic: '%s', message-type: '%s')", topic, reflect.TypeOf(messProto)))
 	}
 
@@ -57,7 +57,9 @@ func makeValidator[M shmsg.P2PMessage](registry map[string]pubsub.Validator, val
 		key, ok = unmshl.(M)
 		if !ok {
 			// Either this is a programming error or someone sent the wrong message for that topic.
-			log.Printf("type assertion failed while unmarshaling message (topic: '%s'). Received message of type '%s'. Is this a valid message with incorrect type for that topic?", topic, reflect.TypeOf(unmshl))
+			log.Printf("type assertion failed while unmarshaling message (topic: '%s'). "+
+				"Received message of type '%s'. Is this a valid message with incorrect type for that topic?",
+				topic, reflect.TypeOf(unmshl))
 			return false
 		}
 

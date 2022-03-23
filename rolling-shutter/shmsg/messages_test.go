@@ -18,6 +18,8 @@ import (
 )
 
 func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
+	t.Helper()
+
 	var (
 		err        error
 		ok         bool
@@ -35,18 +37,6 @@ func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
 	newMessage, ok = unmshl.(M)
 	assert.Assert(t, ok)
 	return newMessage
-}
-
-func assertEqualField(t *testing.T, a, b P2PMessage, field string) {
-	get := func(x P2PMessage) interface{} {
-		r := reflect.ValueOf(x)
-		f := reflect.Indirect(r).FieldByName(field)
-		if (reflect.Value{}) == f {
-			t.Errorf("Field '%s' does not exist on struct of type %s", field, reflect.TypeOf(x))
-		}
-		return f.Interface()
-	}
-	assert.Equal(t, get(a), get(b))
 }
 
 type testConfig struct {
