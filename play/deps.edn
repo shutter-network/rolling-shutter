@@ -1,6 +1,6 @@
 {:paths ["src"]
  :resource-paths []
- :deps {org.clojure/clojure {:mvn/version "1.11.0-rc1"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.0"}
         ;; force newer version of encore and pretty in order to avoid warnings being printed with
         ;; clojure 1.11
         com.taoensso/encore {:mvn/version "3.21.0"}
@@ -9,11 +9,11 @@
         cheshire/cheshire {:mvn/version "5.10.2"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.2.772"}
         org.postgresql/postgresql {:mvn/version "42.3.3"}
-        com.taoensso/timbre {:mvn/version "5.1.2"}
+        com.taoensso/timbre {:mvn/version "5.2.1"}
         toml/toml {:mvn/version "0.1.3"}
         mvxcvi/puget {:mvn/version "1.3.2"}
-        babashka/fs {:mvn/version "0.1.2"}
-        babashka/process {:mvn/version "0.1.0"}}
+        babashka/fs {:mvn/version "0.1.4"}
+        babashka/process {:mvn/version "0.1.1"}}
 
 
  :aliases {;; (deprecated) Run tests with clojure -X:run-tests
@@ -21,7 +21,7 @@
            ;; Run with clojure -M:test
            :test {:main-opts ["-m" "sht.core"]}
            ;; Build uberjar with clojure -T:build
-           :build {:deps {io.github.clojure/tools.build {:git/tag "v0.7.7" :git/sha "1474ad6"}}
+           :build {:deps {io.github.clojure/tools.build {:git/tag "v0.8.1" :git/sha "7d40500"}}
                    :ns-default build
                    :exec-fn uber}
            :dev {:extra-paths ["dev"]}}}
