@@ -245,18 +245,9 @@ func makePubSubMessage(message shmsg.P2PMessage, topic string) (*pubsub.Message,
 		return nil, err
 	}
 
-	b, err := json.Marshal(&p2p.Message{
-		Topic:    topic,
-		Message:  messageBytes,
-		SenderID: "",
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	pubsubMessage := pubsub.Message{
 		Message: &pb.Message{
-			Data:  b,
+			Data:  messageBytes,
 			Topic: &topic,
 		},
 		ReceivedFrom:  "",

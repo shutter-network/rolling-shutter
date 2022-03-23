@@ -392,7 +392,7 @@ func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error
 	var msgsOut []shmsg.P2PMessage
 	var err error
 
-	unmarshalled, err := unmarshalP2PMessage(msg)
+	unmarshalled, err := msg.Unmarshal()
 	if err != nil {
 		return err
 	}

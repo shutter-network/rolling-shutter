@@ -3,18 +3,59 @@ package shmsg
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
+
+// All messages to be used in the P2P Gossip have to be included in this slice,
+// otherwise they won't be known to the marshalling layer
+var messageTypes = []P2PMessage{
+	// Keyper messages
+	new(DecryptionKey),
+	new(DecryptionTrigger),
+	new(DecryptionKeyShare),
+	new(EonPublicKey),
+
+	// Decryptor messages
+	new(CipherBatch),
+	new(AggregatedDecryptionSignature),
+	new(DecryptionSignature),
+}
+
+var topicToProtoName = make(map[string]protoreflect.FullName)
+
+func init() {
+	for _, mess := range messageTypes {
+		registerP2PMessage(mess)
+	}
+}
+
+// Instead of using an envelope for the unmarshalling,
+// we simply map one protobuf message type 1 to 1 to a Gossip topic.
+func registerP2PMessage(mess P2PMessage) {
+	messageTypeName := mess.ProtoReflect().Type().Descriptor().FullName()
+	topic := mess.Topic()
+
+	if val, exists := topicToProtoName[topic]; exists == true {
+		if val != messageTypeName {
+			err := errors.Errorf("Topic '%s' already has message type <%s> registered. Registering %s failed", topic, val, messageTypeName)
+			panic(err)
+		}
+	}
+	topicToProtoName[topic] = messageTypeName
+}
 
 // P2PMessage can be send via the p2p protocol.
 type P2PMessage interface {
@@ -23,6 +64,42 @@ type P2PMessage interface {
 	GetInstanceID() uint64
 	Topic() string
 	LogInfo() string
+	Validate() error
+}
+
+func NewP2PMessageFromTopic(topic string) (P2PMessage, error) {
+	name, ok := topicToProtoName[topic]
+	if !ok {
+		return nil, errors.Errorf("No message type found for topic <%s>", topic)
+	}
+	t, err := protoregistry.GlobalTypes.FindMessageByName(name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error while retrieving message type for topic <%s>", topic)
+	}
+	protomess, ok := t.New().Interface().(P2PMessage)
+	if !ok {
+		return nil, errors.Errorf("Error while instantiating message type for topic <%s>", topic)
+	}
+	return protomess, nil
+}
+
+func Unmarshal(topic string, data []byte) (P2PMessage, error) {
+	var err error
+
+	unmshl, err := NewP2PMessageFromTopic(topic)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to retrieve deserialisation type")
+	}
+
+	if err = proto.Unmarshal(data, unmshl); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal protobuf <%s>", reflect.TypeOf(unmshl).String()))
+	}
+
+	err = unmshl.Validate()
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()))
+	}
+	return unmshl, nil
 }
 
 func (*DecryptionTrigger) ImplementsP2PMessage() {
@@ -34,6 +111,10 @@ func (trigger *DecryptionTrigger) LogInfo() string {
 
 func (*DecryptionTrigger) Topic() string {
 	return kprtopics.DecryptionTrigger
+}
+
+func (*DecryptionTrigger) Validate() error {
+	return nil
 }
 
 func (*DecryptionKeyShare) ImplementsP2PMessage() {
@@ -59,6 +140,11 @@ func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecret
 	return epochSecretKeyShare, nil
 }
 
+func (share *DecryptionKeyShare) Validate() error {
+	_, err := share.GetEpochSecretKeyShare()
+	return err
+}
+
 func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
@@ -67,7 +153,7 @@ func (key *DecryptionKey) LogInfo() string {
 }
 
 func (*DecryptionKey) Topic() string {
-	return dcrtopics.DecryptionKey
+	return kprtopics.DecryptionKey
 }
 
 func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
@@ -76,6 +162,11 @@ func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) 
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
 	}
 	return epochSecretKey, nil
+}
+
+func (key *DecryptionKey) Validate() error {
+	_, err := key.GetEpochSecretKey()
+	return err
 }
 
 func (*CipherBatch) ImplementsP2PMessage() {
@@ -97,6 +188,10 @@ func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
 	return cipherBatch.DecryptionTrigger.GetInstanceID()
 }
 
+func (*CipherBatch) Validate() error {
+	return nil
+}
+
 func (*DecryptionSignature) ImplementsP2PMessage() {
 }
 
@@ -109,6 +204,10 @@ func (sig *DecryptionSignature) LogInfo() string {
 
 func (*DecryptionSignature) Topic() string {
 	return dcrtopics.DecryptionSignature
+}
+
+func (*DecryptionSignature) Validate() error {
+	return nil
 }
 
 func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
@@ -125,6 +224,10 @@ func (*AggregatedDecryptionSignature) Topic() string {
 	return dcrtopics.AggregatedDecryptionSignature
 }
 
+func (*AggregatedDecryptionSignature) Validate() error {
+	return nil
+}
+
 func (*EonPublicKey) ImplementsP2PMessage() {
 }
 
@@ -137,6 +240,10 @@ func (e *EonPublicKey) LogInfo() string {
 
 func (*EonPublicKey) Topic() string {
 	return kprtopics.EonPublicKey
+}
+
+func (*EonPublicKey) Validate() error {
+	return nil
 }
 
 // NewBatchConfig creates a new BatchConfig message.
