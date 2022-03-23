@@ -10,7 +10,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-// Message envelopes the serialized protobuf bytes with additonal topic and sender info
+// Message envelopes the serialized protobuf bytes with additional topic and sender info.
 type Message struct {
 	Topic    string
 	Message  []byte
