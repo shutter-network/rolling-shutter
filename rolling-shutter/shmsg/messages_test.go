@@ -1,15 +1,69 @@
 package shmsg
 
 import (
+	"bytes"
 	"crypto/rand"
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
+	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/medley/testkeygen"
 )
+
+func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
+	var (
+		err        error
+		ok         bool
+		msgBytes   []byte
+		newMessage M
+		unmshl     any
+	)
+	const sender = "foo/sender"
+
+	msgBytes, err = proto.Marshal(message)
+	assert.NilError(t, err)
+
+	unmshl, err = Unmarshal(message.Topic(), msgBytes)
+	assert.NilError(t, err)
+	newMessage, ok = unmshl.(M)
+	assert.Assert(t, ok)
+	return newMessage
+}
+
+func assertEqualField(t *testing.T, a, b P2PMessage, field string) {
+	get := func(x P2PMessage) interface{} {
+		r := reflect.ValueOf(x)
+		f := reflect.Indirect(r).FieldByName(field)
+		if (reflect.Value{}) == f {
+			t.Errorf("Field '%s' does not exist on struct of type %s", field, reflect.TypeOf(x))
+		}
+		return f.Interface()
+	}
+	assert.Equal(t, get(a), get(b))
+}
+
+type testConfig struct {
+	epochID    uint64
+	instanceID uint64
+	tkg        *testkeygen.TestKeyGenerator
+}
+
+func defaultTestConfig(t *testing.T) testConfig {
+	t.Helper()
+
+	return testConfig{
+		epochID:    epochid.New(2, 0),
+		instanceID: uint64(42),
+		tkg:        testkeygen.NewTestKeyGenerator(t, 1, 1),
+	}
+}
 
 func TestNewPolyCommitmentMsg(t *testing.T) {
 	eon := uint64(10)
@@ -41,4 +95,86 @@ func TestNewPolyEvalMsg(t *testing.T) {
 
 	assert.Equal(t, eon, msg.Eon)
 	assert.DeepEqual(t, receiver.Bytes(), msg.Receivers[0])
+}
+
+func TestNewP2PMessageFromTopic(t *testing.T) {
+	for _, mess := range messageTypes {
+		newInstance, err := NewP2PMessageFromTopic(mess.Topic())
+		assert.NilError(t, err)
+		assert.Equal(t, reflect.TypeOf(newInstance), reflect.TypeOf(mess))
+	}
+	newInstance, err := NewP2PMessageFromTopic("notopicknown")
+	assert.ErrorContains(t, err, "No message type found")
+	assert.Assert(t, newInstance == nil)
+}
+
+func TestDecryptionKey(t *testing.T) {
+	cfg := defaultTestConfig(t)
+	validSecretKey := cfg.tkg.EpochSecretKey(cfg.epochID).Marshal()
+
+	orig := &DecryptionKey{
+		EpochID:    cfg.epochID,
+		InstanceID: cfg.instanceID,
+		Key:        validSecretKey,
+	}
+	m := marshalUnmarshalMessage(t, orig)
+	assert.Equal(t, orig.EpochID, m.EpochID)
+	assert.Equal(t, orig.InstanceID, m.InstanceID)
+	assert.Assert(t, bytes.Compare(orig.Key, m.Key) == 0)
+}
+
+func TestDecryptionTrigger(t *testing.T) {
+	cfg := defaultTestConfig(t)
+	txs := [][]byte{
+		[]byte("tx1"),
+		[]byte("tx2"),
+		[]byte("tx3"),
+	}
+
+	privKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+
+	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, txs, privKey)
+	assert.NilError(t, err)
+	m := marshalUnmarshalMessage(t, orig)
+
+	assert.Equal(t, orig.EpochID, m.EpochID)
+	assert.Equal(t, orig.InstanceID, m.InstanceID)
+	assert.Assert(t, bytes.Compare(orig.TransactionsHash, m.TransactionsHash) == 0)
+	assert.Assert(t, bytes.Compare(orig.Signature, m.Signature) == 0)
+}
+
+func TestDecryptionKeyShare(t *testing.T) {
+	cfg := defaultTestConfig(t)
+	keyperIndex := uint64(0)
+	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.epochID, keyperIndex).Marshal()
+
+	orig := &DecryptionKeyShare{
+		EpochID:     cfg.epochID,
+		InstanceID:  cfg.instanceID,
+		Share:       keyshare,
+		KeyperIndex: keyperIndex,
+	}
+	m := marshalUnmarshalMessage(t, orig)
+
+	assert.Equal(t, orig.EpochID, m.EpochID)
+	assert.Equal(t, orig.InstanceID, m.InstanceID)
+	assert.Equal(t, orig.KeyperIndex, m.KeyperIndex)
+	assert.Assert(t, bytes.Compare(orig.Share, m.Share) == 0)
+}
+
+func TestEonPublicKey(t *testing.T) {
+	cfg := defaultTestConfig(t)
+	eonPublicKey := cfg.tkg.EonPublicKey(cfg.epochID).Marshal()
+
+	orig := &EonPublicKey{
+		PublicKey:  eonPublicKey,
+		Eon:        uint64(1),
+		InstanceID: cfg.instanceID,
+	}
+	m := marshalUnmarshalMessage(t, orig)
+
+	assert.Equal(t, orig.InstanceID, m.InstanceID)
+	assert.Equal(t, orig.Eon, m.Eon)
+	assert.Assert(t, bytes.Compare(orig.PublicKey, m.PublicKey) == 0)
 }

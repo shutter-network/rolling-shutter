@@ -115,7 +115,7 @@ func (kpr *keyper) validateEonPublicKey(_ context.Context, _ peer.ID, libp2pMess
 	if err := json.Unmarshal(libp2pMessage.Data, p2pMessage); err != nil {
 		return false
 	}
-	msg, err := unmarshalP2PMessage(p2pMessage)
+	msg, err := p2pMessage.Unmarshal()
 	if err != nil {
 		return false
 	}

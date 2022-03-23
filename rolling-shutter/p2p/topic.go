@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -34,26 +33,10 @@ type gossipRoom struct {
 	self         peer.ID
 }
 
-// Message gets converted to/from JSON and sent in the body of pubsub messages.
-type Message struct {
-	Topic    string
-	Message  []byte
-	SenderID string
-}
-
 // Publish sends a message to the pubsub topic.
 func (room *gossipRoom) Publish(ctx context.Context, message []byte) error {
-	m := Message{
-		Topic:    room.topicName,
-		Message:  message,
-		SenderID: room.self.Pretty(),
-	}
-	msgBytes, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
 	p2pMessagesPublished.With(prometheus.Labels{"room": room.topicName}).Inc()
-	return room.topic.Publish(ctx, msgBytes)
+	return room.topic.Publish(ctx, message)
 }
 
 func (room *gossipRoom) ListPeers() []peer.ID {
@@ -72,11 +55,7 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *Message) er
 		if msg.ReceivedFrom == room.self {
 			continue
 		}
-		m := new(Message)
-		err = json.Unmarshal(msg.Data, m)
-		if err != nil {
-			continue
-		}
+		m := &Message{Topic: room.topicName, Message: msg.Data, SenderID: msg.GetFrom().Pretty()}
 		counter.Inc()
 		// send valid messages onto the Messages channel
 		select {
