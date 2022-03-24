@@ -22,7 +22,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [5]string{
+var gossipTopicNames = []string{
 	kprtopics.DecryptionTrigger,
 	kprtopics.EonPublicKey,
 	kprtopics.DecryptionKey,
@@ -82,7 +82,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
+		return m.p2p.Run(errctx, gossipTopicNames, make(map[string]pubsub.Validator))
 	})
 	g.Go(func() error {
 		return m.listen(errctx)
