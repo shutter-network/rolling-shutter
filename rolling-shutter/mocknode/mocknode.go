@@ -109,7 +109,10 @@ func (m *MockNode) logStartupInfo() error {
 func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
-		case msg := <-m.p2p.GossipMessages:
+		case msg, ok := <-m.p2p.GossipMessages:
+			if !ok {
+				return nil
+			}
 			m.handleMessage(msg)
 		case <-ctx.Done():
 			return ctx.Err()

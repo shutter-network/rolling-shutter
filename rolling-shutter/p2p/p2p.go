@@ -53,7 +53,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[
 	}()
 
 	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
-	err := func() error {
+	errorgroup.Go(func() error {
 		p.mux.Lock()
 		defer p.mux.Unlock()
 		if err := p.createHost(ctx); err != nil {
@@ -82,10 +82,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[
 			return p.managePeers(errorgroupctx)
 		})
 		return nil
-	}()
-	if err != nil {
-		return err
-	}
+	})
 	return errorgroup.Wait()
 }
 
