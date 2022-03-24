@@ -1,6 +1,5 @@
 /chain/
 /k*.toml
-/decryptor-*.toml
 /mock.toml
 /collator.toml
 /play.json

@@ -113,8 +113,7 @@
   [sys proc-id cmd opts]
   (info "starting process" proc-id cmd)
   (let [log-dir (:log-dir sys)
-        opts (merge {:extra-env {"PLAY_NUM_KEYPERS" (-> sys :conf :num-keypers str)
-                                 "PLAY_NUM_DECRYPTORS" (-> sys :conf :num-decryptors str)}
+        opts (merge {:extra-env {"PLAY_NUM_KEYPERS" (-> sys :conf :num-keypers str)}
                      :out (-> log-dir (fs/path (format "%s-out.txt" (name proc-id))) str io/file),
                      :err (-> log-dir (fs/path (format "%s-err.txt" (name proc-id))) str io/file),}
                     {:dir (:cwd sys)}
@@ -301,7 +300,7 @@
       (p/destroy-tree p))
     (swap! *process-map* assoc proc-id (deref p))))
 
-(def default-conf {:num-keypers 3, :num-decryptors 3, :threshold 2})
+(def default-conf {:num-keypers 3, :threshold 2})
 
 (defn- sanity-check-step
   [d]

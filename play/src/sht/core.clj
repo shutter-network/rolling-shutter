@@ -75,5 +75,5 @@
     (run-test-cases test-cases)))
 
 (comment
-  (def sys (runner/run-test (dkg-test/test-keypers-dkg-generation {:num-keypers 3, :num-decryptors 2})))
+  (def sys (runner/run-test (dkg-test/test-keypers-dkg-generation {:num-keypers 3})))
   )

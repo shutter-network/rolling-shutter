@@ -26,17 +26,6 @@ export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
 6. bb k 1
 7. bb k 2
 
-## decryptor only test setup
-
-1. bb init
-2. bb populate:decryptors
-3. bb peer mock.toml decryptor-0.toml decryptor-1.toml decryptor-2.toml
-4. bb node
-5. bb m
-6. bb d 0
-7. bb d 1
-8. bb d 2
-
 ## Whole system tests
 
 Make sure you have java jdk 17 as well as clojure installed.
