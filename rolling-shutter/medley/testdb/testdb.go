@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 )
 
@@ -71,19 +70,6 @@ func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, func())
 	if err != nil {
 		closedb()
 		t.Fatalf("failed to initialize keyper db")
-	}
-	return db, closedb
-}
-
-func NewDecryptorTestDB(ctx context.Context, t *testing.T) (*dcrdb.Queries, func()) {
-	t.Helper()
-
-	dbpool, closedb := NewTestDBPool(ctx, t)
-	db := dcrdb.New(dbpool)
-	err := dcrdb.InitDB(ctx, dbpool)
-	if err != nil {
-		closedb()
-		t.Fatalf("failed to initialize decryptor db")
 	}
 	return db, closedb
 }
