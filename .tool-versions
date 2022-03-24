@@ -2,7 +2,7 @@ babashka 0.7.5
 circleci 0.1.16737
 clojure 1.10.3.1075
 golang 1.18
-golangci-lint 1.44.2
+golangci-lint 1.45.1
 java adoptopenjdk-17.0.2+8
 nodejs 16.14.0
 protoc 3.19.4

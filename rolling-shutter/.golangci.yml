@@ -181,7 +181,6 @@ issues:
       text: "unnecessaryDefer:"
 
 run:
-  go: 1.18
   timeout: 10m
   skip-dirs:
     - test/testdata_etc

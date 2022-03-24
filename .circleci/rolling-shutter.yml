@@ -116,9 +116,8 @@ jobs:
       - run:
           name: "Install golangci-lint"
           command: |
-            make install-golangci-lint
-            # asdf plugin add golangci-lint || true
-            # asdf install golangci-lint
+            asdf plugin add golangci-lint || true
+            asdf install golangci-lint
       - run: |
           make lint-changes
       - save_cache:
