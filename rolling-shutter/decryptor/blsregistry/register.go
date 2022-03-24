@@ -38,7 +38,8 @@ type addrsSeqPos struct {
 func findCoordinates(
 	ctx context.Context,
 	addrsSeq *contract.AddrsSeq,
-	addr common.Address) ([]addrsSeqPos, error) {
+	addr common.Address,
+) ([]addrsSeqPos, error) {
 	var res []addrsSeqPos
 	opts := &bind.CallOpts{Context: ctx}
 	count, err := addrsSeq.Count(opts)
@@ -124,7 +125,8 @@ func getRawIdentity(opts *bind.CallOpts, contracts *deployment.Contracts, addr c
 func registerRawIdentity(
 	batch *txbatch.TXBatch,
 	contracts *deployment.Contracts,
-	identity RawIdentity) error {
+	identity RawIdentity,
+) error {
 	from := batch.TransactOpts.From
 	ctx := batch.TransactOpts.Context
 	callOpts := &bind.CallOpts{Context: ctx}

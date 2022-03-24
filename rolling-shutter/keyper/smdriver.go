@@ -41,7 +41,8 @@ func SyncAppWithDB(
 	ctx context.Context,
 	shmcl client.Client,
 	dbpool *pgxpool.Pool,
-	shuttermintState *ShuttermintState) error {
+	shuttermintState *ShuttermintState,
+) error {
 	a := ShuttermintDriver{
 		shmcl:            shmcl,
 		dbpool:           dbpool,
@@ -218,7 +219,8 @@ func (smdrv *ShuttermintDriver) handleBlock(
 func (smdrv *ShuttermintDriver) innerHandleTransactions(
 	ctx context.Context, queries *kprdb.Queries,
 	txs []*coretypes.ResultTx,
-	oldCurrentBlock, newCurrentBlock, lastCommittedHeight int64) error {
+	oldCurrentBlock, newCurrentBlock, lastCommittedHeight int64,
+) error {
 	oldMeta, err := queries.TMGetSyncMeta(ctx)
 	if err != nil {
 		return err

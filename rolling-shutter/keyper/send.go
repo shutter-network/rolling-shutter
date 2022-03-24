@@ -13,7 +13,8 @@ import (
 )
 
 func SendShutterMessages(
-	ctx context.Context, queries *kprdb.Queries, messageSender fx.MessageSender) error {
+	ctx context.Context, queries *kprdb.Queries, messageSender fx.MessageSender,
+) error {
 	for {
 		outgoing, err := queries.GetNextShutterMessage(ctx)
 		if err == pgx.ErrNoRows {

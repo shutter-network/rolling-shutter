@@ -235,7 +235,8 @@ func scheduleShutterMessage(
 	ctx context.Context,
 	queries *kprdb.Queries,
 	description string,
-	msg *shmsg.Message) error {
+	msg *shmsg.Message,
+) error {
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return err
@@ -252,7 +253,8 @@ func scheduleShutterMessage(
 }
 
 func (st *ShuttermintState) handleBatchConfig(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig) error {
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig,
+) error {
 	if !st.isKeyper {
 		if !e.IsKeyper(st.config.Address()) {
 			return nil
@@ -297,7 +299,8 @@ func (st *ShuttermintState) handleBatchConfigStarted(
 }
 
 func (st *ShuttermintState) handleEonStarted(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted) error {
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted,
+) error {
 	if !st.isKeyper {
 		return nil
 	}
@@ -362,7 +365,8 @@ func (st *ShuttermintState) handleEonStarted(
 }
 
 func (st *ShuttermintState) startPhase1Dealing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+) error {
 	pure := dkg.pure
 	commitment, polyEvals, err := pure.StartPhase1Dealing()
 	if err != nil {
@@ -393,7 +397,8 @@ func (st *ShuttermintState) startPhase1Dealing(
 }
 
 func (st *ShuttermintState) startPhase2Accusing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+) error {
 	accusations := dkg.pure.StartPhase2Accusing()
 	dkg.markDirty()
 	if len(accusations) > 0 {
@@ -418,7 +423,8 @@ func (st *ShuttermintState) startPhase2Accusing(
 }
 
 func (st *ShuttermintState) startPhase3Apologizing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+) error {
 	apologies := dkg.pure.StartPhase3Apologizing()
 	dkg.markDirty()
 	if len(apologies) > 0 {
@@ -446,7 +452,8 @@ func (st *ShuttermintState) startPhase3Apologizing(
 }
 
 func (st *ShuttermintState) finalizeDKG(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG) error {
+	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+) error {
 	dkg.pure.Finalize()
 	// There's no need to call dkg.markDirty() here, since we now remove the object from memory
 	// and the database:
@@ -504,7 +511,8 @@ func (st *ShuttermintState) finalizeDKG(
 }
 
 func (st *ShuttermintState) shiftPhase(
-	ctx context.Context, queries *kprdb.Queries, height int64, eon uint64, dkg *ActiveDKG) error {
+	ctx context.Context, queries *kprdb.Queries, height int64, eon uint64, dkg *ActiveDKG,
+) error {
 	phase := st.phaseLength.getPhaseAtHeight(height, dkg.startHeight)
 	for currentPhase := dkg.pure.Phase; currentPhase < phase; currentPhase = dkg.pure.Phase {
 		log.Printf(
@@ -536,7 +544,8 @@ func (st *ShuttermintState) shiftPhase(
 }
 
 func (st *ShuttermintState) shiftPhases(
-	ctx context.Context, queries *kprdb.Queries, height int64) error {
+	ctx context.Context, queries *kprdb.Queries, height int64,
+) error {
 	for eon, dkg := range st.dkg {
 		err := st.shiftPhase(ctx, queries, height, eon, dkg)
 		if err != nil {
@@ -547,7 +556,8 @@ func (st *ShuttermintState) shiftPhases(
 }
 
 func (st *ShuttermintState) handleCheckIn(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.CheckIn) error {
+	ctx context.Context, queries *kprdb.Queries, e *shutterevents.CheckIn,
+) error {
 	st.encryptionKeys[e.Sender] = e.EncryptionPublicKey
 	err := queries.InsertEncryptionKey(ctx, kprdb.InsertEncryptionKeyParams{
 		Address:             shdb.EncodeAddress(e.Sender),
@@ -592,7 +602,8 @@ func (st *ShuttermintState) decryptPolyEval(encrypted []byte) ([]byte, error) {
 }
 
 func (st *ShuttermintState) handlePolyEval(
-	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyEval) error {
+	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyEval,
+) error {
 	myAddress := st.config.Address()
 	if e.Sender == myAddress {
 		return nil
@@ -721,7 +732,8 @@ func (st *ShuttermintState) handleApology(
 }
 
 func (st *ShuttermintState) HandleEvent(
-	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent) error {
+	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent,
+) error {
 	pretty.Fprintf(os.Stderr, "HandleEvent: %#v\n", event)
 	var err error
 	switch e := event.(type) {
