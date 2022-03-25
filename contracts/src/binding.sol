@@ -4,7 +4,5 @@
 pragma solidity =0.8.9;
 
 import "./AddrsSeq.sol";
-import "./DecryptorsConfigsList.sol";
 import "./KeypersConfigsList.sol";
 import "./CollatorConfigsList.sol";
-import "./Registry.sol";

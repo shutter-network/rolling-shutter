@@ -34,7 +34,7 @@ func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) (
 		return addrsSeq.GetAddrs(callOpts, n)
 	})
 	if err != nil {
-		return []common.Address{}, errors.Wrapf(err, "failed to query decryptor addrs set from contract")
+		return []common.Address{}, errors.Wrapf(err, "failed to query address set from contract")
 	}
 	return addrs, nil
 }

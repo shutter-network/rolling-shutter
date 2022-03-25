@@ -12,7 +12,6 @@ import (
 	multiaddr "github.com/multiformats/go-multiaddr"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
 func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
@@ -23,25 +22,6 @@ func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
 func p2pKey(privkey p2pcrypto.PrivKey) string {
 	d, _ := p2pcrypto.MarshalPrivateKey(privkey)
 	return p2pcrypto.ConfigEncodeKey(d)
-}
-
-func blsSecretKey(secretKey *shbls.SecretKey) string {
-	b := secretKey.Marshal()
-	return hex.EncodeToString(b)
-}
-
-func blsPublicKey(publicKey *shbls.PublicKey) string {
-	b := publicKey.Marshal()
-	return hex.EncodeToString(b)
-}
-
-func blsPublicKeySlice(publicKeys []*shbls.PublicKey) string {
-	strlist := []string{}
-	for _, key := range publicKeys {
-		keyStr := blsPublicKey(key)
-		strlist = append(strlist, "\""+keyStr+"\"")
-	}
-	return "[" + strings.Join(strlist, ", ") + "]"
 }
 
 func eonPublicKey(pubkey *shcrypto.EonPublicKey) string {
@@ -63,14 +43,11 @@ func quoteList(lst []multiaddr.Multiaddr) string {
 
 func MustBuildTemplate(name, content string) *template.Template {
 	t, err := template.New(name).Funcs(template.FuncMap{
-		"FromECDSA":     crypto.FromECDSA,
-		"QuoteList":     quoteList,
-		"P2PKey":        p2pKey,
-		"P2PKeyPublic":  p2pKeyPublic,
-		"BLSSecretKey":  blsSecretKey,
-		"BLSPublicKey":  blsPublicKey,
-		"BLSPublicKeys": blsPublicKeySlice,
-		"EonPublicKey":  eonPublicKey,
+		"FromECDSA":    crypto.FromECDSA,
+		"QuoteList":    quoteList,
+		"P2PKey":       p2pKey,
+		"P2PKeyPublic": p2pKeyPublic,
+		"EonPublicKey": eonPublicKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)

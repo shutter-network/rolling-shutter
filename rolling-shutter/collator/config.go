@@ -73,7 +73,7 @@ func (config *Config) WriteTOML(w io.Writer) error {
 	return tmpl.Execute(w, config)
 }
 
-// Unmarshal unmarshals a DecryptorConfig from the given Viper object.
+// Unmarshal unmarshals a collator.Config from the given Viper object.
 func (config *Config) Unmarshal(v *viper.Viper) error {
 	err := v.Unmarshal(
 		config,

@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
@@ -26,8 +25,7 @@ type Config struct {
 	SendDecryptionKeys     bool
 	SendTransactions       bool
 
-	DecryptorPublicKeys []*shbls.PublicKey // public keys of decryptors in order of their index
-	EonKeySeed          int64              // a seed value used to generate the eon key
+	EonKeySeed int64 // a seed value used to generate the eon key
 }
 
 var configTemplate = `# Shutter mock node config
@@ -49,7 +47,6 @@ SendCipherBatches       = {{ .SendCipherBatches }}
 SendDecryptionKeys      = {{ .SendDecryptionKeys }}
 SendTransactions        = {{ .SendTransactions }}
 
-DecryptorPublicKeys = {{ .DecryptorPublicKeys | BLSPublicKeys }}
 EonKeySeed         = {{ .EonKeySeed }}
 `
 
@@ -63,7 +60,6 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
-				medley.BLSPublicKeyHook,
 			),
 		),
 	)

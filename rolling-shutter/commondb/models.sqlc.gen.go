@@ -9,19 +9,6 @@ type ChainCollator struct {
 	Collator              string
 }
 
-type DecryptorIdentity struct {
-	Address        string
-	BlsPublicKey   []byte
-	BlsSignature   []byte
-	SignatureValid bool
-}
-
-type DecryptorSetMember struct {
-	ActivationBlockNumber int64
-	Index                 int32
-	Address               string
-}
-
 type EventSyncProgress struct {
 	ID              bool
 	NextBlockNumber int32
