@@ -9,10 +9,11 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
 
 // TestKeyGenerator is a helper tool to generate secret and public eon and epoch keys and key
-// shares.
+// shares. It will generate a new eon key every eonInterval epochs.
 type TestKeyGenerator struct {
 	t *testing.T
 
@@ -92,13 +93,16 @@ func (tkg *TestKeyGenerator) populateEonKeysUntilEpoch(epochID uint64) {
 	tkg.populateEonKeysUntilEon(eonIndex)
 }
 
+// EonIndex computes the index of the EON key to be used for the given epochID. We generate a new
+// eon key every eonInterval epochs.
 func (tkg *TestKeyGenerator) EonIndex(epochID uint64) uint64 {
 	tkg.t.Helper()
 
 	if tkg.eonInterval == 0 {
 		return 0
 	}
-	return epochID / tkg.eonInterval
+
+	return uint64(epochid.SequenceNumber(epochID)) / tkg.eonInterval
 }
 
 func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID uint64, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
