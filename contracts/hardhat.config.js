@@ -23,7 +23,6 @@ extendEnvironment((hre) => {
   } else {
     hre.deployConf = {
       keypers: null,
-      decryptors: null,
       collator: null,
       fundValue: "",
     };
@@ -38,18 +37,8 @@ extendEnvironment((hre) => {
     }
   };
 
-  hre.getDecryptorAddresses = async function () {
-    if (hre.deployConf.decryptors === null) {
-      const { decryptor0, decryptor1, decryptor2 } =
-        await hre.getNamedAccounts();
-      return [decryptor0, decryptor1, decryptor2];
-    } else {
-      return hre.deployConf.decryptors;
-    }
-  };
-
   hre.getCollatorAddress = async function () {
-    if (hre.deployConf.decryptors === null) {
+    if (hre.deployConf.collator === null) {
       const { collator } = await hre.getNamedAccounts();
       return collator;
     } else {
@@ -74,9 +63,6 @@ module.exports = {
     keyper0: 1,
     keyper1: 2,
     keyper2: 3,
-    decryptor0: 4,
-    decryptor1: 5,
-    decryptor2: 6,
     collator: 7,
   },
   networks: {

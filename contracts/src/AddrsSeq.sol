@@ -12,11 +12,11 @@ struct AddrSet {
 /**
 @title AddrsSeq manages a sequence of a list of addresses
 
-@dev This sequence of addresses is used to store the list of keypers, decryptors or the single
-collator at different points in time. Contrary to what we've done in main chain shutter, we just
-store the list of addresses here without any information about its validity period. A single list
-can be referenced by its index. New lists can be created by calling `add` multiple times and
-appended with a final call to `append`.
+@dev This sequence of addresses is used to store the list of keypers or the single collator at
+different points in time. Contrary to what we've done in main chain shutter, we just store the list
+of addresses here without any information about its validity period. A single list can be
+referenced by its index. New lists can be created by calling `add` multiple times and appended with
+a final call to `append`.
 */
 contract AddrsSeq is Ownable {
     event Added(uint64 n, uint64 i, address[] newAddrs);
