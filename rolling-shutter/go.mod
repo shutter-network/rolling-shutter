@@ -9,7 +9,6 @@ require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/google/go-cmp v0.5.7
 	github.com/jackc/pgconn v1.10.1
-	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/kr/pretty v0.3.0
 	github.com/kyleconroy/sqlc v1.12.0
@@ -88,7 +87,6 @@ require (
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-log/v2 v2.1.3 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.2.0 // indirect

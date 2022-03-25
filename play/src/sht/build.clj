@@ -20,8 +20,8 @@
 (defn sys-write-config-files
   "write config files of all subprocesses to disk.
   This needs to be called, when :tom-edits has been modified."
-  [{:sys/keys [keypers decryptors collator] :as sys}]
-  (doseq [sub (concat keypers decryptors [collator])]
+  [{:sys/keys [keypers collator] :as sys}]
+  (doseq [sub (conj keypers collator)]
       (play/toml-edit-file (:subcommand/cfgfile sub)
                            (:subcommand/toml-edits sub))))
 
@@ -29,20 +29,16 @@
   [sys {:init/keys [conf] :as m}]
   (info "Initializing system" m)
   (let [sys (bb-build-all sys)
-        {:keys [num-keypers num-decryptors]} conf
+        {:keys [num-keypers]} conf
         keypers (->> (range num-keypers)
                      (map play/keyper-subcommand)
                      (map play/generate-config)
                      (mapv play/initdb))
-        decryptors (->> (range num-decryptors)
-                        (map (partial play/decryptor-subcommand num-decryptors))
-                        (map play/generate-config)
-                        (mapv play/initdb))
         collator (-> (play/collator-subcommand)
                      play/generate-config
                      play/initdb)
 
-        peers (->> (concat keypers decryptors [collator])
+        peers (->> (conj keypers collator)
                    (mapv (fn [sub]
                           (str (get-in sub [:subcommand/toml-edits "ListenAddress"])
                                "/p2p/"
@@ -50,10 +46,8 @@
         set-peers (fn [sub]
                     (assoc-in sub  [:subcommand/toml-edits "PeerMultiaddrs"] peers))
         keypers (map set-peers keypers)
-        decryptors (map set-peers decryptors)
         collator (set-peers collator)
         res {:sys/keypers keypers
-             :sys/decryptors decryptors
              :sys/collator collator}
         sys (merge sys res)]
     (sys-write-config-files sys)
@@ -65,7 +59,6 @@
   [sys]
   (let [eth-address (fn [m] (get-in m [:subcommand/cfg :eth-address]))]
     {:keypers (mapv eth-address (:sys/keypers sys))
-     :decryptors (mapv eth-address (:sys/decryptors sys))
      :collator (eth-address (:sys/collator sys))
      :fundValue "100"}))
 

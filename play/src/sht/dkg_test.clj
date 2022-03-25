@@ -292,8 +292,7 @@
         num-initial-keypers (dec num-keypers)
         devmode? false
         conf {:num-keypers num-keypers
-              :num-initial-keypers num-initial-keypers
-              :num-decryptors 0}]
+              :num-initial-keypers num-initial-keypers}]
     {:test/id :change-keyper-set
      :test/conf conf
      :test/description "changing the keyper set should work"
@@ -310,8 +309,7 @@
                   [{:run :process/run
                     :process/id :node
                     :process/cmd '[bb node]
-                    :process/opts {:extra-env {"PLAY_NUM_KEYPERS" num-initial-keypers
-                                               "PLAY_NUM_DECRYPTORS" "0"}}
+                    :process/opts {:extra-env {"PLAY_NUM_KEYPERS" num-initial-keypers}}
                     :process/port 8545
                     :process/port-timeout (+ 5000 (* num-keypers 2000))}
 
@@ -448,7 +446,7 @@
   []
   (concat
    [(test-change-keyper-set)]
-   (for [conf [{:num-keypers 3, :num-decryptors 2, :threshold 2}]
+   (for [conf [{:num-keypers 3, :threshold 2}]
          f [test-keypers-dkg-generation
             test-dkg-keypers-join-late]]
      (f conf))))

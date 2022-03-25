@@ -27,19 +27,6 @@ type DecryptionTrigger struct {
 	EpochID []byte
 }
 
-type DecryptorIdentity struct {
-	Address        string
-	BlsPublicKey   []byte
-	BlsSignature   []byte
-	SignatureValid bool
-}
-
-type DecryptorSetMember struct {
-	ActivationBlockNumber int64
-	Index                 int32
-	Address               string
-}
-
 type DkgResult struct {
 	Eon        int64
 	Success    bool

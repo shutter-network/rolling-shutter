@@ -17,7 +17,6 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 )
 
 const SchemaVersionKey = "schema-version"
@@ -51,26 +50,6 @@ func DecodeEciesPublicKey(data []byte) (*ecies.PublicKey, error) {
 		return nil, err
 	}
 	return ecies.ImportECDSAPublic(k), nil
-}
-
-func EncodeBLSPublicKey(key *shbls.PublicKey) []byte {
-	return key.Marshal()
-}
-
-func DecodeBLSPublicKey(data []byte) (*shbls.PublicKey, error) {
-	key := new(shbls.PublicKey)
-	err := key.Unmarshal(data)
-	return key, err
-}
-
-func EncodeBLSSignature(signature *shbls.Signature) []byte {
-	return signature.Marshal()
-}
-
-func DecodeBLSSignature(data []byte) (*shbls.Signature, error) {
-	signature := new(shbls.Signature)
-	err := signature.Unmarshal(data)
-	return signature, err
 }
 
 func EncodeAddress(addr common.Address) string {

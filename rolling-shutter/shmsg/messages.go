@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
+	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
@@ -28,10 +28,8 @@ var messageTypes = []P2PMessage{
 	new(DecryptionKeyShare),
 	new(EonPublicKey),
 
-	// Decryptor messages
+	// Collator messages
 	new(CipherBatch),
-	new(AggregatedDecryptionSignature),
-	new(DecryptionSignature),
 }
 
 var topicToProtoName = make(map[string]protoreflect.FullName)
@@ -181,7 +179,7 @@ func (batch *CipherBatch) LogInfo() string {
 }
 
 func (*CipherBatch) Topic() string {
-	return dcrtopics.CipherBatch
+	return cltrtopics.CipherBatch
 }
 
 func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
@@ -189,42 +187,6 @@ func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
 }
 
 func (*CipherBatch) Validate() error {
-	return nil
-}
-
-func (*DecryptionSignature) ImplementsP2PMessage() {
-}
-
-func (sig *DecryptionSignature) LogInfo() string {
-	return fmt.Sprintf(
-		"DecryptionSignature{epochid=%s}",
-		epochid.LogInfo(sig.EpochID),
-	)
-}
-
-func (*DecryptionSignature) Topic() string {
-	return dcrtopics.DecryptionSignature
-}
-
-func (*DecryptionSignature) Validate() error {
-	return nil
-}
-
-func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
-}
-
-func (ads *AggregatedDecryptionSignature) LogInfo() string {
-	return fmt.Sprintf(
-		"AggregatedDecryptionSignature{epochid=%s}",
-		epochid.LogInfo(ads.EpochID),
-	)
-}
-
-func (*AggregatedDecryptionSignature) Topic() string {
-	return dcrtopics.AggregatedDecryptionSignature
-}
-
-func (*AggregatedDecryptionSignature) Validate() error {
 	return nil
 }
 

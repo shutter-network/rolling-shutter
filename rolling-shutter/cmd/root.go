@@ -12,7 +12,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/cmd/collator"
 	"github.com/shutter-network/shutter/shuttermint/cmd/completion"
 	"github.com/shutter-network/shutter/shuttermint/cmd/cryptocmd"
-	"github.com/shutter-network/shutter/shuttermint/cmd/decryptor"
 	"github.com/shutter-network/shutter/shuttermint/cmd/keyper"
 	"github.com/shutter-network/shutter/shuttermint/cmd/mocknode"
 	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
@@ -64,7 +63,6 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(chain.Cmd())
 	cmd.AddCommand(collator.Cmd())
 	cmd.AddCommand(completion.Cmd())
-	cmd.AddCommand(decryptor.Cmd())
 	cmd.AddCommand(keyper.Cmd())
 	cmd.AddCommand(mocknode.Cmd())
 	cmd.AddCommand(snapshot.Cmd())

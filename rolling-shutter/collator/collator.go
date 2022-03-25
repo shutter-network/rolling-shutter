@@ -41,7 +41,7 @@ type collator struct {
 	dbpool *pgxpool.Pool
 }
 
-var gossipTopicNames = [2]string{
+var gossipTopicNames = []string{
 	cltrtopics.CipherBatch,
 	cltrtopics.DecryptionTrigger,
 }
@@ -176,7 +176,7 @@ func (c *collator) run(ctx context.Context) error {
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	errorgroup.Go(func() error {
-		return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
+		return c.p2p.Run(errorctx, gossipTopicNames, map[string]pubsub.Validator{})
 	})
 	errorgroup.Go(func() error {
 		return c.processEpochLoop(errorctx)

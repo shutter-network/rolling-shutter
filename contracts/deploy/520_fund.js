@@ -9,9 +9,8 @@ module.exports = async function (hre) {
   }
 
   const [owner] = await ethers.getSigners();
-  const decryptor = await hre.getDecryptorAddresses();
   const keypers = await hre.getKeyperAddresses();
-  const addresses = decryptor.concat(keypers);
+  const addresses = keypers;
   const value = ethers.utils.parseEther(fundValue);
   console.log(
     "fund: funding %s adresses with %s eth",

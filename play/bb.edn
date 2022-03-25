@@ -18,13 +18,9 @@
       (Long/valueOf (or (System/getenv s) default)))
 
     (def num-keypers (long-from-env "PLAY_NUM_KEYPERS" "3"))
-    (def num-decryptors (long-from-env "PLAY_NUM_DECRYPTORS" "3"))
 
     (def windows? (babashka.core/windows?))
     (def no-color? windows?)
-
-    (defn decryptor-db [n]
-      (format "decryptor-db-%d" n))
 
     (defn keyper-port [n]
       (-> n play/keyper-subcommand :subcommand/p2p-port))
@@ -48,10 +44,6 @@
     (def contracts-dir
       (-> src-dir (fs/path ".." "contracts") fs/canonicalize str))
 
-    (def insert-keyper-set-sql "insert_keyper_set.sql")
-    (def insert-decryptor-sql "insert_decryptor.sql")
-    (def insert-eon-key-sql "insert_eon_public_key.sql")
-
     (def exe (src-file (str "bin/rolling-shutter" (if windows? ".exe"))))
     (def ansi-green (if no-color? "" "\u001B[32m"))
     (def ansi-reset (if no-color? "" "\u001B[0m"))
@@ -73,9 +65,6 @@
 
     (defn extract-peerid [cfgfile]
       (second (re-find (re-pattern "(?m)(?i)^# Peer identity: /p2p/([0-9a-zA-Z]*)") (slurp cfgfile))))
-
-    (defn extract-bls-key [cfgfile]
-      (second (re-find (re-pattern "(?m)(?i)^# BLS public key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
 
     (defn extract-eon-key [cfgfile]
       (second (re-find (re-pattern "(?m)(?i)^# Eon Public Key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
@@ -105,10 +94,6 @@
       [filename m]
       (spit filename (toml-edit-string (slurp filename) m)))
 
-    (defn decryptor-cfg
-      [n]
-      (format "decryptor-%s.toml" n))
-
     (def mock-cfg "mock.toml")
     (def collator-cfg "collator.toml")
 
@@ -133,11 +118,7 @@
                            {:executable executable :pkg pkg}))))))
     (defn rs
       [& args]
-      (run-process (cons 'rolling-shutter args)))
-
-    (defn psql
-      [db & args]
-      (run-process (concat ["psql" "-d" db] args))))
+      (run-process (cons 'rolling-shutter args))))
 
 
   -godoc:idx
@@ -324,31 +305,11 @@
    :task (mapv (comp :eth-address :subcommand/cfg) genconfig:keypers)}
 
   ;; --------------------------------------
-  ;; -- decryptor
-  -decryptor-subcommands (mapv (partial play/decryptor-subcommand num-decryptors)
-                               (range num-decryptors))
-
-  genconfig:decryptors
-  {:doc "Generate decryptor configs"
-   :depends [build -decryptor-subcommands]
-   :task (mapv play/generate-config -decryptor-subcommands)}
-
-  init:decryptors
-  {:doc "Initialize decryptor databases"
-   :depends [build genconfig:decryptors]
-   :task (mapv play/initdb genconfig:decryptors)}
-
-  -decryptors
-  {:depends [genconfig:decryptors]
-   :doc "List of decryptor addresses"
-   :task (mapv (comp :eth-address :subcommand/cfg) genconfig:decryptors)}
-
-  ;; --------------------------------------
   ;; -- mocknode
 
   -mocknode-subcommand
-  {:depends [genconfig:decryptors]
-   :task (play/mocknode-subcommand genconfig:decryptors)}
+  {:depends []
+   :task (play/mocknode-subcommand)}
 
   genconfig:mock
   {:doc "Generate mocknode config"
@@ -358,7 +319,7 @@
   ;; -- general tasks
   genconfig
   {:doc "Generate configs"
-   :depends [genconfig:keypers genconfig:decryptors genconfig:mock]}
+   :depends [genconfig:keypers genconfig:mock]}
 
   peer
   {:doc "Add nodes as peers of each other"
@@ -379,14 +340,13 @@
            (rs "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"))}
 
   init
-  {:doc "Initialize keyper and decryptor databases as well as shuttermint"
-   :depends [genconfig init:testchain init:kprdb init:decryptors init:collatordb]}
+  {:doc "Initialize keyper databases as well as shuttermint"
+   :depends [genconfig init:testchain init:kprdb init:collatordb]}
 
   -deploy-conf
   {:doc "Generate a deploy config"
-   :depends [-decryptors -keypers -collator]
+   :depends [-keypers -collator]
    :task (let [conf {:keypers -keypers
-                     :decryptors -decryptors
                      :collator -collator
                      :fundValue "100"}
                play-json (str (fs/absolutize "play.json"))]
@@ -408,42 +368,6 @@
    :task (run-process '[npx hardhat node] {:extra-env {"DEPLOY_CONF" -deploy-conf}
                                            :dir contracts-dir})}
 
-  populate:ds-with-ks
-  {:doc "Populate decryptor dbs with keyper set"
-   :depends [genconfig:decryptors -keypers]
-   :task (let [kaddrs-quoted (map (partial format "\"%s\"") -keypers)
-               kaddrs-args (format "'{%s}'" (str/join "," kaddrs-quoted))]
-           (doseq [i (range num-decryptors)]
-             (psql (decryptor-db i)
-                   "-f" insert-keyper-set-sql
-                   (format "-vkeypers=%s" kaddrs-args))))}
-
-  populate:ds-with-ds
-  {:doc "Populate decryptor dbs with decryptor set"
-   :depends [genconfig:decryptors]
-   :task (doseq [{:subcommand/keys [db]} genconfig:decryptors
-                 i (range num-decryptors)
-                 :let [cfg (decryptor-cfg i)
-                       addr (extract-address cfg)
-                       key (extract-bls-key cfg)]]
-           (psql db
-                 "-f" insert-decryptor-sql
-                 (format "-vaddress='%s'" addr)
-                 (format "-vkey=E'\\\\x%s'" key)))}
-
-  populate:ds-with-eon-key
-  {:doc "Populate decryptor dbs with eon key from mocknode"
-   :depends [genconfig:decryptors genconfig:mock]
-   :task (let [key (-> genconfig:mock :subcommand/cfg :eon-key)]
-           (doseq [{:subcommand/keys [db]} genconfig:decryptors]
-             (psql db
-                   "-f" insert-eon-key-sql
-                   (format "-veon_public_key=E'\\\\x%s'" key))))}
-
-  populate:decryptors
-  {:doc "Populate the decryptor databases"
-   :depends [populate:ds-with-ks populate:ds-with-ds populate:ds-with-eon-key]}
-
   chain
   {:doc "Run shuttermint"
    :depends [build]
@@ -462,14 +386,6 @@
                cmd (play/subcommand-run subcommand)]
            (run-process cmd))}
 
-  d
-  {:doc "Run decryptor"
-   :depends [build genconfig:decryptors -deployments]
-   :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
-               subcommand (nth genconfig:decryptors n)
-               cmd (play/subcommand-run subcommand)]
-           (run-process cmd))}
-
   m
   {:doc "Run mocknode"
    :depends [build genconfig:mock]
@@ -478,12 +394,11 @@
 
   clean
   {:doc "Remove config files and chain related files"
-   :depends [-keyper-subcommands -decryptor-subcommands -collator-subcommand]
+   :depends [-keyper-subcommands -collator-subcommand]
    :task (do
            (fs/delete-tree "testchain")
            (doseq [{:subcommand/keys [cfgfile]} (concat -keyper-subcommands
-                                                        -decryptor-subcommands
-                                                        [(play/mocknode-subcommand [])
+                                                        [(play/mocknode-subcommand)
                                                          -collator-subcommand])]
              (fs/delete-if-exists cfgfile)))}
   ci-gen sht.play/ci-gen}}

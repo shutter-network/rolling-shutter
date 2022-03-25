@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/mocknode"
 )
@@ -110,8 +109,7 @@ func exampleConfig() (*mocknode.Config, error) {
 		SendDecryptionKeys:     true,
 		SendTransactions:       true,
 
-		DecryptorPublicKeys: []*shbls.PublicKey{},
-		EonKeySeed:          0,
+		EonKeySeed: 0,
 	}
 	return &config, nil
 }

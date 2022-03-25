@@ -1,7 +1,6 @@
 package mocknode
 
 import (
-	"bytes"
 	"context"
 	"log"
 	"math/big"
@@ -16,23 +15,17 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/collator/client"
-	"github.com/shutter-network/shutter/shuttermint/decryptor"
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = [5]string{
+var gossipTopicNames = []string{
 	kprtopics.DecryptionTrigger,
 	kprtopics.EonPublicKey,
-	dcrtopics.CipherBatch,
-	dcrtopics.DecryptionKey,
-	dcrtopics.DecryptionSignature,
+	kprtopics.DecryptionKey,
 }
 
 type MockNode struct {
@@ -89,7 +82,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
+		return m.p2p.Run(errctx, gossipTopicNames, make(map[string]pubsub.Validator))
 	})
 	g.Go(func() error {
 		return m.listen(errctx)
@@ -116,7 +109,10 @@ func (m *MockNode) logStartupInfo() error {
 func (m *MockNode) listen(ctx context.Context) error {
 	for {
 		select {
-		case msg := <-m.p2p.GossipMessages:
+		case msg, ok := <-m.p2p.GossipMessages:
+			if !ok {
+				return nil
+			}
 			m.handleMessage(msg)
 		case <-ctx.Done():
 			return ctx.Err()
@@ -126,17 +122,6 @@ func (m *MockNode) listen(ctx context.Context) error {
 
 func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 	switch plainMsg.Topic {
-	case dcrtopics.DecryptionSignature:
-		msg := shmsg.AggregatedDecryptionSignature{}
-		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
-			log.Printf(
-				"received invalid message on topic %s from %s: %X",
-				plainMsg.Topic,
-				plainMsg.SenderID,
-				plainMsg.Message,
-			)
-		}
-		m.handleDecryptionSignature(&msg, plainMsg.SenderID)
 	case kprtopics.EonPublicKey:
 		msg := shmsg.EonPublicKey{}
 		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
@@ -159,61 +144,6 @@ func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
 			plainMsg.Topic,
 			plainMsg.SenderID,
 			plainMsg.Message,
-		)
-	}
-}
-
-func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSignature, senderID string) {
-	sig := new(shbls.Signature)
-	err := sig.Unmarshal(msg.AggregatedSignature)
-	if err != nil {
-		log.Printf(
-			"received not unmarshalable decryption signature in epoch %d from %s: %+v",
-			msg.EpochID,
-			senderID,
-			msg,
-		)
-		return
-	}
-
-	signers := bitfield.Bitfield(msg.SignerBitfield)
-	signerIndices := signers.GetIndexes()
-	signerKeys := []*shbls.PublicKey{}
-	for _, i := range signerIndices {
-		signerKeys = append(signerKeys, m.Config.DecryptorPublicKeys[i])
-	}
-	aggregatedPublicKey := shbls.AggregatePublicKeys(signerKeys)
-	validSignature := shbls.Verify(
-		sig,
-		aggregatedPublicKey,
-		msg.SignedHash,
-	)
-
-	var expectedCipherBatch [][]byte
-	var expectedDecryptedBatch [][]byte
-	func() {
-		m.mux.Lock()
-		defer m.mux.Unlock()
-		expectedCipherBatch = m.cipherTxsSent[msg.EpochID]
-		expectedDecryptedBatch = m.plainTxsSent[msg.EpochID]
-	}()
-	expectedSigningData := decryptor.DecryptionSigningData{
-		InstanceID:     m.Config.InstanceID,
-		EpochID:        msg.EpochID,
-		CipherBatch:    expectedCipherBatch,
-		DecryptedBatch: expectedDecryptedBatch,
-	}
-	correctSignedHash := bytes.Equal(msg.SignedHash, expectedSigningData.Hash().Bytes())
-
-	if validSignature && correctSignedHash {
-		log.Printf("received valid decryption signature for epoch %d", msg.EpochID)
-	} else {
-		log.Printf(
-			"received invalid decryption signature for epoch %d.\nValid signature: %t\nCorrect signed hash: %t\n%+v",
-			msg.EpochID,
-			validSignature,
-			correctSignedHash,
-			msg,
 		)
 	}
 }
@@ -363,7 +293,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, kprtopics.DecryptionTrigger, msgBytes)
+	return m.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
 
 func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
@@ -395,7 +325,7 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 		return err
 	}
 
-	if err := m.p2p.Publish(ctx, dcrtopics.CipherBatch, msgBytes); err != nil {
+	if err := m.p2p.Publish(ctx, msg.Topic(), msgBytes); err != nil {
 		return err
 	}
 
@@ -426,5 +356,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 	if err != nil {
 		return err
 	}
-	return m.p2p.Publish(ctx, dcrtopics.DecryptionKey, msgBytes)
+	return m.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }

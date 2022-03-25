@@ -12,7 +12,6 @@
 
 (def ^:private base-port 23000)
 (def ^:private keyper-base-port (+ base-port 100))
-(def ^:private decryptor-base-port (+ keyper-base-port 500))
 
 (def ^:dynamic *cwd* (str (fs/normalize (fs/absolutize "."))))
 
@@ -94,9 +93,6 @@
 (defn- extract-peerid [toml]
   (second (re-find (re-pattern "(?m)(?i)^# Peer identity: /p2p/([0-9a-zA-Z]*)") toml)))
 
-(defn- extract-bls-key [toml]
-  (second (re-find (re-pattern "(?m)(?i)^# BLS public key: ([0-9a-zA-Z]*)") toml)))
-
 (defn- extract-eon-key [toml]
   (second (re-find (re-pattern "(?m)(?i)^# Eon Public Key: ([0-9a-zA-Z]*)") toml)))
 
@@ -104,7 +100,6 @@
   (let [toml (slurp (str (fs/path *cwd* cfgfile)))]
     {:eth-address (extract-address toml)
      :peerid (extract-peerid toml)
-     :bls-key (extract-bls-key toml)
      :eon-key (extract-eon-key toml)}))
 
 (defn toml-replace
@@ -151,21 +146,6 @@
   (p/check (process ['rolling-shutter cmd "initdb" "--config" cfgfile]))
   subcommand)
 
-;; --- decryptor-subcommand
-(defn decryptor-subcommand
-  [num-decryptors n]
-  (let [db (format "decryptor-db-%d" n)
-        p2p-port (+ decryptor-base-port n)]
-    #:subcommand{:cmd 'decryptor
-                 :db db
-                 :p2p-port p2p-port
-                 :cfgfile (format "decryptor-%s.toml" n)
-                 :index n
-                 :toml-edits {"requiredSignatures" (inc (quot num-decryptors 3))
-                              "DatabaseURL" (format "postgres:///%s" db)
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
-                              "SignerIndex" n}}))
-
 ;; -- keyper-subcommand
 (defn keyper-subcommand
   [n]
@@ -183,14 +163,13 @@
 
 ;; -- mocknode-subcommand
 (defn mocknode-subcommand
-  [decryptors]
+  []
   (let [p2p-port (+ base-port 0)]
     #:subcommand{:cmd 'mocknode
                  :cfgfile "mock.toml"
                  :p2p-port p2p-port
                  :db nil
-                 :toml-edits {"ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
-                              "DecryptorPublicKeys" (mapv (comp :bls-key :subcommand/cfg) decryptors)}}))
+                 :toml-edits {"ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)}}))
 
 ;; -- collator
 (defn collator-subcommand
