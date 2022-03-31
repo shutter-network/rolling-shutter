@@ -19,6 +19,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
+	github.com/rs/zerolog v1.26.1
 	github.com/shutter-network/shutter/shlib v0.1.9
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
@@ -180,7 +181,6 @@ require (
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/rs/cors v1.8.2 // indirect
-	github.com/rs/zerolog v1.26.1 // indirect
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect

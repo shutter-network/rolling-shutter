@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -44,6 +45,13 @@ func P2PKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, 
 		return nil, err
 	}
 	return privkey, nil
+}
+
+func StringToURL(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String || t != reflect.TypeOf(&url.URL{}) {
+		return data, nil
+	}
+	return url.Parse(data.(string))
 }
 
 func StringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
