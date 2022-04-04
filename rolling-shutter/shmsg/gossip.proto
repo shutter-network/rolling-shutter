@@ -27,5 +27,7 @@ message DecryptionKey {
 message EonPublicKey {
     uint64 instanceID = 1;
     bytes publicKey= 2;
-    uint64 eon = 3;
+    uint64 activationBlock = 3;
+    uint64 keyperIndex = 4;
+    bytes signature = 5;
 }

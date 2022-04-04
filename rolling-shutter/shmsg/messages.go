@@ -168,8 +168,8 @@ func (*EonPublicKey) ImplementsP2PMessage() {
 
 func (e *EonPublicKey) LogInfo() string {
 	return fmt.Sprintf(
-		"EonPublicKey{eon=%d}",
-		e.Eon,
+		"EonPublicKey{activationBlock=%d}",
+		e.ActivationBlock,
 	)
 }
 

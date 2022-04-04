@@ -173,7 +173,13 @@ INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
-DELETE FROM outgoing_eon_keys RETURNING *;
+WITH t1 AS (DELETE FROM outgoing_eon_keys RETURNING *)
+SELECT t1.*, eons.activation_block_number, tbc.keypers
+FROM t1
+INNER JOIN eons
+      ON t1.eon = eons.eon
+INNER JOIN tendermint_batch_config tbc
+      ON eons.config_index = tbc.config_index;
 
 -- name: SetLastBatchConfigSent :exec
 INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
