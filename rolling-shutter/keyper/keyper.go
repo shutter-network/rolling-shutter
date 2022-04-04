@@ -362,13 +362,24 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			err := kpr.p2p.SendMessage(ctx, &shmsg.EonPublicKey{
-				PublicKey:  eonPublicKey.EonPublicKey,
-				Eon:        uint64(eonPublicKey.Eon),
-				InstanceID: kpr.config.InstanceID,
-			})
+			keyperIndex, exists := kprdb.GetKeyperIndex(kpr.config.Address(), eonPublicKey.Keypers)
+			if !exists {
+				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
+			}
+			msg, err := shmsg.NewSignedEonPublicKey(
+				kpr.config.InstanceID,
+				eonPublicKey.EonPublicKey,
+				uint64(eonPublicKey.ActivationBlockNumber),
+				keyperIndex,
+				kpr.config.SigningKey,
+			)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "error while signing EonPublicKey")
+			}
+
+			err = kpr.p2p.SendMessage(ctx, msg)
+			if err != nil {
+				return errors.Wrap(err, "error while broadcasting EonPublicKey")
 			}
 		}
 		select {

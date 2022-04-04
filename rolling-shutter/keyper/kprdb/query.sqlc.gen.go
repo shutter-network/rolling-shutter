@@ -160,19 +160,37 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 }
 
 const getAndDeleteEonPublicKeys = `-- name: GetAndDeleteEonPublicKeys :many
-DELETE FROM outgoing_eon_keys RETURNING eon_public_key, eon
+WITH t1 AS (DELETE FROM outgoing_eon_keys RETURNING eon_public_key, eon)
+SELECT t1.eon_public_key, t1.eon, eons.activation_block_number, tbc.keypers
+FROM t1
+INNER JOIN eons
+      ON t1.eon = eons.eon
+INNER JOIN tendermint_batch_config tbc
+      ON eons.config_index = tbc.config_index
 `
 
-func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]OutgoingEonKey, error) {
+type GetAndDeleteEonPublicKeysRow struct {
+	EonPublicKey          []byte
+	Eon                   int64
+	ActivationBlockNumber int64
+	Keypers               []string
+}
+
+func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]GetAndDeleteEonPublicKeysRow, error) {
 	rows, err := q.db.Query(ctx, getAndDeleteEonPublicKeys)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []OutgoingEonKey
+	var items []GetAndDeleteEonPublicKeysRow
 	for rows.Next() {
-		var i OutgoingEonKey
-		if err := rows.Scan(&i.EonPublicKey, &i.Eon); err != nil {
+		var i GetAndDeleteEonPublicKeysRow
+		if err := rows.Scan(
+			&i.EonPublicKey,
+			&i.Eon,
+			&i.ActivationBlockNumber,
+			&i.Keypers,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

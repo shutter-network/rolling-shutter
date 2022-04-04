@@ -156,15 +156,20 @@ func TestDecryptionKeyShare(t *testing.T) {
 func TestEonPublicKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	eonPublicKey := cfg.tkg.EonPublicKey(cfg.epochID).Marshal()
+	keyperIndex := uint64(0)
+	activationBlock := uint64(0)
 
-	orig := &EonPublicKey{
-		PublicKey:  eonPublicKey,
-		Eon:        uint64(1),
-		InstanceID: cfg.instanceID,
-	}
+	privKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+
+	orig, err := NewSignedEonPublicKey(cfg.instanceID, eonPublicKey, activationBlock, keyperIndex, privKey)
+	assert.NilError(t, err)
+
 	m := marshalUnmarshalMessage(t, orig)
 
 	assert.Equal(t, orig.InstanceID, m.InstanceID)
-	assert.Equal(t, orig.Eon, m.Eon)
 	assert.Assert(t, bytes.Compare(orig.PublicKey, m.PublicKey) == 0)
+	assert.Equal(t, orig.ActivationBlock, m.ActivationBlock)
+	assert.Equal(t, orig.KeyperIndex, m.KeyperIndex)
+	assert.Assert(t, bytes.Compare(orig.Signature, m.Signature) == 0)
 }
