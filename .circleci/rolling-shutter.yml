@@ -87,18 +87,21 @@ jobs:
     steps:
       - checkout:
           path: ~/src
+      - run:
+          name: Configure environment
+          command: |
+            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
+            echo >>${BASH_ENV} export VERSION="${version}"
+            echo >>${BASH_ENV} export BIN=/tmp/release-bin
       - restore_cache:
           keys:
             - rs-build-go-integration-v3-{{ checksum "go.sum" }}
-      - run: env VERSION=${CIRCLE_TAG} ./build-release
-      - run: go install github.com/tcnksm/ghr@v0.13.0
-      - attach_workspace:
-          at: ~/share
+      - run: ./build-release
+      - run: go install github.com/tcnksm/ghr@v0.14.0
       - run:
-          name: Upload binaries and combined.json
+          name: Upload binaries
           command: |
-            cp ~/share/combined.json bin/
-            ghr ${CIRCLE_TAG} bin/
+            ghr ${CIRCLE_TAG} ${BIN}
 
   rs-lint:
     executor: go
@@ -132,14 +135,14 @@ workflows:
       - rs-generate:
           filters:
             tags:
-              only: /^v\d+\.\d+\.\d+$/
+              only: /.*/
       - rs-build:
           matrix:
             parameters:
               go-version: [go-integration]
           filters:
             tags:
-              only: /^v\d+\.\d+\.\d+$/
+              only: /.*/
       - publish-release:
           requires:
             - rs-build
@@ -149,7 +152,7 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /^v\d+\.\d+\.\d+$/
+              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
       - rs-lint:
           filters:
             branches:

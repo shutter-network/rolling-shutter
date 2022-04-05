@@ -11,7 +11,7 @@ orbs:
 executors:
   cimg-base:
     docker:
-      - image: cimg/base:2021.11
+      - image: cimg/base:2022.03
 
 jobs:
   gen:
@@ -46,6 +46,9 @@ jobs:
           configuration_path: continue-generated.yml
 
 workflows:
-  always:
+  gen:
     jobs:
-      - gen
+      - gen:
+          filters:
+            tags:
+              only: /^.*$/

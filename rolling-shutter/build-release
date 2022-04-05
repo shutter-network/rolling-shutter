@@ -3,16 +3,23 @@ set -euo pipefail
 
 : "${GO:=go}"
 : "${VERSION:=}"
-: "${TARGETS:=linux-amd64 linux-arm linux-arm64 freebsd-amd64 openbsd-amd64 darwin-amd64}"
+: "${TARGETS:=linux-amd64 linux-arm64 freebsd-amd64 openbsd-amd64 darwin-amd64 darwin-arm64}"
+: "${BIN:=bin}"
+
+function remove_version_prefix() {
+    echo "$1" | sed -e s#^rolling-shutter/##
+}
 
 if [[ -z "${VERSION}" ]]; then
-   VERSION=$(git describe --tags --always --abbrev=4 --dirty --match 'rolling-shutter/v*' | sed -e s#^rolling-shutter/##)
+    VERSION=$(git describe --tags --always --abbrev=4 --dirty --match 'rolling-shutter/v*')
 fi
+
+VERSION=$(remove_version_prefix "$VERSION")
 
 git clean -xfd bin
 for osarch in ${TARGETS}; do
     IFS='-' read -r os arch <<< "${osarch}"
-    target=bin/rolling-shutter-${os}-${arch}-${VERSION}
+    target=${BIN}/rolling-shutter-${os}-${arch}-${VERSION}
     echo "Building ${target}"
     env GOARCH="${arch}" GOOS="${os}" ${GO} build -o "${target}" -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=${VERSION}" .
 done
