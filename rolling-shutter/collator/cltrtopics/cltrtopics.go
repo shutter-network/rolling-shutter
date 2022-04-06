@@ -7,4 +7,5 @@ import (
 const (
 	CipherBatch       = "cipherBatch"
 	DecryptionTrigger = kprtopics.DecryptionTrigger
+	DecryptionKey     = kprtopics.DecryptionKey
 )
