@@ -102,6 +102,14 @@
   (fn [sys {:keyper/keys [description]}]
     description))
 
+(defmethod runner/run ::add-spare-keyper-set
+  [sys m]
+  (runner/dispatch sys {:run :process/run
+                        :process/id :add-spare-keyper-set
+                        :process/wait true
+                        :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/add-spare-keyper-set.js"]
+                        :process/opts {:dir (str (fs/path play/repo-root "contracts"))}}))
+
 (defmethod runner/run ::configure-keypers
   [sys m]
   (let [deploy-conf (build/sys-deploy-conf sys)
@@ -353,6 +361,7 @@
                     {:check :keyper/non-zero-activation-block
                      :keyper/num keyper})
 
+                  {:run ::add-spare-keyper-set}
                   {:run ::configure-keypers}
 
                   {:check :loop/until
