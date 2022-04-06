@@ -35,6 +35,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /eon:
+    get:
+      description: Get all EonPublicKey messages for an Eon
+      operationId: GetEonPublicKeyMessages
+      parameters:
+        - name: activation_block
+          in: query
+          description: Upper bound for block near the activation block for queried Eon
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Eon information and all keypers signed public-key messages byte encoded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Eon"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /tx:
     post:
       description: Submit an encrypted transaction
@@ -87,6 +112,24 @@ components:
         - id
       properties:
         id:
+          type: string
+          format: byte
+    Eon:
+      type: object
+      required:
+        - signed_messages
+        - activation_block_number
+        - eon_public_key
+      properties:
+        signed_messages:
+          type: array
+          items:
+            type: string
+            format: byte
+        activation_block_number:
+          type: integer
+          format: int64
+        eon_public_key:
           type: string
           format: byte
     Error:
