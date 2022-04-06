@@ -13,9 +13,17 @@ import (
 	"path"
 	"strings"
 
+	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 )
+
+// Eon defines model for Eon.
+type Eon struct {
+	ActivationBlockNumber int64    `json:"activation_block_number"`
+	EonPublicKey          []byte   `json:"eon_public_key"`
+	SignedMessages        [][]byte `json:"signed_messages"`
+}
 
 // Error defines model for Error.
 type Error struct {
@@ -39,6 +47,12 @@ type TransactionId struct {
 	Id []byte `json:"id"`
 }
 
+// GetEonPublicKeyMessagesParams defines parameters for GetEonPublicKeyMessages.
+type GetEonPublicKeyMessagesParams struct {
+	// Upper bound for block near the activation block for queried Eon
+	ActivationBlock int64 `json:"activation_block"`
+}
+
 // SubmitTransactionJSONBody defines parameters for SubmitTransaction.
 type SubmitTransactionJSONBody Transaction
 
@@ -47,6 +61,9 @@ type SubmitTransactionJSONRequestBody SubmitTransactionJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /eon)
+	GetEonPublicKeyMessages(w http.ResponseWriter, r *http.Request, params GetEonPublicKeyMessagesParams)
 
 	// (GET /next-epoch)
 	GetNextEpoch(w http.ResponseWriter, r *http.Request)
@@ -66,6 +83,40 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// GetEonPublicKeyMessages operation middleware
+func (siw *ServerInterfaceWrapper) GetEonPublicKeyMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEonPublicKeyMessagesParams
+
+	// ------------- Required query parameter "activation_block" -------------
+	if paramValue := r.URL.Query().Get("activation_block"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "activation_block"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "activation_block", r.URL.Query(), &params.ActivationBlock)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "activation_block", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEonPublicKeyMessages(w, r, params)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // GetNextEpoch operation middleware
 func (siw *ServerInterfaceWrapper) GetNextEpoch(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +277,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/eon", wrapper.GetEonPublicKeyMessages)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/next-epoch", wrapper.GetNextEpoch)
 	})
 	r.Group(func(r chi.Router) {
@@ -241,16 +295,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/8RUTW/UMBD9K9aAxCXdhPaWG0gV2gOoEnsDhLzObOKS2GY8Kbuq8t+R7d1NQlMVpFac",
-	"4mQ+3st7M74HZTtnDRr2UN6DVw12Mh6viSyFgyPrkFhj/KxsheG5s9RJhhK04atLyIAPDtMr1kgwZNCh",
-	"97KO2cegZ9KmhmHIgPBnrwkrKL+knmP+t3Mzu71FxaHXJ9zztbOqechIVzM+2wPjSOcRRF0tomxIGi8V",
-	"a2se4qBRdHCM1Xfe/wViBnji+2/cUlk2x3uC7bp6QV1CkjY7m+w3LBWHo5Fd7NT0zEgXBvmXpR+QQU8t",
-	"lNAwuzLPj+HVMZwH4hV6RdolmWHTaC/Spy16wQ0Ksm2rTS2OxW+8ULZtJVsS727Wgq3w/bbTLHiUwEMG",
-	"rVZoPE7YfVxvAiJrbsPrH43PbSGDOySfCBWrt6siVFmHRjoNJVytilUBGTjJTRQ3N7jni7PDNUZJ5j/2",
-	"AVkE3YIB2hoht7bn+H+hWMTirwYiDsmTjaFsnPZgj3fW+OTpZVGcXEATIaVzrVaxOr/1aW7TFofTa8Id",
-	"lPAqH9c8P+54PoJEh+fc10/wTjbuZN/ysxFKN84Cmd7g3qFirASecoYMchdG+DH1b7Sp0zR5pDukBaVD",
-	"ylxh07dtbJ1W3Fm/0Plzmj1pxHlFp4P4ACblb2YZYenQ83tbHZ5NvynCgoqT8LhBMN1/ph6HF5y4+YW1",
-	"QHGiotDV/5+xYfgdAAD//1fUUtQhBwAA",
+	"H4sIAAAAAAAC/8xV34vjNhD+V4Ra6Is3Tu9KH/zWQiihXFlo+nQ9gmxPEl3skW403sYc/t+LJCe2Ey+X",
+	"g13Yp8TS/Pjmm5lPX2VhamsQkJ3MvkpXHKBW4e/KoP+xZCwQawiHqmD9pFgb3OaVKY5bbOocyF/tDNWK",
+	"ZSY18q+/yERyayF+wh5IdokEg1vb5JUutkdoJ055yzD4OCaNe+/i9B6h3NbgnNpHDJqhdnc59weKSLWy",
+	"6xJJ8KXRBKXMPt5ETp4t7gb4p0tok3+Ggn2uFZGhW8IKU8I1O+/fzbLTI/HWV5VcIQ8xB/s5NH/BiVfW",
+	"FIdbRLq8g7urjLqczbIhhc6zNjcqgAW1lqHc8umubsEZ7/dhi27JNN830K7LV+TFG2ncmdh+ZFWw/4uq",
+	"DpEODTPQAwL/Z+goE9lQJTN5YLZZmvbXi/469cBLcAVpG2mWm4N2Ih7l4AQfQJCpKo170Tv/5ERhqkqx",
+	"IfHb41qwEa7Ja82CBwr8wFe6AHQwQvdhvQmLo7nyn1eBL2FlIp+AXAS0XPy8WHovYwGV1TKT7xfLxVIm",
+	"0io+BHJTiCOyh8DFtKI/gIWqKrEy+BiW7E9oxXkvxc6QUOgvZUhB6txB7zj2+TCsslWkamAgJ7OP1/n+",
+	"sRZI5KbBMkQPyy4QFAU2Bxnob7zNlwZIQ9nD0D6MP2plcqbuWj3keFSYGkh6db1LLLtP3t1Zgy6O57vl",
+	"8jxQgIFEZW2li5Ax/ewiv0OGHwl2MpM/pIPAp726p76IMKZTXlYGhR9cD81Xr7AMfTlCa4GciIopohA+",
+	"HMdN8tsiAL0ylXFkd6qp+OUQB3WdwdwgnCwUDKWAs02XyBThxA8XRXl27Cbl5qbhMAHeWQTnf2eHblDX",
+	"V2zSkGSm7PU3cL+JHlgvmc+x/6hxH9XLAT0BzTDtTaYMY1NVIXR8UqxxM5H/jlqnUFyehLHw3aSJ9puJ",
+	"hd9ccPy7KdsX42+cYYbF0fWg2Dci0r3ixE0fyBmIIxaFfgN73nX/BwAA//9IRxx3wAoAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
