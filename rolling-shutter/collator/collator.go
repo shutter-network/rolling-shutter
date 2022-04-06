@@ -16,10 +16,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
@@ -37,13 +35,8 @@ type collator struct {
 
 	contracts *deployment.Contracts
 
-	p2p    *p2p.P2P
+	p2p    *p2p.P2PHandler
 	dbpool *pgxpool.Pool
-}
-
-var gossipTopicNames = []string{
-	cltrtopics.CipherBatch,
-	cltrtopics.DecryptionTrigger,
 }
 
 func Run(ctx context.Context, config Config) error {
@@ -91,6 +84,8 @@ func Run(ctx context.Context, config Config) error {
 
 		dbpool: dbpool,
 	}
+	c.setupP2PHandler()
+
 	return c.run(ctx)
 }
 
@@ -112,6 +107,11 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
 	}
 	return err
+}
+
+func (c *collator) setupP2PHandler() {
+	c.p2p.AddGossipTopic(cltrtopics.CipherBatch)
+	c.p2p.AddGossipTopic(cltrtopics.DecryptionTrigger)
 }
 
 func (c *collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
@@ -176,7 +176,7 @@ func (c *collator) run(ctx context.Context) error {
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	errorgroup.Go(func() error {
-		return c.p2p.Run(errorctx, gossipTopicNames, map[string]pubsub.Validator{})
+		return c.p2p.Run(errorctx)
 	})
 	errorgroup.Go(func() error {
 		return c.processEpochLoop(errorctx)
@@ -229,22 +229,12 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		return err
 	}
 	for _, msgOut := range outMessages {
-		if err := c.sendMessage(ctx, msgOut); err != nil {
+		if err := c.p2p.SendMessage(ctx, msgOut); err != nil {
 			log.Printf("error sending message %+v: %s", msgOut, err)
 			continue
 		}
 	}
 	return nil
-}
-
-func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal p2p message")
-	}
-	log.Printf("sending %s", msg.LogInfo())
-
-	return c.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
 
 // getNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
