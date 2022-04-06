@@ -26,7 +26,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
@@ -144,7 +144,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)

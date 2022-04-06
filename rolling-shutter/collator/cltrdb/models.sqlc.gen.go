@@ -9,6 +9,19 @@ type DecryptionTrigger struct {
 	BatchHash []byte
 }
 
+type Eon struct {
+	ActivationBlockNumber int64
+	EonPublicKey          []byte
+	Threshold             int64
+}
+
+type EonPublicKeyMessage struct {
+	EonPublicKey          []byte
+	ActivationBlockNumber int64
+	KeyperIndex           int64
+	MsgBytes              []byte
+}
+
 type MetaInf struct {
 	Key   string
 	Value string

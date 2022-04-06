@@ -61,7 +61,7 @@ func NewTestDBPool(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
 	return dbpool, closedb
 }
 
-func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, func()) {
+func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, *pgxpool.Pool, func()) {
 	t.Helper()
 
 	dbpool, closedb := NewTestDBPool(ctx, t)
@@ -71,10 +71,10 @@ func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, func())
 		closedb()
 		t.Fatalf("failed to initialize keyper db")
 	}
-	return db, closedb
+	return db, dbpool, closedb
 }
 
-func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, func()) {
+func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, *pgxpool.Pool, func()) {
 	t.Helper()
 
 	dbpool, closedb := NewTestDBPool(ctx, t)
@@ -85,5 +85,5 @@ func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, func
 		closedb()
 		t.Fatalf("failed to initialize collator db")
 	}
-	return db, closedb
+	return db, dbpool, closedb
 }
