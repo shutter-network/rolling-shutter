@@ -8,4 +8,5 @@ const (
 	CipherBatch       = "cipherBatch"
 	DecryptionTrigger = kprtopics.DecryptionTrigger
 	DecryptionKey     = kprtopics.DecryptionKey
+	EonPublicKey      = kprtopics.EonPublicKey
 )

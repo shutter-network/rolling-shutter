@@ -25,6 +25,11 @@ func initDB(ctx context.Context, tx pgx.Tx) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create collator tables")
 	}
+
+	_, err = tx.Exec(ctx, commondb.CreateObserveTables)
+	if err != nil {
+		return errors.Wrap(err, "failed to create observe tables")
+	}
 	_, err = tx.Exec(ctx, commondb.CreateMetaInf)
 	if err != nil {
 		return errors.Wrap(err, "failed to create meta_inf table")

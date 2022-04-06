@@ -25,11 +25,7 @@ INSERT INTO keyper_set (
 SELECT * FROM keyper_set WHERE event_index=$1;
 
 -- name: GetKeyperSet :one
-SELECT (
-    activation_block_number,
-    keypers,
-    threshold
-) FROM keyper_set
+SELECT * FROM keyper_set
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1;
 

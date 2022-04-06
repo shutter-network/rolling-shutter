@@ -19,12 +19,14 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/shutter-network/shutter/shuttermint/chainobserver"
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
 	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -110,7 +112,9 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 }
 
 func (c *collator) setupP2PHandler() {
-	c.p2p.AddGossipTopic(cltrtopics.CipherBatch)
+	p2p.AddValidator(c.p2p, c.validateEonPublicKey)
+	p2p.AddHandlerFunc(c.p2p, c.handleEonPublicKey)
+
 	c.p2p.AddGossipTopic(cltrtopics.DecryptionTrigger)
 }
 
@@ -176,6 +180,9 @@ func (c *collator) run(ctx context.Context) error {
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	errorgroup.Go(func() error {
+		return c.handleContractEvents(errorctx)
+	})
+	errorgroup.Go(func() error {
 		return c.p2p.Run(errorctx)
 	})
 	errorgroup.Go(func() error {
@@ -183,6 +190,13 @@ func (c *collator) run(ctx context.Context) error {
 	})
 
 	return errorgroup.Wait()
+}
+
+func (c *collator) handleContractEvents(ctx context.Context) error {
+	events := []*eventsyncer.EventType{
+		c.contracts.KeypersConfigsListNewConfig,
+	}
+	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }
 
 func (c *collator) processEpochLoop(ctx context.Context) error {

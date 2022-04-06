@@ -31,7 +31,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, closedb := testdb.NewCollatorTestDB(ctx, t)
+	db, _, closedb := testdb.NewCollatorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
 

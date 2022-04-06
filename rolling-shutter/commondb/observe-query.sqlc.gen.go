@@ -37,20 +37,21 @@ func (q *Queries) GetEventSyncProgress(ctx context.Context) (GetEventSyncProgres
 }
 
 const getKeyperSet = `-- name: GetKeyperSet :one
-SELECT (
-    activation_block_number,
-    keypers,
-    threshold
-) FROM keyper_set
+SELECT event_index, activation_block_number, keypers, threshold FROM keyper_set
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC LIMIT 1
 `
 
-func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64) (interface{}, error) {
+func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64) (KeyperSet, error) {
 	row := q.db.QueryRow(ctx, getKeyperSet, activationBlockNumber)
-	var column_1 interface{}
-	err := row.Scan(&column_1)
-	return column_1, err
+	var i KeyperSet
+	err := row.Scan(
+		&i.EventIndex,
+		&i.ActivationBlockNumber,
+		&i.Keypers,
+		&i.Threshold,
+	)
+	return i, err
 }
 
 const getKeyperSetByEventIndex = `-- name: GetKeyperSetByEventIndex :one
