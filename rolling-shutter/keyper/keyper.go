@@ -21,7 +21,6 @@ import (
 	"github.com/tendermint/tendermint/rpc/client"
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shuttermint/chainobserver"
 	"github.com/shutter-network/shutter/shuttermint/commondb"
@@ -29,19 +28,11 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kproapi"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
-
-var GossipTopicNames = []string{
-	kprtopics.DecryptionTrigger,
-	kprtopics.DecryptionKeyShare,
-	kprtopics.DecryptionKey,
-	kprtopics.EonPublicKey,
-}
 
 type keyper struct {
 	config            Config
@@ -52,7 +43,7 @@ type keyper struct {
 	contracts         *deployment.Contracts
 
 	shuttermintState *ShuttermintState
-	p2p              *p2p.P2P
+	p2p              *p2p.P2PHandler
 }
 
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
@@ -112,6 +103,12 @@ func Run(ctx context.Context, config Config) error {
 	}
 	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.SigningKey)
 
+	p2pHandler := p2p.New(p2p.Config{
+		ListenAddr:     config.ListenAddress,
+		PeerMultiaddrs: config.PeerMultiaddrs,
+		PrivKey:        config.P2PKey,
+	})
+
 	k := keyper{
 		config:            config,
 		dbpool:            dbpool,
@@ -121,13 +118,28 @@ func Run(ctx context.Context, config Config) error {
 		contracts:         contracts,
 
 		shuttermintState: NewShuttermintState(config),
-		p2p: p2p.New(p2p.Config{
-			ListenAddr:     config.ListenAddress,
-			PeerMultiaddrs: config.PeerMultiaddrs,
-			PrivKey:        config.P2PKey,
-		}),
+		p2p:              p2pHandler,
 	}
+
+	k.setupP2PHandler()
+
 	return k.run(ctx)
+}
+
+func (kpr *keyper) setupP2PHandler() {
+	epochHandler := epochKGHandler{
+		config: kpr.config,
+		db:     kprdb.New(kpr.dbpool),
+	}
+
+	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKey)
+	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKeyShare)
+	p2p.AddValidator(kpr.p2p, kpr.validateEonPublicKey)
+	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionTrigger)
+
+	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionTrigger)
+	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionKeyShare)
+	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionKey)
 }
 
 func (kpr *keyper) setupAPIRouter(swagger *openapi3.T) http.Handler {
@@ -180,8 +192,6 @@ func (kpr *keyper) setupRouter() *chi.Mux {
 func (kpr *keyper) run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 
-	topicValidators := kpr.makeMessagesValidators()
-
 	if kpr.config.HTTPEnabled {
 		httpServer := &http.Server{
 			Addr:    kpr.config.HTTPListenAddress,
@@ -197,13 +207,10 @@ func (kpr *keyper) run(ctx context.Context) error {
 	}
 
 	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames, topicValidators)
+		return kpr.p2p.Run(ctx)
 	})
 	group.Go(func() error {
 		return kpr.operateShuttermint(ctx)
-	})
-	group.Go(func() error {
-		return kpr.operateP2P(ctx)
 	})
 	group.Go(func() error {
 		return kpr.broadcastEonPublicKeys(ctx)
@@ -348,22 +355,6 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	}
 }
 
-func (kpr *keyper) operateP2P(ctx context.Context) error {
-	for {
-		select {
-		case msg, ok := <-kpr.p2p.GossipMessages:
-			if !ok {
-				return nil
-			}
-			if err := kpr.handleP2PMessage(ctx, msg); err != nil {
-				log.Printf("error handling message %+v: %s", msg, err)
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
 func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 	for {
 		eonPublicKeys, err := kpr.db.GetAndDeleteEonPublicKeys(ctx)
@@ -371,7 +362,7 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			err := kpr.sendMessage(ctx, &shmsg.EonPublicKey{
+			err := kpr.p2p.SendMessage(ctx, &shmsg.EonPublicKey{
 				PublicKey:  eonPublicKey.EonPublicKey,
 				Eon:        uint64(eonPublicKey.Eon),
 				InstanceID: kpr.config.InstanceID,
@@ -386,52 +377,4 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 		case <-time.After(2 * time.Second):
 		}
 	}
-}
-
-func (kpr *keyper) handleP2PMessage(ctx context.Context, msg *p2p.Message) error {
-	var msgsOut []shmsg.P2PMessage
-	var err error
-
-	unmarshalled, err := msg.Unmarshal()
-	if err != nil {
-		return err
-	}
-
-	handler := epochKGHandler{
-		config: kpr.config,
-		db:     kprdb.New(kpr.dbpool),
-	}
-
-	switch typedMsg := unmarshalled.(type) {
-	case *shmsg.DecryptionTrigger:
-		msgsOut, err = handler.handleDecryptionTrigger(ctx, typedMsg)
-	case *shmsg.DecryptionKeyShare:
-		msgsOut, err = handler.handleDecryptionKeyShare(ctx, typedMsg)
-	case *shmsg.DecryptionKey:
-		msgsOut, err = handler.handleDecryptionKey(ctx, typedMsg)
-	default:
-		log.Println("ignoring message received on topic", msg.Topic)
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-	for _, msgOut := range msgsOut {
-		if err := kpr.sendMessage(ctx, msgOut); err != nil {
-			log.Printf("error sending message %+v: %s", msgOut, err)
-			continue
-		}
-	}
-	return nil
-}
-
-func (kpr *keyper) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal p2p message")
-	}
-	log.Printf("sending %s", msg.LogInfo())
-
-	return kpr.p2p.Publish(ctx, msg.Topic(), msgBytes)
 }
