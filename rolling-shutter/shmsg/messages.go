@@ -14,7 +14,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
@@ -27,9 +26,6 @@ var messageTypes = []P2PMessage{
 	new(DecryptionTrigger),
 	new(DecryptionKeyShare),
 	new(EonPublicKey),
-
-	// Collator messages
-	new(CipherBatch),
 }
 
 var topicToProtoName = make(map[string]protoreflect.FullName)
@@ -165,29 +161,6 @@ func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) 
 func (key *DecryptionKey) Validate() error {
 	_, err := key.GetEpochSecretKey()
 	return err
-}
-
-func (*CipherBatch) ImplementsP2PMessage() {
-}
-
-func (batch *CipherBatch) LogInfo() string {
-	return fmt.Sprintf(
-		"CipherBatch{epochid=%s, num tx=%d}",
-		epochid.LogInfo(batch.DecryptionTrigger.EpochID),
-		len(batch.Transactions),
-	)
-}
-
-func (*CipherBatch) Topic() string {
-	return cltrtopics.CipherBatch
-}
-
-func (cipherBatch *CipherBatch) GetInstanceID() uint64 {
-	return cipherBatch.DecryptionTrigger.GetInstanceID()
-}
-
-func (*CipherBatch) Validate() error {
-	return nil
 }
 
 func (*EonPublicKey) ImplementsP2PMessage() {
