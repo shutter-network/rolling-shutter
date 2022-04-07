@@ -63,10 +63,6 @@ func startNextEpoch(
 	if err != nil {
 		return nil, err
 	}
-	batch := &shmsg.CipherBatch{
-		DecryptionTrigger: trigger,
-		Transactions:      transactions,
-	}
 
-	return []shmsg.P2PMessage{batch, trigger}, nil
+	return []shmsg.P2PMessage{trigger}, nil
 }

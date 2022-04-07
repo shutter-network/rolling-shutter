@@ -58,13 +58,9 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	assert.Equal(t, shdb.DecodeUint64(stored.EpochID), nextEpochID)
 	assert.DeepEqual(t, stored.BatchHash, transactionsHash)
 
-	batchMsg := msgs[0].(*shmsg.CipherBatch)
-	assert.Equal(t, batchMsg.DecryptionTrigger.InstanceID, config.InstanceID)
-	assert.Equal(t, batchMsg.DecryptionTrigger.EpochID, nextEpochID)
-	assert.DeepEqual(t, batchMsg.Transactions, [][]byte{{'f', 'o', 'o', 'b', 'a', 'r'}})
-
 	// make sure output is trigger message
-	triggerMsg := msgs[1].(*shmsg.DecryptionTrigger)
+	assert.Equal(t, len(msgs), 1)
+	triggerMsg := msgs[0].(*shmsg.DecryptionTrigger)
 	assert.Equal(t, triggerMsg.InstanceID, config.InstanceID)
 	assert.Equal(t, triggerMsg.EpochID, nextEpochID)
 	assert.DeepEqual(t, triggerMsg.TransactionsHash, transactionsHash)
