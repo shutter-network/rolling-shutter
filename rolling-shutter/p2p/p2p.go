@@ -36,7 +36,7 @@ type Config struct {
 	PrivKey        p2pcrypto.PrivKey
 }
 
-func New(config Config) *P2P {
+func NewP2P(config Config) *P2P {
 	p := P2P{
 		Config:         config,
 		host:           nil,
@@ -47,7 +47,7 @@ func New(config Config) *P2P {
 	return &p
 }
 
-func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[string]pubsub.Validator) error {
+func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators ValidatorRegistry) error {
 	defer func() {
 		close(p.GossipMessages)
 	}()

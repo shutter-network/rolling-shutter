@@ -138,7 +138,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	for _, msg := range msgs {
-		if err := srv.kpr.sendMessage(ctx, msg); err != nil {
+		if err := srv.kpr.p2p.SendMessage(ctx, msg); err != nil {
 			log.Printf("error sending message %+v: %s", msg, err)
 			continue
 		}

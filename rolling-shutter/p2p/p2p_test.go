@@ -58,7 +58,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 			ListenAddr:     listenAddrs[i],
 			PeerMultiaddrs: nodeAddrs,
 			PrivKey:        privKeys[i],
-		})
+		}).P2P
 		p2ps = append(p2ps, p)
 		waitGroup.Add(1)
 		go func() {

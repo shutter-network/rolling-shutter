@@ -49,7 +49,7 @@ func New(config Config) (*MockNode, error) {
 		PeerMultiaddrs: config.PeerMultiaddrs,
 		PrivKey:        config.P2PKey,
 	}
-	p := p2p.New(p2pConfig)
+	p := p2p.New(p2pConfig).P2P
 
 	eonSecretKeyShare, eonPublicKey, err := computeEonKeys(config.EonKeySeed)
 	if err != nil {

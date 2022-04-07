@@ -15,6 +15,7 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
@@ -36,10 +37,12 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
 
-	kpr := keyper{config: config, db: db}
+	p2pHandler := p2p.New(p2p.Config{})
+	kpr := keyper{config: config, db: db, p2p: p2pHandler}
 	var peerID peer.ID
 
-	validators := kpr.makeMessagesValidators()
+	validateDecryptionKey := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKey)
+	validateDecryptionKeyShare := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKeyShare)
 
 	tests := []struct {
 		name      string
@@ -48,8 +51,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		msg       shmsg.P2PMessage
 	}{
 		{
-			name:  "valid decryption key",
-			valid: true,
+			name:      "valid decryption key",
+			valid:     true,
+			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				EpochID:    epochID,
@@ -57,8 +61,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key wrong epoch",
-			valid: false,
+			name:      "invalid decryption key wrong epoch",
+			valid:     false,
+			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				EpochID:    wrongEpochID,
@@ -66,8 +71,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key wrong instance ID",
-			valid: false,
+			name:      "invalid decryption key wrong instance ID",
+			valid:     false,
+			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
 				EpochID:    epochID,
@@ -75,8 +81,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid decryption key share",
-			valid: true,
+			name:      "valid decryption key share",
+			valid:     true,
+			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				EpochID:     epochID,
@@ -85,8 +92,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong epoch",
-			valid: false,
+			name:      "invalid decryption key share wrong epoch",
+			valid:     false,
+			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				EpochID:     epochID + 1,
@@ -95,8 +103,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong instance ID",
-			valid: false,
+			name:      "invalid decryption key share wrong instance ID",
+			valid:     false,
+			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID + 1,
 				EpochID:     epochID,
@@ -105,8 +114,9 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong keyper index",
-			valid: false,
+			name:      "invalid decryption key share wrong keyper index",
+			valid:     false,
+			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				EpochID:     epochID,
@@ -117,18 +127,12 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 	for _, tc := range tests {
 		topic := tc.msg.Topic()
-		validator, ok := validators[topic]
-		if !ok {
-			t.Fatalf("No validator found for topic <%s>, maybe Keyper.makeMessagesValidators() "+
-				"does not register the corresponding Message validator?",
-				topic)
-		}
 		t.Run(tc.name, func(t *testing.T) {
 			pubsubMessage, err := makePubSubMessage(tc.msg, topic)
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMessage), tc.valid,
+			assert.Equal(t, tc.validator(ctx, peerID, pubsubMessage), tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}
@@ -144,7 +148,8 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	defer closedb()
 
 	config := newTestConfig(t)
-	kpr := keyper{config: config, db: db}
+	p2pHandler := p2p.New(p2p.Config{})
+	kpr := keyper{config: config, db: db, p2p: p2pHandler}
 
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
@@ -174,7 +179,8 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	var peerID peer.ID
-	validators := kpr.makeMessagesValidators()
+
+	validateDecryptionTrigger := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionTrigger)
 
 	tests := []struct {
 		name       string
@@ -229,17 +235,11 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 			)
 			assert.NilError(t, err)
 			topic := msg.Topic()
-			validator, ok := validators[topic]
-			if !ok {
-				t.Fatalf("No validator found for topic <%s>, maybe Keeper.makeMessagesValidators() "+
-					"does not register the corresponding Message validator?",
-					topic)
-			}
 			pubsubMsg, err := makePubSubMessage(msg, topic)
 			if err != nil {
 				t.Fatalf("Error in makePubSubMessage: %s", err)
 			}
-			assert.Equal(t, validator(ctx, peerID, pubsubMsg), tc.valid,
+			assert.Equal(t, validateDecryptionTrigger(ctx, peerID, pubsubMsg), tc.valid,
 				"validate failed valid=%t", tc.valid)
 		})
 	}
