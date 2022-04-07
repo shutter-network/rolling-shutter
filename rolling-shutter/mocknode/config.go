@@ -21,7 +21,6 @@ type Config struct {
 	InstanceID             uint64
 	Rate                   float64
 	SendDecryptionTriggers bool
-	SendCipherBatches      bool
 	SendDecryptionKeys     bool
 	SendTransactions       bool
 
@@ -43,7 +42,6 @@ P2PKey          = "{{ .P2PKey | P2PKey}}"
 InstanceID              = {{ .InstanceID }}
 Rate                    = {{ .Rate }}
 SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
-SendCipherBatches       = {{ .SendCipherBatches }}
 SendDecryptionKeys      = {{ .SendDecryptionKeys }}
 SendTransactions        = {{ .SendTransactions }}
 

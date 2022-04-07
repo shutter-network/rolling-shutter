@@ -24,11 +24,6 @@ message DecryptionKey {
     bytes key = 3;
 }
 
-message CipherBatch {
-    DecryptionTrigger decryption_trigger = 1;
-    repeated bytes transactions = 2;
-}
-
 message EonPublicKey {
     uint64 instanceID = 1;
     bytes publicKey= 2;

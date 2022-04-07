@@ -105,7 +105,6 @@ func exampleConfig() (*mocknode.Config, error) {
 		InstanceID:             0,
 		Rate:                   1.0,
 		SendDecryptionTriggers: true,
-		SendCipherBatches:      true,
 		SendDecryptionKeys:     true,
 		SendTransactions:       true,
 
