@@ -17,7 +17,8 @@ contract KeypersConfigsList is Ownable {
 
     event NewConfig(
         uint64 activationBlockNumber,
-        uint64 index,
+        uint64 keyperSetIndex,
+        uint64 keyperConfigIndex,
         uint64 threshold
     );
 
@@ -30,7 +31,12 @@ contract KeypersConfigsList is Ownable {
         keypersConfigs.push(
             KeypersConfig({activationBlockNumber: 0, setIndex: 0, threshold: 0})
         );
-        emit NewConfig({activationBlockNumber: 0, index: 0, threshold: 0});
+        emit NewConfig({
+            activationBlockNumber: 0,
+            keyperSetIndex: 0,
+            keyperConfigIndex: 0,
+            threshold: 0
+        });
     }
 
     function addNewCfg(KeypersConfig calldata config) public onlyOwner {
@@ -64,7 +70,8 @@ contract KeypersConfigsList is Ownable {
         keypersConfigs.push(config);
         emit NewConfig({
             activationBlockNumber: config.activationBlockNumber,
-            index: config.setIndex,
+            keyperSetIndex: config.setIndex,
+            keyperConfigIndex: uint64(keypersConfigs.length) - 1,
             threshold: config.threshold
         });
     }
