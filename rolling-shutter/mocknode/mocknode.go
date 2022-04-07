@@ -9,10 +9,8 @@ import (
 	"time"
 
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/collator/client"
@@ -22,19 +20,13 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
-var gossipTopicNames = []string{
-	kprtopics.DecryptionTrigger,
-	kprtopics.EonPublicKey,
-	kprtopics.DecryptionKey,
-}
-
 type MockNode struct {
 	Config Config
 
 	mux sync.Mutex
 
 	collatorClient *client.Client
-	p2p            *p2p.P2P
+	p2p            *p2p.P2PHandler
 
 	eonSecretKeyShare *shcrypto.EonSecretKeyShare
 	eonPublicKey      *shcrypto.EonPublicKey
@@ -44,13 +36,6 @@ type MockNode struct {
 }
 
 func New(config Config) (*MockNode, error) {
-	p2pConfig := p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-	}
-	p := p2p.New(p2pConfig).P2P
-
 	eonSecretKeyShare, eonPublicKey, err := computeEonKeys(config.EonKeySeed)
 	if err != nil {
 		return nil, err
@@ -61,18 +46,24 @@ func New(config Config) (*MockNode, error) {
 		return nil, err
 	}
 
-	return &MockNode{
+	node := &MockNode{
 		Config: config,
 
 		collatorClient: collatorClient,
-		p2p:            p,
+		p2p: p2p.New(p2p.Config{
+			ListenAddr:     config.ListenAddress,
+			PeerMultiaddrs: config.PeerMultiaddrs,
+			PrivKey:        config.P2PKey,
+		}),
 
 		eonSecretKeyShare: eonSecretKeyShare,
 		eonPublicKey:      eonPublicKey,
 
 		plainTxsSent:  make(map[uint64][][]byte),
 		cipherTxsSent: make(map[uint64][][]byte),
-	}, nil
+	}
+	node.setupP2PHandler()
+	return node, nil
 }
 
 func (m *MockNode) Run(ctx context.Context) error {
@@ -82,10 +73,7 @@ func (m *MockNode) Run(ctx context.Context) error {
 
 	g, errctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames, make(map[string]pubsub.Validator))
-	})
-	g.Go(func() error {
-		return m.listen(errctx)
+		return m.p2p.Run(errctx)
 	})
 	g.Go(func() error {
 		return m.sendMessages(errctx)
@@ -99,6 +87,13 @@ func (m *MockNode) Run(ctx context.Context) error {
 	return g.Wait()
 }
 
+func (m *MockNode) setupP2PHandler() {
+	p2p.AddHandlerFunc(m.p2p, m.handleEonPublicKey)
+
+	m.p2p.AddGossipTopic(kprtopics.DecryptionTrigger)
+	m.p2p.AddGossipTopic(kprtopics.DecryptionKey)
+}
+
 func (m *MockNode) logStartupInfo() error {
 	eonPublicKey := m.eonPublicKey.Marshal()
 	log.Println("starting mocknode")
@@ -106,46 +101,14 @@ func (m *MockNode) logStartupInfo() error {
 	return nil
 }
 
-func (m *MockNode) listen(ctx context.Context) error {
-	for {
-		select {
-		case msg, ok := <-m.p2p.GossipMessages:
-			if !ok {
-				return nil
-			}
-			m.handleMessage(msg)
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+func (m *MockNode) handleEonPublicKey(_ context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
+		log.Printf("error while unmarshalling eon public key: %s", err)
 	}
-}
-
-func (m *MockNode) handleMessage(plainMsg *p2p.Message) {
-	switch plainMsg.Topic {
-	case kprtopics.EonPublicKey:
-		msg := shmsg.EonPublicKey{}
-		if err := proto.Unmarshal(plainMsg.Message, &msg); err != nil {
-			log.Printf(
-				"received invalid message on topic %s from %s: %X",
-				plainMsg.Topic,
-				plainMsg.SenderID,
-				plainMsg.Message,
-			)
-		}
-		m.mux.Lock()
-		defer m.mux.Unlock()
-		if err := m.eonPublicKey.Unmarshal(msg.PublicKey); err != nil {
-			log.Printf("error while unmarshalling eon public key: %s", err)
-		}
-		log.Printf("updated eon public key from messages to %s", (*bn256.G2)(m.eonPublicKey))
-	default:
-		log.Printf(
-			"received message on topic %s from %s: %X",
-			plainMsg.Topic,
-			plainMsg.SenderID,
-			plainMsg.Message,
-		)
-	}
+	log.Printf("updated eon public key from messages to %s", (*bn256.G2)(m.eonPublicKey))
+	return make([]shmsg.P2PMessage, 0), nil
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {
@@ -284,11 +247,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
 	}
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return m.p2p.Publish(ctx, msg.Topic(), msgBytes)
+	return m.p2p.SendMessage(ctx, msg)
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
@@ -306,9 +265,5 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 		EpochID:    epochID,
 		Key:        keyBytes,
 	}
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return m.p2p.Publish(ctx, msg.Topic(), msgBytes)
+	return m.p2p.SendMessage(ctx, msg)
 }
