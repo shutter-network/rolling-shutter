@@ -270,11 +270,6 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 			return err
 		}
 	}
-	if m.Config.SendCipherBatches {
-		if err := m.sendCipherBatchMessage(ctx, epochID); err != nil {
-			return err
-		}
-	}
 	if m.Config.SendDecryptionKeys {
 		if err := m.sendDecryptionKey(ctx, epochID); err != nil {
 			return err
@@ -294,47 +289,6 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 		return err
 	}
 	return m.p2p.Publish(ctx, msg.Topic(), msgBytes)
-}
-
-func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
-	if _, ok := m.plainTxsSent[epochID]; ok {
-		return errors.Errorf("cipher batch for epoch %d already sent", epochID)
-	}
-	log.Printf("sending cipher batch for epoch %d", epochID)
-
-	plainTxs := [][]byte{}
-	cipherTxs := [][]byte{}
-	for i := 0; i < 3; i++ {
-		plainTx, cipherTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
-		if err != nil {
-			return err
-		}
-		plainTxs = append(plainTxs, plainTx)
-		cipherTxs = append(cipherTxs, cipherTx)
-	}
-
-	msg := &shmsg.CipherBatch{
-		DecryptionTrigger: &shmsg.DecryptionTrigger{
-			InstanceID: m.Config.InstanceID,
-			EpochID:    epochID,
-		},
-		Transactions: cipherTxs,
-	}
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	if err := m.p2p.Publish(ctx, msg.Topic(), msgBytes); err != nil {
-		return err
-	}
-
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	m.plainTxsSent[epochID] = plainTxs
-	m.cipherTxsSent[epochID] = cipherTxs
-
-	return nil
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
