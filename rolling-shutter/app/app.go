@@ -60,6 +60,11 @@ func (app *ShutterApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	if string(msg.ChainId) != app.ChainID {
 		return abcitypes.ResponseCheckTx{Code: 1, Log: "wrong chain"}
 	}
+
+	// Check that the message's nonce has not been used by the sender yet. Note that
+	// `app.NonceTracker` keeps track of nonces of transactions included in the chain, while
+	// `app.CheckTxState` keeps track of all transactions in the mempool checked since the last
+	// `Commit`.
 	if !app.NonceTracker.Check(signer, msg.RandomNonce) {
 		return abcitypes.ResponseCheckTx{Code: 1, Log: "nonce already used"}
 	}

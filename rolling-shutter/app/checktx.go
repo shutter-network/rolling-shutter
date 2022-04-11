@@ -32,8 +32,8 @@ func (s *CheckTxState) SetMembers(members []common.Address) {
 }
 
 // AddTx checks if a tx can be added and updates the internal state accordingly.
-// Returns true if the sender is a member (or the member set is empty) and has not exceeded their
-// tx limit yet.
+// Returns true if the sender is a member (or the member set is empty), has not exceeded their
+// tx limit yet, and has not used the message's nonce since the last call to `Reset`.
 func (s *CheckTxState) AddTx(sender common.Address, msg *shmsg.MessageWithNonce) bool {
 	if len(s.Members) > 0 && !s.Members[sender] {
 		return false
