@@ -7,6 +7,11 @@ CREATE TABLE decryption_trigger(
     batch_hash bytea
 );
 
+CREATE TABLE decryption_key (
+       epoch_id bytea PRIMARY KEY,
+       decryption_key bytea
+);
+
 CREATE TABLE transaction(
        tx_id bytea PRIMARY KEY,
        epoch_id bytea,

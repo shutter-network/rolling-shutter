@@ -20,6 +20,7 @@ type epochKGHandler struct {
 }
 
 func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *shmsg.DecryptionTrigger) ([]shmsg.P2PMessage, error) {
+	log.Printf("received decryption trigger for epoch %d, sending decryption key share now.", msg.EpochID)
 	return h.sendDecryptionKeyShare(ctx, msg.EpochID)
 }
 

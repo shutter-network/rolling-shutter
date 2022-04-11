@@ -5,7 +5,36 @@ package cltrdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgconn"
 )
+
+const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
+SELECT EXISTS (
+    SELECT 1
+    FROM decryption_key
+    WHERE epoch_id = $1
+)
+`
+
+func (q *Queries) ExistsDecryptionKey(ctx context.Context, epochID []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDecryptionKey, epochID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const getDecryptionKey = `-- name: GetDecryptionKey :one
+SELECT epoch_id, decryption_key FROM decryption_key
+WHERE epoch_id = $1
+`
+
+func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptionKey, error) {
+	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
+	var i DecryptionKey
+	err := row.Scan(&i.EpochID, &i.DecryptionKey)
+	return i, err
+}
 
 const getEonForBlock = `-- name: GetEonForBlock :one
 SELECT activation_block_number, eon_public_key, threshold FROM eon
@@ -155,6 +184,21 @@ type InsertCandidateEonIfNotExistsParams struct {
 func (q *Queries) InsertCandidateEonIfNotExists(ctx context.Context, arg InsertCandidateEonIfNotExistsParams) error {
 	_, err := q.db.Exec(ctx, insertCandidateEonIfNotExists, arg.ActivationBlockNumber, arg.EonPublicKey, arg.Threshold)
 	return err
+}
+
+const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
+INSERT INTO decryption_key (epoch_id, decryption_key)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDecryptionKeyParams struct {
+	EpochID       []byte
+	DecryptionKey []byte
+}
+
+func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
 }
 
 const insertEonPublicKeyMessage = `-- name: InsertEonPublicKeyMessage :exec

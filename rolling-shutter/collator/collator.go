@@ -115,6 +115,9 @@ func (c *collator) setupP2PHandler() {
 	p2p.AddValidator(c.p2p, c.validateEonPublicKey)
 	p2p.AddHandlerFunc(c.p2p, c.handleEonPublicKey)
 
+	p2p.AddValidator(c.p2p, c.validateDecryptionKey)
+	p2p.AddHandlerFunc(c.p2p, c.handleDecryptionKey)
+
 	c.p2p.AddGossipTopic(cltrtopics.DecryptionTrigger)
 }
 
