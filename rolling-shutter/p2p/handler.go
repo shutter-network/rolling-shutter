@@ -209,6 +209,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 		return nil
 	}
 
+	log.Printf("received message (msg: %s, topic=%s, sender=%s)", m.LogInfo(), msg.Topic, msg.SenderID)
 	msgsOut, err = handlerFunc(ctx, m)
 	if err != nil {
 		return err

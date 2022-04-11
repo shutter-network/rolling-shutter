@@ -4,6 +4,11 @@ package cltrdb
 
 import ()
 
+type DecryptionKey struct {
+	EpochID       []byte
+	DecryptionKey []byte
+}
+
 type DecryptionTrigger struct {
 	EpochID   []byte
 	BatchHash []byte

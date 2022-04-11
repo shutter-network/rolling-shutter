@@ -4,6 +4,22 @@ INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 -- name: GetTrigger :one
 SELECT * FROM decryption_trigger WHERE epoch_id = $1;
 
+-- name: InsertDecryptionKey :execresult
+INSERT INTO decryption_key (epoch_id, decryption_key)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDecryptionKey :one
+SELECT * FROM decryption_key
+WHERE epoch_id = $1;
+
+-- name: ExistsDecryptionKey :one
+SELECT EXISTS (
+    SELECT 1
+    FROM decryption_key
+    WHERE epoch_id = $1
+);
+
 -- name: GetLastBatchEpochID :one
 SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1;
 
