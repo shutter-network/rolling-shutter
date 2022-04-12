@@ -361,14 +361,14 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 }
 
 const getLastBatchConfigSent = `-- name: GetLastBatchConfigSent :one
-SELECT event_index FROM last_batch_config_sent LIMIT 1
+SELECT keyper_config_index FROM last_batch_config_sent LIMIT 1
 `
 
 func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, getLastBatchConfigSent)
-	var event_index int64
-	err := row.Scan(&event_index)
-	return event_index, err
+	var keyper_config_index int64
+	err := row.Scan(&keyper_config_index)
+	return keyper_config_index, err
 }
 
 const getLastBlockSeen = `-- name: GetLastBlockSeen :one
@@ -715,13 +715,13 @@ func (q *Queries) SetBatchConfigStarted(ctx context.Context, configIndex int32) 
 }
 
 const setLastBatchConfigSent = `-- name: SetLastBatchConfigSent :exec
-INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
+INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET event_index = $1
+SET keyper_config_index = $1
 `
 
-func (q *Queries) SetLastBatchConfigSent(ctx context.Context, eventIndex int64) error {
-	_, err := q.db.Exec(ctx, setLastBatchConfigSent, eventIndex)
+func (q *Queries) SetLastBatchConfigSent(ctx context.Context, keyperConfigIndex int64) error {
+	_, err := q.db.Exec(ctx, setLastBatchConfigSent, keyperConfigIndex)
 	return err
 }
 

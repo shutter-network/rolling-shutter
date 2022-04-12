@@ -176,12 +176,12 @@ VALUES ($1, $2);
 DELETE FROM outgoing_eon_keys RETURNING *;
 
 -- name: SetLastBatchConfigSent :exec
-INSERT INTO last_batch_config_sent (event_index) VALUES ($1)
+INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET event_index = $1;
+SET keyper_config_index = $1;
 
 -- name: GetLastBatchConfigSent :one
-SELECT event_index FROM last_batch_config_sent LIMIT 1;
+SELECT keyper_config_index FROM last_batch_config_sent LIMIT 1;
 
 
 -- name: SetLastBlockSeen :exec

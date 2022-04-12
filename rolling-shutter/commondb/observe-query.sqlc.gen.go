@@ -53,15 +53,15 @@ func (q *Queries) GetKeyperSet(ctx context.Context, activationBlockNumber int64)
 	return column_1, err
 }
 
-const getKeyperSetByEventIndex = `-- name: GetKeyperSetByEventIndex :one
-SELECT event_index, activation_block_number, keypers, threshold FROM keyper_set WHERE event_index=$1
+const getKeyperSetByKeyperConfigIndex = `-- name: GetKeyperSetByKeyperConfigIndex :one
+SELECT keyper_config_index, activation_block_number, keypers, threshold FROM keyper_set WHERE keyper_config_index=$1
 `
 
-func (q *Queries) GetKeyperSetByEventIndex(ctx context.Context, eventIndex int64) (KeyperSet, error) {
-	row := q.db.QueryRow(ctx, getKeyperSetByEventIndex, eventIndex)
+func (q *Queries) GetKeyperSetByKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (KeyperSet, error) {
+	row := q.db.QueryRow(ctx, getKeyperSetByKeyperConfigIndex, keyperConfigIndex)
 	var i KeyperSet
 	err := row.Scan(
-		&i.EventIndex,
+		&i.KeyperConfigIndex,
 		&i.ActivationBlockNumber,
 		&i.Keypers,
 		&i.Threshold,
@@ -97,7 +97,7 @@ func (q *Queries) InsertChainCollator(ctx context.Context, arg InsertChainCollat
 
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
-    event_index,
+    keyper_config_index,
     activation_block_number,
     keypers,
     threshold
@@ -107,7 +107,7 @@ INSERT INTO keyper_set (
 `
 
 type InsertKeyperSetParams struct {
-	EventIndex            int64
+	KeyperConfigIndex     int64
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
@@ -115,7 +115,7 @@ type InsertKeyperSetParams struct {
 
 func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams) error {
 	_, err := q.db.Exec(ctx, insertKeyperSet,
-		arg.EventIndex,
+		arg.KeyperConfigIndex,
 		arg.ActivationBlockNumber,
 		arg.Keypers,
 		arg.Threshold,

@@ -463,7 +463,7 @@ type IEvent interface {
 // makeEonStarted creates a EonStartedEvent from the given tendermint event of type
 // "shutter.eon-started".
 func makeEonStarted(ev abcitypes.Event, height int64) (*EonStarted, error) {
-	err := expectAttributes(ev, "Eon", "ActivationBlockNumber", "ConfigIndex")
+	err := expectAttributes(ev, "Eon", "ActivationBlockNumber", "KeyperConfigIndex")
 	if err != nil {
 		return nil, err
 	}

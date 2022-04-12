@@ -1,4 +1,4 @@
--- schema-version: collator-7 --
+-- schema-version: collator-8 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
