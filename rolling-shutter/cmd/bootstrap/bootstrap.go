@@ -18,12 +18,12 @@ import (
 )
 
 var bootstrapFlags struct {
-	ShuttermintURL   string
-	EthereumURL      string
-	DeploymentDir    string
-	BatchConfigIndex int
-	SigningKey       string
-	Keypers          []string
+	ShuttermintURL    string
+	EthereumURL       string
+	DeploymentDir     string
+	KeyperConfigIndex int
+	SigningKey        string
+	Keypers           []string
 }
 
 func Cmd() *cobra.Command {
@@ -65,11 +65,11 @@ chain's genesis config.`,
 		"Shuttermint RPC URL",
 	)
 	cmd.PersistentFlags().IntVarP(
-		&bootstrapFlags.BatchConfigIndex,
+		&bootstrapFlags.KeyperConfigIndex,
 		"index",
 		"i",
 		1,
-		"index of the batch config to bootstrap with (use latest if negative)",
+		"keyper config index to bootstrap with (use latest if negative)",
 	)
 
 	cmd.PersistentFlags().StringVarP(
@@ -105,8 +105,8 @@ func bootstrap() error {
 		log.Fatalf("Invalid signing key: %v", err)
 	}
 
-	batchConfigIndex := uint64(bootstrapFlags.BatchConfigIndex)
-	cfg, err := contracts.KeypersConfigsList.KeypersConfigs(nil, big.NewInt(int64(batchConfigIndex)))
+	keyperConfigIndex := uint64(bootstrapFlags.KeyperConfigIndex)
+	cfg, err := contracts.KeypersConfigsList.KeypersConfigs(nil, big.NewInt(int64(keyperConfigIndex)))
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func bootstrap() error {
 		activationBlockNumber,
 		keypers,
 		threshold,
-		batchConfigIndex,
+		keyperConfigIndex,
 		false,
 		false,
 	)
@@ -150,7 +150,7 @@ func bootstrap() error {
 	}
 
 	log.Println("Submitted bootstrapping transaction")
-	log.Printf("Config index: %d", batchConfigIndex)
+	log.Printf("Config index: %d", keyperConfigIndex)
 	log.Printf("Activation block number: %d", activationBlockNumber)
 	log.Printf("Threshold: %d", threshold)
 	log.Printf("Num Keypers: %d", len(keypers))
