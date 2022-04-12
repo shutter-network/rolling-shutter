@@ -360,11 +360,10 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 
 		events = append(events, bc.MakeABCIEvent())
 		dkg := app.StartDKG(bc)
-		lastConfig := app.LastConfig()
 		events = append(events, shutterevents.EonStarted{
 			Eon:                   dkg.Eon,
-			ActivationBlockNumber: lastConfig.ActivationBlockNumber,
-			KeyperConfigIndex:     lastConfig.KeyperConfigIndex,
+			ActivationBlockNumber: bc.ActivationBlockNumber,
+			KeyperConfigIndex:     bc.KeyperConfigIndex,
 		}.MakeABCIEvent())
 	}
 
