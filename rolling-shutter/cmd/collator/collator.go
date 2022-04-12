@@ -149,6 +149,7 @@ func exampleConfig() (*collator.Config, error) {
 		ListenAddress:       p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs:      []multiaddr.Multiaddr{},
 		DatabaseURL:         "",
+		SequencerURL:        "http://127.0.0.1:9545/",
 		HTTPListenAddress:   ":3000",
 		EthereumKey:         ethereumKey,
 		P2PKey:              p2pkey,
