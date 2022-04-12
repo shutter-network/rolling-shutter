@@ -14,7 +14,11 @@ contract CollatorConfigsList is Ownable {
     CollatorConfig[] public collatorConfigs;
     AddrsSeq public addrsSeq;
 
-    event NewConfig(uint64 activationBlockNumber, uint64 index);
+    event NewConfig(
+        uint64 activationBlockNumber,
+        uint64 collatorSetIndex,
+        uint64 collatorConfigIndex
+    );
 
     constructor(AddrsSeq _addrsSeq) {
         addrsSeq = _addrsSeq;
@@ -25,7 +29,11 @@ contract CollatorConfigsList is Ownable {
         collatorConfigs.push(
             CollatorConfig({activationBlockNumber: 0, setIndex: 0})
         );
-        emit NewConfig(0, 0);
+        emit NewConfig({
+            activationBlockNumber: 0,
+            collatorSetIndex: 0,
+            collatorConfigIndex: 0
+        });
     }
 
     function addNewCfg(CollatorConfig calldata config) public onlyOwner {
@@ -44,7 +52,11 @@ contract CollatorConfigsList is Ownable {
         );
 
         collatorConfigs.push(config);
-        emit NewConfig(config.activationBlockNumber, config.setIndex);
+        emit NewConfig({
+            activationBlockNumber: config.activationBlockNumber,
+            collatorSetIndex: config.setIndex,
+            collatorConfigIndex: uint64(collatorConfigs.length) - 1
+        });
     }
 
     function getActiveConfig(uint64 activationBlockNumber)

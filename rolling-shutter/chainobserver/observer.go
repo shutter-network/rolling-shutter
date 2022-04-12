@@ -99,7 +99,7 @@ func (chainobs *ChainObserver) amendEvent(
 		}
 		return newKeyperConfig{KeypersConfigsListNewConfig: event, addrs: addrs}, nil
 	case contract.CollatorConfigsListNewConfig:
-		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.Index)
+		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.CollatorSetIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -189,8 +189,8 @@ func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
 	ctx context.Context, db *commondb.Queries, event newCollatorConfig,
 ) error {
 	log.Printf(
-		"handling NewConfig event from collator config contract in block %d (index %d, activation block number %d)",
-		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+		"handling NewConfig event from collator config contract in block %d (collator config index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.CollatorConfigIndex, event.ActivationBlockNumber,
 	)
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
