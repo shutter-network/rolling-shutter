@@ -172,7 +172,7 @@ type BatchConfig struct {
 	Keypers               []common.Address
 	ActivationBlockNumber uint64
 	Threshold             uint64
-	ConfigIndex           uint64
+	KeyperConfigIndex     uint64
 	Started               bool
 	ValidatorsUpdated     bool
 }
@@ -196,7 +196,7 @@ func (bc BatchConfig) MakeABCIEvent() abcitypes.Event {
 			},
 			{
 				Key:   "ConfigIndex",
-				Value: fmt.Sprintf("%d", bc.ConfigIndex),
+				Value: fmt.Sprintf("%d", bc.KeyperConfigIndex),
 			},
 		},
 	}
@@ -224,7 +224,7 @@ func makeBatchConfig(ev abcitypes.Event, height int64) (*BatchConfig, error) {
 		return nil, err
 	}
 
-	configIndex, err := decodeUint64(ev.Attributes[3].Value)
+	keyperConfigIndex, err := decodeUint64(ev.Attributes[3].Value)
 	if err != nil {
 		return nil, err
 	}
@@ -233,13 +233,13 @@ func makeBatchConfig(ev abcitypes.Event, height int64) (*BatchConfig, error) {
 		ActivationBlockNumber: activationBlockNumber,
 		Threshold:             threshold,
 		Keypers:               keypers,
-		ConfigIndex:           configIndex,
+		KeyperConfigIndex:     keyperConfigIndex,
 	}, nil
 }
 
 type BatchConfigStarted struct {
-	Height      int64
-	ConfigIndex uint64
+	Height            int64
+	KeyperConfigIndex uint64
 }
 
 func (bcs BatchConfigStarted) MakeABCIEvent() abcitypes.Event {
@@ -248,7 +248,7 @@ func (bcs BatchConfigStarted) MakeABCIEvent() abcitypes.Event {
 		Attributes: []abcitypes.EventAttribute{
 			{
 				Key:   "ConfigIndex",
-				Value: fmt.Sprintf("%d", bcs.ConfigIndex),
+				Value: fmt.Sprintf("%d", bcs.KeyperConfigIndex),
 			},
 		},
 	}
@@ -261,13 +261,13 @@ func makeBatchConfigStarted(ev abcitypes.Event, height int64) (*BatchConfigStart
 	if err != nil {
 		return nil, err
 	}
-	configIndex, err := decodeUint64(ev.Attributes[0].Value)
+	keyperConfigIndex, err := decodeUint64(ev.Attributes[0].Value)
 	if err != nil {
 		return nil, err
 	}
 	return &BatchConfigStarted{
-		Height:      height,
-		ConfigIndex: configIndex,
+		Height:            height,
+		KeyperConfigIndex: keyperConfigIndex,
 	}, nil
 }
 
@@ -320,7 +320,7 @@ type EonStarted struct {
 	Height                int64
 	Eon                   uint64
 	ActivationBlockNumber uint64
-	ConfigIndex           uint64
+	KeyperConfigIndex     uint64
 }
 
 func (msg EonStarted) MakeABCIEvent() abcitypes.Event {
@@ -329,7 +329,7 @@ func (msg EonStarted) MakeABCIEvent() abcitypes.Event {
 		Attributes: []abcitypes.EventAttribute{
 			newUintPair("Eon", msg.Eon),
 			newUintPair("ActivationBlockNumber", msg.ActivationBlockNumber),
-			newUintPair("ConfigIndex", msg.ConfigIndex),
+			newUintPair("KeyperConfigIndex", msg.KeyperConfigIndex),
 		},
 	}
 }
@@ -476,7 +476,7 @@ func makeEonStarted(ev abcitypes.Event, height int64) (*EonStarted, error) {
 	if err != nil {
 		return nil, err
 	}
-	configIndex, err := decodeUint64(ev.Attributes[2].Value)
+	keyperConfigIndex, err := decodeUint64(ev.Attributes[2].Value)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +484,7 @@ func makeEonStarted(ev abcitypes.Event, height int64) (*EonStarted, error) {
 		Height:                height,
 		Eon:                   eon,
 		ActivationBlockNumber: activationBlockNumber,
-		ConfigIndex:           configIndex,
+		KeyperConfigIndex:     keyperConfigIndex,
 	}, nil
 }
 

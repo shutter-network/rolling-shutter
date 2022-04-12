@@ -99,7 +99,7 @@ func TestBatchConfig(t *testing.T) {
 		ActivationBlockNumber: 111,
 		Threshold:             2,
 		Keypers:               addresses,
-		ConfigIndex:           uint64(0xffffffffffffffff),
+		KeyperConfigIndex:     uint64(0xffffffffffffffff),
 	}
 	roundtrip(t, ev)
 	// XXX should we implement this or drop the field?
@@ -109,7 +109,7 @@ func TestBatchConfig(t *testing.T) {
 
 func TestBatchConfigStarted(t *testing.T) {
 	ev := &shutterevents.BatchConfigStarted{
-		ConfigIndex: uint64(0xffffffffffffffff),
+		KeyperConfigIndex: uint64(0xffffffffffffffff),
 	}
 	roundtrip(t, ev)
 }
@@ -123,7 +123,7 @@ func TestCheckIn(t *testing.T) {
 }
 
 func TestEonStarted(t *testing.T) {
-	ev := &shutterevents.EonStarted{Eon: eon, ActivationBlockNumber: 9999, ConfigIndex: 567}
+	ev := &shutterevents.EonStarted{Eon: eon, ActivationBlockNumber: 9999, KeyperConfigIndex: 567}
 	roundtrip(t, ev)
 }
 

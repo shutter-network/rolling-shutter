@@ -38,7 +38,7 @@ type Eon struct {
 	Eon                   int64
 	Height                int64
 	ActivationBlockNumber int64
-	ConfigIndex           int64
+	KeyperConfigIndex     int64
 }
 
 type EventSyncProgress struct {
@@ -86,7 +86,7 @@ type Puredkg struct {
 }
 
 type TendermintBatchConfig struct {
-	ConfigIndex           int32
+	KeyperConfigIndex     int32
 	Height                int64
 	Keypers               []string
 	Threshold             int32

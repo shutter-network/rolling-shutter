@@ -100,7 +100,7 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *kprdb.Queries)
 			return err
 		}
 
-		batchConfig, err := queries.GetBatchConfig(ctx, int32(keyperEon.ConfigIndex))
+		batchConfig, err := queries.GetBatchConfig(ctx, int32(keyperEon.KeyperConfigIndex))
 		if err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ func (st *ShuttermintState) handleBatchConfig(
 	return queries.InsertBatchConfig(
 		ctx,
 		kprdb.InsertBatchConfigParams{
-			ConfigIndex:           int32(e.ConfigIndex),
+			KeyperConfigIndex:     int32(e.KeyperConfigIndex),
 			Height:                e.Height,
 			Threshold:             int32(e.Threshold),
 			Keypers:               keypers,
@@ -295,7 +295,7 @@ func (st *ShuttermintState) handleBatchConfigStarted(
 	queries *kprdb.Queries,
 	e *shutterevents.BatchConfigStarted,
 ) error {
-	return queries.SetBatchConfigStarted(ctx, int32(e.ConfigIndex))
+	return queries.SetBatchConfigStarted(ctx, int32(e.KeyperConfigIndex))
 }
 
 func (st *ShuttermintState) handleEonStarted(
@@ -311,12 +311,12 @@ func (st *ShuttermintState) handleEonStarted(
 		Eon:                   int64(e.Eon),
 		Height:                e.Height,
 		ActivationBlockNumber: int64(e.ActivationBlockNumber),
-		ConfigIndex:           int64(e.ConfigIndex),
+		KeyperConfigIndex:     int64(e.KeyperConfigIndex),
 	})
 	if err != nil {
 		return err
 	}
-	batchConfig, err := queries.GetBatchConfig(ctx, int32(e.ConfigIndex))
+	batchConfig, err := queries.GetBatchConfig(ctx, int32(e.KeyperConfigIndex))
 	if err != nil {
 		return err
 	}

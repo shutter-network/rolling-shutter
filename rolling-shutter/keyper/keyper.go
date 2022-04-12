@@ -283,7 +283,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	}
 
 	cq := commondb.New(tx)
-	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.ConfigIndex)+1)
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.KeyperConfigIndex)+1)
 	if err == pgx.ErrNoRows {
 		return nil
 	}

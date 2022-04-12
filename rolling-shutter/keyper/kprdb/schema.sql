@@ -54,7 +54,7 @@ CREATE TABLE puredkg (
 );
 
 CREATE TABLE tendermint_batch_config(
-       config_index integer PRIMARY KEY,
+       keyper_config_index integer PRIMARY KEY,
        height bigint NOT NULL,
        keypers text[] NOT NULL,
        threshold integer NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE eons(
        eon bigint PRIMARY KEY,
        height bigint NOT NULL,
        activation_block_number bigint NOT NULL,
-       config_index bigint NOT NULL
+       keyper_config_index bigint NOT NULL
 );
 
 CREATE TABLE poly_evals(

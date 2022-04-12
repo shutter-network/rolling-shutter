@@ -38,7 +38,7 @@ SELECT count(*) FROM decryption_key_share
 WHERE epoch_id = $1;
 
 -- name: InsertBatchConfig :exec
-INSERT INTO tendermint_batch_config (config_index, height, keypers, threshold, started, activation_block_number)
+INSERT INTO tendermint_batch_config (keyper_config_index, height, keypers, threshold, started, activation_block_number)
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: CountBatchConfigs :one
@@ -47,7 +47,7 @@ SELECT count(*) FROM tendermint_batch_config;
 -- name: GetLatestBatchConfig :one
 SELECT *
 FROM tendermint_batch_config
-ORDER BY config_index DESC
+ORDER BY keyper_config_index DESC
 LIMIT 1;
 
 -- name: CountBatchConfigsInBlockRange :one
@@ -58,16 +58,16 @@ WHERE @start_block <= activation_block_number AND activation_block_number < @end
 -- name: GetBatchConfigs :many
 SELECT *
 FROM tendermint_batch_config
-ORDER BY config_index;
+ORDER BY keyper_config_index;
 
 -- name: GetBatchConfig :one
 SELECT *
 FROM tendermint_batch_config
-WHERE config_index = $1;
+WHERE keyper_config_index = $1;
 
 -- name: SetBatchConfigStarted :exec
 UPDATE tendermint_batch_config SET started = TRUE
-WHERE config_index = $1;
+WHERE keyper_config_index = $1;
 
 -- name: TMSetSyncMeta :exec
 INSERT INTO tendermint_sync_meta (current_block, last_committed_height, sync_timestamp)
@@ -115,7 +115,7 @@ LIMIT 1;
 DELETE FROM tendermint_outgoing_messages WHERE id=$1;
 
 -- name: InsertEon :exec
-INSERT INTO eons (eon, height, activation_block_number, config_index)
+INSERT INTO eons (eon, height, activation_block_number, keyper_config_index)
 VALUES ($1, $2, $3, $4);
 
 -- name: GetEon :one
