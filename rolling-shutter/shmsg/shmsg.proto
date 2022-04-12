@@ -7,7 +7,7 @@ message BatchConfig {
         uint64 activation_block_number = 1;
         repeated bytes keypers = 2;
         uint64 threshold = 3 ;
-        uint64 config_index = 5;
+        uint64 keyper_config_index = 5;
         bool started = 6;
         bool validatorsUpdated = 7;
 }

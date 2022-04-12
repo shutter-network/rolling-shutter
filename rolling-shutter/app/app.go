@@ -137,11 +137,11 @@ func (app *ShutterApp) checkConfig(cfg BatchConfig) error {
 			lastConfig.ActivationBlockNumber,
 		)
 	}
-	if cfg.ConfigIndex <= lastConfig.ConfigIndex {
+	if cfg.KeyperConfigIndex <= lastConfig.KeyperConfigIndex {
 		return errors.Errorf(
 			"config index of next config (%d) not greater than current one (%d)",
-			cfg.ConfigIndex,
-			lastConfig.ConfigIndex,
+			cfg.KeyperConfigIndex,
+			lastConfig.KeyperConfigIndex,
 		)
 	}
 	return nil
@@ -152,7 +152,7 @@ func (app *ShutterApp) addConfig(cfg BatchConfig) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("adding config %d", cfg.ConfigIndex)
+	log.Printf("adding config %d", cfg.KeyperConfigIndex)
 	app.Configs = append(app.Configs, &cfg)
 	app.updateCheckTxMembers()
 	return nil
@@ -329,7 +329,7 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 	if reflect.DeepEqual(*app.LastConfig(), bc) {
 		// The config has already been accepted. So, let's just return success
 		// XXX We do not check if we're allowed to vote on config changes here
-		log.Printf("config %d already accepted", bc.ConfigIndex)
+		log.Printf("config %d already accepted", bc.KeyperConfigIndex)
 		return abcitypes.ResponseDeliverTx{
 			Code: 0,
 		}
@@ -365,7 +365,7 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 			events = append(events, shutterevents.EonStarted{
 				Eon:                   dkg.Eon,
 				ActivationBlockNumber: lastConfig.ActivationBlockNumber,
-				ConfigIndex:           lastConfig.ConfigIndex,
+				KeyperConfigIndex:     lastConfig.KeyperConfigIndex,
 			}.MakeABCIEvent())
 		}
 	}
@@ -453,23 +453,23 @@ func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender co
 			shutterevents.EonStarted{
 				Eon:                   dkg.Eon,
 				ActivationBlockNumber: activationBlockNumber,
-				ConfigIndex:           config.ConfigIndex,
+				KeyperConfigIndex:     config.KeyperConfigIndex,
 			}.MakeABCIEvent(),
 		},
 	}
 }
 
 func (app *ShutterApp) countEonStartVote(sender common.Address, config *BatchConfig, activationBlockNumber uint64) {
-	v := app.EonStartVotings[config.ConfigIndex]
+	v := app.EonStartVotings[config.KeyperConfigIndex]
 	if v == nil {
 		v = NewEonStartVoting()
-		app.EonStartVotings[config.ConfigIndex] = v
+		app.EonStartVotings[config.KeyperConfigIndex] = v
 	}
 	v.AddVote(sender, activationBlockNumber)
 }
 
 func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64, bool) {
-	v, ok := app.EonStartVotings[config.ConfigIndex]
+	v, ok := app.EonStartVotings[config.KeyperConfigIndex]
 	if !ok {
 		return nil, uint64(0), false
 	}
@@ -480,7 +480,7 @@ func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64,
 		return nil, uint64(0), false
 	}
 
-	delete(app.EonStartVotings, config.ConfigIndex)
+	delete(app.EonStartVotings, config.KeyperConfigIndex)
 	dkg := app.StartDKG(*config)
 	return dkg, activationBlockNumber, true
 }
@@ -700,13 +700,11 @@ func (app *ShutterApp) countCheckedInKeypers(keypers []common.Address) uint64 {
 func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	var events []abcitypes.Event
 
-	for configIndex, config := range app.Configs {
+	for i, config := range app.Configs {
 		if !config.Started {
 			var allowanceConfigIndex int
-			if configIndex == 0 {
-				allowanceConfigIndex = 0
-			} else {
-				allowanceConfigIndex = configIndex - 1
+			if i > 0 {
+				allowanceConfigIndex = i - 1
 			}
 			numRequiredVotes := app.Configs[allowanceConfigIndex].Threshold
 
@@ -718,10 +716,11 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 				}
 			}
 			if numVotes >= numRequiredVotes {
-				log.Printf("starting config %d", configIndex)
+				log.Printf("starting config with keyper config index %d",
+					config.KeyperConfigIndex)
 				config.Started = true
 				events = append(events, shutterevents.BatchConfigStarted{
-					ConfigIndex: config.ConfigIndex,
+					KeyperConfigIndex: config.KeyperConfigIndex,
 				}.MakeABCIEvent())
 			}
 		}

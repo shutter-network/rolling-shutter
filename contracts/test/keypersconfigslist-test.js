@@ -43,24 +43,24 @@ describe("KeypersConfigsList", function () {
     const addrsSeq = await getAddrsSeq(configContract);
 
     const blockNumber = 123;
-    const index = 0;
+    const setIndex = 0;
     const threshold = 0;
     const blockNumber2 = 123456;
-    const index2 = 1;
+    const setIndex2 = 1;
     const threshold2 = 3;
 
     await expect(
       configContract.addNewCfg({
         activationBlockNumber: blockNumber,
-        setIndex: index,
+        setIndex: setIndex,
         threshold: threshold,
       })
     )
       .to.emit(configContract, "NewConfig")
-      .withArgs(blockNumber, index, threshold);
+      .withArgs(blockNumber, setIndex, 1, threshold);
     let kprSet = await configContract.keypersConfigs(1);
     expect(kprSet.activationBlockNumber).to.equal(blockNumber);
-    expect(kprSet.setIndex).to.equal(index);
+    expect(kprSet.setIndex).to.equal(setIndex);
     expect(kprSet.threshold).to.equal(threshold);
 
     await addrsSeq.add(addresses);
@@ -68,15 +68,15 @@ describe("KeypersConfigsList", function () {
     await expect(
       configContract.addNewCfg({
         activationBlockNumber: blockNumber2,
-        setIndex: index2,
+        setIndex: setIndex2,
         threshold: threshold2,
       })
     )
       .to.emit(configContract, "NewConfig")
-      .withArgs(blockNumber2, index2, threshold2);
+      .withArgs(blockNumber2, setIndex2, 2, threshold2);
     kprSet = await configContract.keypersConfigs(2);
     expect(kprSet.activationBlockNumber).to.equal(blockNumber2);
-    expect(kprSet.setIndex).to.equal(index2);
+    expect(kprSet.setIndex).to.equal(setIndex2);
     expect(kprSet.threshold).to.equal(threshold2);
   });
 
@@ -174,24 +174,24 @@ describe("KeypersConfigsList", function () {
     });
 
     const blockNumber = 123;
-    const index = 1;
+    const setIndex = 1;
     const threshold = 2;
     await addrsSeq.add(addresses);
     await addrsSeq.append();
     await cfg.addNewCfg({
       activationBlockNumber: blockNumber,
-      setIndex: index,
+      setIndex: setIndex,
       threshold: threshold,
     });
 
     expect(await getConfig(cfg, blockNumber)).to.deep.equal({
       activationBlockNumber: blockNumber,
-      setIndex: index,
+      setIndex: setIndex,
       threshold: threshold,
     });
     expect(await getConfig(cfg, blockNumber + 1)).to.deep.equal({
       activationBlockNumber: blockNumber,
-      setIndex: index,
+      setIndex: setIndex,
       threshold: threshold,
     });
     expect(await getConfig(cfg, blockNumber - 1)).to.deep.equal({

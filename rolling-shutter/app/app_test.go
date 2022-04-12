@@ -20,7 +20,7 @@ func TestAddConfig(t *testing.T) {
 	app := NewShutterApp()
 
 	err := app.addConfig(BatchConfig{
-		ConfigIndex:           1,
+		KeyperConfigIndex:     1,
 		ActivationBlockNumber: 100,
 		Threshold:             1,
 		Keypers:               addr,
@@ -28,7 +28,7 @@ func TestAddConfig(t *testing.T) {
 	assert.NilError(t, err)
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:           2,
+		KeyperConfigIndex:     2,
 		ActivationBlockNumber: 99,
 		Threshold:             1,
 		Keypers:               addr,
@@ -36,7 +36,7 @@ func TestAddConfig(t *testing.T) {
 	assert.Assert(t, err != nil, "Expected error, ActivationBlockNumber must not decrease")
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:           1,
+		KeyperConfigIndex:     1,
 		ActivationBlockNumber: 100,
 		Threshold:             1,
 		Keypers:               addr,
@@ -44,7 +44,7 @@ func TestAddConfig(t *testing.T) {
 	assert.Assert(t, err != nil, "Expected error, ConfigIndex must increase")
 
 	err = app.addConfig(BatchConfig{
-		ConfigIndex:           2,
+		KeyperConfigIndex:     2,
 		ActivationBlockNumber: 100,
 		Threshold:             2,
 		Keypers:               addr,
@@ -57,7 +57,7 @@ func TestGobDKG(t *testing.T) {
 	var err error
 	keypers := addr
 	dkg := NewDKGInstance(BatchConfig{
-		ConfigIndex:           1,
+		KeyperConfigIndex:     1,
 		ActivationBlockNumber: 100,
 		Threshold:             1,
 		Keypers:               keypers,

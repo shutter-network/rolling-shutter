@@ -29,9 +29,9 @@ func (h *epochKGHandler) sendDecryptionKeyShare(ctx context.Context, epochID uin
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", epochID)
 	}
-	batchConfig, err := h.db.GetBatchConfig(ctx, int32(eon.ConfigIndex))
+	batchConfig, err := h.db.GetBatchConfig(ctx, int32(eon.KeyperConfigIndex))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.ConfigIndex)
+		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.KeyperConfigIndex)
 	}
 
 	// get our keyper index (and check that we in fact are a keyper)

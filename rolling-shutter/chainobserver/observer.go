@@ -93,7 +93,7 @@ func (chainobs *ChainObserver) amendEvent(
 ) (interface{}, error) {
 	switch event := event.(type) {
 	case contract.KeypersConfigsListNewConfig:
-		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.Index)
+		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.KeyperSetIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -165,8 +165,8 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 	ctx context.Context, db *commondb.Queries, event newKeyperConfig,
 ) error {
 	log.Printf(
-		"handling NewConfig event from keypers config contract in block %d (index %d, activation block number %d)",
-		event.Raw.BlockNumber, event.Index, event.ActivationBlockNumber,
+		"handling NewConfig event from keypers config contract in block %d (config index %d, activation block number %d)",
+		event.Raw.BlockNumber, event.KeyperConfigIndex, event.ActivationBlockNumber,
 	)
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
@@ -174,7 +174,7 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 			event.ActivationBlockNumber)
 	}
 	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
-		EventIndex:            int64(event.Index),
+		KeyperConfigIndex:     int64(event.KeyperConfigIndex),
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
 		Keypers:               shdb.EncodeAddresses(event.addrs),
 		Threshold:             int32(event.Threshold),

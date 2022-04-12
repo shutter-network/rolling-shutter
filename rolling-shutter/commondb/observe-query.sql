@@ -13,7 +13,7 @@ SELECT next_block_number from event_sync_progress LIMIT 1;
 
 -- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
-    event_index,
+    keyper_config_index,
     activation_block_number,
     keypers,
     threshold
@@ -21,8 +21,8 @@ INSERT INTO keyper_set (
     $1, $2, $3, $4
 );
 
--- name: GetKeyperSetByEventIndex :one
-SELECT * FROM keyper_set WHERE event_index=$1;
+-- name: GetKeyperSetByKeyperConfigIndex :one
+SELECT * FROM keyper_set WHERE keyper_config_index=$1;
 
 -- name: GetKeyperSet :one
 SELECT (

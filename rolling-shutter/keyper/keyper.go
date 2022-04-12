@@ -283,7 +283,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	}
 
 	cq := commondb.New(tx)
-	keyperSet, err := cq.GetKeyperSetByEventIndex(ctx, int64(latestBatchConfig.ConfigIndex)+1)
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.KeyperConfigIndex)+1)
 	if err == pgx.ErrNoRows {
 		return nil
 	}
@@ -296,10 +296,10 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	if err != nil {
 		return err
 	}
-	if lastSent == keyperSet.EventIndex {
+	if lastSent == keyperSet.KeyperConfigIndex {
 		return nil
 	}
-	err = q.SetLastBatchConfigSent(ctx, keyperSet.EventIndex)
+	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
 		return nil
 	}
@@ -313,7 +313,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		uint64(keyperSet.ActivationBlockNumber),
 		keypers,
 		uint64(keyperSet.Threshold),
-		uint64(keyperSet.EventIndex),
+		uint64(keyperSet.KeyperConfigIndex),
 		false,
 		false,
 	)

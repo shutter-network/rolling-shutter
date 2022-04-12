@@ -57,17 +57,17 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 	assert.NilError(t, err)
 
 	err = db.InsertBatchConfig(ctx, kprdb.InsertBatchConfigParams{
-		ConfigIndex: 1,
-		Height:      0,
-		Keypers:     keypers,
-		Threshold:   int32(tkg.Threshold),
+		KeyperConfigIndex: 1,
+		Height:            0,
+		Keypers:           keypers,
+		Threshold:         int32(tkg.Threshold),
 	})
 	assert.NilError(t, err)
 	err = db.InsertEon(ctx, kprdb.InsertEonParams{
 		Eon:                   0,
 		Height:                0,
 		ActivationBlockNumber: 0,
-		ConfigIndex:           1,
+		KeyperConfigIndex:     1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{

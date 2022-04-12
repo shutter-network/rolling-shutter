@@ -186,7 +186,7 @@ func NewBatchConfig(
 	activationBlockNumber uint64,
 	keypers []common.Address,
 	threshold uint64,
-	configIndex uint64,
+	keyperConfigIndex uint64,
 	started bool,
 	validatorsUpdated bool,
 ) *Message {
@@ -201,7 +201,7 @@ func NewBatchConfig(
 				ActivationBlockNumber: activationBlockNumber,
 				Keypers:               keypersBytes,
 				Threshold:             threshold,
-				ConfigIndex:           configIndex,
+				KeyperConfigIndex:     keyperConfigIndex,
 				Started:               started,
 				ValidatorsUpdated:     validatorsUpdated,
 			},

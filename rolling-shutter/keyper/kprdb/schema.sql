@@ -1,4 +1,4 @@
--- schema-version: keyper-15 --
+-- schema-version: keyper-16 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -22,9 +22,9 @@ CREATE TABLE decryption_key (
 -- from sending the message multiple times.
 CREATE TABLE last_batch_config_sent(
        enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
-       event_index bigint NOT NULL
+       keyper_config_index bigint NOT NULL
 );
-INSERT INTO last_batch_config_sent (event_index) VALUES (0);
+INSERT INTO last_batch_config_sent (keyper_config_index) VALUES (0);
 
 -- store the last block number seen we sent to shuttermint.
 CREATE TABLE last_block_seen(
@@ -54,7 +54,7 @@ CREATE TABLE puredkg (
 );
 
 CREATE TABLE tendermint_batch_config(
-       config_index integer PRIMARY KEY,
+       keyper_config_index integer PRIMARY KEY,
        height bigint NOT NULL,
        keypers text[] NOT NULL,
        threshold integer NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE eons(
        eon bigint PRIMARY KEY,
        height bigint NOT NULL,
        activation_block_number bigint NOT NULL,
-       config_index bigint NOT NULL
+       keyper_config_index bigint NOT NULL
 );
 
 CREATE TABLE poly_evals(
