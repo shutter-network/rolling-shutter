@@ -187,8 +187,6 @@ func NewBatchConfig(
 	keypers []common.Address,
 	threshold uint64,
 	keyperConfigIndex uint64,
-	started bool,
-	validatorsUpdated bool,
 ) *Message {
 	var keypersBytes [][]byte
 	for _, k := range keypers {
@@ -202,8 +200,6 @@ func NewBatchConfig(
 				Keypers:               keypersBytes,
 				Threshold:             threshold,
 				KeyperConfigIndex:     keyperConfigIndex,
-				Started:               started,
-				ValidatorsUpdated:     validatorsUpdated,
 			},
 		},
 	}

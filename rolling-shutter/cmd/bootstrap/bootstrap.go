@@ -134,8 +134,6 @@ func bootstrap() error {
 		keypers,
 		threshold,
 		keyperConfigIndex,
-		false,
-		false,
 	)
 
 	err = ms.SendMessage(ctx, batchConfigMsg)
