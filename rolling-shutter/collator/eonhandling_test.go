@@ -84,7 +84,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 
 	db := commondb.New(dbtx)
 	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
-		EventIndex:            int64(params.eventIndex),
+		KeyperConfigIndex:     int64(params.eventIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),
 		Threshold:             int32(params.threshold),
