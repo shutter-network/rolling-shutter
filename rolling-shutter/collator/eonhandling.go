@@ -43,11 +43,11 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	)
 
 	if key.ActivationBlock > math.MaxInt64 {
-		return false, errors.New("Int64 overflow for msg.ActivationBlock")
+		return false, errors.New("int64 overflow for msg.ActivationBlock")
 	}
 	activationBlock := int64(key.ActivationBlock)
 	if key.KeyperIndex > math.MaxInt64 {
-		return false, errors.New("Int64 overflow for msg.KeyperIndex")
+		return false, errors.New("int64 overflow for msg.KeyperIndex")
 	}
 	keyperIndex := int64(key.KeyperIndex)
 	// Theoretically, there could be a race condition, where we learn of the EonPublicKey
@@ -60,7 +60,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	// activation-block, then this is ambiguous (there is no sorting on DB-insert order or similar) (see #238)
 	ks, err = c.getKeyperSet(ctx, activationBlock)
 	if err != nil {
-		return false, errors.Wrap(err, fmt.Sprintf("Validation: Error while retrieving on-chain Keyper set for "+
+		return false, errors.Wrap(err, fmt.Sprintf("error while retrieving on-chain Keyper set for "+
 			"EonPublicKey (activation-block=%d)", activationBlock))
 	}
 
@@ -69,14 +69,14 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 		// retrieving the correct keyper set for this activationBlock (see issue #238)
 		// Can also happen when the Keyper is dishonest.
 
-		return false, errors.Errorf("Validation: EonPublicKey message's activation-block (%d) does not match the expected"+
+		return false, errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
 			"activation-block on-chain (%d)", activationBlock, ks.ActivationBlockNumber)
 	}
 	if int64(len(ks.Keypers)) < keyperIndex+1 {
 		// Using the wrong keyper set (e.g. due to #238) will result in out-of-bounds error,
 		// Can also happen when the Keyper is dishonest.
-		return false, errors.Wrap(err, fmt.Sprintf("Keyper index out of bounds for keyper set. "+
-			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex))
+		return false, errors.Wrapf(err, "keyper index out of bounds for keyper set. "+
+			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex)
 	}
 	// This could be susceptible to replay attacks, when the keyper index in an older keyper-config maps to the same
 	// address as in this keyper-config(see issue #238)
@@ -88,7 +88,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex))
 	}
 	if !ok {
-		return false, errors.Errorf("Validation: EonPublicKey's recovered address does not match on-chain address (%s) for keyper-index (%d)",
+		return false, errors.Errorf("eonPublicKey's recovered address does not match on-chain address (%s) for keyper-index (%d)",
 			common.HexToAddress(expectedAddress), keyperIndex)
 	}
 	return true, nil
