@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/proxy"
+	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
 const (
@@ -19,8 +19,8 @@ const (
 	submitBatchRequestTimeout = 1 * time.Second
 )
 
-func newJSONRPCRequest(id int, method string, params []string) proxy.RPCRequest {
-	return proxy.RPCRequest{
+func newJSONRPCRequest(id int, method string, params []string) medley.RPCRequest {
+	return medley.RPCRequest{
 		Version: "2.0",
 		Method:  method,
 		Params:  params,
@@ -28,7 +28,7 @@ func newJSONRPCRequest(id int, method string, params []string) proxy.RPCRequest 
 	}
 }
 
-func newSubmitShutterBatchRequest(id int, batch []byte) proxy.RPCRequest {
+func newSubmitShutterBatchRequest(id int, batch []byte) medley.RPCRequest {
 	batchHex := "0x" + hex.EncodeToString(batch)
 	return newJSONRPCRequest(id, "collator_submitShutterBatch", []string{batchHex})
 }
