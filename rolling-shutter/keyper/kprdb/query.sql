@@ -179,7 +179,7 @@ FROM t1
 INNER JOIN eons
       ON t1.eon = eons.eon
 INNER JOIN tendermint_batch_config tbc
-      ON eons.config_index = tbc.config_index;
+      ON eons.keyper_config_index = tbc.keyper_config_index;
 
 -- name: SetLastBatchConfigSent :exec
 INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
