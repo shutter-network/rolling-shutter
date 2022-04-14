@@ -191,6 +191,9 @@ func (c *collator) run(ctx context.Context) error {
 	errorgroup.Go(func() error {
 		return c.processEpochLoop(errorctx)
 	})
+	errorgroup.Go(func() error {
+		return c.submitBatches(errorctx)
+	})
 
 	return errorgroup.Wait()
 }

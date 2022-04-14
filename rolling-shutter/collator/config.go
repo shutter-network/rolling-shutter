@@ -26,6 +26,8 @@ type Config struct {
 	DatabaseURL       string
 	HTTPListenAddress string
 
+	SequencerURL string
+
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
 
@@ -47,6 +49,9 @@ DeploymentDir   = "{{ .DeploymentDir }}"
 DatabaseURL     = "{{ .DatabaseURL }}"
 
 HTTPListenAddress = "{{ .HTTPListenAddress }}"
+
+# JSON RPC endpoint of the sequencer to which batches will be submitted
+SequencerURL = "{{ .SequencerURL }}"
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"

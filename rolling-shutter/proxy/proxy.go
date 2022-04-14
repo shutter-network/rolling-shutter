@@ -20,13 +20,6 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
 
-type RPCRequest struct {
-	Version string      `json:"jsonrpc"`
-	Method  string      `json:"method,omitempty"`
-	Params  interface{} `json:"params,omitempty"`
-	ID      interface{} `json:"id,omitempty"`
-}
-
 type Config struct {
 	CollatorURL, SequencerURL *url.URL
 	HTTPListenAddress         string
@@ -61,7 +54,7 @@ func (p *JSONRPCProxy) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	rpcreq := RPCRequest{}
+	rpcreq := medley.RPCRequest{}
 	err = json.Unmarshal(body, &rpcreq)
 	if err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
