@@ -352,3 +352,88 @@ identifying the started DKG process, and `ActivationBlockNumber` as well as
 ## Keyper
 
 ## Rollup State Execution
+
+The rollup executes batches provided by the sequencer. The rollup also executes
+transactions submitted directly by the user, but only with significant delay.
+
+### Batch Execution
+
+Batches are encoded as typed transactions according to EIP-2718 with prefix xxx
+and an RLP encoded payload. The payload is a list of the following fields:
+
+- `chainID` (integer)
+- `batchIndex` (integer)
+- `decryptionKey` (bytes)
+- `l1BlockNumber` (integer)
+- `timestamp` (integer)
+- `shutterTxs` (list of bytes)
+- `plaintextTxs` (list of bytes)
+- `v` (integer)
+- `r` (integer)
+- `s` (integer)
+
+Here, the elements of `plaintextTxs` are expected to be a standard, encoded
+Ethereum transaction, the elements of `shutterTxs` encoded transactions of a new
+type. This type has prefix xxx and the payload is as follows:
+
+- `chainID` (integer)
+- `batchIndex` (integer)
+- `nonce` (integer)
+- `gasTipCap` (integer)
+- `gasFeeCap` (integer)
+- `gas` (integer)
+- `encryptedPayload` (bytes)
+- `v` (integer)
+- `r` (integer)
+- `s` (integer)
+
+Signatures for both batches and Shutter transactions are computed by RLP
+encoding the fields excluding `v`, `r`, and `s`, hashing the result, prefixing
+it with the type prefix and signing it.
+
+Batches are executed according to the following steps:
+
+1. `chainID` is checked. If it does not match rollup's chain ID, the batch is
+   rejected.
+2. `batchIndex` is checked. If the index does not match the index returned by
+   calling `getNextBatchIndex` on the batch counter contract, the batch is
+   rejected.
+3. `decryptionKey` is checked against the current eon key. First, the eon key
+   for the batch's `l1BlockNumber` is queried from the eon storage contract. If
+   no key is available, the check succeeds if the decryption key is empty,
+   otherwise the batch is rejected. If the key is available, the epoch id is
+   derived from `batchIndex` and it is verified that `decryptionKey` is the
+   correct decryption key for this epoch given the eon public key.
+4. The signature is checked as described above against the collator identified
+   by `l1BlockNumber` in the collator config contract.
+5. TODO: `l1BlockNumber` and `timestamp`: checked in contract or during batch
+   execution?
+6. For each shutter transaction, the envelope is validated. If any of the
+   following conditions is false, the transaction is ignored for the remainder
+   of the batch execution:
+   1. The transaction is decodable.
+   2. `chainID` is equal to the batch's `chainID`.
+   3. `batchIndex` is equal to the batch's `batchIndex`.
+   4. `v, r, s` is a valid signature.
+   5. `nonce` is equal to the sender's account nonce plus the number of valid
+      transactions by the same number in the batch prior to this one.
+   6. `gasFeeCap` is greater or equal to the current base fee
+   7. The sender's balance is greater or equal to `gasFeeCap * gas` for this and
+      all prior valid transactions in the batch.
+7. For each valid transaction
+   1. the fee is paid by reducing the sender's account balance by
+      `gasFeeCap * gas` and increasing the batch signer's account by
+      `min(gasTipCap, gasFeeCap - currentBaseFee) * gas`. Note that for valid
+      transactions this is guaranteed to succeed.
+   2. `encryptedPayload` is decrypted with `decryptionKey`, yielding
+      `decryptedPayload`. If decryption fails, execution of the transaction
+      ends.
+   3. `decryptedPayload` is decoded as an RLP list `[to, data, value]` where
+      `to` must be a valid address, `data` an arbitrary byte string, and `value`
+      an integer. If decoding fails, execution of the transaction ends.
+   4. If `value` is greater than the sender's account balance, the execution of
+      the transaction ends.
+   5. An EVM message is executed calling `to` with `data` passing `value` Wei
+      and `gas` units of gas.
+8. The transactions in `plaintextTxs` are decoded and executed as normal
+   Ethereum transactions.
