@@ -39,7 +39,8 @@ func (bc *BatchConfig) EnsureValid() error {
 	return nil
 }
 
-// BatchConfigFromMessage extracts the batch config received in a message.
+// BatchConfigFromMessage extracts the batch config received in a message. Started and
+// ValidatorsUpdated which are not present on the message are set to false.
 func BatchConfigFromMessage(m *shmsg.BatchConfig) (BatchConfig, error) {
 	var keypers []common.Address
 	for _, b := range m.Keypers {
@@ -58,8 +59,8 @@ func BatchConfigFromMessage(m *shmsg.BatchConfig) (BatchConfig, error) {
 		Keypers:               keypers,
 		Threshold:             m.Threshold,
 		KeyperConfigIndex:     m.KeyperConfigIndex,
-		Started:               m.Started,
-		ValidatorsUpdated:     m.ValidatorsUpdated,
+		Started:               false,
+		ValidatorsUpdated:     false,
 	}
 	return bc, nil
 }

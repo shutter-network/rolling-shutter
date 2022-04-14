@@ -321,8 +321,6 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		keypers,
 		uint64(keyperSet.Threshold),
 		uint64(keyperSet.KeyperConfigIndex),
-		false,
-		false,
 	)
 	err = scheduleShutterMessage(ctx, q, "new batch config", batchConfigMsg)
 	if err != nil {
