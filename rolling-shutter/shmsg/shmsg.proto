@@ -47,7 +47,7 @@ message Apology {
 }
 
 message EonStartVote {
-        uint64 activation_block_number = 1;
+        uint64 keyper_config_index = 2;
 }
 
 message Message {

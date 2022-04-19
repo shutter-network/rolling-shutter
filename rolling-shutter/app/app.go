@@ -113,14 +113,14 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 	return shapp, nil
 }
 
-// getConfig returns the BatchConfig for the given mainchain block number.
-func (app *ShutterApp) getConfig(blockNumber uint64) *BatchConfig {
-	for i := len(app.Configs) - 1; i >= 0; i-- {
-		if app.Configs[i].ActivationBlockNumber <= blockNumber {
-			return app.Configs[i]
+// getConfigByKeyperConfigIndex returns the BatchConfig with the given keyperConfigIndex.
+func (app *ShutterApp) getConfigByKeyperConfigIndex(keyperConfigIndex uint64) (*BatchConfig, bool) {
+	for _, cfg := range app.Configs {
+		if cfg.KeyperConfigIndex == keyperConfigIndex {
+			return cfg, true
 		}
 	}
-	panic("guard element missing")
+	return nil, false
 }
 
 // checkConfig checks if the given BatchConfig could be added.
@@ -431,12 +431,16 @@ func (app *ShutterApp) deliverBlockSeen(
 }
 
 func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender common.Address) abcitypes.ResponseDeliverTx {
-	config := app.getConfig(msg.ActivationBlockNumber)
+	config, ok := app.getConfigByKeyperConfigIndex(msg.KeyperConfigIndex)
+	if !ok {
+		return makeErrorResponse(fmt.Sprintf(
+			"config with keyper config index %d not found", msg.KeyperConfigIndex))
+	}
 	if !config.IsKeyper(sender) {
 		return notAKeyper(sender)
 	}
 
-	app.countEonStartVote(sender, config, msg.ActivationBlockNumber)
+	app.countEonStartVote(sender, config, config.ActivationBlockNumber)
 	dkg, activationBlockNumber, started := app.maybeStartEon(config)
 	if !started {
 		return abcitypes.ResponseDeliverTx{

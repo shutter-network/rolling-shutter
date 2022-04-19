@@ -284,11 +284,11 @@ func NewPolyEval(eon uint64, receivers []common.Address, encryptedEvals [][]byte
 }
 
 // NewEonStartVote creates a new eon start vote message.
-func NewEonStartVote(activationBlockNumber uint64) *Message {
+func NewEonStartVote(keyperConfigIndex uint64) *Message {
 	return &Message{
 		Payload: &Message_EonStartVote{
 			EonStartVote: &EonStartVote{
-				ActivationBlockNumber: activationBlockNumber,
+				KeyperConfigIndex: keyperConfigIndex,
 			},
 		},
 	}

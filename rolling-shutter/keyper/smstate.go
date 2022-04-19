@@ -484,7 +484,7 @@ func (st *ShuttermintState) finalizeDKG(
 		err = scheduleShutterMessage(
 			ctx, queries,
 			"requesting DKG restart",
-			shmsg.NewEonStartVote(uint64(keyperEon.ActivationBlockNumber)),
+			shmsg.NewEonStartVote(uint64(keyperEon.KeyperConfigIndex)),
 		)
 		if err != nil {
 			return err
