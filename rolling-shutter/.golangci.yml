@@ -40,6 +40,8 @@ linters-settings:
       - paramTypeCombine
       - hugeParam
       - unnamedResult
+      - rangeValCopy
+      - typeDefFirst
   gocyclo:
     min-complexity: 15
   goimports:
