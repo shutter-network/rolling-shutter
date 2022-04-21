@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,23 +38,36 @@ func (appState *GenesisAppState) GetKeypers() []common.Address {
 	return res
 }
 
-// Voting is a struct storing votes for arbitrary indices.
-type Voting struct {
-	Votes map[common.Address]int
+// BatchConfigEquals is used to compare two BatchConfig structs by the Voting generics type.
+type BatchConfigEquals struct{}
+
+func (BatchConfigEquals) Equals(a, b BatchConfig) bool {
+	return reflect.DeepEqual(a, b)
 }
 
-// ConfigVoting is used to let the keypers vote on new BatchConfigs to be added
-// Each keyper can vote exactly once.
-type ConfigVoting struct {
-	Voting
-	Candidates []BatchConfig
+// ComparableEquals is used to compare two Comparables by the Voting generics type.
+type ComparableEquals[T comparable] struct{}
+
+func (ComparableEquals[T]) Equals(a, b T) bool {
+	return a == b
+}
+
+// ConfigVoting is used to let the keypers vote on new BatchConfigs to be added.
+type ConfigVoting = Voting[BatchConfig, BatchConfigEquals]
+
+// NewConfigVoting creates a ConfigVoting struct.
+func NewConfigVoting() ConfigVoting {
+	return NewVoting[BatchConfig, BatchConfigEquals]()
 }
 
 // EonStartVoting is used to vote on the activation block number at which the next eon should be
 // started.
-type EonStartVoting struct {
-	Voting
-	Candidates []uint64
+type EonStartVoting = Voting[uint64, ComparableEquals[uint64]]
+
+// NewEonStartVoting creates a new EonStartVoting struct.
+func NewEonStartVoting() *EonStartVoting {
+	v := NewVoting[uint64, ComparableEquals[uint64]]()
+	return &v
 }
 
 // ValidatorPubkey holds the raw 32 byte ed25519 public key to be used as tendermint validator key

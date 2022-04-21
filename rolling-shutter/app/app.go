@@ -466,7 +466,7 @@ func (app *ShutterApp) countEonStartVote(sender common.Address, config *BatchCon
 		v = NewEonStartVoting()
 		app.EonStartVotings[config.KeyperConfigIndex] = v
 	}
-	v.AddVote(sender, activationBlockNumber)
+	v.SetVote(sender, activationBlockNumber)
 }
 
 func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64, bool) {

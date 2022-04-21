@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/v3/assert"
+
+	"github.com/shutter-network/shutter/shlib/shtest"
 )
 
 var (
@@ -60,4 +62,7 @@ func TestConfigVoting(t *testing.T) {
 	outcome, ok = cfgv.Outcome(2)
 	assert.Assert(t, ok)
 	assert.DeepEqual(t, votes[2], outcome)
+
+	var dst ConfigVoting
+	shtest.EnsureGobable(t, &cfgv, &dst)
 }

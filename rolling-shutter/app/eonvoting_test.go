@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/v3/assert"
+
+	"github.com/shutter-network/shutter/shlib/shtest"
 )
 
 func TestEonStartVoting(t *testing.T) {
@@ -19,21 +21,23 @@ func TestEonStartVoting(t *testing.T) {
 	e1 := uint64(3)
 	e2 := uint64(5)
 
-	v.AddVote(a1, e1)
+	v.SetVote(a1, e1)
 	_, s = v.Outcome(2)
 	assert.Assert(t, !s)
 
-	v.AddVote(a2, e1)
+	v.SetVote(a2, e1)
 	r, s := v.Outcome(2)
 	assert.Assert(t, s)
 	assert.Equal(t, e1, r)
 
-	v.AddVote(a2, e2)
+	v.SetVote(a2, e2)
 	_, s = v.Outcome(2)
 	assert.Assert(t, !s)
 
-	v.AddVote(a3, e2)
+	v.SetVote(a3, e2)
 	r, s = v.Outcome(2)
 	assert.Assert(t, s)
 	assert.Equal(t, e2, r)
+	dst := NewEonStartVoting()
+	shtest.EnsureGobable(t, v, dst)
 }
