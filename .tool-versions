@@ -8,4 +8,4 @@ nodejs 16.14.0
 protoc 3.19.4
 postgres 14.2
 solidity 0.8.9
-sqlc 1.12.0
+sqlc 1.13.0
