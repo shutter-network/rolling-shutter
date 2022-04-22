@@ -568,7 +568,7 @@ func (st *ShuttermintState) handleCheckIn(
 
 func (st *ShuttermintState) handlePolyCommitment(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment,
-) error { //nolint:unparam
+) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Printf("PolyCommitment for non existent eon received: eon=%d commitment=%#v",
@@ -654,7 +654,7 @@ func (st *ShuttermintState) handlePolyEval(
 
 func (st *ShuttermintState) handleAccusation(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.Accusation,
-) error { //nolint:unparam
+) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Printf("Accusation for non existent eon received: %s", e)
@@ -694,7 +694,7 @@ func (st *ShuttermintState) handleAccusation(
 
 func (st *ShuttermintState) handleApology(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.Apology,
-) error { //nolint:unparam
+) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Printf("Apology for non existent eon received: %s", e)
