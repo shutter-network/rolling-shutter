@@ -29,7 +29,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/tools v0.1.10
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.3
 )
