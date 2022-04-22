@@ -234,14 +234,18 @@ func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
 	if err != nil {
 		return err
 	}
-	err = kpr.sendBatchConfigStarted(ctx, tx)
+	err = kpr.sendNewBlockSeen(ctx, tx)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (kpr *keyper) sendBatchConfigStarted(ctx context.Context, tx pgx.Tx) error {
+// sendNewBlockSeen sends shmsg.NewBlockSeen messages to the shuttermint chain. This function sends
+// NewBlockSeen messages to the shuttermint chain, so that the chain can start new batch configs if
+// enough keypers have seen a block past the start block of some BatchConfig. We only send messages
+// when the current block we see, could lead to a batch config being started.
+func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx) error {
 	qc := commondb.New(tx)
 	q := kprdb.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
