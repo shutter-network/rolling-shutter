@@ -1,16 +1,16 @@
 {:paths ["src"]
  :resource-paths []
- :deps {org.clojure/clojure {:mvn/version "1.11.0"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         ;; force newer version of encore and pretty in order to avoid warnings being printed with
         ;; clojure 1.11
         com.taoensso/encore {:mvn/version "3.21.0"}
         io.aviso/pretty {:mvn/version "1.1.1"}
 
         cheshire/cheshire {:mvn/version "5.10.2"}
-        com.github.seancorfield/next.jdbc {:mvn/version "1.2.772"}
-        org.postgresql/postgresql {:mvn/version "42.3.3"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
+        org.postgresql/postgresql {:mvn/version "42.3.4"}
         com.taoensso/timbre {:mvn/version "5.2.1"}
-        toml/toml {:mvn/version "0.1.3"}
+        toml/toml {:mvn/version "0.1.4"}
         mvxcvi/puget {:mvn/version "1.3.2"}
         babashka/fs {:mvn/version "0.1.4"}
         babashka/process {:mvn/version "0.1.1"}}
