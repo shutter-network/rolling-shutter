@@ -77,15 +77,14 @@ func (app *ShutterApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 // NewShutterApp creates a new ShutterApp.
 func NewShutterApp() *ShutterApp {
 	return &ShutterApp{
-		Configs:         []*BatchConfig{{}},
-		DKGMap:          make(map[uint64]*DKGInstance),
-		ConfigVoting:    NewConfigVoting(),
-		EonStartVotings: make(map[uint64]*EonStartVoting),
-		Identities:      make(map[common.Address]ValidatorPubkey),
-		BlocksSeen:      make(map[common.Address]uint64),
-		CheckTxState:    NewCheckTxState(),
-		NonceTracker:    NewNonceTracker(),
-		ChainID:         "", // will be set in InitChain
+		Configs:      []*BatchConfig{{}},
+		DKGMap:       make(map[uint64]*DKGInstance),
+		ConfigVoting: NewConfigVoting(),
+		Identities:   make(map[common.Address]ValidatorPubkey),
+		BlocksSeen:   make(map[common.Address]uint64),
+		CheckTxState: NewCheckTxState(),
+		NonceTracker: NewNonceTracker(),
+		ChainID:      "", // will be set in InitChain
 	}
 }
 
@@ -430,18 +429,24 @@ func (app *ShutterApp) deliverBlockSeen(
 	}
 }
 
-func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender common.Address) abcitypes.ResponseDeliverTx {
-	config, ok := app.getConfigByKeyperConfigIndex(msg.KeyperConfigIndex)
+func (app *ShutterApp) deliverDKGResult(msg *shmsg.DKGResult, sender common.Address) abcitypes.ResponseDeliverTx {
+	dkginstance, ok := app.DKGMap[msg.Eon]
 	if !ok {
 		return makeErrorResponse(fmt.Sprintf(
-			"config with keyper config index %d not found", msg.KeyperConfigIndex))
+			"cannot handle DKGResult message for eon %d", msg.Eon),
+		)
 	}
+	config := dkginstance.Config
 	if !config.IsKeyper(sender) {
 		return notAKeyper(sender)
 	}
 
-	app.countEonStartVote(sender, config, config.ActivationBlockNumber)
-	dkg, activationBlockNumber, started := app.maybeStartEon(config)
+	err := dkginstance.SuccessVoting.AddVote(sender, msg.Success)
+	if err != nil {
+		return makeErrorResponse("already voted on dkg result")
+	}
+
+	dkg, started := app.maybeStartEon(msg.Eon)
 	if !started {
 		return abcitypes.ResponseDeliverTx{
 			Code:   0,
@@ -453,37 +458,26 @@ func (app *ShutterApp) deliverEonStartVoteMsg(msg *shmsg.EonStartVote, sender co
 		Events: []abcitypes.Event{
 			shutterevents.EonStarted{
 				Eon:                   dkg.Eon,
-				ActivationBlockNumber: activationBlockNumber,
+				ActivationBlockNumber: config.ActivationBlockNumber,
 				KeyperConfigIndex:     config.KeyperConfigIndex,
 			}.MakeABCIEvent(),
 		},
 	}
 }
 
-func (app *ShutterApp) countEonStartVote(sender common.Address, config *BatchConfig, activationBlockNumber uint64) {
-	v := app.EonStartVotings[config.KeyperConfigIndex]
-	if v == nil {
-		v = NewEonStartVoting()
-		app.EonStartVotings[config.KeyperConfigIndex] = v
-	}
-	v.SetVote(sender, activationBlockNumber)
-}
-
-func (app *ShutterApp) maybeStartEon(config *BatchConfig) (*DKGInstance, uint64, bool) {
-	v, ok := app.EonStartVotings[config.KeyperConfigIndex]
+func (app *ShutterApp) maybeStartEon(eon uint64) (*DKGInstance, bool) {
+	dkg, ok := app.DKGMap[eon]
 	if !ok {
-		return nil, uint64(0), false
+		return nil, false
 	}
 
-	threshold := int(config.Threshold)
-	activationBlockNumber, success := v.Outcome(threshold)
-	if !success {
-		return nil, uint64(0), false
+	threshold := int(dkg.Config.Threshold)
+	success, ok := dkg.SuccessVoting.Outcome(threshold)
+	if !ok || success {
+		return nil, false
 	}
 
-	delete(app.EonStartVotings, config.KeyperConfigIndex)
-	dkg := app.StartDKG(*config)
-	return dkg, activationBlockNumber, true
+	return app.StartDKG(dkg.Config), true
 }
 
 func (app *ShutterApp) handlePolyEvalMsg(msg *shmsg.PolyEval, sender common.Address) abcitypes.ResponseDeliverTx {
@@ -612,8 +606,8 @@ func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address)
 	if msg.GetCheckIn() != nil {
 		return app.deliverCheckIn(msg.GetCheckIn(), sender)
 	}
-	if msg.GetEonStartVote() != nil {
-		return app.deliverEonStartVoteMsg(msg.GetEonStartVote(), sender)
+	if msg.GetDkgResult() != nil {
+		return app.deliverDKGResult(msg.GetDkgResult(), sender)
 	}
 
 	if msg.GetPolyEval() != nil {

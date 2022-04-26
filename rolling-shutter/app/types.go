@@ -56,22 +56,14 @@ func (ComparableEquals[T]) Equals(a, b T) bool {
 	return a == b
 }
 
+type DKGSuccessVoting = Voting[bool, ComparableEquals[bool]]
+
 // ConfigVoting is used to let the keypers vote on new BatchConfigs to be added.
 type ConfigVoting = Voting[BatchConfig, BatchConfigEquals]
 
 // NewConfigVoting creates a ConfigVoting struct.
 func NewConfigVoting() ConfigVoting {
 	return NewVoting[BatchConfig, BatchConfigEquals]()
-}
-
-// EonStartVoting is used to vote on the activation block number at which the next eon should be
-// started.
-type EonStartVoting = Voting[uint64, ComparableEquals[uint64]]
-
-// NewEonStartVoting creates a new EonStartVoting struct.
-func NewEonStartVoting() *EonStartVoting {
-	v := NewVoting[uint64, ComparableEquals[uint64]]()
-	return &v
 }
 
 // ValidatorPubkey holds the raw 32 byte ed25519 public key to be used as tendermint validator key
@@ -98,10 +90,10 @@ func NewValidatorPubkey(pubkey []byte) (ValidatorPubkey, error) {
 
 // ShutterApp holds our data structures used for the tendermint app.
 type ShutterApp struct {
-	Configs         []*BatchConfig
-	DKGMap          map[uint64]*DKGInstance
-	ConfigVoting    ConfigVoting
-	EonStartVotings map[uint64]*EonStartVoting
+	Configs      []*BatchConfig
+	DKGMap       map[uint64]*DKGInstance // map eon to DKGInstance
+	ConfigVoting ConfigVoting
+	// EonStartVotings map[uint64]*EonStartVoting
 	Gobpath         string
 	LastSaved       time.Time
 	LastBlockHeight int64
@@ -133,9 +125,9 @@ type SenderReceiverPair struct {
 
 // DKGInstance manages the state of one eon key generation instance.
 type DKGInstance struct {
-	Config BatchConfig
-	Eon    uint64
-
+	Config              BatchConfig
+	Eon                 uint64
+	SuccessVoting       DKGSuccessVoting
 	PolyEvalsSeen       map[SenderReceiverPair]struct{}
 	PolyCommitmentsSeen map[common.Address]struct{}
 	AccusationsSeen     map[common.Address]struct{}

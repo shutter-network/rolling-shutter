@@ -46,8 +46,14 @@ message Apology {
         repeated bytes poly_evals = 3;
 }
 
-message EonStartVote {
-        uint64 keyper_config_index = 2;
+// DKGResult is sent by the keyper if the DKG process for an eon has
+// finished. The field 'success' is used to signal whether the DKG process was
+// successful. If the DKG process fails for a majority of keypers, the
+// shuttermint app will restart the DKG process. This replaces the EonStartVote
+// the keypers sent previously when the DKG process failed.
+message DKGResult {
+        bool success = 1;
+        uint64 eon=2;
 }
 
 message Message {
@@ -63,7 +69,8 @@ message Message {
                 Accusation accusation = 11;
                 Apology apology = 12;
 
-                EonStartVote eon_start_vote = 13;
+                DKGResult dkg_result = 15;
+                // EonStartVote eon_start_vote = 13;
         }
 }
 

@@ -283,12 +283,12 @@ func NewPolyEval(eon uint64, receivers []common.Address, encryptedEvals [][]byte
 	}
 }
 
-// NewEonStartVote creates a new eon start vote message.
-func NewEonStartVote(keyperConfigIndex uint64) *Message {
+func NewDKGResult(eon uint64, success bool) *Message {
 	return &Message{
-		Payload: &Message_EonStartVote{
-			EonStartVote: &EonStartVote{
-				KeyperConfigIndex: keyperConfigIndex,
+		Payload: &Message_DkgResult{
+			DkgResult: &DKGResult{
+				Eon:     eon,
+				Success: success,
 			},
 		},
 	}

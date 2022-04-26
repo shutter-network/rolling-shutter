@@ -474,18 +474,13 @@ func (st *ShuttermintState) finalizeDKG(
 	var pureResult []byte
 
 	dkgresult, err := dkg.pure.ComputeResult()
+
+	dkgresultmsg := shmsg.NewDKGResult(eon, err == nil)
+
 	if err != nil {
 		log.Printf("Error: DKG process failed for eon %d: %s", eon, err)
 		dkgerror = sql.NullString{String: err.Error(), Valid: true}
-		keyperEon, err := queries.GetEon(ctx, int64(eon))
-		if err != nil {
-			return err
-		}
-		err = scheduleShutterMessage(
-			ctx, queries,
-			"requesting DKG restart",
-			shmsg.NewEonStartVote(uint64(keyperEon.KeyperConfigIndex)),
-		)
+		_, err := queries.GetEon(ctx, int64(eon))
 		if err != nil {
 			return err
 		}
@@ -500,6 +495,15 @@ func (st *ShuttermintState) finalizeDKG(
 		if err != nil {
 			return err
 		}
+	}
+
+	err = scheduleShutterMessage(
+		ctx, queries,
+		"reporting DKG result",
+		dkgresultmsg,
+	)
+	if err != nil {
+		return err
 	}
 
 	return queries.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{

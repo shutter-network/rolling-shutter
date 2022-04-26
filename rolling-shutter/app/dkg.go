@@ -10,6 +10,7 @@ func NewDKGInstance(config BatchConfig, eon uint64) DKGInstance {
 	return DKGInstance{
 		Config:              config,
 		Eon:                 eon,
+		SuccessVoting:       NewVoting[bool, ComparableEquals[bool]](),
 		PolyEvalsSeen:       make(map[SenderReceiverPair]struct{}),
 		PolyCommitmentsSeen: make(map[common.Address]struct{}),
 		AccusationsSeen:     make(map[common.Address]struct{}),
