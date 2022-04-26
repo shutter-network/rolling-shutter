@@ -38,12 +38,16 @@ func (appState *GenesisAppState) GetKeypers() []common.Address {
 	return res
 }
 
-// BatchConfigEquals is used to compare two BatchConfig structs by the Voting generics type.
-type BatchConfigEquals struct{}
+// ReflectDeepEquals is used to compare any two objects by the Voting generics type using
+// reflect.DeepEqual.
+type ReflectDeepEquals[T any] struct{}
 
-func (BatchConfigEquals) Equals(a, b BatchConfig) bool {
+func (ReflectDeepEquals[T]) Equals(a, b T) bool {
 	return reflect.DeepEqual(a, b)
 }
+
+// BatchConfigEquals is used to compare two BatchConfig structs by the Voting generics type.
+type BatchConfigEquals = ReflectDeepEquals[BatchConfig]
 
 // ComparableEquals is used to compare two Comparables by the Voting generics type.
 type ComparableEquals[T comparable] struct{}
