@@ -1,11 +1,11 @@
 babashka 0.8.1
-circleci 0.1.17142
+circleci 0.1.17183
 clojure 1.10.3.1087
 golang 1.18.1
 golangci-lint 1.45.2
 java adoptopenjdk-17.0.2+8
 nodejs 16.14.0
-protoc 3.20.1
 postgres 14.2
+protoc 3.20.1
 solidity 0.8.9
 sqlc 1.13.0
