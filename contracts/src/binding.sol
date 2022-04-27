@@ -6,3 +6,4 @@ pragma solidity =0.8.9;
 import "./AddrsSeq.sol";
 import "./KeypersConfigsList.sol";
 import "./CollatorConfigsList.sol";
+import "./BatchCounter.sol";

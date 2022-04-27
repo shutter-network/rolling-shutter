@@ -845,6 +845,478 @@ func (_AddrsSeq *AddrsSeqFilterer) ParseOwnershipTransferred(log types.Log) (*Ad
 	return event, nil
 }
 
+// BatchCounterMetaData contains all meta data concerning the BatchCounter contract.
+var BatchCounterMetaData = &bind.MetaData{
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"batchIndex\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"newBatchIndex\",\"type\":\"uint64\"}],\"name\":\"set\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5061001a3361001f565b61006f565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6103ec8061007e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c80631d8c311f14610067578063715018a61461007c5780638da5cb5b14610084578063d09de08a146100a4578063e79993f3146100ac578063f2fde38b146100e0575b600080fd5b61007a6100753660046102ed565b6100f3565b005b61007a610154565b6000546040516001600160a01b0390911681526020015b60405180910390f35b61007a61018a565b6000546100c790600160a01b900467ffffffffffffffff1681565b60405167ffffffffffffffff909116815260200161009b565b61007a6100ee36600461031e565b610202565b6000546001600160a01b031633146101265760405162461bcd60e51b815260040161011d90610347565b60405180910390fd5b6000805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b6000546001600160a01b0316331461017e5760405162461bcd60e51b815260040161011d90610347565b610188600061029d565b565b6000546001600160a01b031633146101b45760405162461bcd60e51b815260040161011d90610347565b6001600060148282829054906101000a900467ffffffffffffffff166101da919061037c565b92506101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550565b6000546001600160a01b0316331461022c5760405162461bcd60e51b815260040161011d90610347565b6001600160a01b0381166102915760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161011d565b61029a8161029d565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156102ff57600080fd5b813567ffffffffffffffff8116811461031757600080fd5b9392505050565b60006020828403121561033057600080fd5b81356001600160a01b038116811461031757600080fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600067ffffffffffffffff8083168185168083038211156103ad57634e487b7160e01b600052601160045260246000fd5b0194935050505056fea26469706673582212207ab02b0c1e0889441328f3002b04e38cb81d6ee1e78cbc73732b14fbc465660d64736f6c63430008090033",
+}
+
+// BatchCounterABI is the input ABI used to generate the binding from.
+// Deprecated: Use BatchCounterMetaData.ABI instead.
+var BatchCounterABI = BatchCounterMetaData.ABI
+
+// BatchCounterBin is the compiled bytecode used for deploying new contracts.
+// Deprecated: Use BatchCounterMetaData.Bin instead.
+var BatchCounterBin = BatchCounterMetaData.Bin
+
+// DeployBatchCounter deploys a new Ethereum contract, binding an instance of BatchCounter to it.
+func DeployBatchCounter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *BatchCounter, error) {
+	parsed, err := BatchCounterMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(BatchCounterBin), backend)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &BatchCounter{BatchCounterCaller: BatchCounterCaller{contract: contract}, BatchCounterTransactor: BatchCounterTransactor{contract: contract}, BatchCounterFilterer: BatchCounterFilterer{contract: contract}}, nil
+}
+
+// BatchCounter is an auto generated Go binding around an Ethereum contract.
+type BatchCounter struct {
+	BatchCounterCaller     // Read-only binding to the contract
+	BatchCounterTransactor // Write-only binding to the contract
+	BatchCounterFilterer   // Log filterer for contract events
+}
+
+// BatchCounterCaller is an auto generated read-only Go binding around an Ethereum contract.
+type BatchCounterCaller struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// BatchCounterTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type BatchCounterTransactor struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// BatchCounterFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type BatchCounterFilterer struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// BatchCounterSession is an auto generated Go binding around an Ethereum contract,
+// with pre-set call and transact options.
+type BatchCounterSession struct {
+	Contract     *BatchCounter     // Generic contract binding to set the session for
+	CallOpts     bind.CallOpts     // Call options to use throughout this session
+	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
+}
+
+// BatchCounterCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// with pre-set call options.
+type BatchCounterCallerSession struct {
+	Contract *BatchCounterCaller // Generic contract caller binding to set the session for
+	CallOpts bind.CallOpts       // Call options to use throughout this session
+}
+
+// BatchCounterTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// with pre-set transact options.
+type BatchCounterTransactorSession struct {
+	Contract     *BatchCounterTransactor // Generic contract transactor binding to set the session for
+	TransactOpts bind.TransactOpts       // Transaction auth options to use throughout this session
+}
+
+// BatchCounterRaw is an auto generated low-level Go binding around an Ethereum contract.
+type BatchCounterRaw struct {
+	Contract *BatchCounter // Generic contract binding to access the raw methods on
+}
+
+// BatchCounterCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type BatchCounterCallerRaw struct {
+	Contract *BatchCounterCaller // Generic read-only contract binding to access the raw methods on
+}
+
+// BatchCounterTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type BatchCounterTransactorRaw struct {
+	Contract *BatchCounterTransactor // Generic write-only contract binding to access the raw methods on
+}
+
+// NewBatchCounter creates a new instance of BatchCounter, bound to a specific deployed contract.
+func NewBatchCounter(address common.Address, backend bind.ContractBackend) (*BatchCounter, error) {
+	contract, err := bindBatchCounter(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounter{BatchCounterCaller: BatchCounterCaller{contract: contract}, BatchCounterTransactor: BatchCounterTransactor{contract: contract}, BatchCounterFilterer: BatchCounterFilterer{contract: contract}}, nil
+}
+
+// NewBatchCounterCaller creates a new read-only instance of BatchCounter, bound to a specific deployed contract.
+func NewBatchCounterCaller(address common.Address, caller bind.ContractCaller) (*BatchCounterCaller, error) {
+	contract, err := bindBatchCounter(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounterCaller{contract: contract}, nil
+}
+
+// NewBatchCounterTransactor creates a new write-only instance of BatchCounter, bound to a specific deployed contract.
+func NewBatchCounterTransactor(address common.Address, transactor bind.ContractTransactor) (*BatchCounterTransactor, error) {
+	contract, err := bindBatchCounter(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounterTransactor{contract: contract}, nil
+}
+
+// NewBatchCounterFilterer creates a new log filterer instance of BatchCounter, bound to a specific deployed contract.
+func NewBatchCounterFilterer(address common.Address, filterer bind.ContractFilterer) (*BatchCounterFilterer, error) {
+	contract, err := bindBatchCounter(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounterFilterer{contract: contract}, nil
+}
+
+// bindBatchCounter binds a generic wrapper to an already deployed contract.
+func bindBatchCounter(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := abi.JSON(strings.NewReader(BatchCounterABI))
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_BatchCounter *BatchCounterRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _BatchCounter.Contract.BatchCounterCaller.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_BatchCounter *BatchCounterRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BatchCounter.Contract.BatchCounterTransactor.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_BatchCounter *BatchCounterRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _BatchCounter.Contract.BatchCounterTransactor.contract.Transact(opts, method, params...)
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_BatchCounter *BatchCounterCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _BatchCounter.Contract.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_BatchCounter *BatchCounterTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BatchCounter.Contract.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_BatchCounter *BatchCounterTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _BatchCounter.Contract.contract.Transact(opts, method, params...)
+}
+
+// BatchIndex is a free data retrieval call binding the contract method 0xe79993f3.
+//
+// Solidity: function batchIndex() view returns(uint64)
+func (_BatchCounter *BatchCounterCaller) BatchIndex(opts *bind.CallOpts) (uint64, error) {
+	var out []interface{}
+	err := _BatchCounter.contract.Call(opts, &out, "batchIndex")
+
+	if err != nil {
+		return *new(uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+
+	return out0, err
+
+}
+
+// BatchIndex is a free data retrieval call binding the contract method 0xe79993f3.
+//
+// Solidity: function batchIndex() view returns(uint64)
+func (_BatchCounter *BatchCounterSession) BatchIndex() (uint64, error) {
+	return _BatchCounter.Contract.BatchIndex(&_BatchCounter.CallOpts)
+}
+
+// BatchIndex is a free data retrieval call binding the contract method 0xe79993f3.
+//
+// Solidity: function batchIndex() view returns(uint64)
+func (_BatchCounter *BatchCounterCallerSession) BatchIndex() (uint64, error) {
+	return _BatchCounter.Contract.BatchIndex(&_BatchCounter.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_BatchCounter *BatchCounterCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BatchCounter.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_BatchCounter *BatchCounterSession) Owner() (common.Address, error) {
+	return _BatchCounter.Contract.Owner(&_BatchCounter.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_BatchCounter *BatchCounterCallerSession) Owner() (common.Address, error) {
+	return _BatchCounter.Contract.Owner(&_BatchCounter.CallOpts)
+}
+
+// Increment is a paid mutator transaction binding the contract method 0xd09de08a.
+//
+// Solidity: function increment() returns()
+func (_BatchCounter *BatchCounterTransactor) Increment(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BatchCounter.contract.Transact(opts, "increment")
+}
+
+// Increment is a paid mutator transaction binding the contract method 0xd09de08a.
+//
+// Solidity: function increment() returns()
+func (_BatchCounter *BatchCounterSession) Increment() (*types.Transaction, error) {
+	return _BatchCounter.Contract.Increment(&_BatchCounter.TransactOpts)
+}
+
+// Increment is a paid mutator transaction binding the contract method 0xd09de08a.
+//
+// Solidity: function increment() returns()
+func (_BatchCounter *BatchCounterTransactorSession) Increment() (*types.Transaction, error) {
+	return _BatchCounter.Contract.Increment(&_BatchCounter.TransactOpts)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_BatchCounter *BatchCounterTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BatchCounter.contract.Transact(opts, "renounceOwnership")
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_BatchCounter *BatchCounterSession) RenounceOwnership() (*types.Transaction, error) {
+	return _BatchCounter.Contract.RenounceOwnership(&_BatchCounter.TransactOpts)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_BatchCounter *BatchCounterTransactorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _BatchCounter.Contract.RenounceOwnership(&_BatchCounter.TransactOpts)
+}
+
+// Set is a paid mutator transaction binding the contract method 0x1d8c311f.
+//
+// Solidity: function set(uint64 newBatchIndex) returns()
+func (_BatchCounter *BatchCounterTransactor) Set(opts *bind.TransactOpts, newBatchIndex uint64) (*types.Transaction, error) {
+	return _BatchCounter.contract.Transact(opts, "set", newBatchIndex)
+}
+
+// Set is a paid mutator transaction binding the contract method 0x1d8c311f.
+//
+// Solidity: function set(uint64 newBatchIndex) returns()
+func (_BatchCounter *BatchCounterSession) Set(newBatchIndex uint64) (*types.Transaction, error) {
+	return _BatchCounter.Contract.Set(&_BatchCounter.TransactOpts, newBatchIndex)
+}
+
+// Set is a paid mutator transaction binding the contract method 0x1d8c311f.
+//
+// Solidity: function set(uint64 newBatchIndex) returns()
+func (_BatchCounter *BatchCounterTransactorSession) Set(newBatchIndex uint64) (*types.Transaction, error) {
+	return _BatchCounter.Contract.Set(&_BatchCounter.TransactOpts, newBatchIndex)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_BatchCounter *BatchCounterTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _BatchCounter.contract.Transact(opts, "transferOwnership", newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_BatchCounter *BatchCounterSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _BatchCounter.Contract.TransferOwnership(&_BatchCounter.TransactOpts, newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_BatchCounter *BatchCounterTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _BatchCounter.Contract.TransferOwnership(&_BatchCounter.TransactOpts, newOwner)
+}
+
+// BatchCounterOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the BatchCounter contract.
+type BatchCounterOwnershipTransferredIterator struct {
+	Event *BatchCounterOwnershipTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *BatchCounterOwnershipTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BatchCounterOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(BatchCounterOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *BatchCounterOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *BatchCounterOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// BatchCounterOwnershipTransferred represents a OwnershipTransferred event raised by the BatchCounter contract.
+type BatchCounterOwnershipTransferred struct {
+	PreviousOwner common.Address
+	NewOwner      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_BatchCounter *BatchCounterFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*BatchCounterOwnershipTransferredIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _BatchCounter.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounterOwnershipTransferredIterator{contract: _BatchCounter.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_BatchCounter *BatchCounterFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *BatchCounterOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _BatchCounter.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(BatchCounterOwnershipTransferred)
+				if err := _BatchCounter.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_BatchCounter *BatchCounterFilterer) ParseOwnershipTransferred(log types.Log) (*BatchCounterOwnershipTransferred, error) {
+	event := new(BatchCounterOwnershipTransferred)
+	if err := _BatchCounter.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 // CollatorConfigsListMetaData contains all meta data concerning the CollatorConfigsList contract.
 var CollatorConfigsListMetaData = &bind.MetaData{
 	ABI: "[{\"inputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"_addrsSeq\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"collatorSetIndex\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"collatorConfigIndex\",\"type\":\"uint64\"}],\"name\":\"NewConfig\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"addNewCfg\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"addrsSeq\",\"outputs\":[{\"internalType\":\"contractAddrsSeq\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"collatorConfigs\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"}],\"name\":\"getActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCurrentActiveConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"setIndex\",\"type\":\"uint64\"}],\"internalType\":\"structCollatorConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
