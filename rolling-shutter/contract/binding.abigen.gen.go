@@ -847,8 +847,8 @@ func (_AddrsSeq *AddrsSeqFilterer) ParseOwnershipTransferred(log types.Log) (*Ad
 
 // BatchCounterMetaData contains all meta data concerning the BatchCounter contract.
 var BatchCounterMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"batchIndex\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"newBatchIndex\",\"type\":\"uint64\"}],\"name\":\"set\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5061001a3361001f565b61006f565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6103ec8061007e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c80631d8c311f14610067578063715018a61461007c5780638da5cb5b14610084578063d09de08a146100a4578063e79993f3146100ac578063f2fde38b146100e0575b600080fd5b61007a6100753660046102ed565b6100f3565b005b61007a610154565b6000546040516001600160a01b0390911681526020015b60405180910390f35b61007a61018a565b6000546100c790600160a01b900467ffffffffffffffff1681565b60405167ffffffffffffffff909116815260200161009b565b61007a6100ee36600461031e565b610202565b6000546001600160a01b031633146101265760405162461bcd60e51b815260040161011d90610347565b60405180910390fd5b6000805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b6000546001600160a01b0316331461017e5760405162461bcd60e51b815260040161011d90610347565b610188600061029d565b565b6000546001600160a01b031633146101b45760405162461bcd60e51b815260040161011d90610347565b6001600060148282829054906101000a900467ffffffffffffffff166101da919061037c565b92506101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550565b6000546001600160a01b0316331461022c5760405162461bcd60e51b815260040161011d90610347565b6001600160a01b0381166102915760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161011d565b61029a8161029d565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156102ff57600080fd5b813567ffffffffffffffff8116811461031757600080fd5b9392505050565b60006020828403121561033057600080fd5b81356001600160a01b038116811461031757600080fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600067ffffffffffffffff8083168185168083038211156103ad57634e487b7160e01b600052601160045260246000fd5b0194935050505056fea26469706673582212207ab02b0c1e0889441328f3002b04e38cb81d6ee1e78cbc73732b14fbc465660d64736f6c63430008090033",
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"oldIndex\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"newIndex\",\"type\":\"uint64\"}],\"name\":\"NewBatchIndex\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"batchIndex\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"newBatchIndex\",\"type\":\"uint64\"}],\"name\":\"set\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5061001a3361001f565b61006f565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6104a08061007e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c80631d8c311f14610067578063715018a61461007c5780638da5cb5b14610084578063d09de08a146100a4578063e79993f3146100ac578063f2fde38b146100e0575b600080fd5b61007a6100753660046103a1565b6100f3565b005b61007a6101a3565b6000546040516001600160a01b0390911681526020015b60405180910390f35b61007a6101d9565b6000546100c790600160a01b900467ffffffffffffffff1681565b60405167ffffffffffffffff909116815260200161009b565b61007a6100ee3660046103d2565b6102b6565b6000546001600160a01b031633146101265760405162461bcd60e51b815260040161011d906103fb565b60405180910390fd5b6000546040805167ffffffffffffffff600160a01b9093048316815291831660208301527f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b910160405180910390a16000805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b6000546001600160a01b031633146101cd5760405162461bcd60e51b815260040161011d906103fb565b6101d76000610351565b565b6000546001600160a01b031633146102035760405162461bcd60e51b815260040161011d906103fb565b6000547f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b90600160a01b900467ffffffffffffffff16610244816001610430565b6040805167ffffffffffffffff93841681529290911660208301520160405180910390a16001600060148282829054906101000a900467ffffffffffffffff1661028e9190610430565b92506101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550565b6000546001600160a01b031633146102e05760405162461bcd60e51b815260040161011d906103fb565b6001600160a01b0381166103455760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161011d565b61034e81610351565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156103b357600080fd5b813567ffffffffffffffff811681146103cb57600080fd5b9392505050565b6000602082840312156103e457600080fd5b81356001600160a01b03811681146103cb57600080fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600067ffffffffffffffff80831681851680830382111561046157634e487b7160e01b600052601160045260246000fd5b0194935050505056fea264697066735822122073740ed6220680564a3527a75723ff6c3bce97aa7de0712c016a69991800087b64736f6c63430008090033",
 }
 
 // BatchCounterABI is the input ABI used to generate the binding from.
@@ -1162,6 +1162,141 @@ func (_BatchCounter *BatchCounterSession) TransferOwnership(newOwner common.Addr
 // Solidity: function transferOwnership(address newOwner) returns()
 func (_BatchCounter *BatchCounterTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _BatchCounter.Contract.TransferOwnership(&_BatchCounter.TransactOpts, newOwner)
+}
+
+// BatchCounterNewBatchIndexIterator is returned from FilterNewBatchIndex and is used to iterate over the raw logs and unpacked data for NewBatchIndex events raised by the BatchCounter contract.
+type BatchCounterNewBatchIndexIterator struct {
+	Event *BatchCounterNewBatchIndex // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *BatchCounterNewBatchIndexIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BatchCounterNewBatchIndex)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(BatchCounterNewBatchIndex)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *BatchCounterNewBatchIndexIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *BatchCounterNewBatchIndexIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// BatchCounterNewBatchIndex represents a NewBatchIndex event raised by the BatchCounter contract.
+type BatchCounterNewBatchIndex struct {
+	OldIndex uint64
+	NewIndex uint64
+	Raw      types.Log // Blockchain specific contextual infos
+}
+
+// FilterNewBatchIndex is a free log retrieval operation binding the contract event 0x5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b.
+//
+// Solidity: event NewBatchIndex(uint64 oldIndex, uint64 newIndex)
+func (_BatchCounter *BatchCounterFilterer) FilterNewBatchIndex(opts *bind.FilterOpts) (*BatchCounterNewBatchIndexIterator, error) {
+
+	logs, sub, err := _BatchCounter.contract.FilterLogs(opts, "NewBatchIndex")
+	if err != nil {
+		return nil, err
+	}
+	return &BatchCounterNewBatchIndexIterator{contract: _BatchCounter.contract, event: "NewBatchIndex", logs: logs, sub: sub}, nil
+}
+
+// WatchNewBatchIndex is a free log subscription operation binding the contract event 0x5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b.
+//
+// Solidity: event NewBatchIndex(uint64 oldIndex, uint64 newIndex)
+func (_BatchCounter *BatchCounterFilterer) WatchNewBatchIndex(opts *bind.WatchOpts, sink chan<- *BatchCounterNewBatchIndex) (event.Subscription, error) {
+
+	logs, sub, err := _BatchCounter.contract.WatchLogs(opts, "NewBatchIndex")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(BatchCounterNewBatchIndex)
+				if err := _BatchCounter.contract.UnpackLog(event, "NewBatchIndex", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseNewBatchIndex is a log parse operation binding the contract event 0x5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b.
+//
+// Solidity: event NewBatchIndex(uint64 oldIndex, uint64 newIndex)
+func (_BatchCounter *BatchCounterFilterer) ParseNewBatchIndex(log types.Log) (*BatchCounterNewBatchIndex, error) {
+	event := new(BatchCounterNewBatchIndex)
+	if err := _BatchCounter.contract.UnpackLog(event, "NewBatchIndex", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 // BatchCounterOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the BatchCounter contract.
@@ -2160,6 +2295,674 @@ func (_Context *ContextTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.
 // Transact invokes the (paid) contract method with params as input values.
 func (_Context *ContextTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _Context.Contract.contract.Transact(opts, method, params...)
+}
+
+// EonKeyStorageMetaData contains all meta data concerning the EonKeyStorage contract.
+var EonKeyStorageMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"blockNumber\",\"type\":\"uint64\"}],\"name\":\"NotFound\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"index\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"key\",\"type\":\"bytes\"}],\"name\":\"Inserted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"blockNumber\",\"type\":\"uint64\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"serializedKey\",\"type\":\"bytes\"},{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"}],\"name\":\"insert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"keys\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"activationBlockNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"nextIndex\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"key\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"num\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60806040523480156200001157600080fd5b506200001d336200004c565b60606200002e60008260016200009c565b50620000446001600160401b038260006200009c565b505062000314565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b60018054604080516060810182526001600160401b0380881682528581166020808401918252938301888152858701875560009687528351600287027fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6810180549451861668010000000000000000026001600160801b031990951692909516919091179290921783555180519394929362000162937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7909301929190910190620001bd565b5050506002816001600160401b031610620001b5577f2f64d9497c8c677c995d99bcc930463dca07bfc5906e28140cbfa4222ddf402c858286604051620001ac9392919062000263565b60405180910390a15b949350505050565b828054620001cb90620002d7565b90600052602060002090601f016020900481019282620001ef57600085556200023a565b82601f106200020a57805160ff19168380011785556200023a565b828001600101855582156200023a579182015b828111156200023a5782518255916020019190600101906200021d565b50620002489291506200024c565b5090565b5b808211156200024857600081556001016200024d565b600060018060401b038086168352602081861681850152606060408501528451915081606085015260005b82811015620002ac578581018201518582016080015281016200028e565b82811115620002bf576000608084870101525b5050601f01601f191691909101608001949350505050565b600181811c90821680620002ec57607f821691505b602082108114156200030e57634e487b7160e01b600052602260045260246000fd5b50919050565b610c5580620003246000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c8063715018a61161005b578063715018a6146100e25780638da5cb5b146100ea578063ada8679814610105578063f2fde38b1461012557600080fd5b80630cb6aaf1146100825780633f5fafa4146100ad5780634e70b1dc146100c2575b600080fd5b610095610090366004610977565b610138565b6040516100a4939291906109dd565b60405180910390f35b6100c06100bb366004610a44565b610206565b005b6100ca6104fa565b6040516001600160401b0390911681526020016100a4565b6100c0610511565b6000546040516001600160a01b0390911681526020016100a4565b610118610113366004610b05565b610547565b6040516100a49190610b27565b6100c0610133366004610b3a565b6106dc565b6001818154811061014857600080fd5b6000918252602090912060029091020180546001820180546001600160401b038084169550600160401b909304909216929161018390610b63565b80601f01602080910402602001604051908101604052809291908181526020018280546101af90610b63565b80156101fc5780601f106101d1576101008083540402835291602001916101fc565b820191906000526020600020905b8154815290600101906020018083116101df57829003601f168201915b5050505050905083565b6000546001600160a01b031633146102395760405162461bcd60e51b815260040161023090610b9e565b60405180910390fd5b6000806001905060006001826001600160401b03168154811061025e5761025e610bd3565b600091825260209182902060408051606081018252600290930290910180546001600160401b038082168552600160401b9091041693830193909352600183018054929392918401916102b090610b63565b80601f01602080910402602001604051908101604052809291908181526020018280546102dc90610b63565b80156103295780601f106102fe57610100808354040283529160200191610329565b820191906000526020600020905b81548152906001019060200180831161030c57829003601f168201915b50505050508152505090505b6000600182602001516001600160401b03168154811061035757610357610bd3565b600091825260209182902060408051606081018252600290930290910180546001600160401b038082168552600160401b9091041693830193909352600183018054929392918401916103a990610b63565b80601f01602080910402602001604051908101604052809291908181526020018280546103d590610b63565b80156104225780601f106103f757610100808354040283529160200191610422565b820191906000526020600020905b81548152906001019060200180831161040557829003601f168201915b5050505050815250509050846001600160401b031681600001516001600160401b0316116104ed5761045985878460200151610777565b6001600160401b0380821660208501526001805492965084929091861690811061048557610485610bd3565b600091825260209182902083516002909202018054848401516001600160401b03908116600160401b026001600160801b03199092169316929092179190911781556040830151805191926104e2926001850192909101906108de565b505050505050505050565b6020909101519150610335565b60015460009061050c90600290610be9565b905090565b6000546001600160a01b0316331461053b5760405162461bcd60e51b815260040161023090610b9e565b610545600061088e565b565b606060006001808154811061055e5761055e610bd3565b6000918252602090912060029091020154600160401b90046001600160401b031690505b6001600160401b038116156106b85760006001826001600160401b0316815481106105af576105af610bd3565b600091825260209182902060408051606081018252600290930290910180546001600160401b038082168552600160401b90910416938301939093526001830180549293929184019161060190610b63565b80601f016020809104026020016040519081016040528092919081815260200182805461062d90610b63565b801561067a5780601f1061064f5761010080835404028352916020019161067a565b820191906000526020600020905b81548152906001019060200180831161065d57829003601f168201915b5050505050815250509050836001600160401b031681600001516001600160401b0316116106ad57604001519392505050565b602001519050610582565b604051636be0ee8760e01b81526001600160401b0384166004820152602401610230565b6000546001600160a01b031633146107065760405162461bcd60e51b815260040161023090610b9e565b6001600160a01b03811661076b5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b6064820152608401610230565b6107748161088e565b50565b60018054604080516060810182526001600160401b0380881682528581166020808401918252938301888152858701875560009687528351600287027fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf68101805494518616600160401b026001600160801b0319909516929095169190911792909217835551805193949293610836937fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf79093019291909101906108de565b5050506002816001600160401b031610610886577f2f64d9497c8c677c995d99bcc930463dca07bfc5906e28140cbfa4222ddf402c85828660405161087d939291906109dd565b60405180910390a15b949350505050565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b8280546108ea90610b63565b90600052602060002090601f01602090048101928261090c5760008555610952565b82601f1061092557805160ff1916838001178555610952565b82800160010185558215610952579182015b82811115610952578251825591602001919060010190610937565b5061095e929150610962565b5090565b5b8082111561095e5760008155600101610963565b60006020828403121561098957600080fd5b5035919050565b6000815180845260005b818110156109b65760208185018101518683018201520161099a565b818111156109c8576000602083870101525b50601f01601f19169290920160200192915050565b60006001600160401b03808616835280851660208401525060606040830152610a096060830184610990565b95945050505050565b634e487b7160e01b600052604160045260246000fd5b80356001600160401b0381168114610a3f57600080fd5b919050565b60008060408385031215610a5757600080fd5b82356001600160401b0380821115610a6e57600080fd5b818501915085601f830112610a8257600080fd5b813581811115610a9457610a94610a12565b604051601f8201601f19908116603f01168101908382118183101715610abc57610abc610a12565b81604052828152886020848701011115610ad557600080fd5b826020860160208301376000602084830101528096505050505050610afc60208401610a28565b90509250929050565b600060208284031215610b1757600080fd5b610b2082610a28565b9392505050565b602081526000610b206020830184610990565b600060208284031215610b4c57600080fd5b81356001600160a01b0381168114610b2057600080fd5b600181811c90821680610b7757607f821691505b60208210811415610b9857634e487b7160e01b600052602260045260246000fd5b50919050565b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b634e487b7160e01b600052603260045260246000fd5b60006001600160401b0383811690831681811015610c1757634e487b7160e01b600052601160045260246000fd5b03939250505056fea2646970667358221220f0122e12d1492303b1fd76490183d74421c92c370c1a229d5923cdce3c6c283164736f6c63430008090033",
+}
+
+// EonKeyStorageABI is the input ABI used to generate the binding from.
+// Deprecated: Use EonKeyStorageMetaData.ABI instead.
+var EonKeyStorageABI = EonKeyStorageMetaData.ABI
+
+// EonKeyStorageBin is the compiled bytecode used for deploying new contracts.
+// Deprecated: Use EonKeyStorageMetaData.Bin instead.
+var EonKeyStorageBin = EonKeyStorageMetaData.Bin
+
+// DeployEonKeyStorage deploys a new Ethereum contract, binding an instance of EonKeyStorage to it.
+func DeployEonKeyStorage(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *EonKeyStorage, error) {
+	parsed, err := EonKeyStorageMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(EonKeyStorageBin), backend)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &EonKeyStorage{EonKeyStorageCaller: EonKeyStorageCaller{contract: contract}, EonKeyStorageTransactor: EonKeyStorageTransactor{contract: contract}, EonKeyStorageFilterer: EonKeyStorageFilterer{contract: contract}}, nil
+}
+
+// EonKeyStorage is an auto generated Go binding around an Ethereum contract.
+type EonKeyStorage struct {
+	EonKeyStorageCaller     // Read-only binding to the contract
+	EonKeyStorageTransactor // Write-only binding to the contract
+	EonKeyStorageFilterer   // Log filterer for contract events
+}
+
+// EonKeyStorageCaller is an auto generated read-only Go binding around an Ethereum contract.
+type EonKeyStorageCaller struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// EonKeyStorageTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type EonKeyStorageTransactor struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// EonKeyStorageFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type EonKeyStorageFilterer struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// EonKeyStorageSession is an auto generated Go binding around an Ethereum contract,
+// with pre-set call and transact options.
+type EonKeyStorageSession struct {
+	Contract     *EonKeyStorage    // Generic contract binding to set the session for
+	CallOpts     bind.CallOpts     // Call options to use throughout this session
+	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
+}
+
+// EonKeyStorageCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// with pre-set call options.
+type EonKeyStorageCallerSession struct {
+	Contract *EonKeyStorageCaller // Generic contract caller binding to set the session for
+	CallOpts bind.CallOpts        // Call options to use throughout this session
+}
+
+// EonKeyStorageTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// with pre-set transact options.
+type EonKeyStorageTransactorSession struct {
+	Contract     *EonKeyStorageTransactor // Generic contract transactor binding to set the session for
+	TransactOpts bind.TransactOpts        // Transaction auth options to use throughout this session
+}
+
+// EonKeyStorageRaw is an auto generated low-level Go binding around an Ethereum contract.
+type EonKeyStorageRaw struct {
+	Contract *EonKeyStorage // Generic contract binding to access the raw methods on
+}
+
+// EonKeyStorageCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type EonKeyStorageCallerRaw struct {
+	Contract *EonKeyStorageCaller // Generic read-only contract binding to access the raw methods on
+}
+
+// EonKeyStorageTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type EonKeyStorageTransactorRaw struct {
+	Contract *EonKeyStorageTransactor // Generic write-only contract binding to access the raw methods on
+}
+
+// NewEonKeyStorage creates a new instance of EonKeyStorage, bound to a specific deployed contract.
+func NewEonKeyStorage(address common.Address, backend bind.ContractBackend) (*EonKeyStorage, error) {
+	contract, err := bindEonKeyStorage(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorage{EonKeyStorageCaller: EonKeyStorageCaller{contract: contract}, EonKeyStorageTransactor: EonKeyStorageTransactor{contract: contract}, EonKeyStorageFilterer: EonKeyStorageFilterer{contract: contract}}, nil
+}
+
+// NewEonKeyStorageCaller creates a new read-only instance of EonKeyStorage, bound to a specific deployed contract.
+func NewEonKeyStorageCaller(address common.Address, caller bind.ContractCaller) (*EonKeyStorageCaller, error) {
+	contract, err := bindEonKeyStorage(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorageCaller{contract: contract}, nil
+}
+
+// NewEonKeyStorageTransactor creates a new write-only instance of EonKeyStorage, bound to a specific deployed contract.
+func NewEonKeyStorageTransactor(address common.Address, transactor bind.ContractTransactor) (*EonKeyStorageTransactor, error) {
+	contract, err := bindEonKeyStorage(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorageTransactor{contract: contract}, nil
+}
+
+// NewEonKeyStorageFilterer creates a new log filterer instance of EonKeyStorage, bound to a specific deployed contract.
+func NewEonKeyStorageFilterer(address common.Address, filterer bind.ContractFilterer) (*EonKeyStorageFilterer, error) {
+	contract, err := bindEonKeyStorage(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorageFilterer{contract: contract}, nil
+}
+
+// bindEonKeyStorage binds a generic wrapper to an already deployed contract.
+func bindEonKeyStorage(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := abi.JSON(strings.NewReader(EonKeyStorageABI))
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_EonKeyStorage *EonKeyStorageRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _EonKeyStorage.Contract.EonKeyStorageCaller.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_EonKeyStorage *EonKeyStorageRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.EonKeyStorageTransactor.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_EonKeyStorage *EonKeyStorageRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.EonKeyStorageTransactor.contract.Transact(opts, method, params...)
+}
+
+// Call invokes the (constant) contract method with params as input values and
+// sets the output to result. The result type might be a single field for simple
+// returns, a slice of interfaces for anonymous returns and a struct for named
+// returns.
+func (_EonKeyStorage *EonKeyStorageCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _EonKeyStorage.Contract.contract.Call(opts, result, method, params...)
+}
+
+// Transfer initiates a plain transaction to move funds to the contract, calling
+// its default method if one is available.
+func (_EonKeyStorage *EonKeyStorageTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.contract.Transfer(opts)
+}
+
+// Transact invokes the (paid) contract method with params as input values.
+func (_EonKeyStorage *EonKeyStorageTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.contract.Transact(opts, method, params...)
+}
+
+// Get is a free data retrieval call binding the contract method 0xada86798.
+//
+// Solidity: function get(uint64 blockNumber) view returns(bytes)
+func (_EonKeyStorage *EonKeyStorageCaller) Get(opts *bind.CallOpts, blockNumber uint64) ([]byte, error) {
+	var out []interface{}
+	err := _EonKeyStorage.contract.Call(opts, &out, "get", blockNumber)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// Get is a free data retrieval call binding the contract method 0xada86798.
+//
+// Solidity: function get(uint64 blockNumber) view returns(bytes)
+func (_EonKeyStorage *EonKeyStorageSession) Get(blockNumber uint64) ([]byte, error) {
+	return _EonKeyStorage.Contract.Get(&_EonKeyStorage.CallOpts, blockNumber)
+}
+
+// Get is a free data retrieval call binding the contract method 0xada86798.
+//
+// Solidity: function get(uint64 blockNumber) view returns(bytes)
+func (_EonKeyStorage *EonKeyStorageCallerSession) Get(blockNumber uint64) ([]byte, error) {
+	return _EonKeyStorage.Contract.Get(&_EonKeyStorage.CallOpts, blockNumber)
+}
+
+// Keys is a free data retrieval call binding the contract method 0x0cb6aaf1.
+//
+// Solidity: function keys(uint256 ) view returns(uint64 activationBlockNumber, uint64 nextIndex, bytes key)
+func (_EonKeyStorage *EonKeyStorageCaller) Keys(opts *bind.CallOpts, arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	NextIndex             uint64
+	Key                   []byte
+}, error) {
+	var out []interface{}
+	err := _EonKeyStorage.contract.Call(opts, &out, "keys", arg0)
+
+	outstruct := new(struct {
+		ActivationBlockNumber uint64
+		NextIndex             uint64
+		Key                   []byte
+	})
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.ActivationBlockNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
+	outstruct.NextIndex = *abi.ConvertType(out[1], new(uint64)).(*uint64)
+	outstruct.Key = *abi.ConvertType(out[2], new([]byte)).(*[]byte)
+
+	return *outstruct, err
+
+}
+
+// Keys is a free data retrieval call binding the contract method 0x0cb6aaf1.
+//
+// Solidity: function keys(uint256 ) view returns(uint64 activationBlockNumber, uint64 nextIndex, bytes key)
+func (_EonKeyStorage *EonKeyStorageSession) Keys(arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	NextIndex             uint64
+	Key                   []byte
+}, error) {
+	return _EonKeyStorage.Contract.Keys(&_EonKeyStorage.CallOpts, arg0)
+}
+
+// Keys is a free data retrieval call binding the contract method 0x0cb6aaf1.
+//
+// Solidity: function keys(uint256 ) view returns(uint64 activationBlockNumber, uint64 nextIndex, bytes key)
+func (_EonKeyStorage *EonKeyStorageCallerSession) Keys(arg0 *big.Int) (struct {
+	ActivationBlockNumber uint64
+	NextIndex             uint64
+	Key                   []byte
+}, error) {
+	return _EonKeyStorage.Contract.Keys(&_EonKeyStorage.CallOpts, arg0)
+}
+
+// Num is a free data retrieval call binding the contract method 0x4e70b1dc.
+//
+// Solidity: function num() view returns(uint64)
+func (_EonKeyStorage *EonKeyStorageCaller) Num(opts *bind.CallOpts) (uint64, error) {
+	var out []interface{}
+	err := _EonKeyStorage.contract.Call(opts, &out, "num")
+
+	if err != nil {
+		return *new(uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+
+	return out0, err
+
+}
+
+// Num is a free data retrieval call binding the contract method 0x4e70b1dc.
+//
+// Solidity: function num() view returns(uint64)
+func (_EonKeyStorage *EonKeyStorageSession) Num() (uint64, error) {
+	return _EonKeyStorage.Contract.Num(&_EonKeyStorage.CallOpts)
+}
+
+// Num is a free data retrieval call binding the contract method 0x4e70b1dc.
+//
+// Solidity: function num() view returns(uint64)
+func (_EonKeyStorage *EonKeyStorageCallerSession) Num() (uint64, error) {
+	return _EonKeyStorage.Contract.Num(&_EonKeyStorage.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_EonKeyStorage *EonKeyStorageCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _EonKeyStorage.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_EonKeyStorage *EonKeyStorageSession) Owner() (common.Address, error) {
+	return _EonKeyStorage.Contract.Owner(&_EonKeyStorage.CallOpts)
+}
+
+// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+//
+// Solidity: function owner() view returns(address)
+func (_EonKeyStorage *EonKeyStorageCallerSession) Owner() (common.Address, error) {
+	return _EonKeyStorage.Contract.Owner(&_EonKeyStorage.CallOpts)
+}
+
+// Insert is a paid mutator transaction binding the contract method 0x3f5fafa4.
+//
+// Solidity: function insert(bytes serializedKey, uint64 activationBlockNumber) returns()
+func (_EonKeyStorage *EonKeyStorageTransactor) Insert(opts *bind.TransactOpts, serializedKey []byte, activationBlockNumber uint64) (*types.Transaction, error) {
+	return _EonKeyStorage.contract.Transact(opts, "insert", serializedKey, activationBlockNumber)
+}
+
+// Insert is a paid mutator transaction binding the contract method 0x3f5fafa4.
+//
+// Solidity: function insert(bytes serializedKey, uint64 activationBlockNumber) returns()
+func (_EonKeyStorage *EonKeyStorageSession) Insert(serializedKey []byte, activationBlockNumber uint64) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.Insert(&_EonKeyStorage.TransactOpts, serializedKey, activationBlockNumber)
+}
+
+// Insert is a paid mutator transaction binding the contract method 0x3f5fafa4.
+//
+// Solidity: function insert(bytes serializedKey, uint64 activationBlockNumber) returns()
+func (_EonKeyStorage *EonKeyStorageTransactorSession) Insert(serializedKey []byte, activationBlockNumber uint64) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.Insert(&_EonKeyStorage.TransactOpts, serializedKey, activationBlockNumber)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_EonKeyStorage *EonKeyStorageTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EonKeyStorage.contract.Transact(opts, "renounceOwnership")
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_EonKeyStorage *EonKeyStorageSession) RenounceOwnership() (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.RenounceOwnership(&_EonKeyStorage.TransactOpts)
+}
+
+// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+//
+// Solidity: function renounceOwnership() returns()
+func (_EonKeyStorage *EonKeyStorageTransactorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.RenounceOwnership(&_EonKeyStorage.TransactOpts)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_EonKeyStorage *EonKeyStorageTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _EonKeyStorage.contract.Transact(opts, "transferOwnership", newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_EonKeyStorage *EonKeyStorageSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.TransferOwnership(&_EonKeyStorage.TransactOpts, newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_EonKeyStorage *EonKeyStorageTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _EonKeyStorage.Contract.TransferOwnership(&_EonKeyStorage.TransactOpts, newOwner)
+}
+
+// EonKeyStorageInsertedIterator is returned from FilterInserted and is used to iterate over the raw logs and unpacked data for Inserted events raised by the EonKeyStorage contract.
+type EonKeyStorageInsertedIterator struct {
+	Event *EonKeyStorageInserted // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *EonKeyStorageInsertedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(EonKeyStorageInserted)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(EonKeyStorageInserted)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *EonKeyStorageInsertedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *EonKeyStorageInsertedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// EonKeyStorageInserted represents a Inserted event raised by the EonKeyStorage contract.
+type EonKeyStorageInserted struct {
+	ActivationBlockNumber uint64
+	Index                 uint64
+	Key                   []byte
+	Raw                   types.Log // Blockchain specific contextual infos
+}
+
+// FilterInserted is a free log retrieval operation binding the contract event 0x2f64d9497c8c677c995d99bcc930463dca07bfc5906e28140cbfa4222ddf402c.
+//
+// Solidity: event Inserted(uint64 activationBlockNumber, uint64 index, bytes key)
+func (_EonKeyStorage *EonKeyStorageFilterer) FilterInserted(opts *bind.FilterOpts) (*EonKeyStorageInsertedIterator, error) {
+
+	logs, sub, err := _EonKeyStorage.contract.FilterLogs(opts, "Inserted")
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorageInsertedIterator{contract: _EonKeyStorage.contract, event: "Inserted", logs: logs, sub: sub}, nil
+}
+
+// WatchInserted is a free log subscription operation binding the contract event 0x2f64d9497c8c677c995d99bcc930463dca07bfc5906e28140cbfa4222ddf402c.
+//
+// Solidity: event Inserted(uint64 activationBlockNumber, uint64 index, bytes key)
+func (_EonKeyStorage *EonKeyStorageFilterer) WatchInserted(opts *bind.WatchOpts, sink chan<- *EonKeyStorageInserted) (event.Subscription, error) {
+
+	logs, sub, err := _EonKeyStorage.contract.WatchLogs(opts, "Inserted")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(EonKeyStorageInserted)
+				if err := _EonKeyStorage.contract.UnpackLog(event, "Inserted", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseInserted is a log parse operation binding the contract event 0x2f64d9497c8c677c995d99bcc930463dca07bfc5906e28140cbfa4222ddf402c.
+//
+// Solidity: event Inserted(uint64 activationBlockNumber, uint64 index, bytes key)
+func (_EonKeyStorage *EonKeyStorageFilterer) ParseInserted(log types.Log) (*EonKeyStorageInserted, error) {
+	event := new(EonKeyStorageInserted)
+	if err := _EonKeyStorage.contract.UnpackLog(event, "Inserted", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// EonKeyStorageOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the EonKeyStorage contract.
+type EonKeyStorageOwnershipTransferredIterator struct {
+	Event *EonKeyStorageOwnershipTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *EonKeyStorageOwnershipTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(EonKeyStorageOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(EonKeyStorageOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *EonKeyStorageOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *EonKeyStorageOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// EonKeyStorageOwnershipTransferred represents a OwnershipTransferred event raised by the EonKeyStorage contract.
+type EonKeyStorageOwnershipTransferred struct {
+	PreviousOwner common.Address
+	NewOwner      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_EonKeyStorage *EonKeyStorageFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*EonKeyStorageOwnershipTransferredIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _EonKeyStorage.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &EonKeyStorageOwnershipTransferredIterator{contract: _EonKeyStorage.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_EonKeyStorage *EonKeyStorageFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *EonKeyStorageOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _EonKeyStorage.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(EonKeyStorageOwnershipTransferred)
+				if err := _EonKeyStorage.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_EonKeyStorage *EonKeyStorageFilterer) ParseOwnershipTransferred(log types.Log) (*EonKeyStorageOwnershipTransferred, error) {
+	event := new(EonKeyStorageOwnershipTransferred)
+	if err := _EonKeyStorage.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 // KeypersConfigsListMetaData contains all meta data concerning the KeypersConfigsList contract.

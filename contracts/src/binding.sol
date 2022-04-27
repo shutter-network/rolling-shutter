@@ -7,3 +7,4 @@ import "./AddrsSeq.sol";
 import "./KeypersConfigsList.sol";
 import "./CollatorConfigsList.sol";
 import "./BatchCounter.sol";
+import "./EonKeyBroadcast.sol";
