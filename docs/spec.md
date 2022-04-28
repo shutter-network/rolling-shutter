@@ -66,7 +66,7 @@ Checks:
 
 #### DecryptionKey
 
-Keypers broadcas the decryption key when they managed to aggregate it from the
+Keypers broadcast the decryption key when they managed to aggregate it from the
 corresponding shares they have received.
 
 Topic: `decryptionKey`
@@ -307,43 +307,36 @@ the sender of the message.
 
 Block seen messages do not emit events.
 
-##### Eon Start Vote
+##### DKGResult
 
-Keypers send eon start votes in order to coordinate on the start of a new DKG
-process.
+Keypers send the DKG result message after the DKG process for an eon has
+finished. The field `success` signals whether the DKG process was successful.
 
 ```
-message EonStartVote {
-        uint64 activation_block_number = 1;
+message DKGResult {
+        bool success = 1;
+        uint64 eon=2;
 }
 ```
 
-TODO: add config index?
-
-Shuttermint rejects the message if the sender is not part of the keyper set of
-the config identified by `activation_block_number` (note that due to the guard
-element with activation block number 0, there will always be matching config).
-
-Shuttermint records the vote by the sender for the given activation block
-number. If the sender has already voted for a different activation block number,
-their vote is updated.
-
-If at least `threshold` (defined in the config identified by the activation
-block number) votes have been recorded for the same activation block number, a
-new DKG process is started and the following event is emitted:
+Shuttermint rejects the message if the sender is not part of the keyper set for
+the given eon or if the sender has already voted for the given eon. If the DKG
+process fails for a majority of keypers, the Shuttermint app will restart the
+DKG process by sending a `EonStarted` event:
 
 ```
 type EonStarted struct {
-	Height                int64
-	Eon                   uint64
-	ActivationBlockNumber uint64
-	ConfigIndex           uint64
+    Height                int64
+    Eon                   uint64
+    ActivationBlockNumber uint64
+    ConfigIndex           uint64
 }
 ```
 
-where `Height` is the current block height, `Eon` is a counter value uniquely
-identifying the started DKG process, and `ActivationBlockNumber` as well as
+where `Height` is the current block height, `ActivationBlockNumber` as well as
 `ConfigIndex` are given by the config for which the key shall be generated.
+`Eon` is a new counter value uniquely identifying the newly started DKG process.
+In particular it differs from the `eon` field in the DKGResult message.
 
 ### Post Block Processing
 
