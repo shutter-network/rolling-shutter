@@ -7,7 +7,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v12-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v13-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -31,7 +31,7 @@ jobs:
             find . -name '*.gen.go' |xargs rm
       - run: make generate
       - save_cache:
-          key: rs-generate-v12-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v13-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
@@ -49,10 +49,10 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: go get -d ./...
       - save_cache:
-          key: go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - ~/go/pkg/
       - restore_cache:
@@ -93,9 +93,6 @@ jobs:
             version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
             echo >>${BASH_ENV} export VERSION="${version}"
             echo >>${BASH_ENV} export BIN=/tmp/release-bin
-      - restore_cache:
-          keys:
-            - rs-build-go-integration-v3-{{ checksum "go.sum" }}
       - run: ./build-release
       - run: go install github.com/tcnksm/ghr@v0.14.0
       - run:
@@ -111,10 +108,10 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
-            - rs-lint-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-lint-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - install-asdf
       - run:
           name: "Install golangci-lint"
@@ -124,7 +121,7 @@ jobs:
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-lint-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
