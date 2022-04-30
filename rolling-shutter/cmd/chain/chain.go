@@ -17,8 +17,8 @@ import (
 	"github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/node"
 
-	"github.com/shutter-network/shutter/shuttermint/app"
-	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 )
 
 var cfgFile string

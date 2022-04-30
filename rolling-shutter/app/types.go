@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/keyper/shutterevents"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 )
 
 // GenesisAppState is used to hold the initial list of keypers, who will bootstrap the system by

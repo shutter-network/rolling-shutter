@@ -8,10 +8,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 // computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.

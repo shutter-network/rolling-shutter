@@ -11,11 +11,11 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/medley/testdb"
-	"github.com/shutter-network/shutter/shuttermint/medley/testkeygen"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type keyper struct {

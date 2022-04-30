@@ -22,16 +22,16 @@ import (
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/chainobserver"
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
-	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kproapi"
-	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type keyper struct {

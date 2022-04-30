@@ -10,9 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v4"
 
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kproapi"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 type server struct {

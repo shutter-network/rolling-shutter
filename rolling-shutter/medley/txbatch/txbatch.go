@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type TXBatch struct {

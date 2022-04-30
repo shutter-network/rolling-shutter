@@ -13,11 +13,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/collator/client"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type MockNode struct {

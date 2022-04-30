@@ -59,6 +59,7 @@ repos:
             "-sStandard",
             "-sDefault",
             "-sPrefix(github.com/shutter-network/shutter)",
+            "-sPrefix(github.com/shutter-network/rolling-shutter)",
           ]
         exclude: |
           (?x)(

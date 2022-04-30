@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 //go:embed schema.sql

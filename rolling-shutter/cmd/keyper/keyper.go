@@ -14,12 +14,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
-	"github.com/shutter-network/shutter/shuttermint/keyper"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 var (

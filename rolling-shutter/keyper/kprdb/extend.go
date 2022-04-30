@@ -3,7 +3,7 @@ package kprdb
 import (
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func GetKeyperIndex(addr common.Address, keypers []string) (uint64, bool) {

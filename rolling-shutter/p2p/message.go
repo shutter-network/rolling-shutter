@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 // Message envelopes the serialized protobuf bytes with additional topic and sender info.

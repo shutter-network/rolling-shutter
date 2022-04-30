@@ -7,11 +7,12 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
-	"github.com/shutter-network/shutter/shuttermint/keyper/epochkg"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type epochKGHandler struct {

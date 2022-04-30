@@ -14,8 +14,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 // All messages to be used in the P2P Gossip have to be included in this slice,

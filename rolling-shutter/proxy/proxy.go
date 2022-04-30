@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type Config struct {

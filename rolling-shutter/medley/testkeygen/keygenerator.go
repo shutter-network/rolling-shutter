@@ -9,7 +9,8 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 // TestKeyGenerator is a helper tool to generate secret and public eon and epoch keys and key

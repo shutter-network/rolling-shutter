@@ -13,8 +13,9 @@ import (
 	"gotest.tools/v3/assert"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/medley/testkeygen"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 )
 
 func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {

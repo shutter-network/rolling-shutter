@@ -23,7 +23,7 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/shutter-network/shutter/shuttermint/app"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
 
 var (

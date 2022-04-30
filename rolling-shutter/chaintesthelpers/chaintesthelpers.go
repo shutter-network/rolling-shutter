@@ -33,7 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 )
 
 const (

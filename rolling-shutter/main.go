@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd"
 )
 
 func main() {

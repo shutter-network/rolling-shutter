@@ -7,17 +7,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd/bootstrap"
-	"github.com/shutter-network/shutter/shuttermint/cmd/chain"
-	"github.com/shutter-network/shutter/shuttermint/cmd/collator"
-	"github.com/shutter-network/shutter/shuttermint/cmd/completion"
-	"github.com/shutter-network/shutter/shuttermint/cmd/cryptocmd"
-	"github.com/shutter-network/shutter/shuttermint/cmd/keyper"
-	"github.com/shutter-network/shutter/shuttermint/cmd/mocknode"
-	"github.com/shutter-network/shutter/shuttermint/cmd/proxy"
-	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
-	"github.com/shutter-network/shutter/shuttermint/cmd/snapshot"
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/collator"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/completion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/cryptocmd"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocknode"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/snapshot"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 var logformat string

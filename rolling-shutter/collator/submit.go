@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func insertTx(ctx context.Context, dbpool *pgxpool.Pool, insertTxParams cltrdb.InsertTxParams) error {

@@ -17,11 +17,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/snapshot"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snpdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpdb"
 )
 
 var (

@@ -15,9 +15,9 @@ import (
 	"github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
-	"github.com/shutter-network/shutter/shuttermint/keyper/shutterevents"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func makeMessage() *shmsg.MessageWithNonce {

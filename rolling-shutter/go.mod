@@ -1,4 +1,4 @@
-module github.com/shutter-network/shutter/shuttermint
+module github.com/shutter-network/rolling-shutter/rolling-shutter
 
 go 1.18
 

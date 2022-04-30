@@ -15,8 +15,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/mocknode"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocknode"
 )
 
 var (

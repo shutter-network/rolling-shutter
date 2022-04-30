@@ -10,9 +10,9 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func (c *collator) getKeyperSet(ctx context.Context, activationBlock int64) (commondb.KeyperSet, error) {

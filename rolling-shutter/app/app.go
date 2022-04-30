@@ -16,8 +16,8 @@ import (
 	"github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 
-	"github.com/shutter-network/shutter/shuttermint/keyper/shutterevents"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 var (

@@ -9,8 +9,9 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/shtest"
-	"github.com/shutter-network/shutter/shuttermint/keyper"
-	"github.com/shutter-network/shutter/shuttermint/medley/comparer"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/comparer"
 )
 
 func tomlRoundtrip(t *testing.T, cfg *keyper.Config) *keyper.Config {

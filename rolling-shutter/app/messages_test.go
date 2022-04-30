@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/v3/assert"
 
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func TestMessageParsing(t *testing.T) {

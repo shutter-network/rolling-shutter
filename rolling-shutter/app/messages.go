@@ -8,8 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func validateAddress(address []byte) (common.Address, error) {

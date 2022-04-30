@@ -19,17 +19,17 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/chainobserver"
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrtopics"
-	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
-	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type collator struct {

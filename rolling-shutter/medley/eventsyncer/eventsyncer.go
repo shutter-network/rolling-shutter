@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 const (

@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 )
 
 const testDBURLVar = "ROLLING_SHUTTER_TESTDB_URL"

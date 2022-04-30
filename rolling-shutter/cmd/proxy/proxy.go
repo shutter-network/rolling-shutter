@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/shutter/shuttermint/cmd/shversion"
-	"github.com/shutter-network/shutter/shuttermint/proxy"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/proxy"
 )
 
 var cfgFile string

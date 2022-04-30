@@ -24,6 +24,7 @@ linters-settings:
       - Standard
       - Default
       - Prefix(github.com/shutter-network/shutter)
+      - Prefix(github.com/shutter-network/rolling-shutter)
   goconst:
     min-len: 2
     min-occurrences: 2

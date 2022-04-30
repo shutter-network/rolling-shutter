@@ -11,10 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/rpc/client/http"
 
-	"github.com/shutter-network/shutter/shuttermint/contract"
-	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
-	"github.com/shutter-network/shutter/shuttermint/keyper/fx"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 var bootstrapFlags struct {

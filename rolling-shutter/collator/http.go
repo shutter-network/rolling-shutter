@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
-	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 type server struct {

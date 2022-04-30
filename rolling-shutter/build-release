@@ -21,5 +21,5 @@ for osarch in ${TARGETS}; do
     IFS='-' read -r os arch <<< "${osarch}"
     target=${BIN}/rolling-shutter-${os}-${arch}-${VERSION}
     echo "Building ${target}"
-    env GOARCH="${arch}" GOOS="${os}" ${GO} build -o "${target}" -ldflags "-X github.com/shutter-network/shutter/shuttermint/cmd/shversion.version=${VERSION}" .
+    env GOARCH="${arch}" GOOS="${os}" ${GO} build -o "${target}" -ldflags "-X github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion.version=${VERSION}" .
 done

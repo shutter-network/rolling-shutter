@@ -22,8 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/shutter/shuttermint/contract"
-	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 )
 
 const chainIDFileName = ".chainId"

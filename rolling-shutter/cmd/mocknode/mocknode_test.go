@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/shutter/shuttermint/medley/comparer"
-	"github.com/shutter-network/shutter/shuttermint/mocknode"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/comparer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocknode"
 )
 
 func tomlRoundtrip(t *testing.T, cfg *mocknode.Config) *mocknode.Config {

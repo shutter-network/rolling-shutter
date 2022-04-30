@@ -12,12 +12,12 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/contract"
-	"github.com/shutter-network/shutter/shuttermint/contract/deployment"
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/medley/eventsyncer"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 const finalityOffset = 3

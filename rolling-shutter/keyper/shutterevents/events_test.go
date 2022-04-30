@@ -15,7 +15,8 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shlib/shtest"
-	"github.com/shutter-network/shutter/shuttermint/keyper/shutterevents"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 )
 
 var (

@@ -1,7 +1,7 @@
 package cltrtopics
 
 import (
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 )
 
 const (
