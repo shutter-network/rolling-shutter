@@ -48,13 +48,18 @@ repos:
       - id: eslint
 
   - repo: https://github.com/shutter-network/pre-commit-go-hooks
-    rev: "ab82294819c63a0cfee3011d036962b1f43040f2"
+    rev: "b1789745a6645db269f6b26dda36d9a029e680a9"
     hooks:
       - id: go-mod-tidy
         args: ["./rolling-shutter"]
 
       - id: gci
-        args: ["-local", "github.com/shutter-network/shutter"]
+        args:
+          [
+            "-sStandard",
+            "-sDefault",
+            "-sPrefix(github.com/shutter-network/shutter)",
+          ]
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
