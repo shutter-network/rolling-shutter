@@ -28,7 +28,7 @@ orbs:
 executors:
   system-tests:
     docker:
-      - image: cimg/openjdk:17.0.2-node
+      - image: cimg/openjdk:17.0.3-node
         environment:
           PGHOST: localhost
           PGUSER: circleci

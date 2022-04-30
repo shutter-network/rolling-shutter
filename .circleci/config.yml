@@ -11,7 +11,7 @@ orbs:
 executors:
   cimg-base:
     docker:
-      - image: cimg/base:2022.03
+      - image: cimg/base:2022.04
 
 jobs:
   gen:
