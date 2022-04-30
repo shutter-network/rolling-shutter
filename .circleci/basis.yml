@@ -6,7 +6,7 @@ commands:
       - run:
           name: Install go
           command: |
-            curl -sSL "https://go.dev/dl/go1.18.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+            curl -sSL "https://go.dev/dl/go1.18.1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
 
