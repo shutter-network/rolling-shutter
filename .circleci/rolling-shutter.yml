@@ -81,24 +81,68 @@ jobs:
           paths:
             - "~/.cache/go-build"
 
+  build-release:
+    parameters:
+      go-os-arch:
+        type: string
+    executor: go
+    working_directory: ~/
+    steps:
+      - run:
+          name: Configure environment for private repository
+          command: |
+            mkdir ~/.ssh; chmod 700 ~/.ssh
+            echo >>~/.ssh/known_hosts github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+            git config --global url."git@github.com:shutter-network/rolling-shutter".insteadOf https://github.com/shutter-network/rolling-shutter
+            echo >>${BASH_ENV} export GOPRIVATE=github.com/shutter-network/rolling-shutter/rolling-shutter
+      - run:
+          name: Configure environment
+          command: |
+            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
+            test -z ${version} && version=${CIRCLE_SHA1}
+            echo >>${BASH_ENV} export VERSION="${version}"
+
+            echo >>${BASH_ENV} osarch=<< parameters.go-os-arch >>
+            # set GOOS, GOARCH from osarch:
+            echo SUZTPSctJyByZWFkIC1yIEdPT1MgR09BUkNIIDw8PCAke29zYXJjaH0K |base64 --decode >>${BASH_ENV}
+            echo >>${BASH_ENV} export GOOS GOARCH
+      - run:
+          name: Go install
+          command: |
+            go install github.com/shutter-network/rolling-shutter/rolling-shutter@${CIRCLE_SHA1}
+      - run:
+          name: Copy binary
+          command: |
+            dst=${HOME}/release-bin/rolling-shutter-$GOOS-$GOARCH-$VERSION
+            mkdir ${HOME}/release-bin
+            if test -e ${HOME}/go/bin/rolling-shutter; then
+              mv ${HOME}/go/bin/rolling-shutter ${dst}
+            else
+              mv ${HOME}/go/bin/${GOOS}_${GOARCH}/rolling-shutter ${dst}
+            fi
+            du -h ${dst}
+      - persist_to_workspace:
+          root: "~"
+          paths:
+            - "release-bin/"
+
   publish-release:
     executor: go
-    working_directory: ~/src/rolling-shutter
+    working_directory: ~/
     steps:
-      - checkout:
-          path: ~/src
+      - attach_workspace:
+          at: ~/
       - run:
           name: Configure environment
           command: |
             version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
             echo >>${BASH_ENV} export VERSION="${version}"
-            echo >>${BASH_ENV} export BIN=/tmp/release-bin
-      - run: ./build-release
       - run: go install github.com/tcnksm/ghr@v0.14.0
       - run:
           name: Upload binaries
           command: |
-            ghr ${CIRCLE_TAG} ${BIN}
+            du -hc release-bin/*
+            ghr ${CIRCLE_TAG} release-bin
 
   rs-lint:
     executor: go
@@ -140,9 +184,27 @@ workflows:
           filters:
             tags:
               only: /.*/
+      - build-release:
+          matrix:
+            parameters:
+              go-os-arch:
+                [
+                  "linux-amd64",
+                  "linux-arm64",
+                  "freebsd-amd64",
+                  "openbsd-amd64",
+                  "darwin-amd64",
+                  "darwin-arm64",
+                ]
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
       - publish-release:
           requires:
             - rs-build
+            - build-release
           context:
             - upload-release
           filters:
