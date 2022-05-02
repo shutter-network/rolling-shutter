@@ -142,7 +142,7 @@ jobs:
           name: Upload binaries
           command: |
             du -hc release-bin/*
-            ghr ${CIRCLE_TAG} release-bin
+            ghr -u shutter-network -r rolling-shutter ${CIRCLE_TAG} release-bin
 
   rs-lint:
     executor: go
