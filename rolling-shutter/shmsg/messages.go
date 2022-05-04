@@ -43,7 +43,7 @@ func registerP2PMessage(mess P2PMessage) {
 	messageTypeName := mess.ProtoReflect().Type().Descriptor().FullName()
 	topic := mess.Topic()
 
-	if val, exists := topicToProtoName[topic]; exists == true {
+	if val, exists := topicToProtoName[topic]; exists {
 		if val != messageTypeName {
 			err := errors.Errorf("Topic '%s' already has message type <%s> registered. Registering %s failed", topic, val, messageTypeName)
 			panic(err)
