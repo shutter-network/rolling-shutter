@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"gotest.tools/assert"
 
@@ -37,15 +36,6 @@ func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
 		return err
 	}
 	return nil
-}
-
-func getAddress(t *testing.T, priv *ecdsa.PrivateKey) common.Address {
-	t.Helper()
-
-	publicKey := priv.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	assert.Check(t, ok)
-	return ethcrypto.PubkeyToAddress(*publicKeyECDSA)
 }
 
 type setupEonKeysParams struct {
@@ -79,7 +69,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 			ethKey,
 		)
 		assert.NilError(t, err)
-		addr := getAddress(t, ethKey)
+		addr := ethcrypto.PubkeyToAddress(ethKey.PublicKey)
 		kprs = append(kprs, keyper{address: addr.Hex(), index: uint64(i), msg: msg})
 		ok, err = msg.VerifySignature(addr)
 		assert.Check(t, ok)
