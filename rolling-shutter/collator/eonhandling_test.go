@@ -69,7 +69,15 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 			msg *shmsg.EonPublicKey
 		)
 
-		msg, err = shmsg.NewSignedEonPublicKey(params.instanceID, params.eonPubKey, params.activationBlock, uint64(i), ethKey)
+		msg, err = shmsg.NewSignedEonPublicKey(
+			params.instanceID,
+			params.eonPubKey,
+			params.activationBlock,
+			uint64(i),
+			5,
+			2,
+			ethKey,
+		)
 		assert.NilError(t, err)
 		addr := getAddress(t, ethKey)
 		kprs = append(kprs, keyper{address: addr.Hex(), index: uint64(i), msg: msg})

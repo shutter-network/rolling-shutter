@@ -373,6 +373,8 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 				eonPublicKey.EonPublicKey,
 				uint64(eonPublicKey.ActivationBlockNumber),
 				keyperIndex,
+				uint64(eonPublicKey.KeyperConfigIndex),
+				uint64(eonPublicKey.Eon),
 				kpr.config.SigningKey,
 			)
 			if err != nil {

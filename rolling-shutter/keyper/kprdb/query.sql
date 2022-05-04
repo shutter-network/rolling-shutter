@@ -174,7 +174,7 @@ VALUES ($1, $2);
 
 -- name: GetAndDeleteEonPublicKeys :many
 WITH t1 AS (DELETE FROM outgoing_eon_keys RETURNING *)
-SELECT t1.*, eons.activation_block_number, tbc.keypers
+SELECT t1.*, eons.activation_block_number, tbc.keypers, tbc.keyper_config_index
 FROM t1
 INNER JOIN eons
       ON t1.eon = eons.eon

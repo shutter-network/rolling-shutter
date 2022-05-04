@@ -163,7 +163,7 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 
 const getAndDeleteEonPublicKeys = `-- name: GetAndDeleteEonPublicKeys :many
 WITH t1 AS (DELETE FROM outgoing_eon_keys RETURNING eon_public_key, eon)
-SELECT t1.eon_public_key, t1.eon, eons.activation_block_number, tbc.keypers
+SELECT t1.eon_public_key, t1.eon, eons.activation_block_number, tbc.keypers, tbc.keyper_config_index
 FROM t1
 INNER JOIN eons
       ON t1.eon = eons.eon
@@ -176,6 +176,7 @@ type GetAndDeleteEonPublicKeysRow struct {
 	Eon                   int64
 	ActivationBlockNumber int64
 	Keypers               []string
+	KeyperConfigIndex     int32
 }
 
 func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]GetAndDeleteEonPublicKeysRow, error) {
@@ -192,6 +193,7 @@ func (q *Queries) GetAndDeleteEonPublicKeys(ctx context.Context) ([]GetAndDelete
 			&i.Eon,
 			&i.ActivationBlockNumber,
 			&i.Keypers,
+			&i.KeyperConfigIndex,
 		); err != nil {
 			return nil, err
 		}

@@ -1,7 +1,6 @@
 package shmsg
 
 import (
-	"bytes"
 	"crypto/rand"
 	"math/big"
 	"reflect"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 
@@ -109,9 +109,7 @@ func TestDecryptionKey(t *testing.T) {
 		Key:        validSecretKey,
 	}
 	m := marshalUnmarshalMessage(t, orig)
-	assert.Equal(t, orig.EpochID, m.EpochID)
-	assert.Equal(t, orig.InstanceID, m.InstanceID)
-	assert.Assert(t, bytes.Compare(orig.Key, m.Key) == 0)
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKey{}))
 }
 
 func TestDecryptionTrigger(t *testing.T) {
@@ -128,11 +126,7 @@ func TestDecryptionTrigger(t *testing.T) {
 	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, txs, privKey)
 	assert.NilError(t, err)
 	m := marshalUnmarshalMessage(t, orig)
-
-	assert.Equal(t, orig.EpochID, m.EpochID)
-	assert.Equal(t, orig.InstanceID, m.InstanceID)
-	assert.Assert(t, bytes.Compare(orig.TransactionsHash, m.TransactionsHash) == 0)
-	assert.Assert(t, bytes.Compare(orig.Signature, m.Signature) == 0)
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionTrigger{}))
 }
 
 func TestDecryptionKeyShare(t *testing.T) {
@@ -147,30 +141,24 @@ func TestDecryptionKeyShare(t *testing.T) {
 		KeyperIndex: keyperIndex,
 	}
 	m := marshalUnmarshalMessage(t, orig)
-
-	assert.Equal(t, orig.EpochID, m.EpochID)
-	assert.Equal(t, orig.InstanceID, m.InstanceID)
-	assert.Equal(t, orig.KeyperIndex, m.KeyperIndex)
-	assert.Assert(t, bytes.Compare(orig.Share, m.Share) == 0)
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKeyShare{}))
 }
 
 func TestEonPublicKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	eonPublicKey := cfg.tkg.EonPublicKey(cfg.epochID).Marshal()
-	keyperIndex := uint64(0)
-	activationBlock := uint64(0)
+	keyperIndex := uint64(1)
+	activationBlock := uint64(2)
 
 	privKey, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
-
-	orig, err := NewSignedEonPublicKey(cfg.instanceID, eonPublicKey, activationBlock, keyperIndex, privKey)
+	eon := uint64(5)
+	keyperConfigIndex := uint64(6)
+	orig, err := NewSignedEonPublicKey(
+		cfg.instanceID, eonPublicKey, activationBlock, keyperIndex, keyperConfigIndex, eon, privKey,
+	)
 	assert.NilError(t, err)
 
 	m := marshalUnmarshalMessage(t, orig)
-
-	assert.Equal(t, orig.InstanceID, m.InstanceID)
-	assert.Assert(t, bytes.Compare(orig.PublicKey, m.PublicKey) == 0)
-	assert.Equal(t, orig.ActivationBlock, m.ActivationBlock)
-	assert.Equal(t, orig.KeyperIndex, m.KeyperIndex)
-	assert.Assert(t, bytes.Compare(orig.Signature, m.Signature) == 0)
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(EonPublicKey{}))
 }

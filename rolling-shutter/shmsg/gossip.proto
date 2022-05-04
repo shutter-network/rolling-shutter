@@ -24,10 +24,14 @@ message DecryptionKey {
     bytes key = 3;
 }
 
+// EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain eon.
 message EonPublicKey {
     uint64 instanceID = 1;
     bytes publicKey= 2;
     uint64 activationBlock = 3;
     uint64 keyperIndex = 4;
+    uint64 keyperConfigIndex = 6;
+    uint64 eon = 7;
+
     bytes signature = 5;
 }
