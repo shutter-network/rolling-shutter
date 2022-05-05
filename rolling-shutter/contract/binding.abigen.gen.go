@@ -847,8 +847,8 @@ func (_AddrsSeq *AddrsSeqFilterer) ParseOwnershipTransferred(log types.Log) (*Ad
 
 // BatchCounterMetaData contains all meta data concerning the BatchCounter contract.
 var BatchCounterMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"oldIndex\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"newIndex\",\"type\":\"uint64\"}],\"name\":\"NewBatchIndex\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"batchIndex\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"newBatchIndex\",\"type\":\"uint64\"}],\"name\":\"set\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5061001a3361001f565b61006f565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6104a08061007e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c80631d8c311f14610067578063715018a61461007c5780638da5cb5b14610084578063d09de08a146100a4578063e79993f3146100ac578063f2fde38b146100e0575b600080fd5b61007a6100753660046103a1565b6100f3565b005b61007a6101a3565b6000546040516001600160a01b0390911681526020015b60405180910390f35b61007a6101d9565b6000546100c790600160a01b900467ffffffffffffffff1681565b60405167ffffffffffffffff909116815260200161009b565b61007a6100ee3660046103d2565b6102b6565b6000546001600160a01b031633146101265760405162461bcd60e51b815260040161011d906103fb565b60405180910390fd5b6000546040805167ffffffffffffffff600160a01b9093048316815291831660208301527f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b910160405180910390a16000805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b6000546001600160a01b031633146101cd5760405162461bcd60e51b815260040161011d906103fb565b6101d76000610351565b565b6000546001600160a01b031633146102035760405162461bcd60e51b815260040161011d906103fb565b6000547f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b90600160a01b900467ffffffffffffffff16610244816001610430565b6040805167ffffffffffffffff93841681529290911660208301520160405180910390a16001600060148282829054906101000a900467ffffffffffffffff1661028e9190610430565b92506101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550565b6000546001600160a01b031633146102e05760405162461bcd60e51b815260040161011d906103fb565b6001600160a01b0381166103455760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161011d565b61034e81610351565b50565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156103b357600080fd5b813567ffffffffffffffff811681146103cb57600080fd5b9392505050565b6000602082840312156103e457600080fd5b81356001600160a01b03811681146103cb57600080fd5b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600067ffffffffffffffff80831681851680830382111561046157634e487b7160e01b600052601160045260246000fd5b0194935050505056fea264697066735822122073740ed6220680564a3527a75723ff6c3bce97aa7de0712c016a69991800087b64736f6c63430008090033",
+	ABI: "[{\"inputs\":[],\"name\":\"CallerNotZeroAddress\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"oldIndex\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"newIndex\",\"type\":\"uint64\"}],\"name\":\"NewBatchIndex\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"batchIndex\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"newBatchIndex\",\"type\":\"uint64\"}],\"name\":\"set\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50610284806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80631d8c311f14610046578063d09de08a1461005b578063e79993f314610063575b600080fd5b6100596100543660046101e3565b610094565b005b61005961011f565b6000546100779067ffffffffffffffff1681565b60405167ffffffffffffffff909116815260200160405180910390f35b33156100b357604051631448d0ef60e01b815260040160405180910390fd5b6000546040805167ffffffffffffffff928316815291831660208301527f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b910160405180910390a16000805467ffffffffffffffff191667ffffffffffffffff92909216919091179055565b331561013e57604051631448d0ef60e01b815260040160405180910390fd5b6000547f5867f9e83f14fb505a43dd58880b1de7e3b5cddbfa99bb92a15dad48b453410b9067ffffffffffffffff16610178816001610214565b6040805167ffffffffffffffff93841681529290911660208301520160405180910390a1600080546001919081906101bb90849067ffffffffffffffff16610214565b92506101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550565b6000602082840312156101f557600080fd5b813567ffffffffffffffff8116811461020d57600080fd5b9392505050565b600067ffffffffffffffff80831681851680830382111561024557634e487b7160e01b600052601160045260246000fd5b0194935050505056fea2646970667358221220c2b168f9e118d5fd1df81ee5364a3cc7223131b5250eeab7c5b1dfa2a782466c64736f6c63430008090033",
 }
 
 // BatchCounterABI is the input ABI used to generate the binding from.
@@ -1049,37 +1049,6 @@ func (_BatchCounter *BatchCounterCallerSession) BatchIndex() (uint64, error) {
 	return _BatchCounter.Contract.BatchIndex(&_BatchCounter.CallOpts)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
-//
-// Solidity: function owner() view returns(address)
-func (_BatchCounter *BatchCounterCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _BatchCounter.contract.Call(opts, &out, "owner")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
-//
-// Solidity: function owner() view returns(address)
-func (_BatchCounter *BatchCounterSession) Owner() (common.Address, error) {
-	return _BatchCounter.Contract.Owner(&_BatchCounter.CallOpts)
-}
-
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
-//
-// Solidity: function owner() view returns(address)
-func (_BatchCounter *BatchCounterCallerSession) Owner() (common.Address, error) {
-	return _BatchCounter.Contract.Owner(&_BatchCounter.CallOpts)
-}
-
 // Increment is a paid mutator transaction binding the contract method 0xd09de08a.
 //
 // Solidity: function increment() returns()
@@ -1101,27 +1070,6 @@ func (_BatchCounter *BatchCounterTransactorSession) Increment() (*types.Transact
 	return _BatchCounter.Contract.Increment(&_BatchCounter.TransactOpts)
 }
 
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_BatchCounter *BatchCounterTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _BatchCounter.contract.Transact(opts, "renounceOwnership")
-}
-
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_BatchCounter *BatchCounterSession) RenounceOwnership() (*types.Transaction, error) {
-	return _BatchCounter.Contract.RenounceOwnership(&_BatchCounter.TransactOpts)
-}
-
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_BatchCounter *BatchCounterTransactorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _BatchCounter.Contract.RenounceOwnership(&_BatchCounter.TransactOpts)
-}
-
 // Set is a paid mutator transaction binding the contract method 0x1d8c311f.
 //
 // Solidity: function set(uint64 newBatchIndex) returns()
@@ -1141,27 +1089,6 @@ func (_BatchCounter *BatchCounterSession) Set(newBatchIndex uint64) (*types.Tran
 // Solidity: function set(uint64 newBatchIndex) returns()
 func (_BatchCounter *BatchCounterTransactorSession) Set(newBatchIndex uint64) (*types.Transaction, error) {
 	return _BatchCounter.Contract.Set(&_BatchCounter.TransactOpts, newBatchIndex)
-}
-
-// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
-//
-// Solidity: function transferOwnership(address newOwner) returns()
-func (_BatchCounter *BatchCounterTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
-	return _BatchCounter.contract.Transact(opts, "transferOwnership", newOwner)
-}
-
-// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
-//
-// Solidity: function transferOwnership(address newOwner) returns()
-func (_BatchCounter *BatchCounterSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _BatchCounter.Contract.TransferOwnership(&_BatchCounter.TransactOpts, newOwner)
-}
-
-// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
-//
-// Solidity: function transferOwnership(address newOwner) returns()
-func (_BatchCounter *BatchCounterTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _BatchCounter.Contract.TransferOwnership(&_BatchCounter.TransactOpts, newOwner)
 }
 
 // BatchCounterNewBatchIndexIterator is returned from FilterNewBatchIndex and is used to iterate over the raw logs and unpacked data for NewBatchIndex events raised by the BatchCounter contract.
@@ -1293,159 +1220,6 @@ func (_BatchCounter *BatchCounterFilterer) WatchNewBatchIndex(opts *bind.WatchOp
 func (_BatchCounter *BatchCounterFilterer) ParseNewBatchIndex(log types.Log) (*BatchCounterNewBatchIndex, error) {
 	event := new(BatchCounterNewBatchIndex)
 	if err := _BatchCounter.contract.UnpackLog(event, "NewBatchIndex", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// BatchCounterOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the BatchCounter contract.
-type BatchCounterOwnershipTransferredIterator struct {
-	Event *BatchCounterOwnershipTransferred // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *BatchCounterOwnershipTransferredIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(BatchCounterOwnershipTransferred)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(BatchCounterOwnershipTransferred)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *BatchCounterOwnershipTransferredIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *BatchCounterOwnershipTransferredIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// BatchCounterOwnershipTransferred represents a OwnershipTransferred event raised by the BatchCounter contract.
-type BatchCounterOwnershipTransferred struct {
-	PreviousOwner common.Address
-	NewOwner      common.Address
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_BatchCounter *BatchCounterFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*BatchCounterOwnershipTransferredIterator, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _BatchCounter.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return &BatchCounterOwnershipTransferredIterator{contract: _BatchCounter.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
-}
-
-// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_BatchCounter *BatchCounterFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *BatchCounterOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _BatchCounter.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(BatchCounterOwnershipTransferred)
-				if err := _BatchCounter.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_BatchCounter *BatchCounterFilterer) ParseOwnershipTransferred(log types.Log) (*BatchCounterOwnershipTransferred, error) {
-	event := new(BatchCounterOwnershipTransferred)
-	if err := _BatchCounter.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
