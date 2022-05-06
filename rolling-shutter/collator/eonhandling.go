@@ -42,10 +42,10 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 		err error
 	)
 
-	if key.ActivationBlock > math.MaxInt64 {
+	if key.Candidate.ActivationBlock > math.MaxInt64 {
 		return false, errors.New("int64 overflow for msg.ActivationBlock")
 	}
-	activationBlock := int64(key.ActivationBlock)
+	activationBlock := int64(key.Candidate.ActivationBlock)
 	if key.KeyperIndex > math.MaxInt64 {
 		return false, errors.New("int64 overflow for msg.KeyperIndex")
 	}
@@ -95,7 +95,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 }
 
 func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	activationBlock := int64(key.ActivationBlock)
+	activationBlock := int64(key.Candidate.ActivationBlock)
 	keyperSet, err := c.getKeyperSet(ctx, activationBlock)
 	if err != nil {
 		return make([]shmsg.P2PMessage, 0), err
@@ -109,7 +109,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 
 		err = db.InsertCandidateEonIfNotExists(ctx, cltrdb.InsertCandidateEonIfNotExistsParams{
 			ActivationBlockNumber: activationBlock,
-			EonPublicKey:          key.PublicKey,
+			EonPublicKey:          key.Candidate.PublicKey,
 			Threshold:             int64(keyperSet.Threshold),
 		})
 		if err != nil {
@@ -125,7 +125,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 			return err
 		}
 		err = db.InsertEonPublicKeyMessage(ctx, cltrdb.InsertEonPublicKeyMessageParams{
-			EonPublicKey:          key.PublicKey,
+			EonPublicKey:          key.Candidate.PublicKey,
 			ActivationBlockNumber: activationBlock,
 			KeyperIndex:           int64(key.KeyperIndex),
 			MsgBytes:              msgBytes,

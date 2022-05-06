@@ -21,25 +21,18 @@ func NewSignedEonPublicKey(
 	eon uint64,
 	privKey *ecdsa.PrivateKey,
 ) (*EonPublicKey, error) {
-	pubKey := &EonPublicKey{
+	candidate := &EonPublicKeyCandidate{
 		InstanceID:        instanceID,
 		PublicKey:         eonPublicKey,
 		ActivationBlock:   activationBlock,
-		KeyperIndex:       keyperIndex,
 		KeyperConfigIndex: keyperConfigIndex,
 		Eon:               eon,
 	}
-	var err error
-
-	pubKey.Signature, err = ethcrypto.Sign(pubKey.Hash(), privKey)
-	if err != nil {
-		return nil, err
-	}
-	return pubKey, nil
+	return candidate.Sign(privKey, keyperIndex)
 }
 
 func (e *EonPublicKey) VerifySignature(address common.Address) (bool, error) {
-	pubkey, err := ethcrypto.SigToPub(e.Hash(), e.Signature)
+	pubkey, err := ethcrypto.SigToPub(e.Candidate.Hash(), e.Signature)
 	if err != nil {
 		return false, err
 	}
@@ -47,14 +40,32 @@ func (e *EonPublicKey) VerifySignature(address common.Address) (bool, error) {
 	return recoveredAddress == address, nil
 }
 
-func (e *EonPublicKey) Hash() []byte {
+func (e *EonPublicKeyCandidate) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(eonPubKeyHashPrefix)
 	_ = binary.Write(hash, binary.BigEndian, e.InstanceID)
 	_ = binary.Write(hash, binary.BigEndian, e.ActivationBlock)
-	_ = binary.Write(hash, binary.BigEndian, e.KeyperIndex)
 	_ = binary.Write(hash, binary.BigEndian, e.KeyperConfigIndex)
 	_ = binary.Write(hash, binary.BigEndian, e.Eon)
 	hash.Write(e.PublicKey)
 	return hash.Sum(nil)
+}
+
+// Sign signs the eon public key candidate and returns an eon public key.
+func (e *EonPublicKeyCandidate) Sign(
+	privKey *ecdsa.PrivateKey, keyperIndex uint64,
+) (*EonPublicKey, error) {
+	signature, err := ethcrypto.Sign(e.Hash(), privKey)
+	if err != nil {
+		return nil, err
+	}
+	return &EonPublicKey{
+		Candidate:   e,
+		KeyperIndex: keyperIndex,
+		Signature:   signature,
+	}, nil
+}
+
+func (e *EonPublicKey) GetInstanceID() uint64 {
+	return e.Candidate.GetInstanceID()
 }

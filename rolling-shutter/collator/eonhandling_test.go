@@ -100,8 +100,8 @@ func checkDBResult(t *testing.T, kpr []keyper, msgs []cltrdb.GetEonPublicKeyMess
 
 	for _, m := range msgs {
 		k := kpr[m.KeyperIndex]
-		assert.Equal(t, k.msg.ActivationBlock, uint64(m.ActivationBlockNumber))
-		assert.Check(t, bytes.Equal(k.msg.PublicKey, m.EonPublicKey))
+		assert.Equal(t, k.msg.Candidate.ActivationBlock, uint64(m.ActivationBlockNumber))
+		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, m.EonPublicKey))
 
 		var unmshldTemp shmsg.P2PMessage
 		unmshldTemp, err = shmsg.Unmarshal(k.msg.Topic(), m.MsgBytes)
@@ -109,8 +109,8 @@ func checkDBResult(t *testing.T, kpr []keyper, msgs []cltrdb.GetEonPublicKeyMess
 
 		unmshld, ok := unmshldTemp.(*shmsg.EonPublicKey)
 		assert.Check(t, ok)
-		assert.Equal(t, k.msg.ActivationBlock, unmshld.ActivationBlock)
-		assert.Check(t, bytes.Equal(k.msg.PublicKey, unmshld.PublicKey))
+		assert.Equal(t, k.msg.Candidate.ActivationBlock, unmshld.Candidate.ActivationBlock)
+		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, unmshld.Candidate.PublicKey))
 	}
 }
 
