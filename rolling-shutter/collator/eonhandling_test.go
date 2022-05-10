@@ -25,7 +25,7 @@ type keyper struct {
 
 func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
 	if k.msg == nil {
-		return errors.New("Message not initiliased")
+		return errors.New("Message not initialized")
 	}
 	ok, err := c.validateEonPublicKey(ctx, k.msg)
 	if err != nil {
