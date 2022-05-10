@@ -44,6 +44,7 @@ type setupEonKeysParams struct {
 	keyperConfigIndex uint64
 	threshold         uint64
 	eonPubKey         []byte
+	eon               uint64
 	keypers           []*ecdsa.PrivateKey
 }
 
@@ -63,9 +64,9 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 			params.instanceID,
 			params.eonPubKey,
 			params.activationBlock,
-			uint64(i),
-			5,
-			2,
+			uint64(i),                // keyperIndex
+			params.keyperConfigIndex, // keyperConfigIndex
+			params.eon,               // eon
 			ethKey,
 		)
 		assert.NilError(t, err)
@@ -147,6 +148,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
+		eon:               2,
 		keyperConfigIndex: uint64(0),
 		activationBlock:   activationBlockNoThreshold,
 		eonPubKey:         eonPubKeyNoThreshold,
@@ -159,6 +161,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// but same activation-block
 	keypersBefore := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
+		eon:               2,
 		keyperConfigIndex: uint64(1),
 		activationBlock:   activationBlockBefore,
 		eonPubKey:         eonPubKeyBefore,
@@ -169,6 +172,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
+		eon:               2,
 		keyperConfigIndex: uint64(2),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKey,
@@ -243,6 +247,7 @@ func TestHandleEonAmbiguityFailsIntegration(t *testing.T) {
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
+		eon:               2,
 		keyperConfigIndex: uint64(0),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKeyNoThreshold,
@@ -255,6 +260,7 @@ func TestHandleEonAmbiguityFailsIntegration(t *testing.T) {
 	// but same activation-block
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
+		eon:               2,
 		keyperConfigIndex: uint64(1),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKey,
