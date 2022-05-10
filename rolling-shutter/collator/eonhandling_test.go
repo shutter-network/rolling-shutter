@@ -39,12 +39,12 @@ func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
 }
 
 type setupEonKeysParams struct {
-	instanceID      uint64
-	activationBlock uint64
-	eventIndex      uint64
-	threshold       uint64
-	eonPubKey       []byte
-	keypers         []*ecdsa.PrivateKey
+	instanceID        uint64
+	activationBlock   uint64
+	keyperConfigIndex uint64
+	threshold         uint64
+	eonPubKey         []byte
+	keypers           []*ecdsa.PrivateKey
 }
 
 func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params setupEonKeysParams) []keyper {
@@ -82,7 +82,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 
 	db := commondb.New(dbtx)
 	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(params.eventIndex),
+		KeyperConfigIndex:     int64(params.keyperConfigIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),
 		Threshold:             int32(params.threshold),
@@ -146,34 +146,34 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(0),
-		activationBlock: activationBlockNoThreshold,
-		eonPubKey:       eonPubKeyNoThreshold,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1},
+		instanceID:        config.InstanceID,
+		keyperConfigIndex: uint64(0),
+		activationBlock:   activationBlockNoThreshold,
+		eonPubKey:         eonPubKeyNoThreshold,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1},
 	})
 	assert.Check(t, len(keypersNoThreshold) > 0)
 
-	// Insert pubkeys with enough signatures and new key / eventindex/ keyperset
+	// Insert pubkeys with enough signatures and new key / keyperConfigIndex / keyperset
 	// but same activation-block
 	keypersBefore := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(1),
-		activationBlock: activationBlockBefore,
-		eonPubKey:       eonPubKeyBefore,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
+		instanceID:        config.InstanceID,
+		keyperConfigIndex: uint64(1),
+		activationBlock:   activationBlockBefore,
+		eonPubKey:         eonPubKeyBefore,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
 	})
 	assert.Check(t, len(keypersBefore) > 0)
 
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(2),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKey,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr3, kpr1, kpr2},
+		instanceID:        config.InstanceID,
+		keyperConfigIndex: uint64(2),
+		activationBlock:   activationBlock,
+		eonPubKey:         eonPubKey,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr3, kpr1, kpr2},
 	})
 	assert.Check(t, len(keypers) > 0)
 
@@ -242,24 +242,24 @@ func TestHandleEonAmbiguityFailsIntegration(t *testing.T) {
 
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(0),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKeyNoThreshold,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1},
+		instanceID:        config.InstanceID,
+		keyperConfigIndex: uint64(0),
+		activationBlock:   activationBlock,
+		eonPubKey:         eonPubKeyNoThreshold,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1},
 	})
 	assert.Check(t, len(keypersNoThreshold) > 0)
 
-	// Insert pubkeys with enough signatures and new key / eventindex/ keyperset
+	// Insert pubkeys with enough signatures and new key / keyperConfigIndex / keyperset
 	// but same activation-block
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(1),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKey,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
+		instanceID:        config.InstanceID,
+		keyperConfigIndex: uint64(1),
+		activationBlock:   activationBlock,
+		eonPubKey:         eonPubKey,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
 	})
 	assert.Check(t, len(keypers) > 0)
 
