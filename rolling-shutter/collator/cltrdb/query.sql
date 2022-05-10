@@ -1,3 +1,14 @@
+-- name: InsertEonPublicKeyCandidate :exec
+INSERT INTO eon_public_key_candidate
+       (hash, eon_public_key, activation_block_number, keyper_config_index, eon)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING;
+
+-- name: InsertEonPublicKeyVote :exec
+INSERT INTO eon_public_key_vote
+       (hash, sender, signature, eon, keyper_config_index)
+VALUES ($1, $2, $3, $4, $5);
+
 -- name: InsertTrigger :exec
 INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 

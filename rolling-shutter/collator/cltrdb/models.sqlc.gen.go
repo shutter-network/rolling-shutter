@@ -4,7 +4,9 @@
 
 package cltrdb
 
-import ()
+import (
+	"database/sql"
+)
 
 type DecryptionKey struct {
 	EpochID       []byte
@@ -22,11 +24,32 @@ type Eon struct {
 	Threshold             int64
 }
 
+type EonPublicKeyCandidate struct {
+	Hash                  []byte
+	EonPublicKey          []byte
+	ActivationBlockNumber int64
+	KeyperConfigIndex     int64
+	Eon                   int64
+}
+
 type EonPublicKeyMessage struct {
 	EonPublicKey          []byte
 	ActivationBlockNumber int64
 	KeyperIndex           int64
 	MsgBytes              []byte
+}
+
+type EonPublicKeyNumVote struct {
+	Hash     []byte
+	NumVotes sql.NullInt32
+}
+
+type EonPublicKeyVote struct {
+	Hash              []byte
+	Sender            string
+	Signature         []byte
+	Eon               int64
+	KeyperConfigIndex int64
 }
 
 type MetaInf struct {

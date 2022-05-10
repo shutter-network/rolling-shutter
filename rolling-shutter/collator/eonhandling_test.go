@@ -148,7 +148,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
-		eon:               2,
+		eon:               1,
 		keyperConfigIndex: uint64(0),
 		activationBlock:   activationBlockNoThreshold,
 		eonPubKey:         eonPubKeyNoThreshold,
@@ -172,7 +172,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
-		eon:               2,
+		eon:               3,
 		keyperConfigIndex: uint64(2),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKey,
@@ -260,7 +260,7 @@ func TestHandleEonAmbiguityFailsIntegration(t *testing.T) {
 	// but same activation-block
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
 		instanceID:        config.InstanceID,
-		eon:               2,
+		eon:               3,
 		keyperConfigIndex: uint64(1),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKey,

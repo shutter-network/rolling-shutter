@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
@@ -106,6 +107,31 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 			msgBytes []byte
 		)
 		db := cltrdb.New(tx)
+		if true {
+			hash := key.Candidate.Hash()
+			err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+				Hash:                  hash,
+				EonPublicKey:          key.Candidate.PublicKey,
+				ActivationBlockNumber: int64(key.Candidate.ActivationBlock),
+				KeyperConfigIndex:     int64(key.Candidate.KeyperConfigIndex),
+				Eon:                   int64(key.Candidate.Eon),
+			})
+			if err != nil {
+				return err
+			}
+			insertEonPublicKeyVoteParam := cltrdb.InsertEonPublicKeyVoteParams{
+				Hash:              hash,
+				Sender:            keyperSet.Keypers[key.KeyperIndex],
+				Signature:         key.Signature,
+				Eon:               int64(key.Candidate.Eon),
+				KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),
+			}
+			pretty.Println(insertEonPublicKeyVoteParam)
+			err = db.InsertEonPublicKeyVote(ctx, insertEonPublicKeyVoteParam)
+			if err != nil {
+				return err
+			}
+		}
 
 		err = db.InsertCandidateEonIfNotExists(ctx, cltrdb.InsertCandidateEonIfNotExistsParams{
 			ActivationBlockNumber: activationBlock,

@@ -203,6 +203,32 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
 }
 
+const insertEonPublicKeyCandidate = `-- name: InsertEonPublicKeyCandidate :exec
+INSERT INTO eon_public_key_candidate
+       (hash, eon_public_key, activation_block_number, keyper_config_index, eon)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING
+`
+
+type InsertEonPublicKeyCandidateParams struct {
+	Hash                  []byte
+	EonPublicKey          []byte
+	ActivationBlockNumber int64
+	KeyperConfigIndex     int64
+	Eon                   int64
+}
+
+func (q *Queries) InsertEonPublicKeyCandidate(ctx context.Context, arg InsertEonPublicKeyCandidateParams) error {
+	_, err := q.db.Exec(ctx, insertEonPublicKeyCandidate,
+		arg.Hash,
+		arg.EonPublicKey,
+		arg.ActivationBlockNumber,
+		arg.KeyperConfigIndex,
+		arg.Eon,
+	)
+	return err
+}
+
 const insertEonPublicKeyMessage = `-- name: InsertEonPublicKeyMessage :exec
 INSERT INTO eon_public_key_message
     (eon_public_key, activation_block_number, keyper_index, msg_bytes)
@@ -222,6 +248,31 @@ func (q *Queries) InsertEonPublicKeyMessage(ctx context.Context, arg InsertEonPu
 		arg.ActivationBlockNumber,
 		arg.KeyperIndex,
 		arg.MsgBytes,
+	)
+	return err
+}
+
+const insertEonPublicKeyVote = `-- name: InsertEonPublicKeyVote :exec
+INSERT INTO eon_public_key_vote
+       (hash, sender, signature, eon, keyper_config_index)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertEonPublicKeyVoteParams struct {
+	Hash              []byte
+	Sender            string
+	Signature         []byte
+	Eon               int64
+	KeyperConfigIndex int64
+}
+
+func (q *Queries) InsertEonPublicKeyVote(ctx context.Context, arg InsertEonPublicKeyVoteParams) error {
+	_, err := q.db.Exec(ctx, insertEonPublicKeyVote,
+		arg.Hash,
+		arg.Sender,
+		arg.Signature,
+		arg.Eon,
+		arg.KeyperConfigIndex,
 	)
 	return err
 }
