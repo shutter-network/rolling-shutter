@@ -96,17 +96,18 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 }
 
 func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	activationBlock := int64(key.Candidate.ActivationBlock)
-	keyperSet, err := c.getKeyperSet(ctx, activationBlock)
-	if err != nil {
-		return make([]shmsg.P2PMessage, 0), err
-	}
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var (
 			err      error
 			msgBytes []byte
 		)
+		activationBlock := int64(key.Candidate.ActivationBlock)
+
 		db := cltrdb.New(tx)
+		keyperSet, err := commondb.New(tx).GetKeyperSet(ctx, activationBlock)
+		if err != nil {
+			return errors.Wrap(err, "failed to retrieve keyper set from db")
+		}
 		if true {
 			hash := key.Candidate.Hash()
 			err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
