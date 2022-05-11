@@ -130,7 +130,7 @@ each block height.
 
 ### CollatorConfigsList
 
-The colltator configs list defines the collator for each block height.
+The collator configs list defines the collator for each block height.
 
 ### EonKeyStorage
 
