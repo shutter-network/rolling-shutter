@@ -16,40 +16,23 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func (c *collator) getKeyperSet(ctx context.Context, activationBlock int64) (commondb.KeyperSet, error) {
-	var keyperSet commondb.KeyperSet
-
-	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		var err error
-		db := commondb.New(tx)
-
-		// only using activationBlock as identifier could be ambiguous (see issue #238)
-		keyperSet, err = db.GetKeyperSet(ctx, activationBlock)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return keyperSet, errors.Wrap(err, "failed to retrieve keyper set from db")
-	}
-	return keyperSet, nil
-}
-
 func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) (bool, error) {
 	var (
-		ok  bool
-		ks  commondb.KeyperSet
-		err error
+		ok        bool
+		keyperSet commondb.KeyperSet
+		err       error
 	)
-
+	if key.Candidate.KeyperConfigIndex > math.MaxInt64 {
+		return false, errors.New("int64 overflow for msg.KeyperConfigIndex")
+	}
 	if key.Candidate.ActivationBlock > math.MaxInt64 {
 		return false, errors.New("int64 overflow for msg.ActivationBlock")
 	}
-	activationBlock := int64(key.Candidate.ActivationBlock)
 	if key.KeyperIndex > math.MaxInt64 {
 		return false, errors.New("int64 overflow for msg.KeyperIndex")
 	}
+
+	activationBlock := int64(key.Candidate.ActivationBlock)
 	keyperIndex := int64(key.KeyperIndex)
 	// Theoretically, there could be a race condition, where we learn of the EonPublicKey
 	// broadcast message before we notice the new keyper-config, and would ignore it
@@ -57,31 +40,29 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
 
-	// If here we inserted two different keyper sets for the same
-	// activation-block, then this is ambiguous (there is no sorting on DB-insert order or similar) (see #238)
-	ks, err = c.getKeyperSet(ctx, activationBlock)
+	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		keyperSet, err = commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
+			ctx, int64(key.Candidate.KeyperConfigIndex),
+		)
+		return err
+	})
 	if err != nil {
-		return false, errors.Wrap(err, fmt.Sprintf("error while retrieving on-chain Keyper set for "+
-			"EonPublicKey (activation-block=%d)", activationBlock))
+		return false, errors.Wrap(err, "failed to retrieve keyper set from db")
 	}
 
-	if ks.ActivationBlockNumber != activationBlock {
-		// This is the case when either there were ambiguities in
-		// retrieving the correct keyper set for this activationBlock (see issue #238)
+	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
+	if keyperSet.ActivationBlockNumber != activationBlock {
 		// Can also happen when the Keyper is dishonest.
-
 		return false, errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
-			"activation-block on-chain (%d)", activationBlock, ks.ActivationBlockNumber)
+			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
 	}
-	if int64(len(ks.Keypers)) < keyperIndex+1 {
-		// Using the wrong keyper set (e.g. due to #238) will result in out-of-bounds error,
+	if int64(len(keyperSet.Keypers)) < keyperIndex+1 {
 		// Can also happen when the Keyper is dishonest.
 		return false, errors.Wrapf(err, "keyper index out of bounds for keyper set. "+
 			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex)
 	}
-	// This could be susceptible to replay attacks, when the keyper index in an older keyper-config maps to the same
-	// address as in this keyper-config(see issue #238)
-	expectedAddress := ks.Keypers[keyperIndex]
+	expectedAddress := keyperSet.Keypers[keyperIndex]
 
 	ok, err = key.VerifySignature(common.HexToAddress(expectedAddress))
 	if err != nil {
@@ -101,10 +82,13 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 			err      error
 			msgBytes []byte
 		)
+
 		activationBlock := int64(key.Candidate.ActivationBlock)
 
 		db := cltrdb.New(tx)
-		keyperSet, err := commondb.New(tx).GetKeyperSet(ctx, activationBlock)
+		keyperSet, err := commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
+			ctx, int64(key.Candidate.KeyperConfigIndex),
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve keyper set from db")
 		}
