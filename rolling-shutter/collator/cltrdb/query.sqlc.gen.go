@@ -48,6 +48,27 @@ func (q *Queries) ExistsDecryptionKey(ctx context.Context, epochID []byte) (bool
 	return exists, err
 }
 
+const findEonPublicKeyForBlock = `-- name: FindEonPublicKeyForBlock :one
+SELECT hash, eon_public_key, activation_block_number, keyper_config_index, eon, confirmed FROM eon_public_key_candidate
+WHERE confirmed AND activation_block_number <= $1
+ORDER BY activation_block_number DESC, keyper_config_index DESC
+LIMIT 1
+`
+
+func (q *Queries) FindEonPublicKeyForBlock(ctx context.Context, blocknumber int64) (EonPublicKeyCandidate, error) {
+	row := q.db.QueryRow(ctx, findEonPublicKeyForBlock, blocknumber)
+	var i EonPublicKeyCandidate
+	err := row.Scan(
+		&i.Hash,
+		&i.EonPublicKey,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.Eon,
+		&i.Confirmed,
+	)
+	return i, err
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, decryption_key FROM decryption_key
 WHERE epoch_id = $1

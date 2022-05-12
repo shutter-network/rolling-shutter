@@ -17,6 +17,12 @@ UPDATE eon_public_key_candidate
 SET confirmed=TRUE
 WHERE hash=$1;
 
+-- name: FindEonPublicKeyForBlock :one
+SELECT * FROM eon_public_key_candidate
+WHERE confirmed AND activation_block_number <= sqlc.arg(blocknumber)
+ORDER BY activation_block_number DESC, keyper_config_index DESC
+LIMIT 1;
+
 -- name: InsertTrigger :exec
 INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 
