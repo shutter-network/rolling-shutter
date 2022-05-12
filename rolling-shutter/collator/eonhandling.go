@@ -16,62 +16,78 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) (bool, error) {
-	var (
-		ok        bool
-		keyperSet commondb.KeyperSet
-		err       error
-	)
+// ensureNoIntegerOverflowsInEonPublicKey checks that the uint64 fields declared in the
+// EonPublicKey do not overflow when converted to an int64. It returns an error if there is an
+// overflow.
+func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 	if key.Candidate.KeyperConfigIndex > math.MaxInt64 {
-		return false, errors.New("int64 overflow for msg.KeyperConfigIndex")
+		return errors.New("int64 overflow for msg.KeyperConfigIndex")
 	}
 	if key.Candidate.ActivationBlock > math.MaxInt64 {
-		return false, errors.New("int64 overflow for msg.ActivationBlock")
+		return errors.New("int64 overflow for msg.ActivationBlock")
 	}
 	if key.KeyperIndex > math.MaxInt64 {
-		return false, errors.New("int64 overflow for msg.KeyperIndex")
+		return errors.New("int64 overflow for msg.KeyperIndex")
 	}
+	return nil
+}
 
+// ensureEonPublicKeyMatchesKeyperSet checks that the information stored in the EonPublicKey
+// matches the commondb.KeyperSet stored in the database. It returns an error if there is a
+// mismatch.
+func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg.EonPublicKey) error {
 	activationBlock := int64(key.Candidate.ActivationBlock)
 	keyperIndex := int64(key.KeyperIndex)
+
+	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
+	if keyperSet.ActivationBlockNumber != activationBlock {
+		// Can also happen when the Keyper is dishonest.
+		return errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
+			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
+	}
+	if keyperIndex >= int64(len(keyperSet.Keypers)) {
+		// Can also happen when the Keyper is dishonest.
+		return errors.Errorf("keyper index out of bounds for keyper set. "+
+			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex)
+	}
+	expectedAddress := keyperSet.Keypers[keyperIndex]
+
+	ok, err := key.VerifySignature(common.HexToAddress(expectedAddress))
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
+			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex))
+	}
+	if !ok {
+		return errors.Errorf("eonPublicKey's recovered address does not match on-chain address (%s) for keyper-index (%d)",
+			common.HexToAddress(expectedAddress), keyperIndex)
+	}
+	return nil
+}
+
+// validateEonPublicKey is a libp2p validator for incoming EonPublicKey messages.
+func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) (bool, error) {
+	if err := ensureNoIntegerOverflowsInEonPublicKey(key); err != nil {
+		return false, err
+	}
+
 	// Theoretically, there could be a race condition, where we learn of the EonPublicKey
 	// broadcast message before we notice the new keyper-config, and would ignore it
 	// because of that.
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
-
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	var keyperSet commondb.KeyperSet
+	if err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 		keyperSet, err = commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.Candidate.KeyperConfigIndex),
 		)
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return false, errors.Wrap(err, "failed to retrieve keyper set from db")
 	}
 
-	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
-	if keyperSet.ActivationBlockNumber != activationBlock {
-		// Can also happen when the Keyper is dishonest.
-		return false, errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
-			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
-	}
-	if int64(len(keyperSet.Keypers)) < keyperIndex+1 {
-		// Can also happen when the Keyper is dishonest.
-		return false, errors.Wrapf(err, "keyper index out of bounds for keyper set. "+
-			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex)
-	}
-	expectedAddress := keyperSet.Keypers[keyperIndex]
-
-	ok, err = key.VerifySignature(common.HexToAddress(expectedAddress))
-	if err != nil {
-		return false, errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
-			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex))
-	}
-	if !ok {
-		return false, errors.Errorf("eonPublicKey's recovered address does not match on-chain address (%s) for keyper-index (%d)",
-			common.HexToAddress(expectedAddress), keyperIndex)
+	if err := ensureEonPublicKeyMatchesKeyperSet(keyperSet, key); err != nil {
+		return false, err
 	}
 	return true, nil
 }
