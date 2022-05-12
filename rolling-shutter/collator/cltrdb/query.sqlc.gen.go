@@ -11,6 +11,28 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const confirmEonPublicKey = `-- name: ConfirmEonPublicKey :exec
+UPDATE eon_public_key_candidate
+SET confirmed=TRUE
+WHERE hash=$1
+`
+
+func (q *Queries) ConfirmEonPublicKey(ctx context.Context, hash []byte) error {
+	_, err := q.db.Exec(ctx, confirmEonPublicKey, hash)
+	return err
+}
+
+const countEonPublicKeyVotes = `-- name: CountEonPublicKeyVotes :one
+SELECT COUNT(*) from eon_public_key_vote WHERE hash=$1
+`
+
+func (q *Queries) CountEonPublicKeyVotes(ctx context.Context, hash []byte) (int64, error) {
+	row := q.db.QueryRow(ctx, countEonPublicKeyVotes, hash)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1

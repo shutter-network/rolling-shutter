@@ -44,15 +44,11 @@ CREATE TABLE eon_public_key_candidate(
     eon_public_key bytea NOT NULL,
     activation_block_number bigint NOT NULL,
     keyper_config_index bigint NOT NULL,
-    eon bigint NOT NULL
+    eon bigint NOT NULL,
+    confirmed BOOL NOT NULL DEFAULT FALSE
 );
 
 CREATE UNIQUE INDEX eon_public_key_index ON eon_public_key_candidate(eon_public_key, activation_block_number, keyper_config_index, eon);
-
-CREATE TABLE eon_public_key_num_votes(
-       hash bytea REFERENCES eon_public_key_candidate(hash) PRIMARY KEY,
-       num_votes integer
-);
 
 -- eon_public_key_vote stores the votes. This maps a sender address to a hash. The eon and
 -- keyper_config_index fields are only here to create unique indexes on them, since postgresql does

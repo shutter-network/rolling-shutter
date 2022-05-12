@@ -3,11 +3,11 @@ package collator
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
-	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
@@ -127,10 +127,23 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 				Eon:               int64(key.Candidate.Eon),
 				KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),
 			}
-			pretty.Println(insertEonPublicKeyVoteParam)
 			err = db.InsertEonPublicKeyVote(ctx, insertEonPublicKeyVoteParam)
 			if err != nil {
 				return err
+			}
+			count, err := db.CountEonPublicKeyVotes(ctx, hash)
+			if err != nil {
+				return err
+			}
+			if count == int64(keyperSet.Threshold) {
+				err = db.ConfirmEonPublicKey(ctx, hash)
+				if err != nil {
+					return err
+				}
+				log.Printf("Confirmed eon public key for keyper config index=%d, eon=%d",
+					key.Candidate.KeyperConfigIndex,
+					key.Candidate.Eon,
+				)
 			}
 		}
 

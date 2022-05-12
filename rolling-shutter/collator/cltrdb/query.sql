@@ -9,6 +9,14 @@ INSERT INTO eon_public_key_vote
        (hash, sender, signature, eon, keyper_config_index)
 VALUES ($1, $2, $3, $4, $5);
 
+-- name: CountEonPublicKeyVotes :one
+SELECT COUNT(*) from eon_public_key_vote WHERE hash=$1;
+
+-- name: ConfirmEonPublicKey :exec
+UPDATE eon_public_key_candidate
+SET confirmed=TRUE
+WHERE hash=$1;
+
 -- name: InsertTrigger :exec
 INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
 
