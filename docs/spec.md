@@ -410,19 +410,7 @@ Batches are executed according to the following steps:
    3. Pay the transaction fee from the sender's account according to EIP1559 and
       the parameters `gas`, `gasTipCap` and `gasFeeCap`. Reject the batch if the
       sender's account balance is insufficient.
-8. For each shutter transaction, the envelope is validated. If any of the
-   following conditions is false, the transaction is ignored for the remainder
-   of the batch execution:
-   1. The transaction is decodable.
-   2. `chainID` is equal to the batch's `chainID`.
-   3. `batchIndex` is equal to the batch's `batchIndex`.
-   4. `v, r, s` is a valid signature.
-   5. `nonce` is equal to the sender's account nonce plus the number of valid
-      transactions by the same number in the batch prior to this one.
-   6. `gasFeeCap` is greater or equal to the current base fee
-   7. The sender's balance is greater or equal to `gasFeeCap * gas` for this and
-      all prior valid transactions in the batch.
-9. For all transactions execute them as follows in the order they appear in
+8. For all transactions execute them as follows in the order they appear in
    `transactions`. Execute standard Ethereum transactions as normal. Reject the
    batch if execution fails. Execute Shutter transactions as follows:
    1. Decrypt `encryptedPayload` using `decryptionKey`. If decryption fails,
