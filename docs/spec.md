@@ -355,27 +355,26 @@ Batches are encoded as typed transactions according to EIP-2718 with prefix xxx
 and an RLP encoded payload. The payload is a list of the following fields:
 
 - `chainID` (integer)
-- `batchIndex` (integer)
 - `decryptionKey` (bytes)
+- `batchIndex` (integer)
 - `l1BlockNumber` (integer)
 - `timestamp` (integer)
-- `shutterTxs` (list of bytes)
-- `plaintextTxs` (list of bytes)
+- `transactions` (list of bytes)
 - `v` (integer)
 - `r` (integer)
 - `s` (integer)
 
-Here, the elements of `plaintextTxs` are expected to be a standard, encoded
-Ethereum transaction, the elements of `shutterTxs` encoded transactions of a new
-type. This type has prefix xxx and the payload is as follows:
+Here, the elements of `transactions` are expected to be encodings of either
+standard Ethereum transactions or transactions of a new type. This type has
+prefix xxx and the payload is as follows:
 
 - `chainID` (integer)
-- `batchIndex` (integer)
 - `nonce` (integer)
 - `gasTipCap` (integer)
 - `gasFeeCap` (integer)
 - `gas` (integer)
 - `encryptedPayload` (bytes)
+- `batchIndex` (integer)
 - `v` (integer)
 - `r` (integer)
 - `s` (integer)
@@ -386,22 +385,30 @@ it with the type prefix and signing it.
 
 Batches are executed according to the following steps:
 
-1. `chainID` is checked. If it does not match rollup's chain ID, the batch is
-   rejected.
-2. `batchIndex` is checked. If the index does not match the index returned by
-   calling `getNextBatchIndex` on the batch counter contract, the batch is
-   rejected.
-3. `decryptionKey` is checked against the current eon key. First, the eon key
-   for the batch's `l1BlockNumber` is queried from the eon storage contract. If
-   no key is available, the check succeeds if the decryption key is empty,
-   otherwise the batch is rejected. If the key is available, the epoch id is
-   derived from `batchIndex` and it is verified that `decryptionKey` is the
-   correct decryption key for this epoch given the eon public key.
-4. The signature is checked as described above against the collator identified
-   by `l1BlockNumber` in the collator config contract.
+1. Check `chainID`. If it does not match rollup's chain ID, reject the batch.
+2. Check `batchIndex`. If the index does not match the index returned by calling
+   `getNextBatchIndex` on the batch counter contract, reject the batch.
+   Subsequently, increment the batch counter.
+3. Check `decryptionKey` against the current eon key. First, query the eon key
+   for the batch's `l1BlockNumber` from the eon key storage contract. If no key
+   is available, the check succeeds. If the key is available, use `batchIndex`
+   as epoch id verify that `decryptionKey` is the correct decryption key for
+   this epoch given the eon public key. If not, reject the batch.
+4. Check the batch signature `(v, r, s)` against the collator identified by
+   `l1BlockNumber` in the collator config contract. If the signature is invalid
+   or the signer is not the collator, reject the batch.
 5. TODO: `l1BlockNumber` and `timestamp`: checked in contract or during batch
    execution?
-6. For each shutter transaction, the envelope is validated. If any of the
+6. Decode all transactions. If any of the transactions is not decodable, reject
+   the batch.
+7. For each shutter transaction, execute the envelope:
+   1. Check `chainID`. If it does not match the rollup's chain ID (or
+      equivalently the batch's), reject the batch.
+   2. TODO: nonce
+   3. Pay the transaction fee from the sender's account according to EIP1559 and
+      the parameters `gas`, `gasTipCap` and `gasFeeCap`. Reject the batch if the
+      sender's account balance is insufficient.
+8. For each shutter transaction, the envelope is validated. If any of the
    following conditions is false, the transaction is ignored for the remainder
    of the batch execution:
    1. The transaction is decodable.
@@ -413,20 +420,16 @@ Batches are executed according to the following steps:
    6. `gasFeeCap` is greater or equal to the current base fee
    7. The sender's balance is greater or equal to `gasFeeCap * gas` for this and
       all prior valid transactions in the batch.
-7. For each valid transaction
-   1. the fee is paid by reducing the sender's account balance by
-      `gasFeeCap * gas` and increasing the batch signer's account by
-      `min(gasTipCap, gasFeeCap - currentBaseFee) * gas`. Note that for valid
-      transactions this is guaranteed to succeed.
-   2. `encryptedPayload` is decrypted with `decryptionKey`, yielding
-      `decryptedPayload`. If decryption fails, execution of the transaction
-      ends.
-   3. `decryptedPayload` is decoded as an RLP list `[to, data, value]` where
-      `to` must be a valid address, `data` an arbitrary byte string, and `value`
-      an integer. If decoding fails, execution of the transaction ends.
-   4. If `value` is greater than the sender's account balance, the execution of
-      the transaction ends.
-   5. An EVM message is executed calling `to` with `data` passing `value` Wei
-      and `gas` units of gas.
-8. The transactions in `plaintextTxs` are decoded and executed as normal
-   Ethereum transactions.
+9. For all transactions execute them as follows in the order they appear in
+   `transactions`. Execute standard Ethereum transactions as normal. Reject the
+   batch if execution fails. Execute Shutter transactions as follows:
+   1. Decrypt `encryptedPayload` using `decryptionKey`. Skip the transaction if
+      decryption fails.
+   2. Decode the result as RLP encoding of the list `[to, data, value]` where
+      `to` is an address, `data` is a byte array, and `value` is an integer.
+      Skip the transaction if decoding fails.
+   3. Execute the transaction as a normal Ethereum transaction with the fields
+      `sender`, `nonce` and `gas` taken from the envelope, `to`, `value`, and
+      `data` from the encrypted payload, and `gasPrice`, `gasFeeCap` and
+      `gasTipCap` set to 0 (note that the fee has already been paid). Skip the
+      transaction if execution fails.
