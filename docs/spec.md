@@ -351,8 +351,9 @@ transactions submitted directly by the user, but only with significant delay.
 
 ### Batch Execution
 
-Batches are encoded as typed transactions according to EIP-2718 with prefix xxx
-and an RLP encoded payload. The payload is a list of the following fields:
+Batches are encoded as typed transactions according to EIP-2718 with prefix
+`0x5a` and an RLP encoded payload. The payload is a list of the following
+fields:
 
 - `chainID` (integer)
 - `decryptionKey` (bytes)
@@ -366,7 +367,7 @@ and an RLP encoded payload. The payload is a list of the following fields:
 
 Here, the elements of `transactions` are expected to be encodings of either
 standard Ethereum transactions or transactions of a new type. This type has
-prefix xxx and the payload is as follows:
+prefix `0x50` and the payload is as follows:
 
 - `chainID` (integer)
 - `nonce` (integer)
