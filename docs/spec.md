@@ -405,7 +405,8 @@ Batches are executed according to the following steps:
 7. For each shutter transaction, execute the envelope:
    1. Check `chainID`. If it does not match the rollup's chain ID (or
       equivalently the batch's), reject the batch.
-   2. TODO: nonce
+   2. Check `nonce`. If it does not match the sender's account nonce, reject the
+      batch. Subsequently, increment the account nonce.
    3. Pay the transaction fee from the sender's account according to EIP1559 and
       the parameters `gas`, `gasTipCap` and `gasFeeCap`. Reject the batch if the
       sender's account balance is insufficient.
