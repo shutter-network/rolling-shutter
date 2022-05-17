@@ -405,23 +405,18 @@ Batches are executed according to the following steps:
 7. For each shutter transaction, execute the envelope:
    1. Check `chainID`. If it does not match the rollup's chain ID (or
       equivalently the batch's), reject the batch.
-   2. Check `nonce`. If it does not match the sender's account nonce, reject the
-      batch. Subsequently, increment the account nonce.
-   3. Pay the transaction fee from the sender's account according to EIP1559 and
+   2. Pay the transaction fee from the sender's account according to EIP1559 and
       the parameters `gas`, `gasTipCap` and `gasFeeCap`. Reject the batch if the
       sender's account balance is insufficient.
 8. For all transactions execute them as follows in the order they appear in
    `transactions`. Execute standard Ethereum transactions as normal. Reject the
    batch if execution fails. Execute Shutter transactions as follows:
    1. Decrypt `encryptedPayload` using `decryptionKey`. If decryption fails,
-      skip to step 5.
+      increment the account nonce and skip the remaining steps.
    2. Decode the result as RLP encoding of the list `[to, data, value]` where
       `to` is an address, `data` is a byte array, and `value` is an integer. If
-      decoding fails, skip to step 5.
-   3. Reset the sender's account nonce to `nonce` from the envelope.
-   4. Execute the transaction as a normal Ethereum transaction with the fields
+      decoding fails, increment the account nonce and skip the remaining steps.
+   3. Execute the transaction as a normal Ethereum transaction with the fields
       `sender`, `nonce` and `gas` taken from the envelope, `to`, `value`, and
       `data` from the encrypted payload, and `gasPrice`, `gasFeeCap` and
-      `gasTipCap` set to 0 (note that the fee has already been paid). If
-      execution fails, skip to step 5.
-   5. If any of above steps have failed, increment the sender's account nonce.
+      `gasTipCap` set to 0 (note that the fee has already been paid).
