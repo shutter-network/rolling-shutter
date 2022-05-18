@@ -359,7 +359,7 @@ fields:
 - `decryptionKey` (bytes)
 - `batchIndex` (integer)
 - `l1BlockNumber` (integer)
-- `timestamp` (integer)
+- `timestamp` (integer, seconds since Unix epoch)
 - `transactions` (list of bytes)
 - `v` (integer)
 - `r` (integer)
