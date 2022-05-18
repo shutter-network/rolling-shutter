@@ -104,17 +104,12 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		msgActivationBlock := int64(epochid.BlockNumber(key.EpochID))
-
-		eonPublicKeyMessages, err := db.GetEonPublicKeyMessages(ctx, msgActivationBlock)
+		eonPub, err := db.FindEonPublicKeyForBlock(ctx, msgActivationBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve EonPublicKey from DB")
 		}
-		if len(eonPublicKeyMessages) == 0 {
-			return errors.Errorf("no EonPublicKey found for DecryptionKey(activation-block: %d)",
-				msgActivationBlock,
-			)
-		}
-		err = eonPublicKey.GobDecode(eonPublicKeyMessages[0].EonPublicKey)
+
+		err = eonPublicKey.GobDecode(eonPub.EonPublicKey)
 		if err != nil {
 			return errors.Wrap(err, "failed to decode persisted EonPublicKey")
 		}

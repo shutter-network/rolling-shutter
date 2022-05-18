@@ -93,25 +93,24 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 	return kprs
 }
 
-func checkDBResult(t *testing.T, kpr []keyper, msgs []cltrdb.GetEonPublicKeyMessagesRow) {
+func checkDBResult(t *testing.T, kpr []keyper, pubkey cltrdb.EonPublicKeyCandidate, votes []cltrdb.EonPublicKeyVote) {
 	t.Helper()
 
-	assert.Check(t, len(msgs) > 0)
-	var err error
+	assert.Check(t, len(votes) > 0)
+	keyperBySender := make(map[string]keyper)
+	for _, k := range kpr {
+		keyperBySender[k.address] = k
+	}
 
-	for _, m := range msgs {
-		k := kpr[m.KeyperIndex]
-		assert.Equal(t, k.msg.Candidate.ActivationBlock, uint64(m.ActivationBlockNumber))
-		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, m.EonPublicKey))
-
-		var unmshldTemp shmsg.P2PMessage
-		unmshldTemp, err = shmsg.Unmarshal(k.msg.Topic(), m.MsgBytes)
-		assert.NilError(t, err)
-
-		unmshld, ok := unmshldTemp.(*shmsg.EonPublicKey)
+	for _, v := range votes {
+		k, ok := keyperBySender[v.Sender]
 		assert.Check(t, ok)
-		assert.Equal(t, k.msg.Candidate.ActivationBlock, unmshld.Candidate.ActivationBlock)
-		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, unmshld.Candidate.PublicKey))
+		assert.Equal(t, k.msg.Candidate.ActivationBlock, uint64(pubkey.ActivationBlockNumber))
+		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, pubkey.EonPublicKey))
+		pubkey, err := ethcrypto.SigToPub(pubkey.Hash, v.Signature)
+		assert.NilError(t, err)
+		recoveredAddress := ethcrypto.PubkeyToAddress(*pubkey)
+		assert.Equal(t, recoveredAddress.Hex(), v.Sender)
 	}
 }
 
@@ -119,7 +118,6 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	var (
 		eonPubKey, eonPubKeyBefore, eonPubKeyNoThreshold []byte
 		err                                              error
-		dbEon, dbEonBefore                               []cltrdb.GetEonPublicKeyMessagesRow
 	)
 
 	if testing.Short() {
@@ -184,7 +182,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// HACK: Only partially instantiating the collator.
 	// This works until the handler/validator functions use something else than
 	// the database-pool
-	c := collator{dbpool: dbpool}
+	c := collator{dbpool: dbpool, Config: config}
 
 	for _, k := range keypersBefore {
 		err = k.handleMsg(ctx, &c)
@@ -202,14 +200,18 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// Although the no-threshold reaching pubkey message have a
 	// later activation block, they should not get retrieved
 	// because they should not get considered valid at this point
-	dbEonBefore, err = db.GetEonPublicKeyMessages(ctx, 500)
-	assert.NilError(t, err)
-	assert.Check(t, len(dbEonBefore) == 3)
-	// This should only return the messages with enough signatures
-	checkDBResult(t, keypersBefore, dbEonBefore)
 
-	dbEon, err = db.GetEonPublicKeyMessages(ctx, 1050)
-	assert.Check(t, len(dbEon) == 3)
+	pubkey, err := db.FindEonPublicKeyForBlock(ctx, 500)
 	assert.NilError(t, err)
-	checkDBResult(t, keypers, dbEon)
+	votes, err := db.FindEonPublicKeyVotes(ctx, pubkey.Hash)
+	assert.NilError(t, err)
+	assert.Equal(t, len(votes), 3)
+	checkDBResult(t, keypersBefore, pubkey, votes)
+
+	pubkey, err = db.FindEonPublicKeyForBlock(ctx, 1050)
+	assert.NilError(t, err)
+	votes, err = db.FindEonPublicKeyVotes(ctx, pubkey.Hash)
+	assert.NilError(t, err)
+	assert.Equal(t, len(votes), 3)
+	checkDBResult(t, keypers, pubkey, votes)
 }

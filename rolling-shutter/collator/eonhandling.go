@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
@@ -70,6 +69,11 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 		return false, err
 	}
 
+	if c.Config.InstanceID != key.GetInstanceID() {
+		return false, errors.Errorf("eonPublicKey has wrong InstanceID (expected=%d, have=%d)",
+			c.Config.InstanceID, key.GetInstanceID())
+	}
+
 	// Theoretically, there could be a race condition, where we learn of the EonPublicKey
 	// broadcast message before we notice the new keyper-config, and would ignore it
 	// because of that.
@@ -94,12 +98,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 
 func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
 	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		var (
-			err      error
-			msgBytes []byte
-		)
-
-		activationBlock := int64(key.Candidate.ActivationBlock)
+		var err error
 
 		db := cltrdb.New(tx)
 		keyperSet, err := commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
@@ -108,70 +107,41 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve keyper set from db")
 		}
-		if true {
-			hash := key.Candidate.Hash()
-			err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
-				Hash:                  hash,
-				EonPublicKey:          key.Candidate.PublicKey,
-				ActivationBlockNumber: int64(key.Candidate.ActivationBlock),
-				KeyperConfigIndex:     int64(key.Candidate.KeyperConfigIndex),
-				Eon:                   int64(key.Candidate.Eon),
-			})
-			if err != nil {
-				return err
-			}
-			insertEonPublicKeyVoteParam := cltrdb.InsertEonPublicKeyVoteParams{
-				Hash:              hash,
-				Sender:            keyperSet.Keypers[key.KeyperIndex],
-				Signature:         key.Signature,
-				Eon:               int64(key.Candidate.Eon),
-				KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),
-			}
-			err = db.InsertEonPublicKeyVote(ctx, insertEonPublicKeyVoteParam)
-			if err != nil {
-				return err
-			}
-			count, err := db.CountEonPublicKeyVotes(ctx, hash)
-			if err != nil {
-				return err
-			}
-			if count == int64(keyperSet.Threshold) {
-				err = db.ConfirmEonPublicKey(ctx, hash)
-				if err != nil {
-					return err
-				}
-				log.Printf("Confirmed eon public key for keyper config index=%d, eon=%d",
-					key.Candidate.KeyperConfigIndex,
-					key.Candidate.Eon,
-				)
-			}
-		}
-
-		err = db.InsertCandidateEonIfNotExists(ctx, cltrdb.InsertCandidateEonIfNotExistsParams{
-			ActivationBlockNumber: activationBlock,
+		hash := key.Candidate.Hash()
+		err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+			Hash:                  hash,
 			EonPublicKey:          key.Candidate.PublicKey,
-			Threshold:             int64(keyperSet.Threshold),
+			ActivationBlockNumber: int64(key.Candidate.ActivationBlock),
+			KeyperConfigIndex:     int64(key.Candidate.KeyperConfigIndex),
+			Eon:                   int64(key.Candidate.Eon),
 		})
 		if err != nil {
 			return err
 		}
-
-		// inefficient to marshal again after the message has just been umarshaled and
-		// passed to the handler function
-		// for optimisation: also pass the raw msg bytes to the handler functions and ignore
-		// the argument if not needed
-		msgBytes, err = proto.Marshal(key)
+		insertEonPublicKeyVoteParam := cltrdb.InsertEonPublicKeyVoteParams{
+			Hash:              hash,
+			Sender:            keyperSet.Keypers[key.KeyperIndex],
+			Signature:         key.Signature,
+			Eon:               int64(key.Candidate.Eon),
+			KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),
+		}
+		err = db.InsertEonPublicKeyVote(ctx, insertEonPublicKeyVoteParam)
 		if err != nil {
 			return err
 		}
-		err = db.InsertEonPublicKeyMessage(ctx, cltrdb.InsertEonPublicKeyMessageParams{
-			EonPublicKey:          key.Candidate.PublicKey,
-			ActivationBlockNumber: activationBlock,
-			KeyperIndex:           int64(key.KeyperIndex),
-			MsgBytes:              msgBytes,
-		})
+		count, err := db.CountEonPublicKeyVotes(ctx, hash)
 		if err != nil {
 			return err
+		}
+		if count == int64(keyperSet.Threshold) {
+			err = db.ConfirmEonPublicKey(ctx, hash)
+			if err != nil {
+				return err
+			}
+			log.Printf("Confirmed eon public key for keyper config index=%d, eon=%d",
+				key.Candidate.KeyperConfigIndex,
+				key.Candidate.Eon,
+			)
 		}
 		return nil
 	})

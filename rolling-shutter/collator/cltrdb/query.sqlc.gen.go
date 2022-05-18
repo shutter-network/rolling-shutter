@@ -69,6 +69,36 @@ func (q *Queries) FindEonPublicKeyForBlock(ctx context.Context, blocknumber int6
 	return i, err
 }
 
+const findEonPublicKeyVotes = `-- name: FindEonPublicKeyVotes :many
+SELECT hash, sender, signature, eon, keyper_config_index FROM eon_public_key_vote WHERE hash=$1 ORDER BY sender
+`
+
+func (q *Queries) FindEonPublicKeyVotes(ctx context.Context, hash []byte) ([]EonPublicKeyVote, error) {
+	rows, err := q.db.Query(ctx, findEonPublicKeyVotes, hash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EonPublicKeyVote
+	for rows.Next() {
+		var i EonPublicKeyVote
+		if err := rows.Scan(
+			&i.Hash,
+			&i.Sender,
+			&i.Signature,
+			&i.Eon,
+			&i.KeyperConfigIndex,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, decryption_key FROM decryption_key
 WHERE epoch_id = $1
@@ -79,83 +109,6 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 	var i DecryptionKey
 	err := row.Scan(&i.EpochID, &i.DecryptionKey)
 	return i, err
-}
-
-const getEonForBlock = `-- name: GetEonForBlock :one
-SELECT activation_block_number, eon_public_key, threshold FROM eon
-WHERE activation_block_number <= $1
-ORDER BY activation_block_number DESC
-LIMIT 1
-`
-
-// There could be ambiguities when same activation_block_number
-//   is used for different pubkeys, see #238
-func (q *Queries) GetEonForBlock(ctx context.Context, blockNumber int64) (Eon, error) {
-	row := q.db.QueryRow(ctx, getEonForBlock, blockNumber)
-	var i Eon
-	err := row.Scan(&i.ActivationBlockNumber, &i.EonPublicKey, &i.Threshold)
-	return i, err
-}
-
-const getEonPublicKeyMessages = `-- name: GetEonPublicKeyMessages :many
-WITH t3 AS (
-	SELECT t2.activation_block_number, t2.eon_public_key, t2.msg_bytes, t2.keyper_index FROM (
-		SELECT t1.num_signatures,
-			t1.activation_block_number,
-			t1.eon_public_key,
-			t1.msg_bytes,
-			t1.keyper_index
-			FROM (
-			SELECT eon.threshold,
-				epkm.keyper_index,
-				epkm.msg_bytes,
-				epkm.activation_block_number,
-				epkm.eon_public_key,
-				COUNT(keyper_index) OVER (PARTITION BY (epkm.activation_block_number, epkm.eon_public_key)) num_signatures
-			FROM eon_public_key_message epkm
-			INNER JOIN eon
-				ON epkm.activation_block_number = eon.activation_block_number
-				AND epkm.eon_public_key = eon.eon_public_key
-			WHERE epkm.activation_block_number <= $1
-			) t1
-		WHERE t1.num_signatures >= t1.threshold
-		) t2
-)
-SELECT m.activation_block_number, m.eon_public_key, m.msg_bytes, m.keyper_index
-FROM t3 m
-WHERE NOT EXISTS (SELECT activation_block_number, eon_public_key, msg_bytes, keyper_index FROM t3 b WHERE b.activation_block_number > m.activation_block_number)
-`
-
-type GetEonPublicKeyMessagesRow struct {
-	ActivationBlockNumber int64
-	EonPublicKey          []byte
-	MsgBytes              []byte
-	KeyperIndex           int64
-}
-
-func (q *Queries) GetEonPublicKeyMessages(ctx context.Context, blockNumber int64) ([]GetEonPublicKeyMessagesRow, error) {
-	rows, err := q.db.Query(ctx, getEonPublicKeyMessages, blockNumber)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetEonPublicKeyMessagesRow
-	for rows.Next() {
-		var i GetEonPublicKeyMessagesRow
-		if err := rows.Scan(
-			&i.ActivationBlockNumber,
-			&i.EonPublicKey,
-			&i.MsgBytes,
-			&i.KeyperIndex,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
@@ -215,22 +168,6 @@ func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (DecryptionTri
 	return i, err
 }
 
-const insertCandidateEonIfNotExists = `-- name: InsertCandidateEonIfNotExists :exec
-INSERT INTO eon (activation_block_number, eon_public_key, threshold) VALUES ($1, $2, $3)
-ON CONFLICT DO NOTHING
-`
-
-type InsertCandidateEonIfNotExistsParams struct {
-	ActivationBlockNumber int64
-	EonPublicKey          []byte
-	Threshold             int64
-}
-
-func (q *Queries) InsertCandidateEonIfNotExists(ctx context.Context, arg InsertCandidateEonIfNotExistsParams) error {
-	_, err := q.db.Exec(ctx, insertCandidateEonIfNotExists, arg.ActivationBlockNumber, arg.EonPublicKey, arg.Threshold)
-	return err
-}
-
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
 INSERT INTO decryption_key (epoch_id, decryption_key)
 VALUES ($1, $2)
@@ -268,29 +205,6 @@ func (q *Queries) InsertEonPublicKeyCandidate(ctx context.Context, arg InsertEon
 		arg.ActivationBlockNumber,
 		arg.KeyperConfigIndex,
 		arg.Eon,
-	)
-	return err
-}
-
-const insertEonPublicKeyMessage = `-- name: InsertEonPublicKeyMessage :exec
-INSERT INTO eon_public_key_message
-    (eon_public_key, activation_block_number, keyper_index, msg_bytes)
-    VALUES ($1, $2, $3, $4)
-`
-
-type InsertEonPublicKeyMessageParams struct {
-	EonPublicKey          []byte
-	ActivationBlockNumber int64
-	KeyperIndex           int64
-	MsgBytes              []byte
-}
-
-func (q *Queries) InsertEonPublicKeyMessage(ctx context.Context, arg InsertEonPublicKeyMessageParams) error {
-	_, err := q.db.Exec(ctx, insertEonPublicKeyMessage,
-		arg.EonPublicKey,
-		arg.ActivationBlockNumber,
-		arg.KeyperIndex,
-		arg.MsgBytes,
 	)
 	return err
 }
