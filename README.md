@@ -7,7 +7,7 @@ modifications to its protocol.
 
 ## Further Reading
 
-For a high level introduction, check out the
+For a high-level introduction, check out the
 [announcement blog post](https://blog.shutter.network/announcing-rolling-shutter/).
 Also, have a look at the
 [Rolling Shutter FAQ](https://blog.shutter.network/rolling-shutter-faq/).
