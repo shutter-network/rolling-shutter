@@ -37,8 +37,8 @@ paths:
 
   /eon:
     get:
-      description: Get all EonPublicKey messages for an Eon
-      operationId: GetEonPublicKeyMessages
+      description: Get EonPublicKey for an Eon
+      operationId: GetEonPublicKey
       parameters:
         - name: activation_block
           in: query
@@ -117,21 +117,33 @@ components:
     Eon:
       type: object
       required:
-        - signed_messages
-        - activation_block_number
+        - instance_id
         - eon_public_key
+        - activation_block_number
+        - keyper_config_index
+        - eon
+        - signatures
       properties:
-        signed_messages:
-          type: array
-          items:
-            type: string
-            format: byte
-        activation_block_number:
+        instance_id:
           type: integer
           format: int64
         eon_public_key:
           type: string
           format: byte
+        activation_block_number:
+          type: integer
+          format: int64
+        keyper_config_index:
+          type: integer
+          format: int64
+        eon:
+          type: integer
+          format: int64
+        signatures:
+          type: array
+          items:
+            type: string
+            format: byte
     Error:
       type: object
       required:

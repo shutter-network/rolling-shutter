@@ -160,5 +160,5 @@ func TestEonPublicKey(t *testing.T) {
 	assert.NilError(t, err)
 
 	m := marshalUnmarshalMessage(t, orig)
-	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(EonPublicKey{}))
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(EonPublicKey{}, EonPublicKeyCandidate{}))
 }

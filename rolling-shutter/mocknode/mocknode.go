@@ -105,7 +105,7 @@ func (m *MockNode) logStartupInfo() error {
 func (m *MockNode) handleEonPublicKey(_ context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
+	if err := m.eonPublicKey.Unmarshal(key.Candidate.PublicKey); err != nil {
 		log.Printf("error while unmarshalling eon public key: %s", err)
 	}
 	log.Printf("updated eon public key from messages to %s", (*bn256.G2)(m.eonPublicKey))

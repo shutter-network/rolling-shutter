@@ -73,53 +73,50 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(oapi.TransactionId{Id: txid})
 }
 
-func (srv *server) GetEonPublicKeyMessages(w http.ResponseWriter, r *http.Request, params oapi.GetEonPublicKeyMessagesParams) {
+func (srv *server) GetEonPublicKey(w http.ResponseWriter, r *http.Request, params oapi.GetEonPublicKeyParams) {
 	var (
-		eonPublicKeyMessages []cltrdb.GetEonPublicKeyMessagesRow
-		messagesBytes        [][]byte
+		eonPub     cltrdb.EonPublicKeyCandidate
+		votes      []cltrdb.EonPublicKeyVote
+		signatures [][]byte
 	)
 	ctx := r.Context()
 
 	err := srv.c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 		db := cltrdb.New(tx)
-
-		eonPublicKeyMessages, err = db.GetEonPublicKeyMessages(ctx, params.ActivationBlock)
+		eonPub, err = db.FindEonPublicKeyForBlock(ctx, params.ActivationBlock)
 		if err != nil {
 			return err
 		}
+
+		votes, err = db.FindEonPublicKeyVotes(ctx, eonPub.Hash)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if len(eonPublicKeyMessages) == 0 {
+	if len(votes) == 0 {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(make(map[string]string, 0))
+		_ = json.NewEncoder(w).Encode(make(map[string]string))
 		return
 	}
 
-	activationBlockNumber := eonPublicKeyMessages[0].ActivationBlockNumber
-	eonPublicKey := eonPublicKeyMessages[0].EonPublicKey
-
-	for _, mess := range eonPublicKeyMessages {
-		messagesBytes = append(messagesBytes, mess.MsgBytes)
-		// We simply extract the (ActivationBlockNumber, EonPublicKey) values from the first message.
-		// Since there can be ambiguities in the retrieved messages (see #238),
-		// it can happen that for some messages mess.EonPublicKey != eonPublicKey
-		// and thus they do not represent a message for the (ActivationBlockNumber, EonPublicKey)
-		// that is specified in the response body
-
-		// This could (should) be handled / verified in the requester,
-		// because also the collator can't resolve the ambiguity at this point
-
-		// Ultimately it should be solved by getting rid of the ambiguity (see #238)
+	for _, v := range votes {
+		signatures = append(signatures, v.Signature)
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(oapi.Eon{
-		ActivationBlockNumber: activationBlockNumber,
-		EonPublicKey:          eonPublicKey,
-		SignedMessages:        messagesBytes,
+		ActivationBlockNumber: eonPub.ActivationBlockNumber,
+		Eon:                   eonPub.Eon,
+		EonPublicKey:          eonPub.EonPublicKey,
+		InstanceId:            int64(srv.c.Config.InstanceID),
+		KeyperConfigIndex:     eonPub.KeyperConfigIndex,
+		Signatures:            signatures,
 	})
 }

@@ -16,17 +16,21 @@ type DecryptionTrigger struct {
 	BatchHash []byte
 }
 
-type Eon struct {
-	ActivationBlockNumber int64
+type EonPublicKeyCandidate struct {
+	Hash                  []byte
 	EonPublicKey          []byte
-	Threshold             int64
+	ActivationBlockNumber int64
+	KeyperConfigIndex     int64
+	Eon                   int64
+	Confirmed             bool
 }
 
-type EonPublicKeyMessage struct {
-	EonPublicKey          []byte
-	ActivationBlockNumber int64
-	KeyperIndex           int64
-	MsgBytes              []byte
+type EonPublicKeyVote struct {
+	Hash              []byte
+	Sender            string
+	Signature         []byte
+	Eon               int64
+	KeyperConfigIndex int64
 }
 
 type MetaInf struct {

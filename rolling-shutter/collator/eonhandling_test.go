@@ -25,7 +25,7 @@ type keyper struct {
 
 func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
 	if k.msg == nil {
-		return errors.New("Message not initiliased")
+		return errors.New("Message not initialized")
 	}
 	ok, err := c.validateEonPublicKey(ctx, k.msg)
 	if err != nil {
@@ -39,12 +39,13 @@ func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
 }
 
 type setupEonKeysParams struct {
-	instanceID      uint64
-	activationBlock uint64
-	eventIndex      uint64
-	threshold       uint64
-	eonPubKey       []byte
-	keypers         []*ecdsa.PrivateKey
+	instanceID        uint64
+	activationBlock   uint64
+	keyperConfigIndex uint64
+	threshold         uint64
+	eonPubKey         []byte
+	eon               uint64
+	keypers           []*ecdsa.PrivateKey
 }
 
 func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params setupEonKeysParams) []keyper {
@@ -63,9 +64,9 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 			params.instanceID,
 			params.eonPubKey,
 			params.activationBlock,
-			uint64(i),
-			5,
-			2,
+			uint64(i),                // keyperIndex
+			params.keyperConfigIndex, // keyperConfigIndex
+			params.eon,               // eon
 			ethKey,
 		)
 		assert.NilError(t, err)
@@ -82,7 +83,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 
 	db := commondb.New(dbtx)
 	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(params.eventIndex),
+		KeyperConfigIndex:     int64(params.keyperConfigIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),
 		Threshold:             int32(params.threshold),
@@ -92,25 +93,24 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 	return kprs
 }
 
-func checkDBResult(t *testing.T, kpr []keyper, msgs []cltrdb.GetEonPublicKeyMessagesRow) {
+func checkDBResult(t *testing.T, kpr []keyper, pubkey cltrdb.EonPublicKeyCandidate, votes []cltrdb.EonPublicKeyVote) {
 	t.Helper()
 
-	assert.Check(t, len(msgs) > 0)
-	var err error
+	assert.Check(t, len(votes) > 0)
+	keyperBySender := make(map[string]keyper)
+	for _, k := range kpr {
+		keyperBySender[k.address] = k
+	}
 
-	for _, m := range msgs {
-		k := kpr[m.KeyperIndex]
-		assert.Equal(t, k.msg.ActivationBlock, uint64(m.ActivationBlockNumber))
-		assert.Check(t, bytes.Equal(k.msg.PublicKey, m.EonPublicKey))
-
-		var unmshldTemp shmsg.P2PMessage
-		unmshldTemp, err = shmsg.Unmarshal(k.msg.Topic(), m.MsgBytes)
-		assert.NilError(t, err)
-
-		unmshld, ok := unmshldTemp.(*shmsg.EonPublicKey)
+	for _, v := range votes {
+		k, ok := keyperBySender[v.Sender]
 		assert.Check(t, ok)
-		assert.Equal(t, k.msg.ActivationBlock, unmshld.ActivationBlock)
-		assert.Check(t, bytes.Equal(k.msg.PublicKey, unmshld.PublicKey))
+		assert.Equal(t, k.msg.Candidate.ActivationBlock, uint64(pubkey.ActivationBlockNumber))
+		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, pubkey.EonPublicKey))
+		pubkey, err := ethcrypto.SigToPub(pubkey.Hash, v.Signature)
+		assert.NilError(t, err)
+		recoveredAddress := ethcrypto.PubkeyToAddress(*pubkey)
+		assert.Equal(t, recoveredAddress.Hex(), v.Sender)
 	}
 }
 
@@ -118,7 +118,6 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	var (
 		eonPubKey, eonPubKeyBefore, eonPubKeyNoThreshold []byte
 		err                                              error
-		dbEon, dbEonBefore                               []cltrdb.GetEonPublicKeyMessagesRow
 	)
 
 	if testing.Short() {
@@ -146,41 +145,44 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(0),
-		activationBlock: activationBlockNoThreshold,
-		eonPubKey:       eonPubKeyNoThreshold,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1},
+		instanceID:        config.InstanceID,
+		eon:               1,
+		keyperConfigIndex: uint64(0),
+		activationBlock:   activationBlockNoThreshold,
+		eonPubKey:         eonPubKeyNoThreshold,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1},
 	})
 	assert.Check(t, len(keypersNoThreshold) > 0)
 
-	// Insert pubkeys with enough signatures and new key / eventindex/ keyperset
+	// Insert pubkeys with enough signatures and new key / keyperConfigIndex / keyperset
 	// but same activation-block
 	keypersBefore := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(1),
-		activationBlock: activationBlockBefore,
-		eonPubKey:       eonPubKeyBefore,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
+		instanceID:        config.InstanceID,
+		eon:               2,
+		keyperConfigIndex: uint64(1),
+		activationBlock:   activationBlockBefore,
+		eonPubKey:         eonPubKeyBefore,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
 	})
 	assert.Check(t, len(keypersBefore) > 0)
 
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(2),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKey,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr3, kpr1, kpr2},
+		instanceID:        config.InstanceID,
+		eon:               3,
+		keyperConfigIndex: uint64(2),
+		activationBlock:   activationBlock,
+		eonPubKey:         eonPubKey,
+		threshold:         tkg.Threshold,
+		keypers:           []*ecdsa.PrivateKey{kpr3, kpr1, kpr2},
 	})
 	assert.Check(t, len(keypers) > 0)
 
 	// HACK: Only partially instantiating the collator.
 	// This works until the handler/validator functions use something else than
 	// the database-pool
-	c := collator{dbpool: dbpool}
+	c := collator{dbpool: dbpool, Config: config}
 
 	for _, k := range keypersBefore {
 		err = k.handleMsg(ctx, &c)
@@ -198,96 +200,18 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// Although the no-threshold reaching pubkey message have a
 	// later activation block, they should not get retrieved
 	// because they should not get considered valid at this point
-	dbEonBefore, err = db.GetEonPublicKeyMessages(ctx, 500)
+
+	pubkey, err := db.FindEonPublicKeyForBlock(ctx, 500)
 	assert.NilError(t, err)
-	assert.Check(t, len(dbEonBefore) == 3)
-	// This should only return the messages with enough signatures
-	checkDBResult(t, keypersBefore, dbEonBefore)
-
-	dbEon, err = db.GetEonPublicKeyMessages(ctx, 1050)
-	assert.Check(t, len(dbEon) == 3)
+	votes, err := db.FindEonPublicKeyVotes(ctx, pubkey.Hash)
 	assert.NilError(t, err)
-	checkDBResult(t, keypers, dbEon)
-}
+	assert.Equal(t, len(votes), 3)
+	checkDBResult(t, keypersBefore, pubkey, votes)
 
-func TestHandleEonAmbiguityFailsIntegration(t *testing.T) {
-	// THE GOAL IS TO MAKE THIS FAIL! (see #238)
-	// (testing module does not have expected-to-fail marker)
-
-	var (
-		eonPubKey, eonPubKeyNoThreshold []byte
-		err                             error
-		dbEon                           []cltrdb.GetEonPublicKeyMessagesRow
-	)
-
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
-	defer closedb()
-	config := newTestConfig(t)
-	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2)
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
-
-	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(1).GobEncode()
-	eonPubKey, _ = tkg.EonPublicKey(1000).GobEncode()
-
-	kpr1, _ := ethcrypto.GenerateKey()
-	kpr2, _ := ethcrypto.GenerateKey()
-	kpr3, _ := ethcrypto.GenerateKey()
-
-	activationBlock := uint64(42)
-
-	// Insert pubkey with not enough signatures
-	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(0),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKeyNoThreshold,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1},
-	})
-	assert.Check(t, len(keypersNoThreshold) > 0)
-
-	// Insert pubkeys with enough signatures and new key / eventindex/ keyperset
-	// but same activation-block
-	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:      config.InstanceID,
-		eventIndex:      uint64(1),
-		activationBlock: activationBlock,
-		eonPubKey:       eonPubKey,
-		threshold:       tkg.Threshold,
-		keypers:         []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
-	})
-	assert.Check(t, len(keypers) > 0)
-
-	// HACK: Only partially instantiating the collator.
-	// This works until the handler/validator functions use something else than
-	// the database-pool
-	c := collator{dbpool: dbpool}
-
-	for _, k := range keypersNoThreshold {
-		err = k.handleMsg(ctx, &c)
-		assert.NilError(t, err)
-	}
-
-	for _, k := range keypers {
-		// the validation should fail due to the
-		// ambiguity
-		err = k.handleMsg(ctx, &c)
-		assert.NilError(t, err)
-	}
-
-	// This is actually NOT what we expect to happen!
-
-	dbEon, err = db.GetEonPublicKeyMessages(ctx, 500)
+	pubkey, err = db.FindEonPublicKeyForBlock(ctx, 1050)
 	assert.NilError(t, err)
-	// The messages are not returned because of the
-	// too low threshold,
-	// but the ambiguous keyper set still hinders the
-	// correct messages being validated correctly and
-	// thus they will not be handled (inserted in the db)
-	assert.Check(t, len(dbEon) == 0)
+	votes, err = db.FindEonPublicKeyVotes(ctx, pubkey.Hash)
+	assert.NilError(t, err)
+	assert.Equal(t, len(votes), 3)
+	checkDBResult(t, keypers, pubkey, votes)
 }

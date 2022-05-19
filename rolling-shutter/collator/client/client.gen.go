@@ -20,8 +20,11 @@ import (
 // Eon defines model for Eon.
 type Eon struct {
 	ActivationBlockNumber int64    `json:"activation_block_number"`
+	Eon                   int64    `json:"eon"`
 	EonPublicKey          []byte   `json:"eon_public_key"`
-	SignedMessages        [][]byte `json:"signed_messages"`
+	InstanceId            int64    `json:"instance_id"`
+	KeyperConfigIndex     int64    `json:"keyper_config_index"`
+	Signatures            [][]byte `json:"signatures"`
 }
 
 // Error defines model for Error.
@@ -46,8 +49,8 @@ type TransactionId struct {
 	Id []byte `json:"id"`
 }
 
-// GetEonPublicKeyMessagesParams defines parameters for GetEonPublicKeyMessages.
-type GetEonPublicKeyMessagesParams struct {
+// GetEonPublicKeyParams defines parameters for GetEonPublicKey.
+type GetEonPublicKeyParams struct {
 	// Upper bound for block near the activation block for queried Eon
 	ActivationBlock int64 `json:"activation_block"`
 }
@@ -131,8 +134,8 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// GetEonPublicKeyMessages request
-	GetEonPublicKeyMessages(ctx context.Context, params *GetEonPublicKeyMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetEonPublicKey request
+	GetEonPublicKey(ctx context.Context, params *GetEonPublicKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNextEpoch request
 	GetNextEpoch(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -146,8 +149,8 @@ type ClientInterface interface {
 	SubmitTransaction(ctx context.Context, body SubmitTransactionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) GetEonPublicKeyMessages(ctx context.Context, params *GetEonPublicKeyMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetEonPublicKeyMessagesRequest(c.Server, params)
+func (c *Client) GetEonPublicKey(ctx context.Context, params *GetEonPublicKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEonPublicKeyRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +209,8 @@ func (c *Client) SubmitTransaction(ctx context.Context, body SubmitTransactionJS
 	return c.Client.Do(req)
 }
 
-// NewGetEonPublicKeyMessagesRequest generates requests for GetEonPublicKeyMessages
-func NewGetEonPublicKeyMessagesRequest(server string, params *GetEonPublicKeyMessagesParams) (*http.Request, error) {
+// NewGetEonPublicKeyRequest generates requests for GetEonPublicKey
+func NewGetEonPublicKeyRequest(server string, params *GetEonPublicKeyParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -386,8 +389,8 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// GetEonPublicKeyMessages request
-	GetEonPublicKeyMessagesWithResponse(ctx context.Context, params *GetEonPublicKeyMessagesParams, reqEditors ...RequestEditorFn) (*GetEonPublicKeyMessagesResponse, error)
+	// GetEonPublicKey request
+	GetEonPublicKeyWithResponse(ctx context.Context, params *GetEonPublicKeyParams, reqEditors ...RequestEditorFn) (*GetEonPublicKeyResponse, error)
 
 	// GetNextEpoch request
 	GetNextEpochWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNextEpochResponse, error)
@@ -401,7 +404,7 @@ type ClientWithResponsesInterface interface {
 	SubmitTransactionWithResponse(ctx context.Context, body SubmitTransactionJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitTransactionResponse, error)
 }
 
-type GetEonPublicKeyMessagesResponse struct {
+type GetEonPublicKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Eon
@@ -409,7 +412,7 @@ type GetEonPublicKeyMessagesResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetEonPublicKeyMessagesResponse) Status() string {
+func (r GetEonPublicKeyResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -417,7 +420,7 @@ func (r GetEonPublicKeyMessagesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetEonPublicKeyMessagesResponse) StatusCode() int {
+func (r GetEonPublicKeyResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -491,13 +494,13 @@ func (r SubmitTransactionResponse) StatusCode() int {
 	return 0
 }
 
-// GetEonPublicKeyMessagesWithResponse request returning *GetEonPublicKeyMessagesResponse
-func (c *ClientWithResponses) GetEonPublicKeyMessagesWithResponse(ctx context.Context, params *GetEonPublicKeyMessagesParams, reqEditors ...RequestEditorFn) (*GetEonPublicKeyMessagesResponse, error) {
-	rsp, err := c.GetEonPublicKeyMessages(ctx, params, reqEditors...)
+// GetEonPublicKeyWithResponse request returning *GetEonPublicKeyResponse
+func (c *ClientWithResponses) GetEonPublicKeyWithResponse(ctx context.Context, params *GetEonPublicKeyParams, reqEditors ...RequestEditorFn) (*GetEonPublicKeyResponse, error) {
+	rsp, err := c.GetEonPublicKey(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetEonPublicKeyMessagesResponse(rsp)
+	return ParseGetEonPublicKeyResponse(rsp)
 }
 
 // GetNextEpochWithResponse request returning *GetNextEpochResponse
@@ -535,15 +538,15 @@ func (c *ClientWithResponses) SubmitTransactionWithResponse(ctx context.Context,
 	return ParseSubmitTransactionResponse(rsp)
 }
 
-// ParseGetEonPublicKeyMessagesResponse parses an HTTP response from a GetEonPublicKeyMessagesWithResponse call
-func ParseGetEonPublicKeyMessagesResponse(rsp *http.Response) (*GetEonPublicKeyMessagesResponse, error) {
+// ParseGetEonPublicKeyResponse parses an HTTP response from a GetEonPublicKeyWithResponse call
+func ParseGetEonPublicKeyResponse(rsp *http.Response) (*GetEonPublicKeyResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetEonPublicKeyMessagesResponse{
+	response := &GetEonPublicKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
