@@ -2,6 +2,7 @@
 
 GO		?= go
 GOFLAGS		?=
+TINYGO		?= tinygo
 BINDIR		?= ./bin
 EXECUTABLE	?= ${BINDIR}/rolling-shutter
 
@@ -10,6 +11,11 @@ build:
 
 wasm:
 	GOARCH=wasm GOOS=js ${GO} build ${GOFLAGS} -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/main_wasm.go
+
+shcryptowasm:
+	${TINYGO} build -target wasm -size full -o ${BINDIR}/encrypt.wasm ./shcryptowasm/encrypt_wasm.go
+	${TINYGO} build -target wasm -size full -o ${BINDIR}/decrypt.wasm ./shcryptowasm/decrypt_wasm.go
+	${TINYGO} build -target wasm -size full -o ${BINDIR}/both.wasm ./shcryptowasm/both_wasm.go
 
 protoc:
 	${GO} generate ./shmsg/
@@ -78,4 +84,4 @@ lint-changes:
 abigen:
 	go generate -x ./contract
 
-.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen
+.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm

@@ -20,7 +20,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
-	github.com/shutter-network/shutter/shlib v0.1.9
+	github.com/shutter-network/shutter/shlib v0.1.10-0.20220518192747-e18feb7de111
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
