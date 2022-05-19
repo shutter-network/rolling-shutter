@@ -28,15 +28,22 @@ func NewSignedEonPublicKey(
 		KeyperConfigIndex: keyperConfigIndex,
 		Eon:               eon,
 	}
-	return candidate.Sign(privKey, keyperIndex)
+	return candidate.Sign(privKey)
+}
+
+func (e *EonPublicKey) RecoverAddress() (common.Address, error) {
+	pubkey, err := ethcrypto.SigToPub(e.Candidate.Hash(), e.Signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return ethcrypto.PubkeyToAddress(*pubkey), nil
 }
 
 func (e *EonPublicKey) VerifySignature(address common.Address) (bool, error) {
-	pubkey, err := ethcrypto.SigToPub(e.Candidate.Hash(), e.Signature)
+	recoveredAddress, err := e.RecoverAddress()
 	if err != nil {
 		return false, err
 	}
-	recoveredAddress := ethcrypto.PubkeyToAddress(*pubkey)
 	return recoveredAddress == address, nil
 }
 
@@ -52,17 +59,14 @@ func (e *EonPublicKeyCandidate) Hash() []byte {
 }
 
 // Sign signs the eon public key candidate and returns an eon public key.
-func (e *EonPublicKeyCandidate) Sign(
-	privKey *ecdsa.PrivateKey, keyperIndex uint64,
-) (*EonPublicKey, error) {
+func (e *EonPublicKeyCandidate) Sign(privKey *ecdsa.PrivateKey) (*EonPublicKey, error) {
 	signature, err := ethcrypto.Sign(e.Hash(), privKey)
 	if err != nil {
 		return nil, err
 	}
 	return &EonPublicKey{
-		Candidate:   e,
-		KeyperIndex: keyperIndex,
-		Signature:   signature,
+		Candidate: e,
+		Signature: signature,
 	}, nil
 }
 

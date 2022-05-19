@@ -6,12 +6,13 @@ import (
 	"log"
 	"math"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -25,9 +26,6 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 	if key.Candidate.ActivationBlock > math.MaxInt64 {
 		return errors.New("int64 overflow for msg.ActivationBlock")
 	}
-	if key.KeyperIndex > math.MaxInt64 {
-		return errors.New("int64 overflow for msg.KeyperIndex")
-	}
 	return nil
 }
 
@@ -36,7 +34,6 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 // mismatch.
 func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg.EonPublicKey) error {
 	activationBlock := int64(key.Candidate.ActivationBlock)
-	keyperIndex := int64(key.KeyperIndex)
 
 	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
 	if keyperSet.ActivationBlockNumber != activationBlock {
@@ -44,21 +41,19 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg
 		return errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
 			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
 	}
-	if keyperIndex >= int64(len(keyperSet.Keypers)) {
-		// Can also happen when the Keyper is dishonest.
-		return errors.Errorf("keyper index out of bounds for keyper set. "+
-			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex)
-	}
-	expectedAddress := keyperSet.Keypers[keyperIndex]
 
-	ok, err := key.VerifySignature(common.HexToAddress(expectedAddress))
+	recoveredAddress, err := key.RecoverAddress()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
-			"(activation-block=%d, keyper-index=%d)", activationBlock, keyperIndex))
+			"(activation-block=%d)", activationBlock))
 	}
+	_, ok := kprdb.GetKeyperIndex(recoveredAddress, keyperSet.Keypers)
+
 	if !ok {
-		return errors.Errorf("eonPublicKey's recovered address does not match on-chain address (%s) for keyper-index (%d)",
-			common.HexToAddress(expectedAddress), keyperIndex)
+		return errors.Errorf(
+			"eonPublicKey's recovered address %s not found in on-chain addresses",
+			recoveredAddress.Hex(),
+		)
 	}
 	return nil
 }
@@ -97,7 +92,11 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 }
 
 func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	recoveredAddress, err := key.RecoverAddress()
+	if err != nil {
+		return make([]shmsg.P2PMessage, 0), err
+	}
+	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 
 		db := cltrdb.New(tx)
@@ -120,7 +119,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 		}
 		insertEonPublicKeyVoteParam := cltrdb.InsertEonPublicKeyVoteParams{
 			Hash:              hash,
-			Sender:            keyperSet.Keypers[key.KeyperIndex],
+			Sender:            shdb.EncodeAddress(recoveredAddress),
 			Signature:         key.Signature,
 			Eon:               int64(key.Candidate.Eon),
 			KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),

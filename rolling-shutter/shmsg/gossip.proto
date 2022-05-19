@@ -40,6 +40,5 @@ message EonPublicKeyCandidate {
 // EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain eon.
 message EonPublicKey {
     EonPublicKeyCandidate candidate = 7;
-    uint64 keyperIndex = 4;
     bytes signature = 5;
 }
