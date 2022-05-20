@@ -72,7 +72,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 		assert.NilError(t, err)
 		addr := ethcrypto.PubkeyToAddress(ethKey.PublicKey)
 		kprs = append(kprs, keyper{address: addr.Hex(), index: uint64(i), msg: msg})
-		ok, err = msg.VerifySignature(addr)
+		ok, err = shmsg.VerifySignature(msg, addr)
 		assert.Check(t, ok)
 		assert.NilError(t, err)
 	}
@@ -105,8 +105,8 @@ func checkDBResult(t *testing.T, kpr []keyper, pubkey cltrdb.EonPublicKeyCandida
 	for _, v := range votes {
 		k, ok := keyperBySender[v.Sender]
 		assert.Check(t, ok)
-		assert.Equal(t, k.msg.Candidate.ActivationBlock, uint64(pubkey.ActivationBlockNumber))
-		assert.Check(t, bytes.Equal(k.msg.Candidate.PublicKey, pubkey.EonPublicKey))
+		assert.Equal(t, k.msg.ActivationBlock, uint64(pubkey.ActivationBlockNumber))
+		assert.Check(t, bytes.Equal(k.msg.PublicKey, pubkey.EonPublicKey))
 		pubkey, err := ethcrypto.SigToPub(pubkey.Hash, v.Signature)
 		assert.NilError(t, err)
 		recoveredAddress := ethcrypto.PubkeyToAddress(*pubkey)

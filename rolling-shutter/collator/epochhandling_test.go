@@ -65,7 +65,7 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 	assert.Equal(t, triggerMsg.EpochID, nextEpochID)
 	assert.DeepEqual(t, triggerMsg.TransactionsHash, transactionsHash)
 	address := ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
-	signatureCorrect, err := triggerMsg.VerifySignature(address)
+	signatureCorrect, err := shmsg.VerifySignature(triggerMsg, address)
 	assert.NilError(t, err)
 	assert.Check(t, signatureCorrect)
 }

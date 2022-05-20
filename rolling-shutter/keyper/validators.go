@@ -102,7 +102,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg
 		return false, errors.Wrapf(err, "error while converting collator from string to address: %s", chainCollator.Collator)
 	}
 
-	signatureValid, err := trigger.VerifySignature(collator)
+	signatureValid, err := shmsg.VerifySignature(trigger, collator)
 	if err != nil {
 		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %d", trigger.EpochID)
 	}

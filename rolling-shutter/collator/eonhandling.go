@@ -20,10 +20,10 @@ import (
 // EonPublicKey do not overflow when converted to an int64. It returns an error if there is an
 // overflow.
 func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
-	if key.Candidate.KeyperConfigIndex > math.MaxInt64 {
+	if key.KeyperConfigIndex > math.MaxInt64 {
 		return errors.New("int64 overflow for msg.KeyperConfigIndex")
 	}
-	if key.Candidate.ActivationBlock > math.MaxInt64 {
+	if key.ActivationBlock > math.MaxInt64 {
 		return errors.New("int64 overflow for msg.ActivationBlock")
 	}
 	return nil
@@ -33,7 +33,7 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 // matches the commondb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
 func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg.EonPublicKey) error {
-	activationBlock := int64(key.Candidate.ActivationBlock)
+	activationBlock := int64(key.ActivationBlock)
 
 	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
 	if keyperSet.ActivationBlockNumber != activationBlock {
@@ -42,7 +42,7 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg
 			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
 	}
 
-	recoveredAddress, err := key.RecoverAddress()
+	recoveredAddress, err := shmsg.RecoverAddress(key)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
 			"(activation-block=%d)", activationBlock))
@@ -78,7 +78,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	if err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 		keyperSet, err = commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
-			ctx, int64(key.Candidate.KeyperConfigIndex),
+			ctx, int64(key.KeyperConfigIndex),
 		)
 		return err
 	}); err != nil {
@@ -92,7 +92,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 }
 
 func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	recoveredAddress, err := key.RecoverAddress()
+	recoveredAddress, err := shmsg.RecoverAddress(key)
 	if err != nil {
 		return make([]shmsg.P2PMessage, 0), err
 	}
@@ -101,18 +101,18 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 
 		db := cltrdb.New(tx)
 		keyperSet, err := commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
-			ctx, int64(key.Candidate.KeyperConfigIndex),
+			ctx, int64(key.KeyperConfigIndex),
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve keyper set from db")
 		}
-		hash := key.Candidate.Hash()
+		hash := key.Hash()
 		err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
 			Hash:                  hash,
-			EonPublicKey:          key.Candidate.PublicKey,
-			ActivationBlockNumber: int64(key.Candidate.ActivationBlock),
-			KeyperConfigIndex:     int64(key.Candidate.KeyperConfigIndex),
-			Eon:                   int64(key.Candidate.Eon),
+			EonPublicKey:          key.PublicKey,
+			ActivationBlockNumber: int64(key.ActivationBlock),
+			KeyperConfigIndex:     int64(key.KeyperConfigIndex),
+			Eon:                   int64(key.Eon),
 		})
 		if err != nil {
 			return err
@@ -121,8 +121,8 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 			Hash:              hash,
 			Sender:            shdb.EncodeAddress(recoveredAddress),
 			Signature:         key.Signature,
-			Eon:               int64(key.Candidate.Eon),
-			KeyperConfigIndex: int64(key.Candidate.KeyperConfigIndex),
+			Eon:               int64(key.Eon),
+			KeyperConfigIndex: int64(key.KeyperConfigIndex),
 		}
 		err = db.InsertEonPublicKeyVote(ctx, insertEonPublicKeyVoteParam)
 		if err != nil {
@@ -138,8 +138,8 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 				return err
 			}
 			log.Printf("Confirmed eon public key for keyper config index=%d, eon=%d",
-				key.Candidate.KeyperConfigIndex,
-				key.Candidate.Eon,
+				key.KeyperConfigIndex,
+				key.Eon,
 			)
 		}
 		return nil

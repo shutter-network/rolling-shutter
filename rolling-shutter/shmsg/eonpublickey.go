@@ -4,8 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -21,33 +19,25 @@ func NewSignedEonPublicKey(
 	eon uint64,
 	privKey *ecdsa.PrivateKey,
 ) (*EonPublicKey, error) {
-	candidate := &EonPublicKeyCandidate{
+	candidate := &EonPublicKey{
 		InstanceID:        instanceID,
 		PublicKey:         eonPublicKey,
 		ActivationBlock:   activationBlock,
 		KeyperConfigIndex: keyperConfigIndex,
 		Eon:               eon,
 	}
-	return candidate.Sign(privKey)
-}
-
-func (e *EonPublicKey) RecoverAddress() (common.Address, error) {
-	pubkey, err := ethcrypto.SigToPub(e.Candidate.Hash(), e.Signature)
+	err := Sign(candidate, privKey)
 	if err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-	return ethcrypto.PubkeyToAddress(*pubkey), nil
+	return candidate, nil
 }
 
-func (e *EonPublicKey) VerifySignature(address common.Address) (bool, error) {
-	recoveredAddress, err := e.RecoverAddress()
-	if err != nil {
-		return false, err
-	}
-	return recoveredAddress == address, nil
+func (e *EonPublicKey) SetSignature(s []byte) {
+	e.Signature = s
 }
 
-func (e *EonPublicKeyCandidate) Hash() []byte {
+func (e *EonPublicKey) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(eonPubKeyHashPrefix)
 	_ = binary.Write(hash, binary.BigEndian, e.InstanceID)
@@ -56,20 +46,4 @@ func (e *EonPublicKeyCandidate) Hash() []byte {
 	_ = binary.Write(hash, binary.BigEndian, e.Eon)
 	hash.Write(e.PublicKey)
 	return hash.Sum(nil)
-}
-
-// Sign signs the eon public key candidate and returns an eon public key.
-func (e *EonPublicKeyCandidate) Sign(privKey *ecdsa.PrivateKey) (*EonPublicKey, error) {
-	signature, err := ethcrypto.Sign(e.Hash(), privKey)
-	if err != nil {
-		return nil, err
-	}
-	return &EonPublicKey{
-		Candidate: e,
-		Signature: signature,
-	}, nil
-}
-
-func (e *EonPublicKey) GetInstanceID() uint64 {
-	return e.Candidate.GetInstanceID()
 }

@@ -24,21 +24,14 @@ message DecryptionKey {
     bytes key = 3;
 }
 
-// EonPublicKeyCandidate is sent as part of the EonPublicKey message by the
-// keypers to publish the EonPublicKey for a certain eon. From the keypers point
-// of view this isn't a candidate, it's the real key for the given eon. But for
-// those that observe it, e.g. the collator, it's a candidate until the observer
-// has seen at least threshold messages.
-message EonPublicKeyCandidate {
+// EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain
+// eon.  For those that observe it, e.g. the collator, it's a candidate until
+// the observer has seen at least threshold messages.
+message EonPublicKey {
     uint64 instanceID = 1;
     bytes publicKey= 2;
     uint64 activationBlock = 3;
     uint64 keyperConfigIndex = 6;
     uint64 eon = 7;
-}
-
-// EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain eon.
-message EonPublicKey {
-    EonPublicKeyCandidate candidate = 7;
     bytes signature = 5;
 }

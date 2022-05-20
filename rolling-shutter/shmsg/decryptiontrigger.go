@@ -4,8 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -19,21 +17,15 @@ func NewSignedDecryptionTrigger(
 		EpochID:          epochID,
 		TransactionsHash: HashTransactions(transactions),
 	}
-	var err error
-	trigger.Signature, err = ethcrypto.Sign(trigger.Hash(), privKey)
+	err := Sign(trigger, privKey)
 	if err != nil {
 		return nil, err
 	}
 	return trigger, nil
 }
 
-func (t *DecryptionTrigger) VerifySignature(address common.Address) (bool, error) {
-	pubkey, err := ethcrypto.SigToPub(t.Hash(), t.Signature)
-	if err != nil {
-		return false, err
-	}
-	recoveredAddress := ethcrypto.PubkeyToAddress(*pubkey)
-	return recoveredAddress == address, nil
+func (t *DecryptionTrigger) SetSignature(s []byte) {
+	t.Signature = s
 }
 
 func (t *DecryptionTrigger) Hash() []byte {
