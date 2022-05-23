@@ -2,7 +2,7 @@
 
 ## Installation
 
-Make sure you have at least go version 1.16 installed. Make sure `PATH` contains
+Make sure you have at least go version 1.18 installed. Make sure `PATH` contains
 `$GOPATH/bin`. If `GOPATH` isn't set, it defaults to `${HOME}/go`. Install
 protoc version v3.18.0 from
 https://github.com/protocolbuffers/protobuf/releases/
@@ -61,6 +61,8 @@ asdf plugin add nodejs
 asdf plugin add protoc
 asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git
 asdf plugin add solidity
+asdf plugin add tinygo https://github.com/schmir/asdf-tinygo.git
+asdf plugin add pre-commit
 ```
 
 Finally, install the tools by running the following inside the rolling shutter
