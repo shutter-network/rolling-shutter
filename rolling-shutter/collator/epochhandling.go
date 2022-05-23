@@ -49,7 +49,7 @@ func startNextEpoch(
 	}
 
 	trigger, err := shmsg.NewSignedDecryptionTrigger(
-		cfg.InstanceID, epochID, transactions, cfg.EthereumKey,
+		cfg.InstanceID, epochID, shmsg.HashTransactions(transactions), cfg.EthereumKey,
 	)
 	if err != nil {
 		return nil, err
