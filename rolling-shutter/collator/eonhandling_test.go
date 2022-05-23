@@ -11,11 +11,26 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
+
+func newTestConfig(t *testing.T) config.Config {
+	t.Helper()
+
+	ethereumKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	return config.Config{
+		EthereumURL:         "http://127.0.0.1:8454",
+		SequencerURL:        "http://127.0.0.1:8455",
+		EthereumKey:         ethereumKey,
+		ExecutionBlockDelay: uint32(5),
+		InstanceID:          123,
+	}
+}
 
 type keyper struct {
 	address string

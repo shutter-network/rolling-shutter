@@ -20,6 +20,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -60,12 +61,12 @@ func initDBCmd() *cobra.Command {
 func initDB() error {
 	ctx := context.Background()
 
-	config, err := readConfig()
+	cfg, err := readConfig()
 	if err != nil {
 		return err
 	}
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
@@ -96,9 +97,10 @@ func generateConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func readConfig() (collator.Config, error) {
+func readConfig() (config.Config, error) {
 	viper.SetEnvPrefix("COLLATOR")
 	viper.BindEnv("EthereumURL")
+	viper.BindEnv("SequencerURL")
 	viper.BindEnv("DeploymentDir")
 	viper.BindEnv("ListenAddress")
 	viper.BindEnv("PeerMultiaddrs")
@@ -109,7 +111,7 @@ func readConfig() (collator.Config, error) {
 	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
 	viper.SetDefault("EpochDuration", "5s")
 
-	config := collator.Config{}
+	cfg := config.Config{}
 
 	viper.AddConfigPath("$HOME/.config/shutter")
 	viper.SetConfigName("collator")
@@ -120,21 +122,21 @@ func readConfig() (collator.Config, error) {
 	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 		// Config file not found
 		if cfgFile != "" {
-			return config, err
+			return cfg, err
 		}
 	} else if err != nil {
-		return config, err // Config file was found but another error was produced
+		return cfg, err // Config file was found but another error was produced
 	}
 
-	err = config.Unmarshal(viper.GetViper())
+	err = cfg.Unmarshal(viper.GetViper())
 	if err != nil {
-		return config, err
+		return cfg, err
 	}
 
-	return config, nil
+	return cfg, nil
 }
 
-func exampleConfig() (*collator.Config, error) {
+func exampleConfig() (*config.Config, error) {
 	ethereumKey, err := ethcrypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -143,7 +145,7 @@ func exampleConfig() (*collator.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &collator.Config{
+	return &config.Config{
 		EthereumURL:         "http://127.0.0.1:8545/",
 		DeploymentDir:       "./deployments/localhost/",
 		ListenAddress:       p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
@@ -159,12 +161,12 @@ func exampleConfig() (*collator.Config, error) {
 }
 
 func generateConfig() error {
-	config, err := exampleConfig()
+	cfg, err := exampleConfig()
 	if err != nil {
 		return err
 	}
 	buf := &bytes.Buffer{}
-	err = config.WriteTOML(buf)
+	err = cfg.WriteTOML(buf)
 	if err != nil {
 		return err
 	}
@@ -172,7 +174,7 @@ func generateConfig() error {
 }
 
 func main() error {
-	config, err := readConfig()
+	cfg, err := readConfig()
 	if err != nil {
 		return err
 	}
@@ -187,7 +189,7 @@ func main() error {
 		cancel()
 	}()
 
-	err = collator.Run(ctx, config)
+	err = collator.Run(ctx, cfg)
 	if err == context.Canceled {
 		log.Printf("Bye.")
 		return nil

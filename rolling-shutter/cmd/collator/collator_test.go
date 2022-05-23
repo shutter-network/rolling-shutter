@@ -8,11 +8,11 @@ import (
 	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/comparer"
 )
 
-func tomlRoundtrip(t *testing.T, cfg *collator.Config) *collator.Config {
+func tomlRoundtrip(t *testing.T, cfg *config.Config) *config.Config {
 	t.Helper()
 	var buf bytes.Buffer
 	err := cfg.WriteTOML(&buf)
@@ -26,7 +26,7 @@ func tomlRoundtrip(t *testing.T, cfg *collator.Config) *collator.Config {
 	err = v.ReadConfig(&buf)
 	assert.NilError(t, err)
 
-	cfg2 := &collator.Config{}
+	cfg2 := &config.Config{}
 	err = cfg2.Unmarshal(v)
 	assert.NilError(t, err)
 	return cfg2

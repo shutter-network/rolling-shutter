@@ -36,7 +36,7 @@ func computeNextEpochID(epochID uint64, currentBlockNumber uint32, executionBloc
 }
 
 func startNextEpoch(
-	ctx context.Context, config Config, db *cltrdb.Queries, currentBlockNumber uint32,
+	ctx context.Context, cfg config.Config, db *cltrdb.Queries, currentBlockNumber uint32,
 ) ([]shmsg.P2PMessage, error) {
 	epochID, err := getNextEpochID(ctx, db)
 	if err != nil {
@@ -49,7 +49,7 @@ func startNextEpoch(
 	}
 
 	trigger, err := shmsg.NewSignedDecryptionTrigger(
-		config.InstanceID, epochID, transactions, config.EthereumKey,
+		cfg.InstanceID, epochID, transactions, cfg.EthereumKey,
 	)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func startNextEpoch(
 		return nil, err
 	}
 
-	nextEpochID := computeNextEpochID(epochID, currentBlockNumber, config.ExecutionBlockDelay)
+	nextEpochID := computeNextEpochID(epochID, currentBlockNumber, cfg.ExecutionBlockDelay)
 	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
 	if err != nil {
 		return nil, err

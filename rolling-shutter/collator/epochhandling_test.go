@@ -14,17 +14,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func newTestConfig(t *testing.T) Config {
-	t.Helper()
-
-	ethereumKey, err := ethcrypto.GenerateKey()
-	assert.NilError(t, err)
-	return Config{
-		EthereumKey: ethereumKey,
-		InstanceID:  123,
-	}
-}
-
 func TestDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
