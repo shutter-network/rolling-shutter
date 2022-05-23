@@ -121,7 +121,7 @@ func TestDecryptionTrigger(t *testing.T) {
 	privKey, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 
-	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, txs, privKey)
+	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, HashTransactions(txs), privKey)
 	assert.NilError(t, err)
 	m := marshalUnmarshalMessage(t, orig)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionTrigger{}))

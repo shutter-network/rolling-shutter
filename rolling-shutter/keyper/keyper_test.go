@@ -230,7 +230,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 			msg, err := shmsg.NewSignedDecryptionTrigger(
 				tc.instanceID,
 				tc.epochID,
-				[][]byte{},
+				[]byte{},
 				tc.privKey,
 			)
 			assert.NilError(t, err)

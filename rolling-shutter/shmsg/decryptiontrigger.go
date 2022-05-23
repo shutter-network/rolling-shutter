@@ -10,12 +10,12 @@ import (
 var triggerHashPrefix = []byte{0x19, 't', 'r', 'i', 'g', 'g', 'e', 'r'}
 
 func NewSignedDecryptionTrigger(
-	instanceID uint64, epochID uint64, transactions [][]byte, privKey *ecdsa.PrivateKey,
+	instanceID uint64, epochID uint64, txHash []byte, privKey *ecdsa.PrivateKey,
 ) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
 		InstanceID:       instanceID,
 		EpochID:          epochID,
-		TransactionsHash: HashTransactions(transactions),
+		TransactionsHash: txHash,
 	}
 	err := Sign(trigger, privKey)
 	if err != nil {
