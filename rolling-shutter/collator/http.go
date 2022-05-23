@@ -60,9 +60,9 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	txid := hash.Sum(nil)
 
 	err := insertTx(ctx, srv.c.dbpool, cltrdb.InsertTxParams{
-		TxID:        txid,
-		EpochID:     x.Epoch,
-		EncryptedTx: x.EncryptedTx,
+		TxHash:  txid,
+		EpochID: x.Epoch,
+		TxBytes: x.EncryptedTx,
 	})
 	if err != nil {
 		log.Printf("Error in SubmitTransaction: %s", err)

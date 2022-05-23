@@ -52,10 +52,10 @@ SELECT EXISTS (
 SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1;
 
 -- name: InsertTx :exec
-INSERT INTO transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3);
+INSERT INTO transaction (tx_hash, epoch_id, tx_bytes) VALUES ($1, $2, $3);
 
 -- name: GetTransactionsByEpoch :many
-SELECT encrypted_tx FROM transaction WHERE epoch_id = $1 ORDER BY tx_id;
+SELECT tx_bytes FROM transaction WHERE epoch_id = $1 ORDER BY id ASC;
 
 -- name: SetNextEpochID :exec
 INSERT INTO next_epoch (epoch_id) VALUES ($1)
