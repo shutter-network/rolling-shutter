@@ -1,4 +1,4 @@
-package collator
+package config
 
 import (
 	"crypto/ecdsa"
@@ -22,25 +22,26 @@ type Config struct {
 	PeerMultiaddrs []multiaddr.Multiaddr
 
 	EthereumURL       string
+	SequencerURL      string
 	DeploymentDir     string
 	DatabaseURL       string
 	HTTPListenAddress string
-
-	SequencerURL string
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
 
 	InstanceID uint64
 
-	EpochDuration       time.Duration
-	ExecutionBlockDelay uint32
+	EpochDuration                time.Duration
+	ExecutionBlockDelay          uint32
+	BatchIndexAcceptenceInterval uint32
 }
 
 var configTemplate = `# Shutter collator config
 # Ethereum address: {{ .EthereumAddress }}
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
 
+# L1 node URL
 EthereumURL     = "{{ .EthereumURL }}"
 DeploymentDir   = "{{ .DeploymentDir }}"
 

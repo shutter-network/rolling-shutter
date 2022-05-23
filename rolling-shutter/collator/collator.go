@@ -22,6 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -33,7 +34,7 @@ import (
 )
 
 type collator struct {
-	Config Config
+	Config config.Config
 
 	contracts *deployment.Contracts
 
@@ -41,24 +42,24 @@ type collator struct {
 	dbpool *pgxpool.Pool
 }
 
-func Run(ctx context.Context, config Config) error {
+func Run(ctx context.Context, cfg config.Config) error {
 	log.Printf(
 		"starting collator with ethereum address %s",
-		config.EthereumAddress(),
+		cfg.EthereumAddress(),
 	)
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
-	ethereumClient, err := ethclient.Dial(config.EthereumURL)
+	ethereumClient, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
+	contracts, err := deployment.NewContracts(ethereumClient, cfg.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -74,14 +75,14 @@ func Run(ctx context.Context, config Config) error {
 	}
 
 	c := collator{
-		Config: config,
+		Config: cfg,
 
 		contracts: contracts,
 
 		p2p: p2p.New(p2p.Config{
-			ListenAddr:     config.ListenAddress,
-			PeerMultiaddrs: config.PeerMultiaddrs,
-			PrivKey:        config.P2PKey,
+			ListenAddr:     cfg.ListenAddress,
+			PeerMultiaddrs: cfg.PeerMultiaddrs,
+			PrivKey:        cfg.P2PKey,
 		}),
 
 		dbpool: dbpool,
