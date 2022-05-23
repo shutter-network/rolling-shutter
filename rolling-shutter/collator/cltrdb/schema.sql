@@ -13,9 +13,11 @@ CREATE TABLE decryption_key (
 );
 
 CREATE TABLE transaction(
-       tx_id bytea PRIMARY KEY,
+       tx_hash bytea PRIMARY KEY,
+       -- id persists the input ordering of txs
+       id INTEGER GENERATED ALWAYS AS IDENTITY,
        epoch_id bytea,
-       encrypted_tx bytea
+       tx_bytes bytea
 );
 
 CREATE TABLE next_epoch(

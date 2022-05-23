@@ -30,9 +30,9 @@ func TestDecryptionTriggerIntegration(t *testing.T) {
 
 	encryptedTX := []byte("foobar")
 	err = db.InsertTx(ctx, cltrdb.InsertTxParams{
-		TxID:        []byte{'a'},
-		EpochID:     shdb.EncodeUint64(nextEpochID),
-		EncryptedTx: encryptedTX,
+		TxHash:  []byte{'a'},
+		EpochID: shdb.EncodeUint64(nextEpochID),
+		TxBytes: encryptedTX,
 	})
 	assert.NilError(t, err)
 

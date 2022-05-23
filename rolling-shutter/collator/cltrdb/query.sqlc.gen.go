@@ -134,7 +134,7 @@ func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
 }
 
 const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
-SELECT encrypted_tx FROM transaction WHERE epoch_id = $1 ORDER BY tx_id
+SELECT tx_bytes FROM transaction WHERE epoch_id = $1 ORDER BY id ASC
 `
 
 func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([][]byte, error) {
@@ -145,11 +145,11 @@ func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([
 	defer rows.Close()
 	var items [][]byte
 	for rows.Next() {
-		var encrypted_tx []byte
-		if err := rows.Scan(&encrypted_tx); err != nil {
+		var tx_bytes []byte
+		if err := rows.Scan(&tx_bytes); err != nil {
 			return nil, err
 		}
-		items = append(items, encrypted_tx)
+		items = append(items, tx_bytes)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -249,17 +249,17 @@ func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) er
 }
 
 const insertTx = `-- name: InsertTx :exec
-INSERT INTO transaction (tx_id, epoch_id, encrypted_tx) VALUES ($1, $2, $3)
+INSERT INTO transaction (tx_hash, epoch_id, tx_bytes) VALUES ($1, $2, $3)
 `
 
 type InsertTxParams struct {
-	TxID        []byte
-	EpochID     []byte
-	EncryptedTx []byte
+	TxHash  []byte
+	EpochID []byte
+	TxBytes []byte
 }
 
 func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
-	_, err := q.db.Exec(ctx, insertTx, arg.TxID, arg.EpochID, arg.EncryptedTx)
+	_, err := q.db.Exec(ctx, insertTx, arg.TxHash, arg.EpochID, arg.TxBytes)
 	return err
 }
 

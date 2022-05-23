@@ -4,7 +4,9 @@
 
 package cltrdb
 
-import ()
+import (
+	"database/sql"
+)
 
 type DecryptionKey struct {
 	EpochID       []byte
@@ -44,7 +46,8 @@ type NextEpoch struct {
 }
 
 type Transaction struct {
-	TxID        []byte
-	EpochID     []byte
-	EncryptedTx []byte
+	TxHash  []byte
+	ID      sql.NullInt32
+	EpochID []byte
+	TxBytes []byte
 }
