@@ -155,7 +155,7 @@ jobs:
             - go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
-            - rs-lint-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-lint-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - install-asdf
       - run:
           name: "Install golangci-lint"
@@ -165,7 +165,7 @@ jobs:
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-lint-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
