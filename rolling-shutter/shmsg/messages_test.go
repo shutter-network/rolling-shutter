@@ -28,8 +28,6 @@ func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
 		newMessage M
 		unmshl     any
 	)
-	const sender = "foo/sender"
-
 	msgBytes, err = proto.Marshal(message)
 	assert.NilError(t, err)
 
