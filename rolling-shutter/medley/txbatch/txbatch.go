@@ -63,7 +63,7 @@ func (txbatch *TXBatch) WaitMined(ctx context.Context) ([]*types.Receipt, error)
 		}
 	}
 	if numFailed > 0 {
-		return res, errors.Errorf("%d transactions failed.", numFailed)
+		return res, errors.Errorf("%d transactions failed", numFailed)
 	}
 
 	return res, nil
