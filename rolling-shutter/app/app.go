@@ -112,16 +112,6 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 	return shapp, nil
 }
 
-// getConfigByKeyperConfigIndex returns the BatchConfig with the given keyperConfigIndex.
-func (app *ShutterApp) getConfigByKeyperConfigIndex(keyperConfigIndex uint64) (*BatchConfig, bool) {
-	for _, cfg := range app.Configs {
-		if cfg.KeyperConfigIndex == keyperConfigIndex {
-			return cfg, true
-		}
-	}
-	return nil, false
-}
-
 // checkConfig checks if the given BatchConfig could be added.
 func (app *ShutterApp) checkConfig(cfg BatchConfig) error {
 	err := cfg.EnsureValid()
