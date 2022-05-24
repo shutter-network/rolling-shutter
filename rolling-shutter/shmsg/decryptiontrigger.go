@@ -24,16 +24,16 @@ func NewSignedDecryptionTrigger(
 	return trigger, nil
 }
 
-func (t *DecryptionTrigger) SetSignature(s []byte) {
-	t.Signature = s
+func (trigger *DecryptionTrigger) SetSignature(s []byte) {
+	trigger.Signature = s
 }
 
-func (t *DecryptionTrigger) Hash() []byte {
+func (trigger *DecryptionTrigger) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(triggerHashPrefix)
-	_ = binary.Write(hash, binary.BigEndian, t.InstanceID)
-	_ = binary.Write(hash, binary.BigEndian, t.EpochID)
-	hash.Write(t.TransactionsHash)
+	_ = binary.Write(hash, binary.BigEndian, trigger.InstanceID)
+	_ = binary.Write(hash, binary.BigEndian, trigger.EpochID)
+	hash.Write(trigger.TransactionsHash)
 	return hash.Sum(nil)
 }
 
