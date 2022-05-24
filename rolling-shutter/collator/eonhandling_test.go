@@ -64,7 +64,6 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 			params.instanceID,
 			params.eonPubKey,
 			params.activationBlock,
-			uint64(i),                // keyperIndex
 			params.keyperConfigIndex, // keyperConfigIndex
 			params.eon,               // eon
 			ethKey,

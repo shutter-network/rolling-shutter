@@ -14,7 +14,6 @@ func NewSignedEonPublicKey(
 	instanceID uint64,
 	eonPublicKey []byte,
 	activationBlock uint64,
-	keyperIndex uint64,
 	keyperConfigIndex uint64,
 	eon uint64,
 	privKey *ecdsa.PrivateKey,

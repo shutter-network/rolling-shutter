@@ -147,7 +147,6 @@ func TestDecryptionKeyShare(t *testing.T) {
 func TestEonPublicKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	eonPublicKey := cfg.tkg.EonPublicKey(cfg.epochID).Marshal()
-	keyperIndex := uint64(1)
 	activationBlock := uint64(2)
 
 	privKey, err := ethcrypto.GenerateKey()
@@ -155,7 +154,7 @@ func TestEonPublicKey(t *testing.T) {
 	eon := uint64(5)
 	keyperConfigIndex := uint64(6)
 	orig, err := NewSignedEonPublicKey(
-		cfg.instanceID, eonPublicKey, activationBlock, keyperIndex, keyperConfigIndex, eon, privKey,
+		cfg.instanceID, eonPublicKey, activationBlock, keyperConfigIndex, eon, privKey,
 	)
 	assert.NilError(t, err)
 

@@ -375,7 +375,7 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			keyperIndex, exists := kprdb.GetKeyperIndex(kpr.config.Address(), eonPublicKey.Keypers)
+			_, exists := kprdb.GetKeyperIndex(kpr.config.Address(), eonPublicKey.Keypers)
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}
@@ -383,7 +383,6 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 				kpr.config.InstanceID,
 				eonPublicKey.EonPublicKey,
 				uint64(eonPublicKey.ActivationBlockNumber),
-				keyperIndex,
 				uint64(eonPublicKey.KeyperConfigIndex),
 				uint64(eonPublicKey.Eon),
 				kpr.config.SigningKey,
