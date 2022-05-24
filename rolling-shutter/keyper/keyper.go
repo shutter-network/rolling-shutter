@@ -310,6 +310,17 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	if lastSent == keyperSet.KeyperConfigIndex {
 		return nil
 	}
+
+	lastBlock, err := q.GetLastBlockSeen(ctx)
+	if err != nil {
+		return err
+	}
+
+	if keyperSet.ActivationBlockNumber-lastBlock > kpr.config.DKGStartBlockDelta {
+		log.Printf("not yet submitting config for %+v", keyperSet)
+		return nil
+	}
+
 	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
 		return nil

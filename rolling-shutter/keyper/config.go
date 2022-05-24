@@ -26,13 +26,14 @@ type Config struct {
 	DatabaseURL    string
 	DeploymentDir  string
 
-	SigningKey     *ecdsa.PrivateKey
-	ValidatorKey   ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
-	EncryptionKey  *ecies.PrivateKey
-	P2PKey         p2pcrypto.PrivKey
-	DKGPhaseLength uint64 // in shuttermint blocks
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
+	SigningKey         *ecdsa.PrivateKey
+	ValidatorKey       ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
+	EncryptionKey      *ecies.PrivateKey
+	P2PKey             p2pcrypto.PrivKey
+	DKGPhaseLength     uint64 // in shuttermint blocks
+	DKGStartBlockDelta int64
+	ListenAddress      multiaddr.Multiaddr
+	PeerMultiaddrs     []multiaddr.Multiaddr
 
 	HTTPEnabled       bool
 	HTTPListenAddress string
@@ -52,6 +53,10 @@ DeploymentDir       = "{{ .DeploymentDir }}"
 # If it's empty, we use the standard PG* environment variables
 DatabaseURL		= "{{ .DatabaseURL }}"
 DKGPhaseLength		= {{ .DKGPhaseLength }}
+
+# DKGStartBlockDelta is used to delay the start of the DKG process. The first block where the DKG
+# process may start is the activation block - DKGStartBlockDelta
+DKGStartBlockDelta   = {{ .DKGStartBlockDelta }}
 
 # p2p configuration
 ListenAddress	= "{{ .ListenAddress }}"

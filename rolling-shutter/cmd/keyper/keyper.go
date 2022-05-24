@@ -177,11 +177,12 @@ func initDB() error {
 
 func exampleConfig() (*keyper.Config, error) {
 	cfg := &keyper.Config{
-		ShuttermintURL: "http://localhost:26657",
-		EthereumURL:    "http://127.0.0.1:8545/",
-		DeploymentDir:  "./deployments/localhost/",
-		DKGPhaseLength: 30,
-		ListenAddress:  p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		ShuttermintURL:     "http://localhost:26657",
+		EthereumURL:        "http://127.0.0.1:8545/",
+		DeploymentDir:      "./deployments/localhost/",
+		DKGPhaseLength:     30,
+		DKGStartBlockDelta: 12000,
+		ListenAddress:      p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{
 			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
 			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
