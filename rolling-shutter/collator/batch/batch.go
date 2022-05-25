@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 const minimumTxGas uint64 = 21000

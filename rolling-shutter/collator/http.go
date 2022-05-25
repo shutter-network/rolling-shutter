@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -35,7 +36,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	db := cltrdb.New(srv.c.dbpool)
-	epoch, err := getNextEpochID(req.Context(), db)
+	epoch, err := batch.GetNextEpochID(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
@@ -59,11 +60,7 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	hash.Write(x.EncryptedTx)
 	txid := hash.Sum(nil)
 
-	err := insertTx(ctx, srv.c.dbpool, cltrdb.InsertTxParams{
-		TxHash:  txid,
-		EpochID: x.Epoch,
-		TxBytes: x.EncryptedTx,
-	})
+	err := srv.c.batchHandler.EnqueueTx(ctx, x.EncryptedTx)
 	if err != nil {
 		log.Printf("Error in SubmitTransaction: %s", err)
 		sendError(w, http.StatusConflict, err.Error())

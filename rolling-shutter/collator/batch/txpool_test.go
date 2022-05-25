@@ -5,25 +5,9 @@ import (
 	"testing"
 	"time"
 
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
 )
-
-func newTestConfig(t *testing.T) config.Config {
-	t.Helper()
-
-	ethereumKey, err := ethcrypto.GenerateKey()
-	assert.NilError(t, err)
-	return config.Config{
-		EthereumURL:         "http://127.0.0.1:8454",
-		SequencerURL:        "http://127.0.0.1:8455",
-		EthereumKey:         ethereumKey,
-		ExecutionBlockDelay: uint32(5),
-		InstanceID:          123,
-	}
-}
 
 func TestBatches(t *testing.T) {
 	batches := make(Batches, 0)

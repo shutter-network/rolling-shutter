@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
@@ -36,7 +37,8 @@ import (
 type collator struct {
 	Config config.Config
 
-	contracts *deployment.Contracts
+	contracts    *deployment.Contracts
+	batchHandler *batch.BatchHandler
 
 	p2p    *p2p.P2PHandler
 	dbpool *pgxpool.Pool
@@ -69,7 +71,12 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts)
+	batchHandler, err := batch.NewBatchHandler(cfg, dbpool)
+	if err != nil {
+		return err
+	}
+
+	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts, batchHandler)
 	if err != nil {
 		return err
 	}
@@ -78,14 +85,14 @@ func Run(ctx context.Context, cfg config.Config) error {
 		Config: cfg,
 
 		contracts: contracts,
-
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     cfg.ListenAddress,
 			PeerMultiaddrs: cfg.PeerMultiaddrs,
 			PrivKey:        cfg.P2PKey,
 		}),
 
-		dbpool: dbpool,
+		batchHandler: batchHandler,
+		dbpool:       dbpool,
 	}
 	c.setupP2PHandler()
 
@@ -93,12 +100,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 }
 
 // initializeEpochID populate the epoch_id table with a valid value if it is empty.
-func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
+func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts, bh *batch.BatchHandler) error {
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
-		blk, err := medley.Retry(ctx, func() (uint64, error) {
-			return contracts.Client.BlockNumber(ctx)
-		})
+		blk, err := getBlockNumber(ctx, contracts.Client)
 		if err != nil {
 			return err
 		}
@@ -108,8 +113,10 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 
 		epochID := epochid.New(0, uint32(blk))
 		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
+	} else if err != nil {
+		return err
 	}
-	return err
+	return bh.InitialiseEpoch(ctx)
 }
 
 func (c *collator) setupP2PHandler() {
@@ -225,9 +232,7 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
-	blockNumber, err := medley.Retry(ctx, func() (uint64, error) {
-		return c.contracts.Client.BlockNumber(ctx)
-	})
+	blockNumber, err := getBlockNumber(ctx, c.contracts.Client)
 	if err != nil {
 		return err
 	}
@@ -235,17 +240,7 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		return errors.Errorf("block number too big: %d", blockNumber)
 	}
 
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		// Disallow submitting transactions at the same time.
-		_, err = tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
-		if err != nil {
-			return err
-		}
-
-		db := cltrdb.New(tx)
-		outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
-		return err
-	})
+	outMessages, err = c.batchHandler.StartNextEpoch(ctx, uint32(blockNumber))
 	if err != nil {
 		return err
 	}
@@ -258,12 +253,12 @@ func (c *collator) newEpoch(ctx context.Context) error {
 	return nil
 }
 
-// getNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
-func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
-	epochID, err := db.GetNextEpochID(ctx)
+func getBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
+	blk, err := medley.Retry(ctx, func() (uint64, error) {
+		return client.BlockNumber(ctx)
+	})
 	if err != nil {
-		// There should already be an epochID in the database so not finding a row is an error
 		return 0, err
 	}
-	return shdb.DecodeUint64(epochID), nil
+	return blk, nil
 }
