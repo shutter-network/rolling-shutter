@@ -15,64 +15,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-// computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-// The function also depends on the current mainchain block number and the configured execution
-// block delay. The result will encode a block number and a sequence number. The sequence number
-// will be the sequence number of the previous epoch id plus one. The block number will be
-// max(current block number - execution block delay, block number encoded in previous epoch id, 0).
-func computeNextEpochID(epochID uint64, currentBlockNumber uint32, executionBlockDelay uint32) uint64 {
-	executionBlockNumber := uint32(0)
-	if currentBlockNumber >= executionBlockDelay {
-		executionBlockNumber = currentBlockNumber - executionBlockDelay
-	}
-
-	previousExecutionBlockNumber := epochid.BlockNumber(epochID)
-	if executionBlockNumber < previousExecutionBlockNumber {
-		executionBlockNumber = previousExecutionBlockNumber
-	}
-
-	sequenceNumber := epochid.SequenceNumber(epochID)
-	return epochid.New(sequenceNumber+1, executionBlockNumber)
-}
-
-func startNextEpoch(
-	ctx context.Context, cfg config.Config, db *cltrdb.Queries, currentBlockNumber uint32,
-) ([]shmsg.P2PMessage, error) {
-	epochID, err := getNextEpochID(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-
-	transactions, err := db.GetTransactionsByEpoch(ctx, shdb.EncodeUint64(epochID))
-	if err != nil {
-		return nil, err
-	}
-
-	trigger, err := shmsg.NewSignedDecryptionTrigger(
-		cfg.InstanceID, epochID, shmsg.HashTransactions(transactions), cfg.EthereumKey,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Write back the generated trigger to the database
-	err = db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
-		EpochID:   shdb.EncodeUint64(trigger.EpochID),
-		BatchHash: trigger.TransactionsHash,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	nextEpochID := computeNextEpochID(epochID, currentBlockNumber, cfg.ExecutionBlockDelay)
-	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
-	if err != nil {
-		return nil, err
-	}
-
-	return []shmsg.P2PMessage{trigger}, nil
-}
-
 func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
@@ -92,7 +34,17 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.Decryptio
 		"inserted decryption key for epoch %s to database",
 		epochid.LogInfo(msg.EpochID),
 	)
-	return make([]shmsg.P2PMessage, 0), nil
+
+	// The one-time receival of the decryption key is the only event
+	// that triggers the submitting of the batch-tx currently.
+	// This call is not guaranteed to succeed and could fail e.g. due to networking issues.
+	msgs, err := c.batchHandler.HandleDecryptionKey(ctx, msg.EpochID, msg.Key)
+	if err != nil {
+		// NOTE: If this fails then the batch will never be re-submitted to the sequencer
+		// because we don't memorize the key and try to re-submit it later.
+		return make([]shmsg.P2PMessage, 0), errors.Wrapf(err, "error while processing the batch (epoch %s)", epochid.LogInfo(msg.EpochID))
+	}
+	return msgs, nil
 }
 
 func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) (bool, error) {

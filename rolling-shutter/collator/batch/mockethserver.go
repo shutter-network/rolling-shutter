@@ -53,6 +53,7 @@ func RunMockEthServer(t *testing.T) *MockEthServer {
 		blocks:      make(map[string]blockData),
 		receivedTxs: make(map[string]bool),
 		txs:         make(map[string]*txtypes.Transaction),
+		hooks:       make([]txHookFunc, 0),
 		t:           t,
 	}
 	mock.HTTPServer = httptest.NewServer(http.HandlerFunc(mock.handle))
@@ -371,6 +372,8 @@ func jsonReceipt(txHash string, blockNumber *big.Int, success bool) json.RawMess
 	} else {
 		status = "0x0"
 	}
+	var bloom ethtypes.Bloom
+	bloomHex, _ := bloom.MarshalText()
 	receiptString := fmt.Sprintf(`{
     "blockHash": "0xc4485dae215696aeb152e6a4f469a00dac2640bd0cbb540275e1e4b416475c52",
     "blockNumber": "%s",
@@ -380,13 +383,13 @@ func jsonReceipt(txHash string, blockNumber *big.Int, success bool) json.RawMess
     "from": "0x7b907992d6c5820ff7c80fb9e481780f2bbf30fd",
     "gasUsed": "0xfff8",
     "logs": [],
-    "logsBloom": "0x0",
+    "logsBloom": "%s",
     "status": "%s",
     "to": "0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b",
     "transactionHash": "%s",
     "transactionIndex": "0x0",
     "type": "0x0"
-  }`, hexutil.EncodeBig(blockNumber), status, txHash)
+  }`, hexutil.EncodeBig(blockNumber), bloomHex, status, txHash)
 	return json.RawMessage(strings.ReplaceAll(receiptString, "\n", ""))
 }
 
