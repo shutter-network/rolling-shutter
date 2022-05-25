@@ -24,6 +24,41 @@ type State interface {
 	SetNonce(a common.Address, nonce uint64)
 }
 
+func NewCachedPendingBatch(ctx context.Context, epochID uint64, client *ethclient.Client) (*Batch, error) {
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signer := txtypes.LatestSignerForChainID(chainID)
+
+	// batchindex not necessarily the same as the l2blocknumber.
+	// just query for the current state of the addresses balance/nonce.
+	// since the collator is the only one progressing the balance/nonce state,
+	// this is fine as long as the current batch is not submitted
+	// number=nil means the latest state from the node
+	block, err := client.BlockByNumber(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	state := &ChainBatchCache{
+		Client:        client,
+		AtBlockNumber: nil,
+		balances:      make(map[common.Address]*big.Int, 0),
+		nonces:        make(map[common.Address]uint64, 0),
+	}
+
+	b := &Batch{
+		ChainID:      chainID,
+		epochID:      epochID,
+		signer:       signer,
+		state:        state,
+		block:        block,
+		transactions: NewTransactionQueue(),
+	}
+	b.gasPool.AddGas(block.GasLimit())
+	return b, nil
+}
+
 type EthClient interface {
 	BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error)
 	NonceAt(context.Context, common.Address, *big.Int) (uint64, error)

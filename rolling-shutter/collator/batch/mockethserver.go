@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 )
@@ -45,6 +46,7 @@ func decodeRequest(req *http.Request, mess *jsonrpcMessage) error {
 // The MockEthServer.Teardown() should be called deferred immediately
 // after using this function.
 func RunMockEthServer(t *testing.T) *MockEthServer {
+	t.Helper()
 	mock := &MockEthServer{
 		balances:    make(map[string]map[string]*big.Int),
 		nonces:      make(map[string]map[string]uint64),
@@ -73,7 +75,7 @@ type MockEthServer struct {
 	t           *testing.T
 	balances    map[string]map[string]*big.Int
 	nonces      map[string]map[string]uint64
-	chainId     *big.Int
+	chainID     *big.Int
 	blocks      map[string]blockData
 	receivedTxs map[string]bool
 	HTTPServer  *httptest.Server
@@ -88,6 +90,7 @@ func (me *MockEthServer) Teardown() {
 		me.HTTPServer.Close()
 	}
 }
+
 func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 	var (
 		status int
@@ -159,16 +162,15 @@ func (me *MockEthServer) SetBalance(a common.Address, b *big.Int, block string) 
 
 func (me *MockEthServer) getBalance(mess *jsonrpcMessage) (int, error) {
 	if len(mess.Params) > 2 {
-		return -1, errors.Errorf("got more parameteres then expected: %v", mess.Params)
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
 	}
 	if len(mess.Params) != 2 {
 		return -1, errors.Errorf("expected exactly 2 parameters, got: %v", mess.Params)
 	}
 	address := normalizeAddress(mess.Params[0].(string))
 	block := mess.Params[1].(string)
-	// TODO not exists handling
 	balance := me.balances[block][address]
-	res := fmt.Sprintf("\"%s\"", hexutil.EncodeBig(balance))
+	res := fmt.Sprintf("%q", hexutil.EncodeBig(balance))
 	mess.Result = json.RawMessage(res)
 	return 200, nil
 }
@@ -185,30 +187,31 @@ func (me *MockEthServer) SetNonce(a common.Address, nonce uint64, block string) 
 	}
 	nc[a.Hex()] = nonce
 }
+
 func (me *MockEthServer) getNonce(mess *jsonrpcMessage) (int, error) {
 	if len(mess.Params) > 2 {
-		return -1, errors.Errorf("got more parameteres then expected: %v", mess.Params)
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
 	}
 	address := normalizeAddress(mess.Params[0].(string))
 	block := mess.Params[1].(string)
-	// TODO not exists handling?
 	nonce := me.nonces[block][address]
 	me.t.Logf("nonces:%v, addr:%s, nonce:%d, block:%s", me.nonces, address, nonce, block)
 
-	res := fmt.Sprintf("\"%s\"", hexutil.EncodeUint64(nonce))
+	res := fmt.Sprintf("%q", hexutil.EncodeUint64(nonce))
 	mess.Result = json.RawMessage(res)
 	return 200, nil
 }
 
 // SetChainID is used to set the state of the server for the "eth_chainId" method.
 func (me *MockEthServer) SetChainID(c *big.Int) {
-	me.chainId = c
+	me.chainID = c
 }
+
 func (me *MockEthServer) getChainID(mess *jsonrpcMessage) (int, error) {
 	if len(mess.Params) > 0 {
-		return -1, errors.Errorf("got more parameteres then expected: %v", mess.Params)
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
 	}
-	res := fmt.Sprintf("\"%s\"", hexutil.EncodeBig(me.chainId))
+	res := fmt.Sprintf("%q", hexutil.EncodeBig(me.chainID))
 	mess.Result = json.RawMessage(res)
 	return 200, nil
 }
@@ -246,8 +249,7 @@ func (me *MockEthServer) getBlock(mess *jsonrpcMessage) (int, error) {
 		mess.Result = json.RawMessage("\"null\"")
 		return 200, nil
 	}
-	res := jsonBlock(b.baseFee, b.gasLimit)
-	mess.Result = json.RawMessage(res)
+	mess.Result = jsonBlock(b.baseFee, b.gasLimit)
 	return 200, nil
 }
 
@@ -261,7 +263,7 @@ func (me *MockEthServer) getReceipt(mess *jsonrpcMessage) (int, error) {
 		mess.Result = json.RawMessage("null")
 		return 200, nil
 	}
-	mess.Result = jsonReceipt(txHash, big.NewInt(42), 1)
+	mess.Result = jsonReceipt(txHash, big.NewInt(42), true)
 	return 200, nil
 }
 
@@ -276,7 +278,10 @@ func (me *MockEthServer) respondRawTx(mess *jsonrpcMessage) (int, error) {
 	}
 
 	var tx txtypes.Transaction
-	tx.UnmarshalBinary(txBytes)
+	err = tx.UnmarshalBinary(txBytes)
+	if err != nil {
+		return 0, errors.Wrap(err, "can't unmarshael incoming bytes to transaction")
+	}
 	me.txs[tx.Hash().Hex()] = &tx
 
 	newHooks := make([]txHookFunc, 0)
@@ -289,7 +294,7 @@ func (me *MockEthServer) respondRawTx(mess *jsonrpcMessage) (int, error) {
 		}
 	}
 	me.hooks = newHooks
-	res := fmt.Sprintf("\"%s\"", tx.Hash().Hex())
+	res := fmt.Sprintf("%q", tx.Hash().Hex())
 	mess.Result = json.RawMessage(res)
 	return 200, nil
 }
@@ -332,25 +337,16 @@ func (me *MockEthServer) GetReceivedTx(txHash string) *txtypes.Transaction {
 	return tx
 }
 
-func toBlockNumArg(number *big.Int) string {
-	if number == nil {
-		return "latest"
-	}
-	pending := big.NewInt(-1)
-	if number.Cmp(pending) == 0 {
-		return "pending"
-	}
-	return hexutil.EncodeBig(number)
-}
-
 func jsonBlock(baseFee *big.Int, gasLimit uint64) json.RawMessage {
+	var bloom ethtypes.Bloom
+	bloomHex, _ := bloom.MarshalText()
 	blockString := fmt.Sprintf(`{"baseFeePerGas": "%s",
 "difficulty": "0x1",
-"extraData": "0xd883010a0d846765746888676f312e31372e33856c696e757800000000000000e84cd9e4e123bcf132f2afdfd1c32a416fd6290f2116d637591511e8622202d561fafdde71f513a7a2fafbf2544e5fd439b0f2e3dd25756ec921da74b3e8116a01",
+"extraData": "0x00",
 "gasLimit": "%s",
 "gasUsed": "0x7defcf",
 "hash": "0xc7608dbb166f66c00ca8a7b0674c982b1cc12d390d7b3a3572e9185b583621f7",
-"logsBloom": "0x0620000401000000120c040280202000081008000200008000a080002640140000801880000100801000051000040000000000004400400020010260002402c0029880002401000021a000280044402208210002800400100080000080018808c003501012400800a011496000900888000000140108001150001291100201400492828800001600810031100000002120500009025010080000204008000000620250100000005008008102000841040400041400300090400800840004082050204102402000040300000001130000000240021000001000200400000060020850000000990820040020102000100000470009008201401001010000408000",
+"logsBloom": "%s",
 "miner": "0x0000000000000000000000000000000000000000",
 "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
 "nonce": "0x0000000000000000",
@@ -364,11 +360,17 @@ func jsonBlock(baseFee *big.Int, gasLimit uint64) json.RawMessage {
 "totalDifficulty": "0x99c2ec",
 "transactions": [],
 "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-"uncles": []}`, hexutil.EncodeBig(baseFee), hexutil.EncodeUint64(gasLimit))
+"uncles": []}`, hexutil.EncodeBig(baseFee), hexutil.EncodeUint64(gasLimit), bloomHex)
 	return json.RawMessage(strings.ReplaceAll(blockString, "\n", ""))
 }
 
-func jsonReceipt(txHash string, blockNumber *big.Int, status int) json.RawMessage {
+func jsonReceipt(txHash string, blockNumber *big.Int, success bool) json.RawMessage {
+	var status string
+	if success {
+		status = "0x1"
+	} else {
+		status = "0x0"
+	}
 	receiptString := fmt.Sprintf(`{
     "blockHash": "0xc4485dae215696aeb152e6a4f469a00dac2640bd0cbb540275e1e4b416475c52",
     "blockNumber": "%s",
@@ -378,17 +380,16 @@ func jsonReceipt(txHash string, blockNumber *big.Int, status int) json.RawMessag
     "from": "0x7b907992d6c5820ff7c80fb9e481780f2bbf30fd",
     "gasUsed": "0xfff8",
     "logs": [],
-    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000",
+    "logsBloom": "0x0",
     "status": "%s",
     "to": "0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b",
     "transactionHash": "%s",
     "transactionIndex": "0x0",
     "type": "0x0"
-  }`, hexutil.EncodeBig(blockNumber), "0x1", txHash)
+  }`, hexutil.EncodeBig(blockNumber), status, txHash)
 	return json.RawMessage(strings.ReplaceAll(receiptString, "\n", ""))
 }
 
 func normalizeAddress(addr string) string {
 	return common.HexToAddress(addr).String()
-
 }
