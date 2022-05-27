@@ -7,6 +7,8 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=1000"]
+      - id: file-contents-sorter
+        files: \.tool-versions$
       - id: fix-byte-order-marker
       - id: check-case-conflict
       - id: check-json

@@ -12,15 +12,21 @@ import (
 var (
 	uint8Array        js.Value
 	uint8ClampedArray js.Value
+	functionRegistry  js.Value
+)
+
+const (
+	registryJavaScriptName = "__wasm_functions__"
 )
 
 func main() {
 	uint8Array = js.Global().Get("Uint8Array")
 	uint8ClampedArray = js.Global().Get("Uint8ClampedArray")
+	functionRegistry = js.Global().Get(registryJavaScriptName)
 
-	js.Global().Set("shcrypto_encrypt", encrypt)
-	js.Global().Set("shcrypto_decrypt", decrypt)
-	js.Global().Set("shcrypto_verifyDecryptionKey", verifyDecryptionKey)
+	functionRegistry.Set("encrypt", encrypt)
+	functionRegistry.Set("decrypt", decrypt)
+	functionRegistry.Set("verifyDecryptionKey", verifyDecryptionKey)
 
 	select {}
 }

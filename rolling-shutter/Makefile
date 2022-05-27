@@ -3,17 +3,23 @@
 GO		?= go
 GOFLAGS		?=
 TINYGO		?= tinygo
+WASMOPT     ?= wasm-opt
 BINDIR		?= ./bin
 EXECUTABLE	?= ${BINDIR}/rolling-shutter
 
 build:
 	${GO} build ${GOFLAGS} -o ${EXECUTABLE}
 
-wasm:
-	GOARCH=wasm GOOS=js ${GO} build ${GOFLAGS} -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/shcrypto_wasm.go
+shcryptowasm: wasm
+	echo "The 'shcryptowasm' target is deprecated, use 'wasm' instead."
 
-shcryptowasm:
-	${TINYGO} build -target wasm -size full -o ${BINDIR}/shcrypto.wasm ./shcryptowasm/shcrypto_wasm.go
+wasm:
+	${TINYGO} build -target wasm -size full -o ${BINDIR}/shutter-crypto.unopt.wasm ./shcryptowasm/shutter_crypto_wasm.go
+	${WASMOPT} -Oz --vacuum --strip-debug --strip-dwarf --strip-producers --strip-target-features -o ${BINDIR}/shutter-crypto.wasm ${BINDIR}/shutter-crypto.unopt.wasm
+	rm ${BINDIR}/shutter-crypto.unopt.wasm
+
+wasm-js: wasm
+	$(MAKE) -C ../js/shutter-crypto build
 
 protoc:
 	${GO} generate ./shmsg/
@@ -82,4 +88,4 @@ lint-changes:
 abigen:
 	go generate -x ./contract
 
-.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm
+.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy

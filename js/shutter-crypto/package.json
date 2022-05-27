@@ -1,0 +1,17 @@
+{
+  "name": "@shutter-network/shutter-crypto",
+  "version": "0.1.0-beta.0",
+  "description": "Core crypto primitives to interact with Shutter Network",
+  "author": "Shutter Network <contact@shutter.network>",
+  "license": "MIT",
+  "homepage": "https://github.com/shutter-network/rolling-shutter/tree/main/js/shutter-crypto#readme",
+  "repository": "github:shutter-network/rolling-shutter",
+  "devDependencies": {
+    "webpack": "^5.72.1",
+    "webpack-cli": "^4.9.2"
+  },
+  "main": "./dist/shutter-crypto.js",
+  "files": [
+    "dist"
+  ]
+}
