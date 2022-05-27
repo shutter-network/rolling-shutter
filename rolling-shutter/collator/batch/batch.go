@@ -58,7 +58,7 @@ func CalculatePriorityFee(tx *txtypes.Transaction, baseFee *big.Int) *big.Int {
 	return new(big.Int).Mul(priorityFeeGasPrice, new(big.Int).SetUint64(tx.Gas()))
 }
 
-func NewPendingTx(signer txtypes.Signer, txBytes []byte) (*PendingTransaction, error) {
+func NewPendingTransaction(signer txtypes.Signer, txBytes []byte, receiveTime time.Time) (*PendingTransaction, error) {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
@@ -71,9 +71,10 @@ func NewPendingTx(signer txtypes.Signer, txBytes []byte) (*PendingTransaction, e
 	}
 
 	pendingTx := &PendingTransaction{
-		txBytes: txBytes,
-		tx:      &tx,
-		sender:  sender,
+		txBytes:     txBytes,
+		tx:          &tx,
+		sender:      sender,
+		receiveTime: receiveTime,
 	}
 	return pendingTx, nil
 }
@@ -83,23 +84,12 @@ func NewPendingTx(signer txtypes.Signer, txBytes []byte) (*PendingTransaction, e
 // It is used to keep track of sender, gas-fees and receive-time of
 // a shutter transaction.
 type PendingTransaction struct {
-	tx       *txtypes.Transaction
-	txBytes  []byte
-	sender   common.Address
-	minerFee *big.Int
-	gasCost  *big.Int
-	time     time.Time
-}
-
-// SetReceived sets the time an incoming transaction was
-// received. It should be called with a `t=nil` value immediatelY
-// after the transaction was received.
-func (pt *PendingTransaction) SetReceived(t *time.Time) {
-	if t == nil {
-		pt.time = time.Now()
-		return
-	}
-	pt.time = *t
+	tx          *txtypes.Transaction
+	txBytes     []byte
+	sender      common.Address
+	minerFee    *big.Int
+	gasCost     *big.Int
+	receiveTime time.Time
 }
 
 // Batch tracks the current local state of a
@@ -131,16 +121,17 @@ func (b *Batch) EpochID() uint64 {
 	return b.epochID
 }
 
-func (b *Batch) NewPendingTx(tx *txtypes.Transaction, txRaw []byte) (*PendingTransaction, error) {
+func (b *Batch) NewPendingTransaction(tx *txtypes.Transaction, txRaw []byte, receiveTime time.Time) (*PendingTransaction, error) {
 	sender, err := b.signer.Sender(tx)
 	if err != nil {
 		return nil, err
 	}
 
 	pendingTx := &PendingTransaction{
-		txBytes: txRaw,
-		tx:      tx,
-		sender:  sender,
+		txBytes:     txRaw,
+		tx:          tx,
+		sender:      sender,
+		receiveTime: receiveTime,
 	}
 	return pendingTx, nil
 }
