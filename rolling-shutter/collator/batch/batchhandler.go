@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -161,12 +162,12 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 			return errors.New("batch too far in the future")
 		}
 
-		pending, err := NewPendingTx(bh.Signer(), txBytes)
+		// Set the transactions received timestamp to the current time.
+		receiveTime := time.Now()
+		pending, err := NewPendingTransaction(bh.Signer(), txBytes, receiveTime)
 		if err != nil {
 			return err
 		}
-		// Set the transactions received timestamp to the current time.
-		pending.SetReceived(nil)
 		txEpoch := epochid.New(uint32(tx.BatchIndex()), blockNumber)
 
 		if err := db.InsertTx(ctx, cltrdb.InsertTxParams{
@@ -425,7 +426,12 @@ func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Q
 			fmt.Println(err)
 			continue
 		}
-		p, err := batch.NewPendingTx(&tx, txBytes)
+
+		// This is not strictly the original receive time since we don't persist that (yet).
+		// But since the transactions are retrieved in the original insert order, the time will
+		// slightly increase monotonically (monotonic clock time) and preserve original insert-order.
+		recoverTime := time.Now()
+		p, err := batch.NewPendingTransaction(&tx, txBytes, recoverTime)
 		if err != nil {
 			// This shouldn't happen, since the tx was once instantiated and validated
 			// before being written to DB

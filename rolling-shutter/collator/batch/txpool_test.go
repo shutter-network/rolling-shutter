@@ -61,8 +61,7 @@ func TestTxByNonceAndTime(t *testing.T) {
 		// marshal tx to bytes
 		txBytes, err := tx.MarshalBinary()
 		assert.NilError(t, err)
-		ptx, err := NewPendingTx(signer, txBytes)
-		ptx.SetReceived(&tm)
+		ptx, err := NewPendingTransaction(signer, txBytes, tm)
 		assert.NilError(t, err)
 		return ptx
 	}
@@ -108,8 +107,7 @@ func TestTxPool(t *testing.T) {
 		// marshal tx to bytes
 		txBytes, err := tx.MarshalBinary()
 		assert.NilError(t, err)
-		ptx, err := NewPendingTx(signer, txBytes)
-		ptx.SetReceived(&tm)
+		ptx, err := NewPendingTransaction(signer, txBytes, tm)
 		assert.NilError(t, err)
 		return ptx
 	}

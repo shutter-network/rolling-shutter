@@ -94,7 +94,7 @@ func (s TxByNonceAndTime) Less(i, j int) bool {
 	// If the nonces are equal, use the time the transaction was last seen for
 	// deterministic sorting
 	if s[i].tx.Nonce() == s[j].tx.Nonce() {
-		return s[j].time.Before(s[i].time)
+		return s[j].receiveTime.Before(s[i].receiveTime)
 	}
 	return s[i].tx.Nonce() < s[j].tx.Nonce()
 }
