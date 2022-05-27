@@ -1,0 +1,300 @@
+// This is an asciidoc file. Please use asciidoctor or asciidoctor.pdf to
+// convert the handbook to HTML or a PDF file. On ubuntu 22.04 install them with:
+//
+//   sudo apt install asciidoctor ruby-asciidoctor-pdf ruby-rouge
+//
+// Generate HTML:
+//   asciidoctor handbook.adoc
+//
+// Generate PDF:
+//   asciidoctor-pdf handbook.adoc
+
+// setup postgres db
+// run geth node
+// deploy contracts
+// run shuttermint
+// generate config
+// initdb
+
+= The Rolling Shutter Operator's Handbook
+:toc:
+:toclevels: 4
+:hide-uri-scheme:
+// :source-highlighter: rouge
+
+{empty}
+
+== Introduction / Overview
+This document describes how to install and run a Rolling Shutter Network. A
+Rolling Shutter Network consists of the following components:
+
+. A set of keypers, who are responsible for providing cryptographic keys to
+  encrypt and decrypt transactions.
+. A collator, who is responsible for collecting encrypted transactions from
+  clients and making them available for the rollup state execution.
+. A modified optimism rollup, consisting of
+.. L2Geth
+.. Cannon
+.. Rolling Shutter Smart Contract System
+. A JSON RPC proxy, which proxies user request to either the collator or the
+L2Geth node.
+
+WARNING: This document is not finished yet and may be inaccurate, incomplete or
+just plain wrong. Please bear with us and report bugs to the
+https://github.com/shutter-network/rolling-shutter/issues[rolling shutter issue
+tracker]
+
+==  Obtaining the `rolling-shutter` binary
+The `rolling-shutter` executable is needed for running a keyper, the collator or
+the JSON RPC proxy.  You can either download binaries or build rolling-shutter
+from source. We recommend the former. Building from source should only be
+necessary, if you want to run an unreleased version.
+
+=== Github releases
+We provide rolling-shutter binaries on the
+https://github.com/shutter-network/rolling-shutter/releases[github releases
+page]. Please download a version suitable for your operating system. Rename the
+binary to `rolling-shutter`, make it executable with `chmod +x rolling-shutter`
+and move it somewhere in your `$PATH`.
+
+You should now be able to run `rolling-shutter --version` in order to verify the
+installation:
+[source,shell]
+----
+$ rolling-shutter --version
+rolling-shutter version v0.0.5 (go1.18.2, linux-amd64)
+----
+NOTE: Only the linux-amd64 version is extensively tested by us. Please do not
+use any other operating system or architecture for a production setup. The MacOS
+binaries are not yet signed at the moment.
+
+// [source,shell]
+// ----
+// curl -sLo /usr/local/bin/rolling-shutter https://github.com/shutter-network/rolling-shutter/releases/download/rolling-shutter%2Fv0.0.5/rolling-shutter-linux-amd64-v0.0.5
+// chmod +x /usr/local/bin/rolling-shutter
+// ----
+
+=== Installing from source
+You need to have at least go 1.18 installed. You can verify the version by
+running `go version`. Please visit https://go.dev/doc/install for the
+installation instructions if you need to install or upgrade go.
+
+The `go install` command installs the rolling-shutter executable. If you want
+the latest released version, run:
+[source,shell]
+----
+go install github.com/shutter-network/rolling-shutter/rolling-shutter@latest
+----
+
+If you want to install a specific version, run:
+[source,shell]
+----
+go install github.com/shutter-network/rolling-shutter/rolling-shutter@v0.0.5
+----
+
+And if you want the latest code from the main branch, run:
+[source,shell]
+----
+go install github.com/shutter-network/rolling-shutter/rolling-shutter@main
+----
+
+After running `go install`, the rolling-shutter exectuable should be available
+in `~/go/bin`. Make sure that this directory is in `$PATH` and verify that the
+executable works:
+
+[source,shell]
+----
+$ rolling-shutter --version
+rolling-shutter version v0.0.6-0.20220524110141-4a0ea85ecd9b (go1.18.2, linux-amd64)
+----
+
+== Running a keyper
+Running a keyper consists of two parts.
+. You need to run a tendermint node, which is used for the distributed key
+generation process. This is implemented in the `rolling-shutter chain`
+subcommand.
+.  You need to run the `rolling-shutter keyper` subcommand, which is used to
+drive the tendermint node and which communicates via libp2p with the collator.
+
+=== Shuttermint
+
+// XXX How do we distribute the initial config (genesis.json?)
+
+==== Bootstrapping a chain
+
+We need to bootstrap the shuttermint chain. In the following example, we do this
+with a single trusted 'genesis keyper' in order to simplify the bootstrapping
+process.
+
+First create the keyper configuration for the genesis keyper:
+
+[source,shell]
+----
+rolling-shutter keyper generate-config --output keyper.toml
+----
+
+Lookup the ethereum address of this keyper and create an initial configuration
+for the chain:
+[source,shell]
+----
+$ head -n3 keyper.toml
+# Shutter keyper config
+# Ethereum address: 0x8473aeC5E68A647d02dF9b9b03924c3E67a86693
+# Peer identity: /p2p/12D3KooWNBTwn4M7LWmz7udrCHFTYai4V7o5eeSgnuToeDvxfxaH
+$ rolling-shutter chain init --root boot --genesis-keyper 0x8473aeC5E68A647d02dF9b9b03924c3E67a86693
+----
+
+Edit genesis.json, change 'chain_id' as well as the `genesis_time`.
+
+You can now already start the chain:
+[source,shell]
+----
+rolling-shutter chain --config boot/config/config.toml
+----
+
+==== PORTS
+// rolling-s 29250        root   30u  IPv4  55901      0t0  TCP localhost:26657 (LISTEN)
+// rolling-s 29250        root   31u  IPv6  55905      0t0  TCP *:26656 (LISTEN)
+
+26656
+
+=== Keyper subcommand
+==== Setup PostgreSQL
+The `rolling-shutter keyper` subcommand needs access to a PostgreSQL
+database. On debian based systems `apt install postgresql` will install the
+postgresql database server.
+
+The following commands can be used to initialize a database suitable for our
+purposes.
+
+First, become the database system user:
+[source,shell]
+----
+sudo -i -u postgres
+----
+
+As system user, create a database user `keyper`:
+[source,shell]
+----
+createuser -P -d keyper
+----
+
+Create a `keyperdb` database with owner `keyper`:
+[source,shell]
+----
+createdb -O keyper keyperdb
+----
+
+If any of the above, does not work you, we'd like to refer you to the
+https://www.postgresql.org/docs/[PostgreSQL documentation].
+
+== `rolling-shutter chain`
+== `rolling-shutter keyper`
+Edit keyper.toml, copy deployments/goerli/,
+
+rolling-shutter keyper initdb --config keyper.toml
+== Running the collator
+== Deploying the contracts
+We use the https://hardhat.org/[hardhat framework] for deploying the
+contracts. Please make sure you have git installed and have a working nodejs
+16.x installation. The following command will checkout the source code and
+install hardhat:
+
+[source,shell]
+----
+git clone https://github.com/shutter-network/rolling-shutter
+cd rolling-shutter/contracts/
+npm install
+----
+You will now need to edit `hardhat-config.js` and define the network you will
+deploy to. E.g. if you're running a local goerli node and want to deploy via
+that node, add a `goerli` entry to the `networks` section:
+
+[source]
+----
+  ...
+  networks: {
+    goerli: {
+      url: "http://localhost:8545",
+      accounts: [
+        "YOUR PRIVATE KEY",
+      ],
+    },
+    hardhat: {
+  ...
+----
+
+You should be able to deploy the contracts now by running:
+[source,shell]
+----
+% npx hardhat deploy --network goerli
+Nothing to compile
+deploying "Keypers" (tx: 0xe3da42db5c50d0ff5737eb9558cbccff937a0b4b9fde69081d8d01aaf1376de3)...: deployed at 0x678865022e187081FA8F96DF2fBf25f0Cc38B4D7 with 1104318 gas
+deploying "KeyperConfig" (tx: 0xeee41f08661644f6afc2636c7585b51f72a2ab788e3358915c14b8a8c0f153c3)...: deployed at 0xe7bF7E4B9aE353EFC3c7120a769426101AB8219B with 1436682 gas
+deploying "Collator" (tx: 0x64049db773f72e90a910ecebefdb1f69a065f92408b589caf98aa103664cc29f)...: deployed at 0xFe08F343276001513C23CC6bc7889503Cd3a2168 with 1104318 gas
+deploying "CollatorConfig" (tx: 0x65c9631746037964dd84491bb95177fafcd0ef022e87027edcb751b6c1187e2c)...: deployed at 0xEf33ff9fD923d8aEf76c4A3122CE6Cc9233142D5 with 1168107 gas
+deploying "EonKeyStorage" (tx: 0x6862fa6a3ca90ae76c1e0ed92bd3ff8531d65f650e9c82732acc18a062489114)...: deployed at 0x327011390e5DD1e7C5E134fe2A315033a89fBa18 with 1230178 gas
+deploying "BatchCounter" (tx: 0x599a33a533120d7c2369277c540ccd55800b44841b38169bfce7d85af33f5353)...: deployed at 0x6AcB4F1CBF02Fc7e31bC090D09987042Ef93b623 with 275043 gas
+WARNING: cannot configure keypers: no keyper addresses given
+WARNING: cannot confgure collator: address not set
+fund: not doing any funding
+
+----
+
+
+More documentation on deploying contracts with hardhat can be found in the
+https://hardhat.org/tutorial/deploying-to-a-live-network[hardhat documentation
+on deploying contracts].
+
+=== Configuring the initial keyper set and collator
+We now need to configure the initial keyper set. The keyper set and collator
+will later be managed by the DAO. For now we assume we have collected the
+ethereum addresses of all keypers as well as the collator.
+
+Create a `deploy-conf.json` file that has the following structure. Please adapt
+the addresses:
+[source,json]
+----
+{
+  "keypers": [
+    "0x33f4C5746eBf8b0797C106ee117E46BCb246698b",
+    "0x9fb444c4E2454d42360956bb157A3277618FD1CA",
+    "0x7D0ae959294D0425D5Fb8Ab74bd0317fd0470D43"
+  ],
+  "collator": "0x3002033c69B3378b7A9bdF9A460f4aeB35e1753b",
+  "fundValue": ""
+}
+----
+
+Run the deployment script again, but set the `DEPLOY_CONF` environment variable:
+
+[source, shell]
+----
+% DEPLOY_CONF=deploy-conf.json npx hardhat deploy --network goerli
+Nothing to compile
+reusing "Keypers" at 0x678865022e187081FA8F96DF2fBf25f0Cc38B4D7
+reusing "KeyperConfig" at 0xe7bF7E4B9aE353EFC3c7120a769426101AB8219B
+reusing "Collator" at 0xFe08F343276001513C23CC6bc7889503Cd3a2168
+reusing "CollatorConfig" at 0xEf33ff9fD923d8aEf76c4A3122CE6Cc9233142D5
+reusing "EonKeyStorage" at 0x327011390e5DD1e7C5E134fe2A315033a89fBa18
+reusing "BatchCounter" at 0x6AcB4F1CBF02Fc7e31bC090D09987042Ef93b623
+[
+  '0x33f4C5746eBf8b0797C106ee117E46BCb246698b',
+  '0x9fb444c4E2454d42360956bb157A3277618FD1CA',
+  '0x7D0ae959294D0425D5Fb8Ab74bd0317fd0470D43'
+]
+configure keypers: activationBlockNumber 7020853, setIndex: 1, keypers: [
+  '0x33f4C5746eBf8b0797C106ee117E46BCb246698b',
+  '0x9fb444c4E2454d42360956bb157A3277618FD1CA',
+  '0x7D0ae959294D0425D5Fb8Ab74bd0317fd0470D43'
+]
+configure collator: activationBlockNumber 7020854 collator: 0x3002033c69B3378b7A9bdF9A460f4aeB35e1753b
+fund: not doing any funding
+----
+
+The deployment of the contracts will also create a directory
+`deployments/goerli`, which contains information about the deployed
+contracts. We need to zip that directory and distribute it to the keypers as
+well as the collator. The `rolling-shutter keyper` and `rolling-shutter
+collator` subcommands will read the information stored in the directory, which
+is specified with the `DeploymentDir` configuration option.
