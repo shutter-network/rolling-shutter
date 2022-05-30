@@ -83,14 +83,14 @@ func (bt *SortedUint64s) Insert(x uint64) {
 	(*bt)[i] = x
 }
 
-// TxByNonceAndTime implements the container/heap interface.
+// SortableTransactions implements the container/heap interface.
 // It allows to sort `PendingTransaction` transactions by Nonce,
 // and if the nonces are the same the transaction with
 // earlier receival time will come first in the sorted slice.
-type TxByNonceAndTime []*PendingTransaction
+type SortableTransactions []*PendingTransaction
 
-func (s TxByNonceAndTime) Len() int { return len(s) }
-func (s TxByNonceAndTime) Less(i, j int) bool {
+func (s SortableTransactions) Len() int { return len(s) }
+func (s SortableTransactions) Less(i, j int) bool {
 	// If the nonces are equal, use the time the transaction was last seen for
 	// deterministic sorting
 	if s[i].tx.Nonce() == s[j].tx.Nonce() {
@@ -98,13 +98,13 @@ func (s TxByNonceAndTime) Less(i, j int) bool {
 	}
 	return s[i].tx.Nonce() < s[j].tx.Nonce()
 }
-func (s TxByNonceAndTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortableTransactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-func (s *TxByNonceAndTime) Push(x interface{}) {
+func (s *SortableTransactions) Push(x interface{}) {
 	*s = append(*s, x.(*PendingTransaction))
 }
 
-func (s *TxByNonceAndTime) Pop() interface{} {
+func (s *SortableTransactions) Pop() interface{} {
 	old := *s
 	n := len(old)
 	if n == 0 {
@@ -115,7 +115,7 @@ func (s *TxByNonceAndTime) Pop() interface{} {
 	return x
 }
 
-func (s *TxByNonceAndTime) Peek() interface{} {
+func (s *SortableTransactions) Peek() interface{} {
 	old := *s
 	n := len(old)
 	if n == 0 {
@@ -126,7 +126,7 @@ func (s *TxByNonceAndTime) Peek() interface{} {
 
 func NewTransactionPool(signer txtypes.Signer) *TransactionPool {
 	return &TransactionPool{
-		txs:          make(map[common.Address]*TxByNonceAndTime, 0),
+		txs:          make(map[common.Address]*SortableTransactions, 0),
 		batchSenders: make(map[uint64]map[common.Address]bool, 0),
 		signer:       signer,
 		batches:      make(SortedUint64s, 0),
@@ -139,7 +139,7 @@ type TransactionPool struct {
 	signer txtypes.Signer
 	mux    sync.Mutex
 	// Per account nonce-sorted list of transactions
-	txs map[common.Address]*TxByNonceAndTime
+	txs map[common.Address]*SortableTransactions
 	// The set of tx sender addresses per batch
 	batchSenders map[uint64]map[common.Address]bool
 	// The sorted list of batch-indices currently in the Pool
@@ -228,7 +228,7 @@ func (t *TransactionPool) Push(pending *PendingTransaction) {
 	senders[pending.sender] = true
 	txs, exists := t.txs[pending.sender]
 	if !exists {
-		tx := make(TxByNonceAndTime, 0)
+		tx := make(SortableTransactions, 0)
 		txs = &tx
 		heap.Init(txs)
 		t.txs[pending.sender] = txs
