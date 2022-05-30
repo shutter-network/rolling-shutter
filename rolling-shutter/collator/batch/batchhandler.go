@@ -134,6 +134,10 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	if err != nil {
 		return errors.New("can't decode transaction bytes")
 	}
+	if tx.Type() != txtypes.ShutterTxType {
+		return errors.New("only encrypted shutter transactions allowed")
+
+	}
 
 	if tx.BatchIndex() > math.MaxUint32 {
 		return errors.New("batch index overflow")
