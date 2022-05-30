@@ -66,7 +66,7 @@ func TestTxByNonceAndTime(t *testing.T) {
 		return ptx
 	}
 
-	txs := make(TxByNonceAndTime, 0)
+	txs := make(SortableTransactions, 0)
 	tm := time.Now()
 
 	tx1 := makeTx(1, 1, tm.AddDate(0, 0, 1))
