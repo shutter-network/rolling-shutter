@@ -2,6 +2,7 @@ package keyper
 
 import (
 	"context"
+	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -88,7 +89,10 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, trigger.GetInstanceID())
 	}
 
-	blk := epochid.BlockNumber(trigger.EpochID)
+	blk := trigger.BlockNumber
+	if blk > math.MaxInt64 {
+		return false, errors.Errorf("block number %d overflows int64", blk)
+	}
 	chainCollator, err := kpr.db.GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("got decryption trigger with no collator for given block number: %d", blk)

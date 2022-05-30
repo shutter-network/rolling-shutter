@@ -22,12 +22,11 @@ type epochKGHandler struct {
 
 func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *shmsg.DecryptionTrigger) ([]shmsg.P2PMessage, error) {
 	log.Printf("received decryption trigger for epoch %d, sending decryption key share now.", msg.EpochID)
-	return h.sendDecryptionKeyShare(ctx, msg.EpochID)
+	return h.sendDecryptionKeyShare(ctx, msg.EpochID, int64(msg.BlockNumber))
 }
 
-func (h *epochKGHandler) sendDecryptionKeyShare(ctx context.Context, epochID uint64) ([]shmsg.P2PMessage, error) {
-	activationBlockNumber := epochid.BlockNumber(epochID)
-	eon, err := h.db.GetEonForBlockNumber(ctx, int64(activationBlockNumber))
+func (h *epochKGHandler) sendDecryptionKeyShare(ctx context.Context, epochID uint64, blockNumber int64) ([]shmsg.P2PMessage, error) {
+	eon, err := h.db.GetEonForBlockNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for epoch %d from db", epochID)
 	}

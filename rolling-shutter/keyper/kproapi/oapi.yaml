@@ -68,12 +68,12 @@ paths:
       description: Trigger decryption key generation for an epoch
       operationId: SubmitDecryptionTrigger
       requestBody:
-        description: Hex encoded ID of the epoch whose decryption key to generate
+        description: A decryption trigger specifying epoch and block number
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EpochID"
+              $ref: "#/components/schemas/DecryptionTrigger"
       responses:
         "200":
           description: success
@@ -93,6 +93,19 @@ components:
     DecryptionKey:
       type: string
       pattern: "^0x[0-9a-f]{16}$"
+
+    DecryptionTrigger:
+      type: object
+      required:
+        - epoch_id
+        - block_number
+      properties:
+        epoch_id:
+          type: string
+          pattern: "^0x[0-9a-f]{16}$"
+        block_number:
+          type: integer
+          minimum: 0
 
     Eon:
       type: object
