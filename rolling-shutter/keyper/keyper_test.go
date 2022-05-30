@@ -160,20 +160,20 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	collatorAddress2 := ethcrypto.PubkeyToAddress(collatorKey2.PublicKey)
 
 	// Make a db with collator 1 from a certain block and collator 2 afterwards
-	activationBlk1 := int64(0)
+	activationBlk1 := uint64(0)
 	epochID1 := uint64(0)
-	activationBlk2 := int64(123)
+	activationBlk2 := uint64(123)
 	epochID2 := epochid.New(0, uint32(activationBlk2))
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
 	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
-		ActivationBlockNumber: activationBlk1,
+		ActivationBlockNumber: int64(activationBlk1),
 		Collator:              collator1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
-		ActivationBlockNumber: activationBlk2,
+		ActivationBlockNumber: int64(activationBlk2),
 		Collator:              collator2,
 	})
 	assert.NilError(t, err)
@@ -183,46 +183,52 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	validateDecryptionTrigger := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionTrigger)
 
 	tests := []struct {
-		name       string
-		valid      bool
-		instanceID uint64
-		epochID    uint64
-		privKey    *ecdsa.PrivateKey
+		name        string
+		valid       bool
+		instanceID  uint64
+		epochID     uint64
+		blockNumber uint64
+		privKey     *ecdsa.PrivateKey
 	}{
 		{
-			name:       "valid trigger collator 1",
-			valid:      true,
-			instanceID: config.InstanceID,
-			epochID:    epochID1,
-			privKey:    collatorKey1,
+			name:        "valid trigger collator 1",
+			valid:       true,
+			instanceID:  config.InstanceID,
+			epochID:     epochID1,
+			blockNumber: activationBlk1,
+			privKey:     collatorKey1,
 		},
 		{
-			name:       "valid trigger collator 2",
-			valid:      true,
-			instanceID: config.InstanceID,
-			epochID:    epochID2,
-			privKey:    collatorKey2,
+			name:        "valid trigger collator 2",
+			valid:       true,
+			instanceID:  config.InstanceID,
+			epochID:     epochID2,
+			blockNumber: activationBlk2,
+			privKey:     collatorKey2,
 		},
 		{
-			name:       "invalid trigger wrong collator 1",
-			valid:      false,
-			instanceID: config.InstanceID,
-			epochID:    epochID2,
-			privKey:    collatorKey1,
+			name:        "invalid trigger wrong collator 1",
+			valid:       false,
+			instanceID:  config.InstanceID,
+			epochID:     epochID2,
+			blockNumber: activationBlk2,
+			privKey:     collatorKey1,
 		},
 		{
-			name:       "invalid trigger wrong collator 2",
-			valid:      false,
-			instanceID: config.InstanceID,
-			epochID:    epochID1,
-			privKey:    collatorKey2,
+			name:        "invalid trigger wrong collator 2",
+			valid:       false,
+			instanceID:  config.InstanceID,
+			epochID:     epochID1,
+			blockNumber: activationBlk1,
+			privKey:     collatorKey2,
 		},
 		{
-			name:       "invalid trigger wrong instanceID",
-			valid:      false,
-			instanceID: config.InstanceID + 1,
-			epochID:    epochID1,
-			privKey:    collatorKey1,
+			name:        "invalid trigger wrong instanceID",
+			valid:       false,
+			instanceID:  config.InstanceID + 1,
+			epochID:     epochID1,
+			blockNumber: activationBlk1,
+			privKey:     collatorKey1,
 		},
 	}
 	for _, tc := range tests {
@@ -230,6 +236,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 			msg, err := shmsg.NewSignedDecryptionTrigger(
 				tc.instanceID,
 				tc.epochID,
+				tc.blockNumber,
 				[]byte{},
 				tc.privKey,
 			)

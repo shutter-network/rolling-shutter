@@ -117,7 +117,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, "Invalid request for SubmitDecryptionTrigger")
 		return
 	}
-	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(requestBody), "0x"))
+	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(requestBody.EpochId, "0x"))
 	if err != nil {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
@@ -129,7 +129,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		config: srv.kpr.config,
 		db:     srv.kpr.db,
 	}
-	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID)
+	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())

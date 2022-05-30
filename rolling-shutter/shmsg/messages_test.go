@@ -39,18 +39,20 @@ func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
 }
 
 type testConfig struct {
-	epochID    uint64
-	instanceID uint64
-	tkg        *testkeygen.TestKeyGenerator
+	epochID     uint64
+	blockNumber uint64
+	instanceID  uint64
+	tkg         *testkeygen.TestKeyGenerator
 }
 
 func defaultTestConfig(t *testing.T) testConfig {
 	t.Helper()
 
 	return testConfig{
-		epochID:    epochid.New(2, 0),
-		instanceID: uint64(42),
-		tkg:        testkeygen.NewTestKeyGenerator(t, 1, 1),
+		epochID:     epochid.New(2, 0),
+		blockNumber: uint64(0),
+		instanceID:  uint64(42),
+		tkg:         testkeygen.NewTestKeyGenerator(t, 1, 1),
 	}
 }
 
@@ -121,7 +123,7 @@ func TestDecryptionTrigger(t *testing.T) {
 	privKey, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 
-	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, HashTransactions(txs), privKey)
+	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, cfg.blockNumber, HashTransactions(txs), privKey)
 	assert.NilError(t, err)
 	m := marshalUnmarshalMessage(t, orig)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionTrigger{}))
