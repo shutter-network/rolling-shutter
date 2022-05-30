@@ -9,25 +9,25 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 )
 
-// Batches represents a set of batch indices
+// SortedUint64s represents a set of batch indices
 // that remain sorted upon inserting and removing
 // values to the set.
-type Batches []uint64
+type SortedUint64s []uint64
 
-func (bt Batches) Len() int { return len(bt) }
-func (bt *Batches) Swap(i, j int) {
+func (bt SortedUint64s) Len() int { return len(bt) }
+func (bt *SortedUint64s) Swap(i, j int) {
 	(*bt)[i], (*bt)[j] = (*bt)[j], (*bt)[i]
 }
-func (bt Batches) Less(i, j int) bool { return bt[i] < bt[j] }
-func (bt Batches) Search(x uint64) int {
+func (bt SortedUint64s) Less(i, j int) bool { return bt[i] < bt[j] }
+func (bt SortedUint64s) Search(x uint64) int {
 	return sort.Search(bt.Len(), func(i int) bool { return bt[i] >= x })
 }
 
 // searchDoesExist returns the index where x should be
-// inserted in order for Batches to remain in sorted order.
+// inserted in order for the internal array to remain in sorted order.
 // The secondary return value indicates wether x is already
 // present in Batches.
-func (bt Batches) searchDoesExist(x uint64) (int, bool) {
+func (bt SortedUint64s) searchDoesExist(x uint64) (int, bool) {
 	i := bt.Search(x)
 	if i < bt.Len() && bt[i] == x {
 		// x is present at index i
@@ -38,12 +38,12 @@ func (bt Batches) searchDoesExist(x uint64) (int, bool) {
 	return i, false
 }
 
-func (bt Batches) Batches() []uint64 {
+func (bt SortedUint64s) ToUint64s() []uint64 {
 	return bt
 }
 
 // Has indicates wether x is already present in Batches.
-func (bt Batches) Has(x uint64) bool {
+func (bt SortedUint64s) Has(x uint64) bool {
 	if bt.Len() == 0 {
 		return false
 	}
@@ -51,10 +51,10 @@ func (bt Batches) Has(x uint64) bool {
 	return exists
 }
 
-// Removes removes x from Batches.
+// Removes removes x from SortedUint64s.
 // Since a value can only be inserted once, the remove operation
-// will leave Batches without any entry with value x.
-func (bt *Batches) Remove(x uint64) {
+// will leave SortedUint64s without any entry with value x.
+func (bt *SortedUint64s) Remove(x uint64) {
 	if bt.Len() == 0 {
 		return
 	}
@@ -64,10 +64,10 @@ func (bt *Batches) Remove(x uint64) {
 	}
 }
 
-// Insert inserts x into Batches, if x doesn't yet exist in Batches.
+// Insert inserts x into SortedUint64s, if x doesn't yet exist in SortedUint64s.
 // If x already exists, Insert does nothing.
-// The insert operation will leave Batches in sorted order.
-func (bt *Batches) Insert(x uint64) {
+// The insert operation will leave SortedUint64s in sorted order.
+func (bt *SortedUint64s) Insert(x uint64) {
 	var i int
 	if bt.Len() == 0 {
 		i = 0
@@ -129,7 +129,7 @@ func NewTransactionPool(signer txtypes.Signer) *TransactionPool {
 		txs:          make(map[common.Address]*TxByNonceAndTime, 0),
 		batchSenders: make(map[uint64]map[common.Address]bool, 0),
 		signer:       signer,
-		batches:      make(Batches, 0),
+		batches:      make(SortedUint64s, 0),
 	}
 }
 
@@ -143,10 +143,10 @@ type TransactionPool struct {
 	// The set of tx sender addresses per batch
 	batchSenders map[uint64]map[common.Address]bool
 	// The sorted list of batch-indices currently in the Pool
-	batches Batches
+	batches SortedUint64s
 }
 
-func (t *TransactionPool) Batches() Batches {
+func (t *TransactionPool) Batches() SortedUint64s {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 

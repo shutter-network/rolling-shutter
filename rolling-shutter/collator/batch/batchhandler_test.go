@@ -154,7 +154,7 @@ func TestHandlerStateProgression(t *testing.T) {
 	// check there should be 2 tx in the current batch
 	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epochid.New(1, 1))
 	assert.Equal(t, fixtures.batchHandler.latestBatch.Transactions().Len(), 2)
-	assert.DeepEqual(t, fixtures.batchHandler.txpool.Batches().Batches(), []uint64{2})
+	assert.DeepEqual(t, fixtures.batchHandler.txpool.Batches().ToUint64s(), []uint64{2})
 
 	// batch 2
 	msgs, err := fixtures.batchHandler.StartNextEpoch(ctx, uint32(1))

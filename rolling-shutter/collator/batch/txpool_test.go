@@ -10,7 +10,7 @@ import (
 )
 
 func TestBatches(t *testing.T) {
-	batches := make(Batches, 0)
+	batches := make(SortedUint64s, 0)
 	// Batches reorders the underlying array
 	// on insert
 	batches.Insert(2)
@@ -19,18 +19,18 @@ func TestBatches(t *testing.T) {
 	batches.Insert(1)
 
 	expected := []uint64{1, 2, 3, 5}
-	assert.DeepEqual(t, expected, batches.Batches())
+	assert.DeepEqual(t, expected, batches.ToUint64s())
 
 	batches.Remove(1)
 	batches.Remove(3)
 
 	expected = []uint64{2, 5}
-	assert.DeepEqual(t, expected, batches.Batches())
+	assert.DeepEqual(t, expected, batches.ToUint64s())
 
 	batches.Insert(4)
 
 	expected = []uint64{2, 4, 5}
-	assert.DeepEqual(t, expected, batches.Batches())
+	assert.DeepEqual(t, expected, batches.ToUint64s())
 
 	batches.Remove(5)
 	batches.Remove(2)
@@ -126,7 +126,7 @@ func TestTxPool(t *testing.T) {
 	txpool.Push(tx2)
 
 	expected := []uint64{1, 2}
-	assert.DeepEqual(t, expected, txpool.Batches().Batches())
+	assert.DeepEqual(t, expected, txpool.Batches().ToUint64s())
 
 	assert.Equal(t, len(txpool.Senders(1)), 1)
 	assert.Equal(t, len(txpool.Senders(2)), 1)
