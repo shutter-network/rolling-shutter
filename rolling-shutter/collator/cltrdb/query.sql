@@ -17,6 +17,11 @@ UPDATE eon_public_key_candidate
 SET confirmed=TRUE
 WHERE hash=$1;
 
+-- name: GetEonPublicKey :one
+SELECT * FROM eon_public_key_candidate
+WHERE confirmed AND eon = $1
+LIMIT 1;
+
 -- name: FindEonPublicKeyForBlock :one
 SELECT * FROM eon_public_key_candidate
 WHERE confirmed AND activation_block_number <= sqlc.arg(blocknumber)
