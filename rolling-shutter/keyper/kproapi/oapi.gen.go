@@ -57,8 +57,8 @@ type SubmitDecryptionTriggerJSONRequestBody SubmitDecryptionTriggerJSONBody
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /decryptionKey/{epochID})
-	GetDecryptionKey(w http.ResponseWriter, r *http.Request, epochID EpochID)
+	// (GET /decryptionKey/{eon}/{epochID})
+	GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID EpochID)
 
 	// (POST /decryptionTrigger)
 	SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Request)
@@ -85,6 +85,15 @@ func (siw *ServerInterfaceWrapper) GetDecryptionKey(w http.ResponseWriter, r *ht
 
 	var err error
 
+	// ------------- Path parameter "eon" -------------
+	var eon int
+
+	err = runtime.BindStyledParameter("simple", false, "eon", chi.URLParam(r, "eon"), &eon)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eon", Err: err})
+		return
+	}
+
 	// ------------- Path parameter "epochID" -------------
 	var epochID EpochID
 
@@ -95,7 +104,7 @@ func (siw *ServerInterfaceWrapper) GetDecryptionKey(w http.ResponseWriter, r *ht
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDecryptionKey(w, r, epochID)
+		siw.Handler.GetDecryptionKey(w, r, eon, epochID)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -264,7 +273,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/decryptionKey/{epochID}", wrapper.GetDecryptionKey)
+		r.Get(options.BaseURL+"/decryptionKey/{eon}/{epochID}", wrapper.GetDecryptionKey)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/decryptionTrigger", wrapper.SubmitDecryptionTrigger)
@@ -282,20 +291,20 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/8xV32+kNhD+V6zpSX0hC/dDlcrbVYmqVVXppOYtTSNjBvAFbNce0qCI/70aQ7Kwy/aa",
-	"qifd07KYmW++bz7PPIGynbMGDQXInyCoBjsZHy9R+cGRtuYXHPiFk0ToDeTwR/Z4k138KC+q26e3P4xv",
-	"IAEaHEIOgbw2NYzJIvza67pGH1N469CTxohQtFbd35m+K6bTThvd9R3k2Us+bQg5dkwAnVXNnS5fW8qY",
-	"gMc/e+2xhPzmkCZZ49++BNriMypiyCtrTquWivSDZGJ3ryRgzd39f5Gy0kaHBiPz+bCwtkVp+FSbEh+/",
-	"jB56pTCEqm+30hyJNOVMznI9kFlUt8I4I2dUUBN28eGNxwpy+C49mDCdHZiy9uNLEum9HGIObt/+8vUi",
-	"XnlvNzyobIn8W1nfSZoke/8OthTsMARZ40K+MxaLOQ/fn0oxxrZVdirAkFTEj0Z2MWvTM7ELg/SX9feQ",
-	"QO9byKEhcnmazse7+Tjl0koMyut42yCH60YHMb0qMAhqUHjbttrUYg7+Poh7HBx68fHTHhJotUITcFHE",
-	"r/vrKL+mlv8exc/RkMAD+jChZru3u4xjrEMjnYYc3u+yXQYJd6qJaqflcqikTzh1c+SzGqMIayo/I8X6",
-	"D3EMLSrrhTQihov9JURQH426L6ew9fjiGrzskNAHyG+OYa7mRMJWW3BkBVfHTYM8soHkWaiZAiwtQL7H",
-	"ZJ6lX/T5HD+Ot5wiOGvCZM13WfZsEDRRG+lcq1WkmX4O03D6dyhrNaIBjz1zzJpb+SH7cNoT5Jsk9KZS",
-	"jQzCWBIFohE1Gm4KlmJAmmxayb6l/43VdKc32PQGHx0qhsbnb8Zkab/lUrJhw3nzB8cEZ078d2nCEwf+",
-	"1hedptMlONkEA/1ky+ErtPcZZ0OUj0suNNMLDpWuBr7b022SphRx1ouXWb829rht0zXWvAm+iabjvHbO",
-	"DhgexTz9WRdZ2J6EbFsRSHrC8nezNV3iKvuK9zXm3+C4/6dSRWT6LUjueC2ek/yTNvW0lQL6B/QbCvMn",
-	"a3lN37ac/O8AAAD//z411DOxCgAA",
+	"H4sIAAAAAAAC/8xV32vjRhD+V5bpQV8US/eDQvV2JaGYUjho3tI0rKWRtRdpdrs7SmOM/vcyKyWWbDnX",
+	"HD24J6+1Oz++b76Z2UNhW2cJiQPkewhFja2Ox0ss/M6xsfQb7uSD08zoCXL4K3u8yS5+1hfV7f7tT/0b",
+	"SIB3DiGHwN7QFvpkYn7tzXaLPrrw1qFngzHCprHF/R117Wa4bQ2Ztmshz579GWIU2z4BdLao70z52lT6",
+	"BDz+3RmPJeQ3BzfJPP7ts6HdfMaCJeSVpdOsdcHmQQuwu1cCsHR3/zVUVoZMqDEiHy831jaoSW4Nlfj4",
+	"5eihKwoMoeqaJTdHJA0+k7NYD2Am2c1inKEzMmgY23h447GCHH5IDyJMRwWmwn3/7ER7r3fRh5Rvffl6",
+	"Eq+8twsaLGyJ8ltZ32oeKHv/DpYYbDEEvcUJfWckFn0e3p9S0ceyVXZIgFgXLEfSbfRadwLsgpD/sf4e",
+	"Euh8AznUzC5P0/F6NV6nklqJofAmdhvkcF2boIZPGwyKa1TeNo2hrRqNfwzqHncOvfr4aQ0JNKZACjhJ",
+	"4vf1daTfcCN/j+xHa0jgAX0Yomart6tMbKxD0s5ADu9X2SqDRCpVR7bTcjpU0j1a6tM9DjXt5cUWIxVz",
+	"QL8iRxQHa0lAVdYrTSqaq/UlxNA+ynVdDmbzISaZeN0iow+Q3xyHubKkbLUUia2SxKRqkEc4kDwxhZZg",
+	"Wn/2HSbjIP1SW/bJSQ4jmK9JZGyNl5J5seNG+76/FRfBWQpDk7zLsiepIsX6aOcaU0Sq089hGJP/Lcq8",
+	"IrEVjtV7jFpE9SH7cKoLlJ5WZpGpWgdFltUGkdQWSYSBpdohDw1T6a7h/w3VMF0W0HSEjw4LCY1Pb/pk",
+	"2gjT9WjDgvrHB8cAR0zyd9oIJ13wR7dpDZ+u40EmGPgXW+6+QXmf4iyQ8nGKhUd4wWFhqp1MmaGjNZUq",
+	"bh31vHXmwu6XZTqPNe6k76LoOC7As0NOloLsIeFFb2zHSjeNCqw9Y/knLU24uFS/Yb9G/wsY1y+lqiLS",
+	"74FyJwv6HOWfDG2H/RjQP6BfYFiezOmlrmnE+b8BAAD//1Yw9QY7CwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -34,7 +34,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("pong"))
 }
 
-func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epochID kproapi.EpochID) {
+func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
 	db := kprdb.New(srv.kpr.dbpool)
 
@@ -44,7 +44,10 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epoc
 		return
 	}
 
-	decryptionKey, err := db.GetDecryptionKey(ctx, epochIDBytes)
+	decryptionKey, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
+		Eon:     int64(eon),
+		EpochID: epochIDBytes,
+	})
 	if err == pgx.ErrNoRows {
 		sendError(w, http.StatusNotFound, "no decryption key found for given epoch")
 		return

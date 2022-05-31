@@ -9,7 +9,6 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -18,21 +17,23 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	if key.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, key.GetInstanceID())
 	}
+	if key.Eon > math.MaxInt64 {
+		return false, errors.Errorf("eon %d overflows int64", key.Eon)
+	}
 
-	activationBlockNumber := epochid.BlockNumber(key.EpochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
-		return false, errors.Errorf("no DKG result found for epoch %d", key.EpochID)
+		return false, errors.Errorf("no DKG result found for eon %d", key.Eon)
 	}
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get dkg result for epoch %d from db", key.EpochID)
+		return false, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
 	}
 	if !dkgResultDB.Success {
-		return false, errors.Errorf("no successful DKG result found for epoch %d", key.EpochID)
+		return false, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while decoding pure DKG result for epoch %d", key.EpochID)
+		return false, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
 	}
 	epochSecretKey, err := key.GetEpochSecretKey()
 	if err != nil {

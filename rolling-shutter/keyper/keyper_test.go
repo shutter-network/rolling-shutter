@@ -31,6 +31,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 
 	config := newTestConfig(t)
 	keyperIndex := uint64(1)
+	eon := uint64(0)
 	epochID := uint64(0)
 	wrongEpochID := uint64(1)
 	tkg := initializeEon(ctx, t, db, config, keyperIndex)
@@ -56,6 +57,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
+				Eon:        eon,
 				EpochID:    epochID,
 				Key:        secretKey,
 			},
@@ -66,6 +68,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
+				Eon:        eon,
 				EpochID:    wrongEpochID,
 				Key:        secretKey,
 			},
@@ -76,6 +79,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKey,
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
+				Eon:        eon,
 				EpochID:    epochID,
 				Key:        secretKey,
 			},
@@ -86,6 +90,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
+				Eon:         eon,
 				EpochID:     epochID,
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
@@ -97,6 +102,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
+				Eon:         eon,
 				EpochID:     epochID + 1,
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
@@ -108,6 +114,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID + 1,
+				Eon:         eon,
 				EpochID:     epochID,
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
@@ -119,6 +126,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			validator: validateDecryptionKeyShare,
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
+				Eon:         eon,
 				EpochID:     epochID,
 				KeyperIndex: keyperIndex + 1,
 				Share:       keyshare,
