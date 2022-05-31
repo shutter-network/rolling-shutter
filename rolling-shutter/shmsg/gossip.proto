@@ -22,8 +22,9 @@ message DecryptionKeyShare {
 
 message DecryptionKey {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
-    bytes key = 3;
+    uint64 eon = 2;
+    uint64 epochID = 3;
+    bytes key = 4;
 }
 
 // EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain

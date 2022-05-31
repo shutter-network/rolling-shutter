@@ -13,8 +13,10 @@ CREATE TABLE decryption_key_share (
        PRIMARY KEY (eon, epoch_id, keyper_index)
 );
 CREATE TABLE decryption_key (
-       epoch_id bytea PRIMARY KEY,
-       decryption_key bytea
+       eon bigint,
+       epoch_id bytea,
+       decryption_key bytea,
+       PRIMARY KEY (eon, epoch_id)
 );
 
 ----- tendermint events

@@ -181,6 +181,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
+	eon := uint64(2)
 	epochID := uint64(50)
 	keyperIndex := uint64(1)
 
@@ -195,12 +196,16 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	// send a decryption key and check that it gets inserted
 	msgs, err := handler.handleDecryptionKey(ctx, &shmsg.DecryptionKey{
 		InstanceID: 0,
+		Eon:        eon,
 		EpochID:    epochID,
 		Key:        tkg.EpochSecretKey(epochID).Marshal(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
-	key, err := db.GetDecryptionKey(ctx, shdb.EncodeUint64(epochID))
+	key, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
+		Eon:     int64(eon),
+		EpochID: shdb.EncodeUint64(epochID),
+	})
 	assert.NilError(t, err)
 	assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKey))
 }

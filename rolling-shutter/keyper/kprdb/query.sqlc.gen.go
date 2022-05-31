@@ -106,12 +106,17 @@ const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1
     FROM decryption_key
-    WHERE epoch_id = $1
+    WHERE eon = $1 AND epoch_id = $2
 )
 `
 
-func (q *Queries) ExistsDecryptionKey(ctx context.Context, epochID []byte) (bool, error) {
-	row := q.db.QueryRow(ctx, existsDecryptionKey, epochID)
+type ExistsDecryptionKeyParams struct {
+	Eon     int64
+	EpochID []byte
+}
+
+func (q *Queries) ExistsDecryptionKey(ctx context.Context, arg ExistsDecryptionKeyParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDecryptionKey, arg.Eon, arg.EpochID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -301,14 +306,19 @@ func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber in
 }
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
-SELECT epoch_id, decryption_key FROM decryption_key
-WHERE epoch_id = $1
+SELECT eon, epoch_id, decryption_key FROM decryption_key
+WHERE eon = $1 AND epoch_id = $2
 `
 
-func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (DecryptionKey, error) {
-	row := q.db.QueryRow(ctx, getDecryptionKey, epochID)
+type GetDecryptionKeyParams struct {
+	Eon     int64
+	EpochID []byte
+}
+
+func (q *Queries) GetDecryptionKey(ctx context.Context, arg GetDecryptionKeyParams) (DecryptionKey, error) {
+	row := q.db.QueryRow(ctx, getDecryptionKey, arg.Eon, arg.EpochID)
 	var i DecryptionKey
-	err := row.Scan(&i.EpochID, &i.DecryptionKey)
+	err := row.Scan(&i.Eon, &i.EpochID, &i.DecryptionKey)
 	return i, err
 }
 
@@ -513,18 +523,19 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 }
 
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
-INSERT INTO decryption_key (epoch_id, decryption_key)
-VALUES ($1, $2)
+INSERT INTO decryption_key (eon, epoch_id, decryption_key)
+VALUES ($1, $2, $3)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyParams struct {
+	Eon           int64
 	EpochID       []byte
 	DecryptionKey []byte
 }
 
 func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.DecryptionKey)
+	return q.db.Exec(ctx, insertDecryptionKey, arg.Eon, arg.EpochID, arg.DecryptionKey)
 }
 
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec

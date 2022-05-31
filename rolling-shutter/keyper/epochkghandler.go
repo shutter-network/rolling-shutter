@@ -174,7 +174,10 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 	}
 
 	// Check that we don't know the decryption key yet
-	keyExists, err := h.db.ExistsDecryptionKey(ctx, shdb.EncodeUint64(msg.EpochID))
+	keyExists, err := h.db.ExistsDecryptionKey(ctx, kprdb.ExistsDecryptionKeyParams{
+		Eon:     int64(msg.Eon),
+		EpochID: shdb.EncodeUint64(msg.EpochID),
+	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query decryption key for epoch %d", msg.EpochID)
 	}
@@ -217,6 +220,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 
 	// send decryption key
 	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
+		Eon:           int64(msg.Eon),
 		EpochID:       shdb.EncodeUint64(msg.EpochID),
 		DecryptionKey: decryptionKeyEncoded,
 	})
@@ -231,6 +235,7 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 	return []shmsg.P2PMessage{
 		&shmsg.DecryptionKey{
 			InstanceID: h.config.InstanceID,
+			Eon:        msg.Eon,
 			EpochID:    msg.EpochID,
 			Key:        decryptionKeyEncoded,
 		},
@@ -241,6 +246,7 @@ func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *shmsg.Dec
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
 	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
+		Eon:           int64(msg.Eon),
 		EpochID:       shdb.EncodeUint64(msg.EpochID),
 		DecryptionKey: msg.Key,
 	})
