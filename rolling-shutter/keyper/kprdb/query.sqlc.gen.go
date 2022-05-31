@@ -44,11 +44,16 @@ func (q *Queries) CountBatchConfigsInBlockRange(ctx context.Context, arg CountBa
 
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
 SELECT count(*) FROM decryption_key_share
-WHERE epoch_id = $1
+WHERE eon = $1 AND epoch_id = $2
 `
 
-func (q *Queries) CountDecryptionKeyShares(ctx context.Context, epochID []byte) (int64, error) {
-	row := q.db.QueryRow(ctx, countDecryptionKeyShares, epochID)
+type CountDecryptionKeySharesParams struct {
+	Eon     int64
+	EpochID []byte
+}
+
+func (q *Queries) CountDecryptionKeyShares(ctx context.Context, arg CountDecryptionKeySharesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countDecryptionKeyShares, arg.Eon, arg.EpochID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -116,17 +121,18 @@ const existsDecryptionKeyShare = `-- name: ExistsDecryptionKeyShare :one
 SELECT EXISTS (
     SELECT 1
     FROM decryption_key_share
-    WHERE epoch_id = $1 AND keyper_index = $2
+    WHERE eon = $1 AND epoch_id = $2 AND keyper_index = $3
 )
 `
 
 type ExistsDecryptionKeyShareParams struct {
+	Eon         int64
 	EpochID     []byte
 	KeyperIndex int64
 }
 
 func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryptionKeyShareParams) (bool, error) {
-	row := q.db.QueryRow(ctx, existsDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
+	row := q.db.QueryRow(ctx, existsDecryptionKeyShare, arg.Eon, arg.EpochID, arg.KeyperIndex)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -307,19 +313,25 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 }
 
 const getDecryptionKeyShare = `-- name: GetDecryptionKeyShare :one
-SELECT epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
-WHERE epoch_id = $1 AND keyper_index = $2
+SELECT eon, epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
+WHERE eon = $1 AND epoch_id = $2 AND keyper_index = $3
 `
 
 type GetDecryptionKeyShareParams struct {
+	Eon         int64
 	EpochID     []byte
 	KeyperIndex int64
 }
 
 func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKeyShareParams) (DecryptionKeyShare, error) {
-	row := q.db.QueryRow(ctx, getDecryptionKeyShare, arg.EpochID, arg.KeyperIndex)
+	row := q.db.QueryRow(ctx, getDecryptionKeyShare, arg.Eon, arg.EpochID, arg.KeyperIndex)
 	var i DecryptionKeyShare
-	err := row.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare)
+	err := row.Scan(
+		&i.Eon,
+		&i.EpochID,
+		&i.KeyperIndex,
+		&i.DecryptionKeyShare,
+	)
 	return i, err
 }
 
@@ -516,18 +528,24 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 }
 
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
-INSERT INTO decryption_key_share (epoch_id, keyper_index, decryption_key_share)
-VALUES ($1, $2, $3)
+INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
+VALUES ($1, $2, $3, $4)
 `
 
 type InsertDecryptionKeyShareParams struct {
+	Eon                int64
 	EpochID            []byte
 	KeyperIndex        int64
 	DecryptionKeyShare []byte
 }
 
 func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryptionKeyShareParams) error {
-	_, err := q.db.Exec(ctx, insertDecryptionKeyShare, arg.EpochID, arg.KeyperIndex, arg.DecryptionKeyShare)
+	_, err := q.db.Exec(ctx, insertDecryptionKeyShare,
+		arg.Eon,
+		arg.EpochID,
+		arg.KeyperIndex,
+		arg.DecryptionKeyShare,
+	)
 	return err
 }
 
@@ -678,12 +696,17 @@ func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutte
 }
 
 const selectDecryptionKeyShares = `-- name: SelectDecryptionKeyShares :many
-SELECT epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
-WHERE epoch_id = $1
+SELECT eon, epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
+WHERE eon = $1 AND epoch_id = $2
 `
 
-func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte) ([]DecryptionKeyShare, error) {
-	rows, err := q.db.Query(ctx, selectDecryptionKeyShares, epochID)
+type SelectDecryptionKeySharesParams struct {
+	Eon     int64
+	EpochID []byte
+}
+
+func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, arg SelectDecryptionKeySharesParams) ([]DecryptionKeyShare, error) {
+	rows, err := q.db.Query(ctx, selectDecryptionKeyShares, arg.Eon, arg.EpochID)
 	if err != nil {
 		return nil, err
 	}
@@ -691,7 +714,12 @@ func (q *Queries) SelectDecryptionKeyShares(ctx context.Context, epochID []byte)
 	var items []DecryptionKeyShare
 	for rows.Next() {
 		var i DecryptionKeyShare
-		if err := rows.Scan(&i.EpochID, &i.KeyperIndex, &i.DecryptionKeyShare); err != nil {
+		if err := rows.Scan(
+			&i.Eon,
+			&i.EpochID,
+			&i.KeyperIndex,
+			&i.DecryptionKeyShare,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

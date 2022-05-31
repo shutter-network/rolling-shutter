@@ -51,20 +51,22 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shm
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, keyShare.GetInstanceID())
 	}
 
-	activationBlockNumber := epochid.BlockNumber(keyShare.EpochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+	if keyShare.Eon > math.MaxInt64 {
+		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
+	}
+	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
-		return false, errors.Errorf("no DKG result found for epoch %d", keyShare.EpochID)
+		return false, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
 	}
 	if err != nil {
-		return false, errors.Errorf("failed to get dkg result for epoch %d from db", keyShare.EpochID)
+		return false, errors.Errorf("failed to get dkg result for eon %d from db", keyShare.Eon)
 	}
 	if !dkgResultDB.Success {
-		return false, errors.Errorf("no successful DKG result found for epoch %d", keyShare.EpochID)
+		return false, errors.Errorf("no successful DKG result found for eon %d", keyShare.Eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return false, errors.Errorf("error while decoding pure DKG result for epoch %d", keyShare.EpochID)
+		return false, errors.Errorf("error while decoding pure DKG result for eon %d", keyShare.Eon)
 	}
 	epochSecretKeyShare, err := keyShare.GetEpochSecretKeyShare()
 	if err != nil {

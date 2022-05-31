@@ -6,10 +6,11 @@ CREATE TABLE decryption_trigger (
        epoch_id bytea PRIMARY KEY
 );
 CREATE TABLE decryption_key_share (
+       eon bigint,
        epoch_id bytea,
        keyper_index bigint,
        decryption_key_share bytea,
-       PRIMARY KEY (epoch_id, keyper_index)
+       PRIMARY KEY (eon, epoch_id, keyper_index)
 );
 CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,
