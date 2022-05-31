@@ -59,6 +59,12 @@ func GetNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
 	return shdb.DecodeUint64(epochID), nil
 }
 
+// NewBatchHandler initializes a new instance of BatchHandler.
+// NewBatchHandler connects to the sequencer and queries
+// some node information (chain-id, latest block) and if we recover
+// pending transactions from the database it will also query state
+// information for the corresponding accounts (nonce, balance) in
+// order to validate and apply the transactions to the current pending batch.
 func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, error) {
 	ctx := context.Background()
 
@@ -67,20 +73,27 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 		return nil, err
 	}
 	l2EthClient := ethclient.NewClient(l2Client)
+	// This will already do a query to the l2-client
 	chainID, err := l2EthClient.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	signer := txtypes.LatestSignerForChainID(chainID)
 
-	return &BatchHandler{
+	bh := &BatchHandler{
 		l2Client:    l2Client,
 		l2EthClient: l2EthClient,
 		config:      cfg,
 		signer:      signer,
 		txpool:      NewTransactionPool(signer),
 		dbpool:      dbpool,
-	}, nil
+	}
+	// This will do more queries to the l2-client
+	err = bh.initialiseEpoch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return bh, nil
 }
 
 // BatchHandler is a threadsafe handler to process the following actions
@@ -136,7 +149,6 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	}
 	if tx.Type() != txtypes.ShutterTxType {
 		return errors.New("only encrypted shutter transactions allowed")
-
 	}
 
 	if tx.BatchIndex() > math.MaxUint32 {
@@ -327,11 +339,11 @@ func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID uint64,
 	return outMessages, nil
 }
 
-// InitialiseEpoch sets the state of the BatchHandler class upon startup
+// initialiseEpoch sets the state of the BatchHandler class upon startup
 // and looks for pending, but not updated transactions in the database.
 // Note that the collatordb's GetNextEpochID() is used to determine the
 // current pending epoch-id.
-func (bh *BatchHandler) InitialiseEpoch(ctx context.Context) error {
+func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
 	return bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow processing transactions at the same time
 		_, err := tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
@@ -340,7 +352,9 @@ func (bh *BatchHandler) InitialiseEpoch(ctx context.Context) error {
 		}
 		db := cltrdb.New(tx)
 		epochID, err := GetNextEpochID(ctx, db)
-		if err != nil {
+		if err == pgx.ErrNoRows {
+			return errors.Wrap(err, "epoch id not initialized in database")
+		} else if err != nil {
 			return err
 		}
 		// either read in the latest unsubmitted txs from the DB,

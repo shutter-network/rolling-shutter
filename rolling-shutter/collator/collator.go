@@ -71,12 +71,12 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	batchHandler, err := batch.NewBatchHandler(cfg, dbpool)
+	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts)
 	if err != nil {
 		return err
 	}
 
-	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts, batchHandler)
+	batchHandler, err := batch.NewBatchHandler(cfg, dbpool)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 }
 
 // initializeEpochID populate the epoch_id table with a valid value if it is empty.
-func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts, bh *batch.BatchHandler) error {
+func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
 		blk, err := getBlockNumber(ctx, contracts.Client)
@@ -116,7 +116,7 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 	} else if err != nil {
 		return err
 	}
-	return bh.InitialiseEpoch(ctx)
+	return nil
 }
 
 func (c *collator) setupP2PHandler() {
