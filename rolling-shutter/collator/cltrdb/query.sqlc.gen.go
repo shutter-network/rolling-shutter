@@ -111,6 +111,26 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 	return i, err
 }
 
+const getEonPublicKey = `-- name: GetEonPublicKey :one
+SELECT hash, eon_public_key, activation_block_number, keyper_config_index, eon, confirmed FROM eon_public_key_candidate
+WHERE confirmed AND eon = $1
+LIMIT 1
+`
+
+func (q *Queries) GetEonPublicKey(ctx context.Context, eon int64) (EonPublicKeyCandidate, error) {
+	row := q.db.QueryRow(ctx, getEonPublicKey, eon)
+	var i EonPublicKeyCandidate
+	err := row.Scan(
+		&i.Hash,
+		&i.EonPublicKey,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.Eon,
+		&i.Confirmed,
+	)
+	return i, err
+}
+
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
 SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `

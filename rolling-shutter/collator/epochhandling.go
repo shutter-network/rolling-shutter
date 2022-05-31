@@ -3,6 +3,7 @@ package collator
 import (
 	"context"
 	"log"
+	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -52,11 +53,13 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	if key.GetInstanceID() != c.Config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", c.Config.InstanceID, key.GetInstanceID())
 	}
+	if key.Eon > math.MaxInt64 {
+		return false, errors.Errorf("eon %d overflows int64", key.Eon)
+	}
 
 	err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
-		msgActivationBlock := int64(epochid.BlockNumber(key.EpochID))
-		eonPub, err := db.FindEonPublicKeyForBlock(ctx, msgActivationBlock)
+		eonPub, err := db.GetEonPublicKey(ctx, int64(key.Eon))
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve EonPublicKey from DB")
 		}
