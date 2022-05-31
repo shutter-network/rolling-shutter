@@ -15,27 +15,27 @@ SELECT EXISTS (
 );
 
 -- name: InsertDecryptionKeyShare :exec
-INSERT INTO decryption_key_share (epoch_id, keyper_index, decryption_key_share)
-VALUES ($1, $2, $3);
+INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
+VALUES ($1, $2, $3, $4);
 
 -- name: SelectDecryptionKeyShares :many
 SELECT * FROM decryption_key_share
-WHERE epoch_id = $1;
+WHERE eon = $1 AND epoch_id = $2;
 
 -- name: GetDecryptionKeyShare :one
 SELECT * FROM decryption_key_share
-WHERE epoch_id = $1 AND keyper_index = $2;
+WHERE eon = $1 AND epoch_id = $2 AND keyper_index = $3;
 
 -- name: ExistsDecryptionKeyShare :one
 SELECT EXISTS (
     SELECT 1
     FROM decryption_key_share
-    WHERE epoch_id = $1 AND keyper_index = $2
+    WHERE eon = $1 AND epoch_id = $2 AND keyper_index = $3
 );
 
 -- name: CountDecryptionKeyShares :one
 SELECT count(*) FROM decryption_key_share
-WHERE epoch_id = $1;
+WHERE eon = $1 AND epoch_id = $2;
 
 -- name: InsertBatchConfig :exec
 INSERT INTO tendermint_batch_config (keyper_config_index, height, keypers, threshold, started, activation_block_number)

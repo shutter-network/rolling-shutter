@@ -14,9 +14,10 @@ message DecryptionTrigger {
 // TODO: replace keyper index by signature
 message DecryptionKeyShare {
     uint64 instanceID = 1;
+    uint64 eon = 4;
     uint64 epochID = 2;
-    uint64 keyperIndex = 3;
-    bytes share = 4;
+    uint64 keyperIndex = 5;
+    bytes share = 6;
 }
 
 message DecryptionKey {
