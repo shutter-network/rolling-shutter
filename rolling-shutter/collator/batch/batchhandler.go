@@ -248,16 +248,12 @@ func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *PendingTransaction) e
 	if batch == nil {
 		return errors.New("batch is not submittable")
 	}
-	ok, err := batch.ValidateTx(ctx, tx)
-	if !ok {
+	err := batch.ValidateTx(ctx, tx)
+	if err != nil {
 		return errors.Wrap(err, "tx not valid")
 	}
-
+	err = batch.ApplyTx(ctx, tx)
 	if err != nil {
-		return err
-	}
-	ok, err = batch.ApplyTx(ctx, tx)
-	if !ok {
 		return errors.Wrap(err, "can't apply tx")
 	}
 
@@ -438,7 +434,7 @@ func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Q
 		var tx txtypes.Transaction
 		err := tx.UnmarshalBinary(txBytes)
 		if err != nil {
-			// This shouldn't happen, since the tx was once instantiated and validated
+			// This shouldn't happen, since the tx was once unmarshalled
 			// before being written to DB
 			err = errors.Wrap(err, "error during unmarshaling transactions from DB")
 			fmt.Println(err)
@@ -451,24 +447,18 @@ func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Q
 		recoverTime := time.Now()
 		p, err := batch.NewPendingTransaction(&tx, txBytes, recoverTime)
 		if err != nil {
-			// This shouldn't happen, since the tx was once instantiated and validated
-			// before being written to DB
 			err = errors.Wrap(err, "error during recovering transactions from DB")
 			fmt.Println(err)
 			continue
 		}
-		ok, err := batch.ValidateTx(ctx, p)
-		if err != nil || !ok {
-			// This shouldn't happen, since the tx was once instantiated and validated
-			// before being written to DB
+		err = batch.ValidateTx(ctx, p)
+		if err != nil {
 			err = errors.Wrap(err, "validation error during recovering transactions from DB")
 			fmt.Println(err)
 			continue
 		}
-		ok, err = batch.ApplyTx(ctx, p)
-		if err != nil || !ok {
-			// This shouldn't happen, since the tx was once instantiated and validated
-			// before being written to DB
+		err = batch.ApplyTx(ctx, p)
+		if err != nil {
 			err = errors.Wrap(err, "error during applying recovered transactions from DB")
 			fmt.Println(err)
 			continue

@@ -146,13 +146,13 @@ func (b *Batch) NewPendingTransaction(tx *txtypes.Transaction, txRaw []byte, rec
 //    b) has enough balance at the senders account in order to pay the
 //        tansactions gas fees, also considering all previous locally
 //        included transactions in that batch
-func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) (bool, error) {
+func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) error {
 	currentNonce, err := b.state.GetNonce(ctx, p.sender)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if p.tx.Nonce() != currentNonce {
-		return false, errors.Errorf("nonce mismatch, want: %d,got: %d", currentNonce, p.tx.Nonce())
+		return errors.Errorf("nonce mismatch, want: %d,got: %d", currentNonce, p.tx.Nonce())
 	}
 
 	if err := ValidateGasParams(p.tx, b.block.BaseFee()); err != nil {
@@ -162,40 +162,40 @@ func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) (bool, er
 	p.minerFee = CalculatePriorityFee(p.tx, b.block.BaseFee())
 	balance, err := b.state.GetBalance(ctx, p.sender)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if balance.Cmp(p.gasCost) < 0 {
-		return false, errors.New("not enough funds to pay gas fee")
+		return errors.New("not enough funds to pay gas fee")
 	}
-	return true, nil
+	return nil
 }
 
 // ApplyTx will include the transaction `p` in the local batch-state and
 // will modify the batches local state to include the nonce and balance changes.
 // ApplyTx can fail when the transaction's inclusion would surpass the batches
 // gas limit.
-func (b *Batch) ApplyTx(ctx context.Context, p *PendingTransaction) (bool, error) {
+func (b *Batch) ApplyTx(ctx context.Context, p *PendingTransaction) error {
 	b.mux.Lock()
 	defer b.mux.Unlock()
 
 	err := b.gasPool.SubGas(p.tx.Gas())
 	if err != nil {
 		// gas limit reached
-		return false, err
+		return err
 	}
 	err = b.state.SubBalance(ctx, p.sender, p.gasCost)
 	if err != nil {
-		return false, err
+		return err
 	}
 	// not really necessary, only to e.g. observe the total gained fee
 	err = b.state.AddBalance(ctx, b.block.Coinbase(), p.minerFee)
 	if err != nil {
-		return false, err
+		return err
 	}
 	b.state.SetNonce(p.sender, p.tx.Nonce()+1)
 
 	b.transactions.Enqueue(p)
-	return true, nil
+	return nil
 }
 
 func (b *Batch) Transactions() *TransactionQueue {
