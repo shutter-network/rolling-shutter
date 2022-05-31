@@ -76,9 +76,15 @@ func setup(ctx context.Context, t *testing.T, params testParams) *fixture {
 	eth.SetChainID(chainID)
 	eth.SetBlock(params.baseFee, gasLimit, "latest")
 
+	// set initial ("next") epoch id manually,
+	// this is usually done in the collator and not in the handler
+	err := db.SetNextEpochID(ctx, shdb.EncodeUint64(params.initialEpochID))
+	assert.NilError(t, err)
+
 	// New batch handler, this will already query the eth-server
 	bh, err := NewBatchHandler(cfg, dbpool)
 	assert.NilError(t, err)
+	assert.Equal(t, bh.LatestEpochID(), params.initialEpochID)
 
 	makeTx := func(batchIndex, nonce, gas int) ([]byte, []byte) {
 		// construct a valid transaction
@@ -99,15 +105,6 @@ func setup(ctx context.Context, t *testing.T, params testParams) *fixture {
 		assert.NilError(t, err)
 		return txBytes, tx.Hash().Bytes()
 	}
-
-	// set initial ("next") epoch id manually,
-	// this is usually done in the collator and not in the handler
-	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(params.initialEpochID))
-	assert.NilError(t, err)
-
-	err = bh.InitialiseEpoch(ctx)
-	assert.NilError(t, err)
-	assert.Equal(t, bh.LatestEpochID(), params.initialEpochID)
 
 	return &fixture{
 		cfg:          cfg,
