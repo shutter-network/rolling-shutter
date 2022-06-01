@@ -16,6 +16,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -171,14 +172,15 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 func (m *MockNode) sendMessages(ctx context.Context) error {
 	sleepDuration := time.Duration(1000/m.Config.Rate) * time.Millisecond
 
-	epochID := uint64(0)
+	epochIDUint64 := uint64(0)
 	for {
 		select {
 		case <-time.After(sleepDuration):
+			epochID, _ := epochid.BigToEpochID(new(big.Int).SetUint64(epochIDUint64))
 			if err := m.sendMessagesForEpoch(ctx, epochID); err != nil {
 				return err
 			}
-			epochID++
+			epochIDUint64++
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -199,8 +201,8 @@ func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPubli
 	return eonSecretKeyShare, eonPublicKey, nil
 }
 
-func computeEpochSecretKey(epochID uint64, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
-	epochIDG1 := shcrypto.ComputeEpochID(epochID)
+func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
+	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
 	epochSecretKeyShare := shcrypto.ComputeEpochSecretKeyShare(eonSecretKeyShare, epochIDG1)
 	return shcrypto.ComputeEpochSecretKey(
 		[]int{0},
@@ -228,7 +230,7 @@ func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) (
 	return message, encryptedMessage.Marshal(), nil
 }
 
-func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
+func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID epochid.EpochID) error {
 	if m.Config.SendDecryptionTriggers {
 		if err := m.sendDecryptionTrigger(ctx, epochID); err != nil {
 			return err
@@ -242,16 +244,16 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 	return nil
 }
 
-func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) error {
+func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID epochid.EpochID) error {
 	log.Printf("sending decryption trigger for epoch %d", epochID)
 	msg := &shmsg.DecryptionTrigger{
 		InstanceID: m.Config.InstanceID,
-		EpochID:    epochID,
+		EpochID:    epochID.Bytes(),
 	}
 	return m.p2p.SendMessage(ctx, msg)
 }
 
-func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
+func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochID) error {
 	log.Printf("sending decryption key for epoch %d", epochID)
 
 	epochSecretKey, err := computeEpochSecretKey(epochID, m.eonSecretKeyShare)
@@ -263,7 +265,7 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error 
 
 	msg := &shmsg.DecryptionKey{
 		InstanceID: m.Config.InstanceID,
-		EpochID:    epochID,
+		EpochID:    epochID.Bytes(),
 		Key:        keyBytes,
 	}
 	return m.p2p.SendMessage(ctx, msg)

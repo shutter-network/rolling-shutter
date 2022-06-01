@@ -10,6 +10,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
@@ -110,9 +111,13 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 		if blk > math.MaxUint32 {
 			return errors.Errorf("block number too big: %d", blk)
 		}
+		// TODO: store block number
 
-		epochID := epochid.New(0, uint32(blk))
-		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
+		epochID, err := epochid.BigToEpochID(common.Big0)
+		if err != nil {
+			return err
+		}
+		return db.SetNextEpochID(ctx, epochID.Bytes())
 	} else if err != nil {
 		return err
 	}

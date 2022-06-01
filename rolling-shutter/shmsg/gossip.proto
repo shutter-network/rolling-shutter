@@ -5,7 +5,7 @@ option go_package = "./;shmsg";
 
 message DecryptionTrigger {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
+    bytes epochID = 2;
     uint64 blockNumber = 3;
     bytes transactionsHash = 4;
     bytes signature = 5;
@@ -15,7 +15,7 @@ message DecryptionTrigger {
 message DecryptionKeyShare {
     uint64 instanceID = 1;
     uint64 eon = 4;
-    uint64 epochID = 2;
+    bytes epochID = 2;
     uint64 keyperIndex = 5;
     bytes share = 6;
 }
@@ -23,7 +23,7 @@ message DecryptionKeyShare {
 message DecryptionKey {
     uint64 instanceID = 1;
     uint64 eon = 2;
-    uint64 epochID = 3;
+    bytes epochID = 3;
     bytes key = 4;
 }
 
