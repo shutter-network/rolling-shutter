@@ -109,7 +109,7 @@ jobs:
       - run:
           name: Go install
           command: |
-            go install github.com/shutter-network/rolling-shutter/rolling-shutter@${CIRCLE_SHA1}
+            env CGO_ENABLED=0 go install github.com/shutter-network/rolling-shutter/rolling-shutter@${CIRCLE_SHA1}
       - run:
           name: Copy binary
           command: |
