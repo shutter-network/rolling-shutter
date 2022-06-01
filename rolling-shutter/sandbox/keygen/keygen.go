@@ -4,10 +4,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 )
 
@@ -15,7 +17,8 @@ func main() {
 	keygen := testkeygen.NewTestKeyGenerator(&testing.T{}, 3, 2)
 
 	var prevEonPublicKey *shcrypto.EonPublicKey
-	for epochID := uint64(0); epochID < 200; epochID++ {
+	for i := int64(0); i < 200; i++ {
+		epochID, _ := epochid.BigToEpochID(big.NewInt(i))
 		eonPublicKey := keygen.EonPublicKey(epochID)
 		decryptionKey := keygen.EpochSecretKey(epochID)
 

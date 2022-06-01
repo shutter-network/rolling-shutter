@@ -18,7 +18,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -138,7 +137,10 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				continue
 			}
 
-			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
+			epochID, err := epochid.BigToEpochID(new(big.Int).SetBytes(nextEpochResponse.JSON200.Id))
+			if err != nil {
+				log.Printf("444 Error converting epoch id")
+			}
 			_, encryptedTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
 			if err != nil {
 				return err
@@ -147,7 +149,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
 					EncryptedTx: encryptedTx,
-					Epoch:       shdb.EncodeUint64(epochID),
+					Epoch:       epochID.Bytes(),
 				})
 			if err != nil {
 				return err
@@ -211,7 +213,7 @@ func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.
 	)
 }
 
-func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
+func encryptRandomMessage(epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
 	_, err := rand.Read(message[3:])
 	if err != nil {
@@ -224,7 +226,7 @@ func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) (
 		return nil, nil, errors.Wrap(err, "failed to generate random sigma")
 	}
 
-	epochIDG1 := shcrypto.ComputeEpochID(epochID)
+	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
 	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
 
 	return message, encryptedMessage.Marshal(), nil

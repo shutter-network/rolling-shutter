@@ -2,7 +2,6 @@ package cryptocmd
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -11,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 var (
@@ -93,18 +94,18 @@ func encrypt(msg string) error {
 	if err != nil {
 		return err
 	}
-	epochIDInt, err := parseEpochID(epochIDFlag)
+	epochID, err := parseEpochID(epochIDFlag)
 	if err != nil {
 		return err
 	}
-	epochID := shcrypto.ComputeEpochID(epochIDInt)
+	epochIDPoint := shcrypto.ComputeEpochID(epochID.Bytes())
 	sigma, err := parseSigma(sigmaFlag)
 	if err != nil {
 		return err
 	}
 
 	msgBytes := []byte(msg)
-	encryptedMsg := shcrypto.Encrypt(msgBytes, eonKey, epochID, sigma)
+	encryptedMsg := shcrypto.Encrypt(msgBytes, eonKey, epochIDPoint, sigma)
 	fmt.Println("0x" + hex.EncodeToString(encryptedMsg.Marshal()))
 	return nil
 }
@@ -145,7 +146,7 @@ func verifyKey(key string) error {
 	if err != nil {
 		return err
 	}
-	ok, err := shcrypto.VerifyEpochSecretKey(decryptionKey, eonKey, epochID)
+	ok, err := shcrypto.VerifyEpochSecretKey(decryptionKey, eonKey, epochID.Bytes())
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify decryption key")
 	}
@@ -169,16 +170,12 @@ func parseEonKey(f string) (*shcrypto.EonPublicKey, error) {
 	return eonKey, err
 }
 
-func parseEpochID(f string) (uint64, error) {
+func parseEpochID(f string) (epochid.EpochID, error) {
 	epochIDBytes, err := parseHex(f)
 	if err != nil {
-		return 0, err
+		return epochid.EpochID{}, err
 	}
-	if len(epochIDBytes) != 8 {
-		return 0, errors.Errorf("epoch id must be 8 bytes, got %d", len(epochIDBytes))
-	}
-	epochID := binary.BigEndian.Uint64(epochIDBytes)
-	return epochID, nil
+	return epochid.BytesToEpochID(epochIDBytes)
 }
 
 func parseSigma(f string) (shcrypto.Block, error) {

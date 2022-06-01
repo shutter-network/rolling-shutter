@@ -5,9 +5,11 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math"
+	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -20,7 +22,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -30,33 +31,20 @@ const (
 )
 
 // computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-// The function also depends on the current mainchain block number and the configured execution
-// block delay. The result will encode a block number and a sequence number. The sequence number
-// will be the sequence number of the previous epoch id plus one. The block number will be
-// max(current block number - execution block delay, block number encoded in previous epoch id, 0).
-func computeNextEpochID(epochID uint64, currentBlockNumber uint32, executionBlockDelay uint32) uint64 {
-	executionBlockNumber := uint32(0)
-	if currentBlockNumber >= executionBlockDelay {
-		executionBlockNumber = currentBlockNumber - executionBlockDelay
-	}
-
-	previousExecutionBlockNumber := epochid.BlockNumber(epochID)
-	if executionBlockNumber < previousExecutionBlockNumber {
-		executionBlockNumber = previousExecutionBlockNumber
-	}
-
-	sequenceNumber := epochid.SequenceNumber(epochID)
-	return epochid.New(sequenceNumber+1, executionBlockNumber)
+func computeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
+	n := epochID.Big()
+	nextN := new(big.Int).Add(n, common.Big1)
+	return epochid.BigToEpochID(nextN)
 }
 
 // GetNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
-func GetNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
+func GetNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, error) {
 	epochID, err := db.GetNextEpochID(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error
-		return 0, err
+		return epochid.EpochID{}, err
 	}
-	return shdb.DecodeUint64(epochID), nil
+	return epochid.BytesToEpochID(epochID)
 }
 
 // NewBatchHandler initializes a new instance of BatchHandler.
@@ -121,7 +109,7 @@ func (bh *BatchHandler) Signer() txtypes.Signer {
 
 // LatestEpochID returns the epoch-id associated to
 // the current batch that is yet to be submitted to the sequencer.
-func (bh *BatchHandler) LatestEpochID() uint64 {
+func (bh *BatchHandler) LatestEpochID() epochid.EpochID {
 	return bh.latestBatch.EpochID()
 }
 
@@ -162,11 +150,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 			return err
 		}
 
-		// we implicitly assume the user always means the current
-		// block number
-		blockNumber := epochid.BlockNumber(currentEpochID)
-		currentBatchIndex := uint64(epochid.SequenceNumber(currentEpochID))
-
+		currentBatchIndex := currentEpochID.Big().Uint64()
 		if tx.BatchIndex() < currentBatchIndex {
 			// This will also be the case when we already started the
 			// next epoch but did not successfully receive the
@@ -184,11 +168,11 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 		if err != nil {
 			return err
 		}
-		txEpoch := epochid.New(uint32(tx.BatchIndex()), blockNumber)
+		txEpoch, _ := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
 
 		if err := db.InsertTx(ctx, cltrdb.InsertTxParams{
 			TxHash:  tx.Hash().Bytes(),
-			EpochID: shdb.EncodeUint64(txEpoch),
+			EpochID: txEpoch.Bytes(),
 			TxBytes: txBytes,
 		}); err != nil {
 			return errors.Wrap(err, "can't insert tx into db")
@@ -211,7 +195,10 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 			// this will push all transactions
 			// other than the latest batch index to the txpool.
 
-			threshold = bh.latestBatch.BatchIndex()
+			threshold, err = bh.latestBatch.BatchIndex()
+			if err != nil {
+				return err
+			}
 		}
 		if tx.BatchIndex() > threshold {
 			// push to the tx pool for future processing
@@ -268,20 +255,21 @@ func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *PendingTransaction) e
 // and only then creates a new latestBatch. This is due to the latest-batch state validation
 // relies on the polled state from the sequencer and only the sequencer knows how the state (balances and nonces)
 // progressed during the waited upon state update.
-func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID uint64, decryptionKey []byte) ([]shmsg.P2PMessage, error) {
+func (bh *BatchHandler) HandleDecryptionKey(
+	ctx context.Context, epochID epochid.EpochID, decryptionKey []byte,
+) ([]shmsg.P2PMessage, error) {
 	var (
 		outMessages []shmsg.P2PMessage
-		nextEpochID uint64
+		nextEpochID epochid.EpochID
 	)
 
 	if bh.LatestEpochID() != epochID {
 		return nil, errors.New("received decryption key for wrong batch")
 	}
 
-	// this is the blockNumber the collator originally advertised for the epochID
-	// the users will sign that at some point (see #270)
-	blockNumber := epochid.BlockNumber(epochID)
-	btx, err := bh.latestBatch.SignedBatchTx(bh.privateKey(), decryptionKey, uint64(blockNumber))
+	// TODO: get block number from latest batch
+	blockNumber := uint64(0)
+	btx, err := bh.latestBatch.SignedBatchTx(bh.privateKey(), decryptionKey, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +312,11 @@ func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID uint64,
 		return nil, err
 	}
 	bh.latestBatch = newBatch
-	for _, tx := range bh.txpool.Pop(newBatch.BatchIndex()) {
+	batchIndex, err := newBatch.BatchIndex()
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range bh.txpool.Pop(batchIndex) {
 		err := bh.ProcessTx(ctx, tx)
 		if err != nil {
 			err = errors.Wrapf(err, "pooled tx invalid (hash=%s), dropped", tx.tx.Hash())
@@ -384,7 +376,11 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 		}
 
 		trigger, err := shmsg.NewSignedDecryptionTrigger(
-			bh.config.InstanceID, epochID, bh.latestBatch.Transactions().Hash(), bh.config.EthereumKey,
+			bh.config.InstanceID,
+			epochID,
+			uint64(currentBlockNumber),
+			bh.latestBatch.Transactions().Hash(),
+			bh.config.EthereumKey,
 		)
 		if err != nil {
 			return err
@@ -392,14 +388,17 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 
 		// Write back the generated trigger to the database
 		if err := db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
-			EpochID:   shdb.EncodeUint64(trigger.EpochID),
+			EpochID:   trigger.EpochID,
 			BatchHash: trigger.TransactionsHash,
 		}); err != nil {
 			return err
 		}
 
-		nextEpochID := computeNextEpochID(epochID, currentBlockNumber, bh.config.ExecutionBlockDelay)
-		if err := db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID)); err != nil {
+		nextEpochID, err := computeNextEpochID(epochID)
+		if err != nil {
+			return err
+		}
+		if err := db.SetNextEpochID(ctx, nextEpochID.Bytes()); err != nil {
 			return err
 		}
 
@@ -416,7 +415,7 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 // This method should only be used for immediate recovery of lost, unsubmitted batches,
 // e.g. due to a crash. It is only applicable for a pending, unsubmitted batch, since it relies on
 // the current chain-state of the sequencer node.
-func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Queries, epochID uint64) (*Batch, error) {
+func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID) (*Batch, error) {
 	batch, err := NewCachedPendingBatch(ctx, epochID, bh.l2EthClient)
 	if err != nil {
 		return nil, err
@@ -425,7 +424,7 @@ func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Q
 	// Tx's are returned sorted in the db-insert order, and thus in the submitting
 	// insert order.
 	// This way we can replay all transactions on the batch
-	transactions, err := db.GetTransactionsByEpoch(ctx, shdb.EncodeUint64(epochID))
+	transactions, err := db.GetTransactionsByEpoch(ctx, epochID.Bytes())
 	if err != nil {
 		return nil, err
 	}

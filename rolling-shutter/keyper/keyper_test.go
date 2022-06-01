@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -32,8 +33,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	config := newTestConfig(t)
 	keyperIndex := uint64(1)
 	eon := uint64(0)
-	epochID := uint64(0)
-	wrongEpochID := uint64(1)
+	epochID, _ := epochid.BigToEpochID(common.Big0)
+	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
 	tkg := initializeEon(ctx, t, db, config, keyperIndex)
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
@@ -58,7 +59,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
-				EpochID:    epochID,
+				EpochID:    epochID.Bytes(),
 				Key:        secretKey,
 			},
 		},
@@ -69,7 +70,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
-				EpochID:    wrongEpochID,
+				EpochID:    wrongEpochID.Bytes(),
 				Key:        secretKey,
 			},
 		},
@@ -80,7 +81,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
 				Eon:        eon,
-				EpochID:    epochID,
+				EpochID:    epochID.Bytes(),
 				Key:        secretKey,
 			},
 		},
@@ -91,7 +92,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
-				EpochID:     epochID,
+				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
 			},
@@ -103,7 +104,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
-				EpochID:     epochID + 1,
+				EpochID:     wrongEpochID.Bytes(),
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
 			},
@@ -115,7 +116,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID + 1,
 				Eon:         eon,
-				EpochID:     epochID,
+				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
 				Share:       keyshare,
 			},
@@ -127,7 +128,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &shmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
-				EpochID:     epochID,
+				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex + 1,
 				Share:       keyshare,
 			},
@@ -169,9 +170,9 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 	// Make a db with collator 1 from a certain block and collator 2 afterwards
 	activationBlk1 := uint64(0)
-	epochID1 := uint64(0)
+	epochID1, _ := epochid.BigToEpochID(common.Big0)
 	activationBlk2 := uint64(123)
-	epochID2 := epochid.New(0, uint32(activationBlk2))
+	epochID2, _ := epochid.BigToEpochID(common.Big1)
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
@@ -194,7 +195,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		name        string
 		valid       bool
 		instanceID  uint64
-		epochID     uint64
+		epochID     epochid.EpochID
 		blockNumber uint64
 		privKey     *ecdsa.PrivateKey
 	}{

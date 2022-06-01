@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -41,8 +44,9 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
+	epochID, _ := epochid.BigToEpochID(common.Big0)
 	for i := uint64(0); i < tkg.NumKeypers; i++ {
-		share := tkg.EonPublicKeyShare(0, i)
+		share := tkg.EonPublicKeyShare(epochID, i)
 		publicKeyShares = append(publicKeyShares, share)
 	}
 	dkgResult := puredkg.Result{
@@ -50,8 +54,8 @@ func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config 
 		NumKeypers:      tkg.NumKeypers,
 		Threshold:       tkg.Threshold,
 		Keyper:          keyperIndex,
-		SecretKeyShare:  tkg.EonSecretKeyShare(0, keyperIndex),
-		PublicKey:       tkg.EonPublicKey(0),
+		SecretKeyShare:  tkg.EonSecretKeyShare(epochID, keyperIndex),
+		PublicKey:       tkg.EonPublicKey(epochID),
 		PublicKeyShares: publicKeyShares,
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
@@ -91,7 +95,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID := uint64(50)
+	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
@@ -103,13 +107,13 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 
 	// send decryption key share when first trigger is received
 	trigger := &shmsg.DecryptionTrigger{
-		EpochID:    epochID,
+		EpochID:    epochID.Bytes(),
 		InstanceID: 0,
 	}
 	msgs, err := handler.handleDecryptionTrigger(ctx, trigger)
 	assert.NilError(t, err)
 	share, err := db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
-		EpochID:     shdb.EncodeUint64(epochID),
+		EpochID:     epochID.Bytes(),
 		KeyperIndex: int64(keyperIndex),
 	})
 	assert.NilError(t, err)
@@ -117,7 +121,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	msg, ok := msgs[0].(*shmsg.DecryptionKeyShare)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == 0)
-	assert.Check(t, msg.EpochID == epochID)
+	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
 	assert.Check(t, msg.KeyperIndex == keyperIndex)
 	assert.Check(t, bytes.Equal(msg.Share, share.DecryptionKeyShare))
 
@@ -135,7 +139,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID := uint64(50)
+	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
@@ -149,7 +153,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	// threshold is two, so no outgoing message after first input
 	msgs, err := handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
 		InstanceID:  0,
-		EpochID:     epochID,
+		EpochID:     epochID.Bytes(),
 		KeyperIndex: 0,
 		Share:       tkg.EpochSecretKeyShare(epochID, 0).Marshal(),
 	})
@@ -160,7 +164,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	// share of the handler itself doesn't count)
 	msgs, err = handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
 		InstanceID:  0,
-		EpochID:     epochID,
+		EpochID:     epochID.Bytes(),
 		KeyperIndex: 2,
 		Share:       tkg.EpochSecretKeyShare(epochID, 2).Marshal(),
 	})
@@ -169,7 +173,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	msg, ok := msgs[0].(*shmsg.DecryptionKey)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == 0)
-	assert.Check(t, msg.EpochID == epochID)
+	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
 	assert.Check(t, bytes.Equal(msg.Key, encodedDecryptionKey))
 }
 
@@ -182,7 +186,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	defer closedb()
 
 	eon := uint64(2)
-	epochID := uint64(50)
+	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
@@ -197,14 +201,14 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	msgs, err := handler.handleDecryptionKey(ctx, &shmsg.DecryptionKey{
 		InstanceID: 0,
 		Eon:        eon,
-		EpochID:    epochID,
+		EpochID:    epochID.Bytes(),
 		Key:        tkg.EpochSecretKey(epochID).Marshal(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 	key, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
 		Eon:     int64(eon),
-		EpochID: shdb.EncodeUint64(epochID),
+		EpochID: epochID.Bytes(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKey))
