@@ -5,16 +5,18 @@ import (
 	"encoding/binary"
 
 	"golang.org/x/crypto/sha3"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 var triggerHashPrefix = []byte{0x19, 't', 'r', 'i', 'g', 'g', 'e', 'r'}
 
 func NewSignedDecryptionTrigger(
-	instanceID uint64, epochID uint64, blockNumber uint64, txHash []byte, privKey *ecdsa.PrivateKey,
+	instanceID uint64, epochID epochid.EpochID, blockNumber uint64, txHash []byte, privKey *ecdsa.PrivateKey,
 ) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
 		InstanceID:       instanceID,
-		EpochID:          epochID,
+		EpochID:          epochID.Bytes(),
 		BlockNumber:      blockNumber,
 		TransactionsHash: txHash,
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 type server struct {
@@ -42,7 +41,7 @@ func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(oapi.NextEpoch{
-		Id: shdb.EncodeUint64(epoch),
+		Id: epoch.Bytes(),
 	})
 }
 

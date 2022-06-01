@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -16,6 +17,9 @@ import (
 func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) (bool, error) {
 	if key.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, key.GetInstanceID())
+	}
+	if _, err := epochid.BytesToEpochID(key.EpochID); err != nil {
+		return false, errors.Wrapf(err, "invalid epoch id")
 	}
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)
@@ -51,7 +55,9 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shm
 	if keyShare.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, keyShare.GetInstanceID())
 	}
-
+	if _, err := epochid.BytesToEpochID(keyShare.EpochID); err != nil {
+		return false, errors.Wrapf(err, "invalid epoch id")
+	}
 	if keyShare.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
@@ -90,6 +96,9 @@ func (kpr *keyper) validateEonPublicKey(_ context.Context, key *shmsg.EonPublicK
 func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) (bool, error) {
 	if trigger.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, trigger.GetInstanceID())
+	}
+	if _, err := epochid.BytesToEpochID(trigger.EpochID); err != nil {
+		return false, errors.Wrapf(err, "invalid epoch id")
 	}
 
 	blk := trigger.BlockNumber
