@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 type Block interface {
@@ -24,7 +26,7 @@ type State interface {
 	SetNonce(a common.Address, nonce uint64)
 }
 
-func NewCachedPendingBatch(ctx context.Context, epochID uint64, client *ethclient.Client) (*Batch, error) {
+func NewCachedPendingBatch(ctx context.Context, epochID epochid.EpochID, client *ethclient.Client) (*Batch, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, err

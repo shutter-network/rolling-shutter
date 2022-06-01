@@ -1,7 +1,6 @@
 package keyper
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -125,7 +125,11 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	epochID := binary.BigEndian.Uint64(epochIDBytes)
+	epochID, err := epochid.BytesToEpochID(epochIDBytes)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	ctx := r.Context()
 	handler := epochKGHandler{

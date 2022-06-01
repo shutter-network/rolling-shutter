@@ -42,7 +42,7 @@ var encrypt = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 	if err != nil {
 		return encodeResult(nil, err)
 	}
-	epochID, err := decodeEpochIDArg(epochIDArg)
+	epochID, err := decodeEpochIDArgPoint(epochIDArg)
 	if err != nil {
 		return encodeResult(nil, err)
 	}
@@ -94,7 +94,7 @@ var verifyDecryptionKey = js.FuncOf(func(this js.Value, args []js.Value) interfa
 	if err != nil {
 		return encodeResult(nil, err)
 	}
-	epochID, err := decodeUint64Arg(epochIDArg, "epochID")
+	epochID, err := decodeEpochIDArgBytes(epochIDArg)
 	if err != nil {
 		return encodeResult(nil, err)
 	}
@@ -132,12 +132,23 @@ func decodeEonPublicKeyArg(arg js.Value) (*shcrypto.EonPublicKey, error) {
 	return p, nil
 }
 
-func decodeEpochIDArg(arg js.Value) (*shcrypto.EpochID, error) {
-	i, err := decodeUint64Arg(arg, "epochID")
+func decodeEpochIDArgBytes(arg js.Value) ([]byte, error) {
+	b, err := decodeBytesArg(arg, "epochID")
 	if err != nil {
 		return nil, err
 	}
-	p := shcrypto.ComputeEpochID(i)
+	if len(b) != 32 {
+		return nil, fmt.Errorf("sigma must be 32 bytes, got %d", len(b))
+	}
+	return b, nil
+}
+
+func decodeEpochIDArgPoint(args js.Value) (*shcrypto.EpochID, error) {
+	b, err := decodeEpochIDArgBytes(args)
+	if err != nil {
+		return nil, err
+	}
+	p := shcrypto.ComputeEpochID(b)
 	return p, nil
 }
 

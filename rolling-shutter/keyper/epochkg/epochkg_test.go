@@ -8,6 +8,8 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shtest"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 func Results(t *testing.T) []*puredkg.Result {
@@ -77,7 +79,7 @@ func TestEpochKG(t *testing.T) {
 		kgs = append(kgs, NewEpochKG(r))
 	}
 
-	epoch := uint64(50)
+	epoch, _ := epochid.BytesToEpochID([]byte{50})
 	for sender, kg := range kgs {
 		share := EpochSecretKeyShare{
 			Eon:    kg.Eon,

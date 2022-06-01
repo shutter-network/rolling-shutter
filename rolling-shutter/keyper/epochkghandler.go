@@ -29,7 +29,9 @@ func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *shmsg
 	return h.sendDecryptionKeyShare(ctx, epochID, int64(msg.BlockNumber))
 }
 
-func (h *epochKGHandler) sendDecryptionKeyShare(ctx context.Context, epochID epochid.EpochID, blockNumber int64) ([]shmsg.P2PMessage, error) {
+func (h *epochKGHandler) sendDecryptionKeyShare(
+	ctx context.Context, epochID epochid.EpochID, blockNumber int64,
+) ([]shmsg.P2PMessage, error) {
 	eon, err := h.db.GetEonForBlockNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for block %d from db", blockNumber)
@@ -158,7 +160,7 @@ func (h *epochKGHandler) aggregateDecryptionKeySharesFromDB(
 		}
 		err = epochKG.HandleEpochSecretKeyShare(&epochkg.EpochSecretKeyShare{
 			Eon:    pureDKGResult.Eon,
-			Epoch:  epochID.Bytes(),
+			Epoch:  epochID,
 			Sender: uint64(share.KeyperIndex),
 			Share:  shareDecoded,
 		})

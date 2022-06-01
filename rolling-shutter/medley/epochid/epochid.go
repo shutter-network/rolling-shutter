@@ -36,6 +36,6 @@ func (e EpochID) Big() *big.Int {
 }
 
 func (e EpochID) String() string {
-	s := e.String()
+	s := common.Hash(e).String()
 	return s[2:6] + ".." + s[len(s)-4:]
 }
