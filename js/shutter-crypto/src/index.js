@@ -7,6 +7,8 @@ if (typeof g.__wasm_functions__ === "undefined") {
   g.__wasm_functions__ = {};
 }
 
+/* global Go */
+
 function init() {
   let shutterCrypto;
   const go = new Go();

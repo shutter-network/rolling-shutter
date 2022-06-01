@@ -58,6 +58,17 @@ jobs:
       - restore_cache:
           keys:
             - rs-build-<< parameters.go-version >>-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - install-asdf
+      - run:
+          name: "Install asdf plugins"
+          command: |
+            asdf plugin add tinygo https://github.com/schmir/asdf-tinygo.git || true
+            asdf plugin add binaryen https://github.com/birros/asdf-binaryen.git || true
+      - run:
+          name: "Install asdf managed executables"
+          command: |
+            asdf install tinygo
+            asdf install binaryen
       - run: make build wasm
       - run:
           name: "Run unit tests with gotestsum"

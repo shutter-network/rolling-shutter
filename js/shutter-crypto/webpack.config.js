@@ -1,5 +1,7 @@
 const path = require("path");
 
+/* global __dirname */
+
 module.exports = {
   mode: "production",
   performance: {

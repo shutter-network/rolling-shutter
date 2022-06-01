@@ -13,5 +13,14 @@
   "main": "./dist/shutter-crypto.js",
   "files": [
     "dist"
-  ]
+  ],
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "ignorePatterns": [
+      "derived/*.js"
+    ],
+    "parserOptions": {
+      "sourceType": "module"
+    }
+  }
 }
