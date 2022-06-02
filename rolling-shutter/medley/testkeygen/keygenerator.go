@@ -89,11 +89,6 @@ func (tkg *TestKeyGenerator) populateEonKeysUntilEon(eonIndex uint64) {
 	}
 }
 
-func (tkg *TestKeyGenerator) populateEonKeysUntilEpoch(epochID epochid.EpochID) {
-	eonIndex := tkg.EonIndex(epochID)
-	tkg.populateEonKeysUntilEon(eonIndex)
-}
-
 // EonIndex computes the index of the EON key to be used for the given epochID. We generate a new
 // eon key every eonInterval epochs.
 func (tkg *TestKeyGenerator) EonIndex(epochID epochid.EpochID) uint64 {
