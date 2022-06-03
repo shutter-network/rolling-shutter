@@ -111,6 +111,26 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 	return i, err
 }
 
+const getEonPublicKey = `-- name: GetEonPublicKey :one
+SELECT hash, eon_public_key, activation_block_number, keyper_config_index, eon, confirmed FROM eon_public_key_candidate
+WHERE confirmed AND eon = $1
+LIMIT 1
+`
+
+func (q *Queries) GetEonPublicKey(ctx context.Context, eon int64) (EonPublicKeyCandidate, error) {
+	row := q.db.QueryRow(ctx, getEonPublicKey, eon)
+	var i EonPublicKeyCandidate
+	err := row.Scan(
+		&i.Hash,
+		&i.EonPublicKey,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.Eon,
+		&i.Confirmed,
+	)
+	return i, err
+}
+
 const getLastBatchEpochID = `-- name: GetLastBatchEpochID :one
 SELECT epoch_id FROM decryption_trigger ORDER BY epoch_id DESC LIMIT 1
 `
@@ -122,15 +142,15 @@ func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
 	return epoch_id, err
 }
 
-const getNextEpochID = `-- name: GetNextEpochID :one
-SELECT epoch_id FROM next_epoch LIMIT 1
+const getNextBatch = `-- name: GetNextBatch :one
+SELECT enforce_one_row, epoch_id, l1_block_number FROM next_batch LIMIT 1
 `
 
-func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getNextEpochID)
-	var epoch_id []byte
-	err := row.Scan(&epoch_id)
-	return epoch_id, err
+func (q *Queries) GetNextBatch(ctx context.Context) (NextBatch, error) {
+	row := q.db.QueryRow(ctx, getNextBatch)
+	var i NextBatch
+	err := row.Scan(&i.EnforceOneRow, &i.EpochID, &i.L1BlockNumber)
+	return i, err
 }
 
 const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
@@ -263,13 +283,18 @@ func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
 	return err
 }
 
-const setNextEpochID = `-- name: SetNextEpochID :exec
-INSERT INTO next_epoch (epoch_id) VALUES ($1)
+const setNextBatch = `-- name: SetNextBatch :exec
+INSERT INTO next_batch (epoch_id, l1_block_number) VALUES ($1, $2)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET epoch_id = $1
+SET epoch_id = $1, l1_block_number = $2
 `
 
-func (q *Queries) SetNextEpochID(ctx context.Context, epochID []byte) error {
-	_, err := q.db.Exec(ctx, setNextEpochID, epochID)
+type SetNextBatchParams struct {
+	EpochID       []byte
+	L1BlockNumber int64
+}
+
+func (q *Queries) SetNextBatch(ctx context.Context, arg SetNextBatchParams) error {
+	_, err := q.db.Exec(ctx, setNextBatch, arg.EpochID, arg.L1BlockNumber)
 	return err
 }

@@ -21,6 +21,12 @@ import (
 // DecryptionKey defines model for DecryptionKey.
 type DecryptionKey string
 
+// DecryptionTrigger defines model for DecryptionTrigger.
+type DecryptionTrigger struct {
+	BlockNumber int    `json:"block_number"`
+	EpochId     string `json:"epoch_id"`
+}
+
 // Eon defines model for Eon.
 type Eon struct {
 	ActivationBlockNumber int    `json:"activation_block_number"`
@@ -43,7 +49,7 @@ type Error struct {
 }
 
 // SubmitDecryptionTriggerJSONBody defines parameters for SubmitDecryptionTrigger.
-type SubmitDecryptionTriggerJSONBody EpochID
+type SubmitDecryptionTriggerJSONBody DecryptionTrigger
 
 // SubmitDecryptionTriggerJSONRequestBody defines body for SubmitDecryptionTrigger for application/json ContentType.
 type SubmitDecryptionTriggerJSONRequestBody SubmitDecryptionTriggerJSONBody
@@ -51,8 +57,8 @@ type SubmitDecryptionTriggerJSONRequestBody SubmitDecryptionTriggerJSONBody
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /decryptionKey/{epochID})
-	GetDecryptionKey(w http.ResponseWriter, r *http.Request, epochID EpochID)
+	// (GET /decryptionKey/{eon}/{epochID})
+	GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID EpochID)
 
 	// (POST /decryptionTrigger)
 	SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Request)
@@ -79,6 +85,15 @@ func (siw *ServerInterfaceWrapper) GetDecryptionKey(w http.ResponseWriter, r *ht
 
 	var err error
 
+	// ------------- Path parameter "eon" -------------
+	var eon int
+
+	err = runtime.BindStyledParameter("simple", false, "eon", chi.URLParam(r, "eon"), &eon)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eon", Err: err})
+		return
+	}
+
 	// ------------- Path parameter "epochID" -------------
 	var epochID EpochID
 
@@ -89,7 +104,7 @@ func (siw *ServerInterfaceWrapper) GetDecryptionKey(w http.ResponseWriter, r *ht
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDecryptionKey(w, r, epochID)
+		siw.Handler.GetDecryptionKey(w, r, eon, epochID)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -258,7 +273,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/decryptionKey/{epochID}", wrapper.GetDecryptionKey)
+		r.Get(options.BaseURL+"/decryptionKey/{eon}/{epochID}", wrapper.GetDecryptionKey)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/decryptionTrigger", wrapper.SubmitDecryptionTrigger)
@@ -276,19 +291,20 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

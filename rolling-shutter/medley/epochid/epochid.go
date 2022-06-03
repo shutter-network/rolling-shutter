@@ -1,24 +1,41 @@
 package epochid
 
 import (
-	"fmt"
-	"math"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 )
 
-// BlockNumber extracts the activation block number from an epoch id.
-func BlockNumber(epochID uint64) uint32 {
-	return uint32(epochID >> 32) // take first 4 bytes
+type EpochID common.Hash
+
+// BytesToEpochID converts b to an epoch id. It fails if b is not 32 bytes.
+func BytesToEpochID(b []byte) (EpochID, error) {
+	if len(b) != len(common.Hash{}) {
+		return EpochID{}, errors.Errorf("epoch id must be %d bytes, got %d", len(b), len(common.Hash{}))
+	}
+	return EpochID(common.BytesToHash(b)), nil
 }
 
-// SequenceNumber extracts the sequence number from an epoch id.
-func SequenceNumber(epochID uint64) uint32 {
-	return uint32(epochID & math.MaxUint32) // take last 4 bytes
+// BigToEpochID converts n to an epoch id. It fails if n is too big.
+func BigToEpochID(n *big.Int) (EpochID, error) {
+	e := EpochID(common.BigToHash(n))
+	n2 := e.Big()
+	if n2.Cmp(n) != 0 {
+		return EpochID{}, errors.Errorf("input %d is too big to be an epoch id", n)
+	}
+	return e, nil
 }
 
-func New(seq uint32, blk uint32) uint64 {
-	return uint64(blk)<<32 | uint64(seq)
+func (e EpochID) Bytes() []byte {
+	return common.Hash(e).Bytes()
 }
 
-func LogInfo(epochID uint64) string {
-	return fmt.Sprintf("(%d, block=%d, seq=%d)", epochID, BlockNumber(epochID), SequenceNumber(epochID))
+func (e EpochID) Big() *big.Int {
+	return common.Hash(e).Big()
+}
+
+func (e EpochID) String() string {
+	s := common.Hash(e).String()
+	return s[2:6] + ".." + s[len(s)-4:]
 }

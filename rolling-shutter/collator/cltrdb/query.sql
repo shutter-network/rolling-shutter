@@ -17,6 +17,11 @@ UPDATE eon_public_key_candidate
 SET confirmed=TRUE
 WHERE hash=$1;
 
+-- name: GetEonPublicKey :one
+SELECT * FROM eon_public_key_candidate
+WHERE confirmed AND eon = $1
+LIMIT 1;
+
 -- name: FindEonPublicKeyForBlock :one
 SELECT * FROM eon_public_key_candidate
 WHERE confirmed AND activation_block_number <= sqlc.arg(blocknumber)
@@ -57,10 +62,10 @@ INSERT INTO transaction (tx_hash, epoch_id, tx_bytes) VALUES ($1, $2, $3);
 -- name: GetTransactionsByEpoch :many
 SELECT tx_bytes FROM transaction WHERE epoch_id = $1 ORDER BY id ASC;
 
--- name: SetNextEpochID :exec
-INSERT INTO next_epoch (epoch_id) VALUES ($1)
+-- name: SetNextBatch :exec
+INSERT INTO next_batch (epoch_id, l1_block_number) VALUES ($1, $2)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET epoch_id = $1;
+SET epoch_id = $1, l1_block_number = $2;
 
--- name: GetNextEpochID :one
-SELECT epoch_id FROM next_epoch LIMIT 1;
+-- name: GetNextBatch :one
+SELECT * FROM next_batch LIMIT 1;

@@ -39,18 +39,21 @@ func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
 }
 
 type testConfig struct {
-	epochID    uint64
-	instanceID uint64
-	tkg        *testkeygen.TestKeyGenerator
+	epochID     epochid.EpochID
+	blockNumber uint64
+	instanceID  uint64
+	tkg         *testkeygen.TestKeyGenerator
 }
 
 func defaultTestConfig(t *testing.T) testConfig {
 	t.Helper()
 
+	epochID, _ := epochid.BigToEpochID(common.Big2)
 	return testConfig{
-		epochID:    epochid.New(2, 0),
-		instanceID: uint64(42),
-		tkg:        testkeygen.NewTestKeyGenerator(t, 1, 1),
+		epochID:     epochID,
+		blockNumber: uint64(0),
+		instanceID:  uint64(42),
+		tkg:         testkeygen.NewTestKeyGenerator(t, 1, 1),
 	}
 }
 
@@ -102,7 +105,7 @@ func TestDecryptionKey(t *testing.T) {
 	validSecretKey := cfg.tkg.EpochSecretKey(cfg.epochID).Marshal()
 
 	orig := &DecryptionKey{
-		EpochID:    cfg.epochID,
+		EpochID:    cfg.epochID.Bytes(),
 		InstanceID: cfg.instanceID,
 		Key:        validSecretKey,
 	}
@@ -121,7 +124,7 @@ func TestDecryptionTrigger(t *testing.T) {
 	privKey, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 
-	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, HashTransactions(txs), privKey)
+	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, cfg.blockNumber, HashTransactions(txs), privKey)
 	assert.NilError(t, err)
 	m := marshalUnmarshalMessage(t, orig)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionTrigger{}))
@@ -133,7 +136,7 @@ func TestDecryptionKeyShare(t *testing.T) {
 	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.epochID, keyperIndex).Marshal()
 
 	orig := &DecryptionKeyShare{
-		EpochID:     cfg.epochID,
+		EpochID:     cfg.epochID.Bytes(),
 		InstanceID:  cfg.instanceID,
 		Share:       keyshare,
 		KeyperIndex: keyperIndex,

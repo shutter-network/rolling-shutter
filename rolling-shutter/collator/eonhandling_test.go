@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"math/big"
 	"testing"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -13,6 +14,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -145,9 +147,13 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 
-	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(1).GobEncode()
-	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(1000).GobEncode()
-	eonPubKey, _ = tkg.EonPublicKey(2000).GobEncode()
+	epoch1, _ := epochid.BigToEpochID(big.NewInt(1))
+	epoch1000, _ := epochid.BigToEpochID(big.NewInt(1000))
+	epoch2000, _ := epochid.BigToEpochID(big.NewInt(2000))
+
+	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(epoch1).GobEncode()
+	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(epoch1000).GobEncode()
+	eonPubKey, _ = tkg.EonPublicKey(epoch2000).GobEncode()
 
 	kpr1, _ := ethcrypto.GenerateKey()
 	kpr2, _ := ethcrypto.GenerateKey()

@@ -20,9 +20,12 @@ CREATE TABLE transaction(
        tx_bytes bytea
 );
 
-CREATE TABLE next_epoch(
+-- next_batch contains data to be used in the next batch to be submitted. It will be populated
+-- as soon as the previous batch has been finalized.
+CREATE TABLE next_batch(
     enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
-    epoch_id bytea NOT NULL
+    epoch_id bytea NOT NULL,
+    l1_block_number bigint NOT NULL
 );
 
 -- CREATE TABLE eon(

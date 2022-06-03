@@ -109,15 +109,20 @@ type Batch struct {
 	state        State
 	transactions *TransactionQueue
 
-	epochID uint64
-	ChainID *big.Int
+	epochID       epochid.EpochID
+	l1BlockNumber uint64
+	ChainID       *big.Int
 }
 
-func (b *Batch) BatchIndex() uint64 {
-	return uint64(epochid.SequenceNumber(b.epochID))
+func (b *Batch) BatchIndex() (uint64, error) {
+	i := b.epochID.Big()
+	if !i.IsUint64() {
+		return 0, errors.Errorf("epoch id %s does not represent a batch index", b.epochID)
+	}
+	return i.Uint64(), nil
 }
 
-func (b *Batch) EpochID() uint64 {
+func (b *Batch) EpochID() epochid.EpochID {
 	return b.epochID
 }
 
@@ -204,14 +209,18 @@ func (b *Batch) Transactions() *TransactionQueue {
 
 // SignedBatchTx constructs the signed Batch-Transaction to be sent to
 // the sequencer for batch submittal.
-func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte, l1BlockNumber uint64) (*txtypes.Transaction, error) {
+func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte) (*txtypes.Transaction, error) {
 	txs := b.Transactions()
 	ts := time.Now().Unix()
+	batchIndex, err := b.BatchIndex()
+	if err != nil {
+		return nil, err
+	}
 	btxData := &txtypes.BatchTx{
 		ChainID:       b.ChainID,
 		DecryptionKey: decryptionKey,
-		BatchIndex:    b.BatchIndex(),
-		L1BlockNumber: new(big.Int).SetUint64(l1BlockNumber),
+		BatchIndex:    batchIndex,
+		L1BlockNumber: new(big.Int).SetUint64(b.l1BlockNumber),
 		Timestamp:     big.NewInt(ts),
 		Transactions:  txs.Bytes(),
 	}

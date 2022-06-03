@@ -1704,8 +1704,8 @@ github.com/shurcooL/sanitized_anchor_name v0.0.0-20170918181015-86672fcb3f95/go.
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
 github.com/shurcooL/users v0.0.0-20180125191416-49c67e49c537/go.mod h1:QJTqeLYEDaXHZDBsXlPCDqdhQuJkuw4NOtaxYe3xii4=
 github.com/shurcooL/webdavfs v0.0.0-20170829043945-18c3829fa133/go.mod h1:hKmq5kWdCj2z2KEozexVbfEZIWiTjhE0+UjmZgPqehw=
-github.com/shutter-network/shutter/shlib v0.1.10-0.20220518192747-e18feb7de111 h1:3Wlqjw5JNVmk60PyW4KmBhB1VD5HyQxiw4+SrjD/xAI=
-github.com/shutter-network/shutter/shlib v0.1.10-0.20220518192747-e18feb7de111/go.mod h1:V003agcyGtHXQT0yIe3xmvN6AYfqSpnJPnHCwmiLzF8=
+github.com/shutter-network/shutter/shlib v0.1.10 h1:p0O35mZBHqDD/UXTMYh6GtKtPCG7kv0b7DWpMNYOXrE=
+github.com/shutter-network/shutter/shlib v0.1.10/go.mod h1:V003agcyGtHXQT0yIe3xmvN6AYfqSpnJPnHCwmiLzF8=
 github.com/shutter-network/txtypes v0.0.3 h1:f4RkXmx2pyCNvQMFcdK/h8S2ZHeQtBdj2Xd5OpUrlMU=
 github.com/shutter-network/txtypes v0.0.3/go.mod h1:OojGWxGTcroGInvhbux+FgRw82pHehftrQYZIgeywos=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=

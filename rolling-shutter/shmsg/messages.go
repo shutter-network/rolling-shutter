@@ -16,7 +16,6 @@ import (
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 // All messages to be used in the P2P Gossip have to be included in this slice,
@@ -101,7 +100,7 @@ func (*DecryptionTrigger) ImplementsP2PMessage() {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochid.LogInfo(trigger.EpochID))
+	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", trigger.EpochID)
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -118,7 +117,7 @@ func (*DecryptionKeyShare) ImplementsP2PMessage() {
 func (share *DecryptionKeyShare) LogInfo() string {
 	return fmt.Sprintf(
 		"DecryptionKeyShare{epochid=%s, keyperIndex=%d}",
-		epochid.LogInfo(share.EpochID),
+		share.EpochID,
 		share.KeyperIndex,
 	)
 }
@@ -144,7 +143,7 @@ func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%s}", epochid.LogInfo(key.EpochID))
+	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
 }
 
 func (*DecryptionKey) Topic() string {

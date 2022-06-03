@@ -15,11 +15,13 @@ type ChainCollator struct {
 }
 
 type DecryptionKey struct {
+	Eon           int64
 	EpochID       []byte
 	DecryptionKey []byte
 }
 
 type DecryptionKeyShare struct {
+	Eon                int64
 	EpochID            []byte
 	KeyperIndex        int64
 	DecryptionKeyShare []byte
