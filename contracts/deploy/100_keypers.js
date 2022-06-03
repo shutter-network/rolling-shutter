@@ -11,6 +11,7 @@ module.exports = async function (hre) {
   });
   if (deployResult.newlyDeployed) {
     const c = await ethers.getContract("Keypers");
-    await c.append();
+    const tx = await c.append();
+    await tx.wait();
   }
 };

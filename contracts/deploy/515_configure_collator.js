@@ -2,7 +2,10 @@ const { ethers } = require("hardhat");
 
 module.exports = async function (hre) {
   var collatorAddress = [await hre.getCollatorAddress()];
-
+  if (!collatorAddress[0]) {
+    console.log("WARNING: cannot confgure collator: address not set");
+    return;
+  }
   const collator = await ethers.getContract("Collator");
   const lastSetIndex = (await collator.count()) - 1;
   let configSetIndex;

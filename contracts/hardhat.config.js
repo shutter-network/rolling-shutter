@@ -31,7 +31,11 @@ extendEnvironment((hre) => {
   hre.getKeyperAddresses = async function () {
     if (hre.deployConf.keypers === null) {
       const { keyper0, keyper1, keyper2 } = await hre.getNamedAccounts();
-      return [keyper0, keyper1, keyper2];
+      if (keyper0 && keyper1 && keyper2) {
+        return [keyper0, keyper1, keyper2];
+      } else {
+        return [];
+      }
     } else {
       return hre.deployConf.keypers;
     }

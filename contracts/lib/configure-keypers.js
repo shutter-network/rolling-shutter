@@ -7,6 +7,11 @@ const { ethers } = require("hardhat");
 // const { inspect } = require("util");
 
 async function configure_keypers(keyperAddrs) {
+  if (keyperAddrs.length == 0) {
+    console.log("WARNING: cannot configure keypers: no keyper addresses given");
+    return;
+  }
+
   const keypers = await ethers.getContract("Keypers");
   const lastSetIndex = (await keypers.count()) - 1;
   let configSetIndex;
@@ -28,8 +33,11 @@ async function configure_keypers(keyperAddrs) {
     console.log("Keyper set already added");
     configSetIndex = lastSetIndex;
   } else {
-    await keypers.add(keyperAddrs);
-    await keypers.append();
+    console.log(keyperAddrs);
+    const tx = await keypers.add(keyperAddrs);
+    await tx.wait();
+    const tx2 = await keypers.append();
+    await tx2.wait();
     configSetIndex = lastSetIndex + 1;
   }
 
@@ -43,11 +51,12 @@ async function configure_keypers(keyperAddrs) {
     return;
   }
 
-  await cfg.addNewCfg({
+  const tx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
     threshold: Math.ceil((keyperAddrs.length / 3) * 2),
   });
+  await tx.wait();
   console.log(
     "configure keypers: activationBlockNumber %s, setIndex: %d, keypers: %s",
     activationBlockNumber,
