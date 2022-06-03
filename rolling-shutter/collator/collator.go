@@ -72,7 +72,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	err = initializeEpochID(ctx, cltrdb.New(dbpool), contracts)
+	err = initializeNextBatch(ctx, cltrdb.New(dbpool), contracts)
 	if err != nil {
 		return err
 	}
@@ -100,24 +100,26 @@ func Run(ctx context.Context, cfg config.Config) error {
 	return c.run(ctx)
 }
 
-// initializeEpochID populate the epoch_id table with a valid value if it is empty.
-func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
-	_, err := db.GetNextEpochID(ctx)
+// initializeNextBatch populates the next_batch table with a valid value if it is empty.
+func initializeNextBatch(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
+	_, err := db.GetNextBatch(ctx)
 	if err == pgx.ErrNoRows {
 		blk, err := getBlockNumber(ctx, contracts.Client)
 		if err != nil {
 			return err
 		}
-		if blk > math.MaxUint32 {
+		if blk > math.MaxInt64 {
 			return errors.Errorf("block number too big: %d", blk)
 		}
-		// TODO: store block number
 
 		epochID, err := epochid.BigToEpochID(common.Big0)
 		if err != nil {
 			return err
 		}
-		return db.SetNextEpochID(ctx, epochID.Bytes())
+		return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+			EpochID:       epochID.Bytes(),
+			L1BlockNumber: int64(blk),
+		})
 	} else if err != nil {
 		return err
 	}

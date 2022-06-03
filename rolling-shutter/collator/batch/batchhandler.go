@@ -37,14 +37,22 @@ func computeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
 	return epochid.BigToEpochID(nextN)
 }
 
-// GetNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
-func GetNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, error) {
-	epochID, err := db.GetNextEpochID(ctx)
+// GetNextBatch gets the epochID and block number that will be used in the next batch.
+func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uint64, error) {
+	b, err := db.GetNextBatch(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error
-		return epochid.EpochID{}, err
+		return epochid.EpochID{}, 0, err
 	}
-	return epochid.BytesToEpochID(epochID)
+	epochID, err := epochid.BytesToEpochID(b.EpochID)
+	if err != nil {
+		return epochid.EpochID{}, 0, err
+	}
+	if b.L1BlockNumber < 0 {
+		return epochid.EpochID{}, 0, errors.Errorf("negative l1 block number in db")
+	}
+	l1BlockNumber := uint64(b.L1BlockNumber)
+	return epochID, l1BlockNumber, nil
 }
 
 // NewBatchHandler initializes a new instance of BatchHandler.
@@ -145,7 +153,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 
 	err = bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
-		currentEpochID, err := GetNextEpochID(ctx, db)
+		currentEpochID, _, err := GetNextBatch(ctx, db)
 		if err != nil {
 			return err
 		}
@@ -259,17 +267,16 @@ func (bh *BatchHandler) HandleDecryptionKey(
 	ctx context.Context, epochID epochid.EpochID, decryptionKey []byte,
 ) ([]shmsg.P2PMessage, error) {
 	var (
-		outMessages []shmsg.P2PMessage
-		nextEpochID epochid.EpochID
+		outMessages       []shmsg.P2PMessage
+		nextEpochID       epochid.EpochID
+		nextL1BlockNumber uint64
 	)
 
 	if bh.LatestEpochID() != epochID {
 		return nil, errors.New("received decryption key for wrong batch")
 	}
 
-	// TODO: get block number from latest batch
-	blockNumber := uint64(0)
-	btx, err := bh.latestBatch.SignedBatchTx(bh.privateKey(), decryptionKey, blockNumber)
+	btx, err := bh.latestBatch.SignedBatchTx(bh.privateKey(), decryptionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +301,7 @@ func (bh *BatchHandler) HandleDecryptionKey(
 
 	err = bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
-		nextEpochID, err = GetNextEpochID(ctx, db)
+		nextEpochID, nextL1BlockNumber, err = GetNextBatch(ctx, db)
 		if err != nil {
 			return err
 		}
@@ -307,7 +314,7 @@ func (bh *BatchHandler) HandleDecryptionKey(
 	// The Batch relies on polling the new state from the sequencer.
 	// We could track nonces ourselves from the local previous state,
 	// but we have to let the sequencer update the balances with the decrypted transactions.
-	newBatch, err := NewCachedPendingBatch(ctx, nextEpochID, bh.l2EthClient)
+	newBatch, err := NewCachedPendingBatch(ctx, nextEpochID, nextL1BlockNumber, bh.l2EthClient)
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +336,8 @@ func (bh *BatchHandler) HandleDecryptionKey(
 
 // initialiseEpoch sets the state of the BatchHandler class upon startup
 // and looks for pending, but not updated transactions in the database.
-// Note that the collatordb's GetNextEpochID() is used to determine the
-// current pending epoch-id.
+// Note that the collatordb's GetNextBatch() is used to determine the
+// current pending epoch-id and l1 block number.
 func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
 	return bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow processing transactions at the same time
@@ -339,15 +346,15 @@ func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
 			return err
 		}
 		db := cltrdb.New(tx)
-		epochID, err := GetNextEpochID(ctx, db)
+		epochID, l1BlockNumber, err := GetNextBatch(ctx, db)
 		if err == pgx.ErrNoRows {
-			return errors.Wrap(err, "epoch id not initialized in database")
+			return errors.Wrap(err, "next batch not initialized in database")
 		} else if err != nil {
 			return err
 		}
 		// either read in the latest unsubmitted txs from the DB,
 		// or create a new, empty batch
-		batch, err := bh.reconstructBatchFromDB(ctx, db, epochID)
+		batch, err := bh.reconstructBatchFromDB(ctx, db, epochID, l1BlockNumber)
 		if err != nil {
 			return errors.Wrap(err, "batch is non-submittable")
 		}
@@ -370,7 +377,7 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 		}
 
 		db := cltrdb.New(tx)
-		epochID, err := GetNextEpochID(ctx, db)
+		epochID, l1BlockNumber, err := GetNextBatch(ctx, db)
 		if err != nil {
 			return err
 		}
@@ -378,7 +385,7 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 		trigger, err := shmsg.NewSignedDecryptionTrigger(
 			bh.config.InstanceID,
 			epochID,
-			uint64(currentBlockNumber),
+			l1BlockNumber,
 			bh.latestBatch.Transactions().Hash(),
 			bh.config.EthereumKey,
 		)
@@ -398,7 +405,10 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 		if err != nil {
 			return err
 		}
-		if err := db.SetNextEpochID(ctx, nextEpochID.Bytes()); err != nil {
+		if err := db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+			EpochID:       nextEpochID.Bytes(),
+			L1BlockNumber: int64(currentBlockNumber),
+		}); err != nil {
 			return err
 		}
 
@@ -415,8 +425,10 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 // This method should only be used for immediate recovery of lost, unsubmitted batches,
 // e.g. due to a crash. It is only applicable for a pending, unsubmitted batch, since it relies on
 // the current chain-state of the sequencer node.
-func (bh *BatchHandler) reconstructBatchFromDB(ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID) (*Batch, error) {
-	batch, err := NewCachedPendingBatch(ctx, epochID, bh.l2EthClient)
+func (bh *BatchHandler) reconstructBatchFromDB(
+	ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID, l1BlockNumber uint64,
+) (*Batch, error) {
+	batch, err := NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
 	if err != nil {
 		return nil, err
 	}
