@@ -109,8 +109,9 @@ type Batch struct {
 	state        State
 	transactions *TransactionQueue
 
-	epochID epochid.EpochID
-	ChainID *big.Int
+	epochID       epochid.EpochID
+	l1BlockNumber uint64
+	ChainID       *big.Int
 }
 
 func (b *Batch) BatchIndex() (uint64, error) {
@@ -208,7 +209,7 @@ func (b *Batch) Transactions() *TransactionQueue {
 
 // SignedBatchTx constructs the signed Batch-Transaction to be sent to
 // the sequencer for batch submittal.
-func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte, l1BlockNumber uint64) (*txtypes.Transaction, error) {
+func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte) (*txtypes.Transaction, error) {
 	txs := b.Transactions()
 	ts := time.Now().Unix()
 	batchIndex, err := b.BatchIndex()
@@ -219,7 +220,7 @@ func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte
 		ChainID:       b.ChainID,
 		DecryptionKey: decryptionKey,
 		BatchIndex:    batchIndex,
-		L1BlockNumber: new(big.Int).SetUint64(l1BlockNumber),
+		L1BlockNumber: new(big.Int).SetUint64(b.l1BlockNumber),
 		Timestamp:     big.NewInt(ts),
 		Transactions:  txs.Bytes(),
 	}

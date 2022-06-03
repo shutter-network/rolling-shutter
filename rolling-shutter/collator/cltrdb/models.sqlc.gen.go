@@ -40,9 +40,10 @@ type MetaInf struct {
 	Value string
 }
 
-type NextEpoch struct {
+type NextBatch struct {
 	EnforceOneRow bool
 	EpochID       []byte
+	L1BlockNumber int64
 }
 
 type Transaction struct {

@@ -35,7 +35,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	db := cltrdb.New(srv.c.dbpool)
-	epoch, err := batch.GetNextEpochID(req.Context(), db)
+	epoch, _, err := batch.GetNextBatch(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
