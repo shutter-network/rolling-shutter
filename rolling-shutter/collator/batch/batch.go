@@ -16,7 +16,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
-const minimumTxGas uint64 = 21000
+const (
+	minimumTxGas   uint64 = 21000
+	BatchSizeLimit int    = 8 * 1024
+)
 
 func ValidateGasParams(tx *txtypes.Transaction, baseFee *big.Int) error {
 	if tx.Gas() < minimumTxGas {
@@ -188,6 +191,12 @@ func (b *Batch) ApplyTx(ctx context.Context, p *PendingTransaction) error {
 		// gas limit reached
 		return err
 	}
+	newTotalSize := b.transactions.TotalByteSize() + len(p.txBytes)
+	if newTotalSize > BatchSizeLimit {
+		return errors.Errorf("size limit reached (%d + %d > %d)",
+			b.transactions.TotalByteSize(), len(p.txBytes), BatchSizeLimit)
+	}
+
 	err = b.state.SubBalance(ctx, p.sender, p.gasCost)
 	if err != nil {
 		return err

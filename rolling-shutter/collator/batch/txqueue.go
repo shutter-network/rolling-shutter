@@ -17,7 +17,7 @@ func NewTransactionQueue() *TransactionQueue {
 // TransactionQueue is a container struct allowing
 // for append-only operation on a list of `PendingTransaction`.
 // TransactionQueue implements convenience methods to
-// join two queus, generate the hash of all queued transactions
+// join two queues, generate the hash of all queued transactions
 // and show the set of all transactions sender addresses.
 type TransactionQueue struct {
 	txqueue []*PendingTransaction
@@ -68,4 +68,14 @@ func (q *TransactionQueue) Len() int { return len(q.txqueue) }
 func (q *TransactionQueue) Enqueue(tx *PendingTransaction) {
 	q.Senders[tx.sender] = true
 	q.txqueue = append(q.txqueue, tx)
+}
+
+// TotalByteSize returns the sum of the size of all transactions measured in bytes.
+func (q *TransactionQueue) TotalByteSize() int {
+	bs := q.Bytes()
+	s := 0
+	for _, b := range bs {
+		s += len(b)
+	}
+	return s
 }
