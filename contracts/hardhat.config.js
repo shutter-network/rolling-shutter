@@ -3,6 +3,7 @@ require("@eth-optimism/hardhat-ovm");
 require("hardhat-deploy");
 require("hardhat-deploy-ethers");
 require("@nomiclabs/hardhat-ganache");
+require("@nomiclabs/hardhat-etherscan");
 const { task, extendEnvironment } = require("hardhat/config");
 const fs = require("fs");
 const process = require("process");

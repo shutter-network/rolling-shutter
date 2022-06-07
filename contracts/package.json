@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-etherscan": "^3.0.4",
     "@nomiclabs/hardhat-ganache": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "chai": "^4.3.4",
