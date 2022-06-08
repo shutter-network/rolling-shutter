@@ -229,7 +229,7 @@ func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte
 		ChainID:       b.ChainID,
 		DecryptionKey: decryptionKey,
 		BatchIndex:    batchIndex,
-		L1BlockNumber: new(big.Int).SetUint64(b.l1BlockNumber),
+		L1BlockNumber: b.l1BlockNumber,
 		Timestamp:     big.NewInt(ts),
 		Transactions:  txs.Bytes(),
 	}
