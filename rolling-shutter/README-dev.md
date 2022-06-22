@@ -62,6 +62,7 @@ asdf plugin add protoc
 asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git
 asdf plugin add solidity
 asdf plugin add tinygo https://github.com/schmir/asdf-tinygo.git
+asdf plugin add binaryen https://github.com/birros/asdf-binaryen.git
 asdf plugin add pre-commit
 ```
 
