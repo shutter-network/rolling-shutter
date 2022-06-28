@@ -46,10 +46,6 @@ contract CollatorConfigsList is Ownable {
                 config.activationBlockNumber,
             "Cannot add new set with lower block number than previous"
         );
-        require(
-            block.number <= config.activationBlockNumber,
-            "Cannot add new set with past block number"
-        );
 
         collatorConfigs.push(config);
         emit NewConfig({
@@ -73,13 +69,5 @@ contract CollatorConfigsList is Ownable {
             }
         }
         revert("unreachable");
-    }
-
-    function getCurrentActiveConfig()
-        public
-        view
-        returns (CollatorConfig memory)
-    {
-        return getActiveConfig(uint64(block.number));
     }
 }

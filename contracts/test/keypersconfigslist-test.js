@@ -110,14 +110,6 @@ describe("KeypersConfigsList", function () {
     );
   });
 
-  it("should be impossible to add sets with past block number", async function () {
-    const cfg = await deploy();
-
-    await expect(
-      cfg.addNewCfg({ activationBlockNumber: 1, setIndex: 0, threshold: 0 })
-    ).to.be.revertedWith("Cannot add new set with past block number");
-  });
-
   it("should be impossible to add sets with threshold 0 and non-empty keyper set", async function () {
     const cfg = await deploy();
     const addrsSeq = await getAddrsSeq(cfg);

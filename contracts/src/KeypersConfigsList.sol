@@ -49,10 +49,6 @@ contract KeypersConfigsList is Ownable {
                 config.activationBlockNumber,
             "Cannot add new set with lower block number than previous"
         );
-        require(
-            block.number <= config.activationBlockNumber,
-            "Cannot add new set with past block number"
-        );
         uint64 numKeypers = addrsSeq.countNth(config.setIndex);
         if (numKeypers == 0) {
             require(
@@ -89,13 +85,5 @@ contract KeypersConfigsList is Ownable {
             }
         }
         revert("unreachable");
-    }
-
-    function getCurrentActiveConfig()
-        public
-        view
-        returns (KeypersConfig memory)
-    {
-        return getActiveConfig(uint64(block.number));
     }
 }
