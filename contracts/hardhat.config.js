@@ -84,5 +84,11 @@ module.exports = {
       gasPrice: 15000000,
       ovm: true, // This sets the network as using the ovm and ensure contract will be compiled against that.
     },
+    nitro: {
+      url: "http://127.0.0.1:8547",
+      accounts: [
+        "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+      ],
+    },
   },
 };
