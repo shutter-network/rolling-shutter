@@ -1,4 +1,5 @@
 {:min-bb-version "0.7.3"
+ :deps {org.clojars.lispyclouds/contajners {:mvn/version "0.0.6"}}
  :paths ["src"]
  :tasks
  {:requires ([babashka.fs :as fs :refer [which]]
@@ -7,12 +8,24 @@
              [clojure.string :as str]
              [clojure.java.browse :as browse]
              [clojure.java.io :as io]
+             [contajners.core :as c]
              [babashka.curl :as curl]
              [cheshire.core :as json]
              [sht.play :as play :refer [run-process]])
 
   :init
   (do
+    (def volumes-docker (c/client {:engine   :docker
+                                   :category :volumes
+                                   :version  "v1.41"
+                                   :conn     {:uri "unix:///var/run/docker.sock"}}))
+
+    (defn docker-shutter-nitro-volumes
+      []
+      (c/invoke volumes-docker
+                {:op  :VolumeList
+                 :params {:filters (json/generate-string {"label" {"com.docker.compose.project=shutter-nitro" true}})}}))
+
     (defn long-from-env
       [s default]
       (Long/valueOf (or (System/getenv s) default)))
@@ -39,6 +52,10 @@
       (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
     (def src-dir
       (-> repo-root (fs/path "rolling-shutter") str))
+    (def play-dir
+      (-> repo-root (fs/path "play") str))
+    (def nitro-dir
+      (-> repo-root (fs/path "play" "shutter-nitro") str))
     (defn src-file [p]
       (-> src-dir (fs/path p) str))
     (def contracts-dir
@@ -254,7 +271,7 @@
            (run-process (if windows?
                           '[go build -o bin/rolling-shutter.exe]
                           '[make])
-            {:dir src-dir}))}
+                        {:dir src-dir}))}
 
   build-all
   {:doc "Run all build/compile steps"
@@ -342,6 +359,24 @@
   init
   {:doc "Initialize keyper databases as well as shuttermint"
    :depends [genconfig init:testchain init:kprdb init:collatordb]}
+
+  -clone-nitro
+  {:doc "Clone the nitro repository"
+   :task (when-not (fs/exists? nitro-dir)
+           (run-process ["git" "clone" "--recurse-submodules" "-j6"
+                         "git@github.com:shutter-network/nitro.git" nitro-dir]))}
+
+  nitro
+  {:doc "Run nitro"
+   :depends [-clone-nitro]
+   :task (let [volumes (:Volumes (docker-shutter-nitro-volumes))
+               cmd ["bash" (str (fs/path nitro-dir "test-node.bash"))
+                    "--no-blockscout"]
+               cmd (if (seq volumes)
+                     cmd
+                     (conj cmd "--init"))]
+           (println "Running" cmd)
+           (babashka.process/exec cmd))}
 
   -deploy-conf
   {:doc "Generate a deploy config"

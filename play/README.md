@@ -31,3 +31,8 @@ export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
 Make sure you have java jdk 17 as well as clojure installed.
 
 Run `bb test-system`.
+
+## nitro
+
+Run `bb nitro` to start an arbitrum nitro test setup. This requires docker and
+docker-compose to be installed.
