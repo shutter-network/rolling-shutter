@@ -38,6 +38,7 @@ import (
 type collator struct {
 	Config config.Config
 
+	l1Client     *ethclient.Client
 	contracts    *deployment.Contracts
 	batchHandler *batch.BatchHandler
 
@@ -58,11 +59,15 @@ func Run(ctx context.Context, cfg config.Config) error {
 	defer dbpool.Close()
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 
-	ethereumClient, err := ethclient.Dial(cfg.EthereumURL)
+	l1Client, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(ethereumClient, cfg.DeploymentDir)
+	l2Client, err := ethclient.Dial(cfg.SequencerURL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(l2Client, cfg.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -72,7 +77,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	err = initializeNextBatch(ctx, cltrdb.New(dbpool), contracts)
+	err = initializeNextBatch(ctx, cltrdb.New(dbpool), l1Client)
 	if err != nil {
 		return err
 	}
@@ -85,6 +90,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 	c := collator{
 		Config: cfg,
 
+		l1Client:  l1Client,
 		contracts: contracts,
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     cfg.ListenAddress,
@@ -101,10 +107,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 }
 
 // initializeNextBatch populates the next_batch table with a valid value if it is empty.
-func initializeNextBatch(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
+func initializeNextBatch(ctx context.Context, db *cltrdb.Queries, l1Client *ethclient.Client) error {
 	_, err := db.GetNextBatch(ctx)
 	if err == pgx.ErrNoRows {
-		blk, err := getBlockNumber(ctx, contracts.Client)
+		blk, err := getBlockNumber(ctx, l1Client)
 		if err != nil {
 			return err
 		}
@@ -239,7 +245,7 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context) error {
 	var outMessages []shmsg.P2PMessage
 
-	blockNumber, err := getBlockNumber(ctx, c.contracts.Client)
+	blockNumber, err := getBlockNumber(ctx, c.l1Client)
 	if err != nil {
 		return err
 	}
