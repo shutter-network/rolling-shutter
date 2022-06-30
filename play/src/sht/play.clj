@@ -159,7 +159,8 @@
                               "DKGPhaseLength" 8
                               "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
                               "HTTPEnabled" true
-                              "HTTPListenAddress" (format ":%d" (+ 24000 n))}}))
+                              "HTTPListenAddress" (format ":%d" (+ 24000 n))
+                              "L2URL" "http://127.0.0.1:8545/"}}))
 
 ;; -- mocknode-subcommand
 (defn mocknode-subcommand

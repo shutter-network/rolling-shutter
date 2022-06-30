@@ -28,6 +28,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -40,6 +41,7 @@ type keyper struct {
 	db                *kprdb.Queries
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
+	l1Client          *ethclient.Client
 	contracts         *deployment.Contracts
 
 	shuttermintState *ShuttermintState
@@ -80,11 +82,15 @@ func Run(ctx context.Context, config Config) error {
 	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
 	db := kprdb.New(dbpool)
 
-	ethereumClient, err := ethclient.Dial(config.EthereumURL)
+	l1Client, err := ethclient.Dial(config.EthereumURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
+	l2Client, err := ethclient.Dial(config.L2URL)
+	if err != nil {
+		return err
+	}
+	contracts, err := deployment.NewContracts(l2Client, config.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -115,6 +121,7 @@ func Run(ctx context.Context, config Config) error {
 		db:                db,
 		shuttermintClient: shuttermintClient,
 		messageSender:     messageSender,
+		l1Client:          l1Client,
 		contracts:         contracts,
 
 		shuttermintState: NewShuttermintState(config),
@@ -229,12 +236,12 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
-func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
+func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
 	err := kpr.handleOnChainKeyperSetChanges(ctx, tx)
 	if err != nil {
 		return err
 	}
-	err = kpr.sendNewBlockSeen(ctx, tx)
+	err = kpr.sendNewBlockSeen(ctx, tx, l1BlockNumber)
 	if err != nil {
 		return err
 	}
@@ -245,14 +252,9 @@ func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx) error {
 // NewBlockSeen messages to the shuttermint chain, so that the chain can start new batch configs if
 // enough keypers have seen a block past the start block of some BatchConfig. We only send messages
 // when the current block we see, could lead to a batch config being started.
-func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx) error {
-	qc := commondb.New(tx)
+func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
 	q := kprdb.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
-	if err != nil {
-		return err
-	}
-	nextBlock, err := qc.GetNextBlockNumber(ctx)
 	if err != nil {
 		return err
 	}
@@ -260,7 +262,7 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx) error {
 	count, err := q.CountBatchConfigsInBlockRange(ctx,
 		kprdb.CountBatchConfigsInBlockRangeParams{
 			StartBlock: lastBlock,
-			EndBlock:   int64(nextBlock),
+			EndBlock:   int64(l1BlockNumber),
 		})
 	if err != nil {
 		return err
@@ -269,16 +271,16 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx) error {
 		return nil
 	}
 
-	blockSeenMsg := shmsg.NewBlockSeen(uint64(nextBlock))
+	blockSeenMsg := shmsg.NewBlockSeen(l1BlockNumber)
 	err = scheduleShutterMessage(ctx, q, "block seen", blockSeenMsg)
 	if err != nil {
 		return err
 	}
-	err = q.SetLastBlockSeen(ctx, int64(nextBlock))
+	err = q.SetLastBlockSeen(ctx, int64(l1BlockNumber))
 	if err != nil {
 		return err
 	}
-	log.Printf("block seen: %d", nextBlock)
+	log.Printf("block seen: %d", l1BlockNumber)
 	return nil
 }
 
@@ -346,16 +348,24 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 
 func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	for {
-		err := SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
-		if err != nil {
-			return err
-		}
-		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			return kpr.handleOnChainChanges(ctx, tx)
+		l1BlockNumber, err := medley.Retry(ctx, func() (uint64, error) {
+			return kpr.l1Client.BlockNumber(ctx)
 		})
 		if err != nil {
 			return err
 		}
+
+		err = SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
+		if err != nil {
+			return err
+		}
+		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+			return kpr.handleOnChainChanges(ctx, tx, l1BlockNumber)
+		})
+		if err != nil {
+			return err
+		}
+
 		err = SendShutterMessages(ctx, kprdb.New(kpr.dbpool), &kpr.messageSender)
 		if err != nil {
 			return err

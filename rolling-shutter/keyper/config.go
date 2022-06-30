@@ -23,6 +23,7 @@ import (
 type Config struct {
 	ShuttermintURL string
 	EthereumURL    string
+	L2URL          string
 	DatabaseURL    string
 	DeploymentDir  string
 
@@ -47,6 +48,7 @@ const configTemplate = `# Shutter keyper config
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
 EthereumURL         = "{{ .EthereumURL }}"
+L2URL               = "{{ .L2URL }}"
 DeploymentDir       = "{{ .DeploymentDir }}"
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
