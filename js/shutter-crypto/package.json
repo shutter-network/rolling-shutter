@@ -22,5 +22,8 @@
     "parserOptions": {
       "sourceType": "module"
     }
+  },
+  "dependencies": {
+    "browser-or-node": "^2.0.0"
   }
 }
