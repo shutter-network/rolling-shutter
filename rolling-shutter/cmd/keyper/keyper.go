@@ -179,6 +179,7 @@ func exampleConfig() (*keyper.Config, error) {
 	cfg := &keyper.Config{
 		ShuttermintURL:     "http://localhost:26657",
 		EthereumURL:        "http://127.0.0.1:8545/",
+		L2URL:              "http://127.0.0.1:8547/",
 		DeploymentDir:      "./deployments/localhost/",
 		DKGPhaseLength:     30,
 		DKGStartBlockDelta: 12000,
