@@ -26,6 +26,12 @@
                 {:op  :VolumeList
                  :params {:filters (json/generate-string {"label" {"com.docker.compose.project=shutter-nitro" true}})}}))
 
+    (defn docker-delete-volume
+      [vol]
+      (c/invoke volumes-docker
+                {:op :VolumeDelete
+                 :params {:name vol}}))
+
     (defn long-from-env
       [s default]
       (Long/valueOf (or (System/getenv s) default)))
@@ -366,9 +372,18 @@
            (run-process ["git" "clone" "--recurse-submodules" "-j6"
                          "git@github.com:shutter-network/nitro.git" nitro-dir]))}
 
+  -nitro-clean
+  {:doc "Remove nitro docker volumes"
+   :task (do
+           (run-process '[docker-compose down] {:dir nitro-dir})
+           (let [volumes (:Volumes (docker-shutter-nitro-volumes))]
+             (doseq [vol volumes
+                     :let [n (:Name vol)]]
+               (println "Removing docker volume" n)
+               (docker-delete-volume n))))}
   nitro
   {:doc "Run nitro"
-   :depends [-clone-nitro]
+   :depends [-clone-nitro -nitro-clean]
    :task (let [volumes (:Volumes (docker-shutter-nitro-volumes))
                cmd ["bash" (str (fs/path nitro-dir "test-node.bash"))
                     "--no-blockscout"]
