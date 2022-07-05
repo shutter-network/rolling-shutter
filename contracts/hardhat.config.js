@@ -68,6 +68,11 @@ module.exports = {
     keyper1: 2,
     keyper2: 3,
     collator: 7,
+    bank: {
+      // an account that has funds
+      default: 0,
+      nitro: 1,
+    },
   },
   networks: {
     hardhat: {
@@ -76,13 +81,12 @@ module.exports = {
         interval: 1500,
       },
     },
-    optimistic: {
-      url: "http://127.0.0.1:8545",
-      accounts: {
-        mnemonic: "test test test test test test test test test test test junk",
-      },
-      gasPrice: 15000000,
-      ovm: true, // This sets the network as using the ovm and ensure contract will be compiled against that.
+    nitro: {
+      url: "http://localhost:8547",
+      accounts: [
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // first hardhat acccount
+        "0xe887f7d17d07cc7b8004053fb8826f6657084e88904bb61590e498ca04704cf2", // nitro funnel
+      ],
     },
   },
 };
