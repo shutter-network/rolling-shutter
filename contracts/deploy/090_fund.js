@@ -8,9 +8,16 @@ module.exports = async function (hre) {
     return;
   }
 
-  const [owner] = await ethers.getSigners();
-  const keypers = await hre.getKeyperAddresses();
-  const addresses = keypers;
+  const { bank, deployer } = await hre.getNamedAccounts();
+  const bankSigner = await ethers.getSigner(bank);
+
+  let addresses = [];
+  if (deployer !== bank) {
+    addresses.push(deployer);
+  }
+  addresses.push(...(await hre.getKeyperAddresses()));
+  addresses.push(await hre.getCollatorAddress());
+
   const value = ethers.utils.parseEther(fundValue);
   console.log(
     "fund: funding %s adresses with %s eth",
@@ -26,7 +33,7 @@ module.exports = async function (hre) {
       console.log(a + " already funded");
       continue;
     }
-    const tx = await owner.sendTransaction({
+    const tx = await bankSigner.sendTransaction({
       to: a,
       value: value,
     });
