@@ -43,28 +43,57 @@ function _checkInitialized() {
   }
 }
 
+function _throwOnError(result) {
+  if (result.startsWith("Error:")) {
+    throw result;
+  }
+}
+
+function _hexToUint8Array(hex) {
+  if (hex.startsWith("0x")) {
+    hex = hex.slice(2);
+  }
+  if (hex.length % 2 != 0) {
+    hex = "0" + hex;
+  }
+  let bytes = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(parseInt(hex.substring(i, i + 2), 16));
+  }
+  return Uint8Array.from(bytes);
+}
+
 async function encrypt(message, eonPublicKey, epochId, sigma) {
   _checkInitialized();
-  return await g.__wasm_functions__.encrypt(
+  const result = await g.__wasm_functions__.encrypt(
     message,
     eonPublicKey,
     epochId,
     sigma
   );
+  _throwOnError(result);
+  return _hexToUint8Array(result);
 }
 
 async function decrypt(encryptedMessage, decryptionKey) {
   _checkInitialized();
-  return await g.__wasm_functions__.decrypt(encryptedMessage, decryptionKey);
+  const result = await g.__wasm_functions__.decrypt(
+    encryptedMessage,
+    decryptionKey
+  );
+  _throwOnError(result);
+  return _hexToUint8Array(result);
 }
 
 async function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
   _checkInitialized();
-  return await g.__wasm_functions__.verifyDecryptionKey(
+  const result = await g.__wasm_functions__.verifyDecryptionKey(
     decryptionKey,
     eonPublicKey,
     epochId
   );
+  _throwOnError(result);
+  return result;
 }
 
 export { init, encrypt, decrypt, verifyDecryptionKey };
