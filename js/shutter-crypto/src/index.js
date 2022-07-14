@@ -6,37 +6,32 @@ if (typeof g.__wasm_functions__ === "undefined") {
   g.__wasm_functions__ = {};
 }
 
-function init(wasmUrlOrPath) {
+async function init(wasmUrlOrPath) {
   let shutterCrypto;
   const go = new Go(); // eslint-disable-line no-undef
   if (isBrowser) {
     if ("instantiateStreaming" in WebAssembly) {
-      return WebAssembly.instantiateStreaming(
+      const obj = await WebAssembly.instantiateStreaming(
         fetch(wasmUrlOrPath),
         go.importObject
-      ).then((obj) => {
-        shutterCrypto = obj.instance;
-        go.run(shutterCrypto);
-      });
+      );
+      shutterCrypto = obj.instance;
+      go.run(shutterCrypto);
     } else {
-      return fetch(wasmUrlOrPath)
-        .then((resp) => resp.arrayBuffer())
-        .then((bytes) =>
-          WebAssembly.instantiate(bytes, go.importObject).then((obj) => {
-            shutterCrypto = obj.instance;
-            go.run(shutterCrypto);
-          })
-        );
+      const resp = await fetch(wasmUrlOrPath);
+      const bytes = await resp.arrayBuffer();
+      const obj = WebAssembly.instantiate(bytes, go.importObject);
+      shutterCrypto = obj.instance;
+      go.run(shutterCrypto);
     }
   } else if (isNode) {
     const fs = __non_webpack_require__("fs"); // eslint-disable-line no-undef
-    WebAssembly.instantiate(
+    const obj = await WebAssembly.instantiate(
       fs.readFileSync(wasmUrlOrPath),
       go.importObject
-    ).then((obj) => {
-      shutterCrypto = obj.instance;
-      go.run(shutterCrypto);
-    });
+    );
+    shutterCrypto = obj.instance;
+    go.run(shutterCrypto);
   } else {
     throw "Neither Browser nor Node; not supported.";
   }
@@ -48,19 +43,24 @@ function _checkInitialized() {
   }
 }
 
-function encrypt(message, eonPublicKey, epochId, sigma) {
+async function encrypt(message, eonPublicKey, epochId, sigma) {
   _checkInitialized();
-  return g.__wasm_functions__.encrypt(message, eonPublicKey, epochId, sigma);
+  return await g.__wasm_functions__.encrypt(
+    message,
+    eonPublicKey,
+    epochId,
+    sigma
+  );
 }
 
-function decrypt(encryptedMessage, decryptionKey) {
+async function decrypt(encryptedMessage, decryptionKey) {
   _checkInitialized();
-  return g.__wasm_functions__.decrypt(encryptedMessage, decryptionKey);
+  return await g.__wasm_functions__.decrypt(encryptedMessage, decryptionKey);
 }
 
-function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
+async function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
   _checkInitialized();
-  return g.__wasm_functions__.verifyDecryptionKey(
+  return await g.__wasm_functions__.verifyDecryptionKey(
     decryptionKey,
     eonPublicKey,
     epochId
