@@ -31,6 +31,6 @@ func main() {
 		}
 		prevEonPublicKey = eonPublicKey
 
-		fmt.Printf("%8d | %X\n", epochID, decryptionKey.Marshal())
+		fmt.Printf("%X | %X\n", epochID.Bytes(), decryptionKey.Marshal())
 	}
 }
