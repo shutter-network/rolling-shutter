@@ -13,19 +13,26 @@ npm install @shutter-network/shutter-crypto@beta
 
 The module provides the following public functions:
 
-### `shutterCrypto.init()`
+### `async shutterCrypto.init(wasmUrlOrPath)`
 
 Load and initialize the Go wasm library. This Promise needs to be consumed
 before any other function in the library is called.
 
-### `shutterCrypto.encrypt(message, eonPublicKey, epochId, sigma)`
+On Node the `wasmUrlOrPath` parameter is optional. If not given it will be
+determined automatically.
+
+In a Web context the path to the `shutter-crypto.wasm` file needs to be given
+(since it appears no standard cross framework way of automatically determining a
+path is available).
+
+### `async shutterCrypto.encrypt(message, eonPublicKey, epochId, sigma)`
 
 ...
 
-### `shutterCrypto.decrypt(encryptedMessage, decryptionKey)`
+### `async shutterCrypto.decrypt(encryptedMessage, decryptionKey)`
 
 ...
 
-### `shutterCrypto.verifyDecryptionKey(decryptionKey, eonPublicKey, epochId)`
+### `async shutterCrypto.verifyDecryptionKey(decryptionKey, eonPublicKey, epochId)`
 
 ...

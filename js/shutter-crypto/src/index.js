@@ -1,103 +1,113 @@
 import "../derived/wasm_exec";
 import { isBrowser, isNode } from "browser-or-node";
 
-let wasm = require("../derived/shutter-crypto.wasm");
-
 const g = global || window || this || self;
-if (typeof g.__wasm_functions__ === "undefined") {
-  g.__wasm_functions__ = {};
+if (typeof g.__wasm_bridge__ === "undefined") {
+  g.__wasm_bridge__ = {};
 }
 
-/* global Go, __non_webpack_require__, __dirname, __webpack_require__ */
+// Roundabout way of waiting for the Go wasm machinery to be done initializing
+// Taken from https://github.com/golang/go/issues/49710#issuecomment-986484758
+const isReady = new Promise((resolve) => {
+  g.__wasm_bridge__["_initialized"] = resolve;
+});
 
-/* Slightly modified copy from webpack/runtime/publicPath
- * Webpack's automatic publicPath doesn't work in node, so we need to manually
- * handle it to be compatible with both.
- */
-function getScriptUrl() {
-  var scriptUrl;
-  if (__webpack_require__.g.importScripts)
-    scriptUrl = __webpack_require__.g.location + "";
-  var document = __webpack_require__.g.document;
-  if (!scriptUrl && document) {
-    if (document.currentScript) scriptUrl = document.currentScript.src;
-    if (!scriptUrl) {
-      var scripts = document.getElementsByTagName("script");
-      if (scripts.length) scriptUrl = scripts[scripts.length - 1].src;
-    }
-  }
-  // When supporting browsers where an automatic publicPath is not supported you must specify an output.publicPath manually via configuration
-  // or pass an empty string ("") and set the __webpack_public_path__ variable from your code to use your own logic.
-  if (!scriptUrl)
-    throw new Error("Automatic publicPath is not supported in this browser");
-  scriptUrl = scriptUrl
-    .replace(/#.*$/, "")
-    .replace(/\?.*$/, "")
-    .replace(/\/[^/]+$/, "/");
-  return scriptUrl;
-}
+const defaultWasmFileName = "shutter-crypto.wasm";
 
-function init() {
+async function init(wasmUrlOrPath) {
   let shutterCrypto;
-  const go = new Go();
+  const go = new Go(); // eslint-disable-line no-undef
   if (isBrowser) {
-    wasm = getScriptUrl() + wasm;
     if ("instantiateStreaming" in WebAssembly) {
-      return WebAssembly.instantiateStreaming(
-        fetch(wasm),
+      const obj = await WebAssembly.instantiateStreaming(
+        fetch(wasmUrlOrPath),
         go.importObject
-      ).then((obj) => {
-        shutterCrypto = obj.instance;
-        go.run(shutterCrypto);
-      });
-    } else {
-      return fetch(wasm)
-        .then((resp) => resp.arrayBuffer())
-        .then((bytes) =>
-          WebAssembly.instantiate(bytes, go.importObject).then((obj) => {
-            shutterCrypto = obj.instance;
-            go.run(shutterCrypto);
-          })
-        );
-    }
-  } else if (isNode) {
-    const fs = __non_webpack_require__("fs");
-    const path = __non_webpack_require__("path");
-    WebAssembly.instantiate(
-      fs.readFileSync(path.join(__dirname, wasm)),
-      go.importObject
-    ).then((obj) => {
+      );
       shutterCrypto = obj.instance;
       go.run(shutterCrypto);
-    });
+    } else {
+      const resp = await fetch(wasmUrlOrPath);
+      const bytes = await resp.arrayBuffer();
+      const obj = WebAssembly.instantiate(bytes, go.importObject);
+      shutterCrypto = obj.instance;
+      go.run(shutterCrypto);
+      await isReady;
+    }
+  } else if (isNode) {
+    const fs = __non_webpack_require__("fs"); // eslint-disable-line no-undef
+    const path = __non_webpack_require__("path"); // eslint-disable-line no-undef
+    if (wasmUrlOrPath === undefined) {
+      wasmUrlOrPath = path.join(__dirname, defaultWasmFileName);
+    }
+    const obj = await WebAssembly.instantiate(
+      fs.readFileSync(wasmUrlOrPath),
+      go.importObject
+    );
+    shutterCrypto = obj.instance;
+    go.run(shutterCrypto);
+    await isReady;
   } else {
     throw "Neither Browser nor Node; not supported.";
   }
 }
 
 function _checkInitialized() {
-  if (typeof g.__wasm_functions__.encrypt === "undefined") {
+  if (typeof g.__wasm_bridge__.encrypt === "undefined") {
     throw "You need to consume the 'shutterCrypto.init()' promise before using the module functions.";
   }
 }
 
-function encrypt(message, eonPublicKey, epochId, sigma) {
-  _checkInitialized();
-  return g.__wasm_functions__.encrypt(message, eonPublicKey, epochId, sigma);
+function _throwOnError(result) {
+  if (result.startsWith("Error:")) {
+    throw result;
+  }
 }
 
-function decrypt(encryptedMessage, decryptionKey) {
-  _checkInitialized();
-  return g.__wasm_functions__.decrypt(encryptedMessage, decryptionKey);
+function _hexToUint8Array(hex) {
+  if (hex.startsWith("0x")) {
+    hex = hex.slice(2);
+  }
+  if (hex.length % 2 != 0) {
+    hex = "0" + hex;
+  }
+  let bytes = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(parseInt(hex.substring(i, i + 2), 16));
+  }
+  return Uint8Array.from(bytes);
 }
 
-function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
+async function encrypt(message, eonPublicKey, epochId, sigma) {
   _checkInitialized();
-  return g.__wasm_functions__.verifyDecryptionKey(
+  const result = await g.__wasm_bridge__.encrypt(
+    message,
+    eonPublicKey,
+    epochId,
+    sigma
+  );
+  _throwOnError(result);
+  return _hexToUint8Array(result);
+}
+
+async function decrypt(encryptedMessage, decryptionKey) {
+  _checkInitialized();
+  const result = await g.__wasm_bridge__.decrypt(
+    encryptedMessage,
+    decryptionKey
+  );
+  _throwOnError(result);
+  return _hexToUint8Array(result);
+}
+
+async function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
+  _checkInitialized();
+  const result = await g.__wasm_bridge__.verifyDecryptionKey(
     decryptionKey,
     eonPublicKey,
     epochId
   );
+  _throwOnError(result);
+  return result;
 }
 
 export { init, encrypt, decrypt, verifyDecryptionKey };

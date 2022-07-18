@@ -12,21 +12,25 @@ import (
 var (
 	uint8Array        js.Value
 	uint8ClampedArray js.Value
-	functionRegistry  js.Value
+	jsRegistry        js.Value
 )
 
 const (
-	registryJavaScriptName = "__wasm_functions__"
+	registryJavaScriptName = "__wasm_bridge__"
+	initializedPromiseName = "_initialized"
 )
 
 func main() {
 	uint8Array = js.Global().Get("Uint8Array")
 	uint8ClampedArray = js.Global().Get("Uint8ClampedArray")
-	functionRegistry = js.Global().Get(registryJavaScriptName)
+	jsRegistry = js.Global().Get(registryJavaScriptName)
 
-	functionRegistry.Set("encrypt", encrypt)
-	functionRegistry.Set("decrypt", decrypt)
-	functionRegistry.Set("verifyDecryptionKey", verifyDecryptionKey)
+	jsRegistry.Set("encrypt", encrypt)
+	jsRegistry.Set("decrypt", decrypt)
+	jsRegistry.Set("verifyDecryptionKey", verifyDecryptionKey)
+
+	// Tell JS we're loaded
+	jsRegistry.Get(initializedPromiseName).Invoke()
 
 	select {}
 }
