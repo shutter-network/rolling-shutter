@@ -6,6 +6,7 @@ if (typeof g.__wasm_functions__ === "undefined") {
   g.__wasm_functions__ = {};
 }
 
+const defaultWasmFileName = "shutter-crypto.wasm";
 async function init(wasmUrlOrPath) {
   let shutterCrypto;
   const go = new Go(); // eslint-disable-line no-undef
@@ -26,6 +27,10 @@ async function init(wasmUrlOrPath) {
     }
   } else if (isNode) {
     const fs = __non_webpack_require__("fs"); // eslint-disable-line no-undef
+    const path = __non_webpack_require__("path"); // eslint-disable-line no-undef
+    if (wasmUrlOrPath === undefined) {
+      wasmUrlOrPath = path.join(__dirname, defaultWasmFileName);
+    }
     const obj = await WebAssembly.instantiate(
       fs.readFileSync(wasmUrlOrPath),
       go.importObject

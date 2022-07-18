@@ -11,6 +11,10 @@ module.exports = {
       type: "umd",
     },
   },
+  node: {
+    // Disable mangling node's `__dirname` property since we need it to load the WASM file
+    __dirname: false,
+  },
   resolve: {
     fallback: {
       fs: false,
