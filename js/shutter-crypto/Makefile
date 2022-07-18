@@ -6,9 +6,13 @@ TINYGO    ?= tinygo
 
 build: derive
 	${NPX} webpack build
+	cp -L derived/shutter-crypto.wasm dist/
 
 publish: build
 	${NPM} publish --access=public --tag=beta
+
+pack: build
+	${NPM} pack
 
 derive: derived/shutter-crypto.wasm derived/wasm_exec.js
 
