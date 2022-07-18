@@ -2,11 +2,18 @@ import "../derived/wasm_exec";
 import { isBrowser, isNode } from "browser-or-node";
 
 const g = global || window || this || self;
-if (typeof g.__wasm_functions__ === "undefined") {
-  g.__wasm_functions__ = {};
+if (typeof g.__wasm_bridge__ === "undefined") {
+  g.__wasm_bridge__ = {};
 }
 
+// Roundabout way of waiting for the Go wasm machinery to be done initializing
+// Taken from https://github.com/golang/go/issues/49710#issuecomment-986484758
+const isReady = new Promise((resolve) => {
+  g.__wasm_bridge__["_initialized"] = resolve;
+});
+
 const defaultWasmFileName = "shutter-crypto.wasm";
+
 async function init(wasmUrlOrPath) {
   let shutterCrypto;
   const go = new Go(); // eslint-disable-line no-undef
@@ -24,6 +31,7 @@ async function init(wasmUrlOrPath) {
       const obj = WebAssembly.instantiate(bytes, go.importObject);
       shutterCrypto = obj.instance;
       go.run(shutterCrypto);
+      await isReady;
     }
   } else if (isNode) {
     const fs = __non_webpack_require__("fs"); // eslint-disable-line no-undef
@@ -37,13 +45,14 @@ async function init(wasmUrlOrPath) {
     );
     shutterCrypto = obj.instance;
     go.run(shutterCrypto);
+    await isReady;
   } else {
     throw "Neither Browser nor Node; not supported.";
   }
 }
 
 function _checkInitialized() {
-  if (typeof g.__wasm_functions__.encrypt === "undefined") {
+  if (typeof g.__wasm_bridge__.encrypt === "undefined") {
     throw "You need to consume the 'shutterCrypto.init()' promise before using the module functions.";
   }
 }
@@ -70,7 +79,7 @@ function _hexToUint8Array(hex) {
 
 async function encrypt(message, eonPublicKey, epochId, sigma) {
   _checkInitialized();
-  const result = await g.__wasm_functions__.encrypt(
+  const result = await g.__wasm_bridge__.encrypt(
     message,
     eonPublicKey,
     epochId,
@@ -82,7 +91,7 @@ async function encrypt(message, eonPublicKey, epochId, sigma) {
 
 async function decrypt(encryptedMessage, decryptionKey) {
   _checkInitialized();
-  const result = await g.__wasm_functions__.decrypt(
+  const result = await g.__wasm_bridge__.decrypt(
     encryptedMessage,
     decryptionKey
   );
@@ -92,7 +101,7 @@ async function decrypt(encryptedMessage, decryptionKey) {
 
 async function verifyDecryptionKey(decryptionKey, eonPublicKey, epochId) {
   _checkInitialized();
-  const result = await g.__wasm_functions__.verifyDecryptionKey(
+  const result = await g.__wasm_bridge__.verifyDecryptionKey(
     decryptionKey,
     eonPublicKey,
     epochId
