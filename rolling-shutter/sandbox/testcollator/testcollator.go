@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -35,13 +34,11 @@ func main() {
 	batchTxBytes, err := batchTx.MarshalBinary()
 	panicIfErr(err)
 
-	fmt.Printf("%+v\n", batchTx.GetInner().V)
-
 	client, err := rpc.Dial("http://localhost:8547")
 	panicIfErr(err)
 
 	var result string
-	err = client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(batchTxBytes))
+	err = client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(batchTxBytes))
 	panicIfErr(err)
 }
 
