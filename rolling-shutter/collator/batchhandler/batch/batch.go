@@ -349,22 +349,97 @@ func (b *Batch) Hash() []byte {
 	return b.committedTxs.Hash()
 }
 
-// SignedBatchTx constructs the signed Batch-Transaction to be sent to
-// the sequencer for batch submittal.
-func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte) (*txtypes.Transaction, error) {
-	txs := b.Transactions()
-	ts := time.Now().Unix()
-	batchIndex, err := b.BatchIndex()
-	if err != nil {
-		return nil, err
+func (b *Batch) Run(epochTick <-chan time.Time, subscriptions ...chan StateChangeResult) error {
+	var transition State
+	b.Broker.Start(subscriptions...)
+	defer b.Broker.Stop()
+
+	logHandler := func(handler string, transition State) {
+		b.Log().Debug().
+			Str("handler", handler).
+			Str("state", transition.StateEnum().String()).
+			Msg("received value, calling handler")
 	}
-	btxData := &txtypes.BatchTx{
-		ChainID:       b.ChainID,
-		DecryptionKey: decryptionKey,
-		BatchIndex:    batchIndex,
-		L1BlockNumber: new(big.Int).SetUint64(b.l1BlockNumber),
-		Timestamp:     big.NewInt(ts),
-		Transactions:  txs.Bytes(),
+	transition = Initial{}
+	for {
+		if transition.StateEnum() == NoState {
+			b.stoppedResult <- nil
+			// transitions have been stopped.
+			// this is only the case for StoppingTransition{}
+			b.Log().Debug().
+				Str("state", transition.StateEnum().String()).
+				Msg("stopped running")
+			return nil
+		}
+		stateChange := transition.Process(b)
+		if stateChange != nil {
+			stateChange.Log().Debug().Msg("state-change")
+			b.publish(*stateChange)
+			next := transition.Post(b)
+			if next.StateEnum() != transition.StateEnum() {
+				transition = next
+				// we transitioned directly,
+				// skip the select
+				continue
+			}
+			transition = next
+		}
+		select {
+		case stateChange, ok := <-b.subscription:
+			if !ok {
+				b.subscription = nil
+				continue
+			}
+			logHandler("OnStateChangePrevious", transition)
+			transition = transition.OnStateChangePrevious(b, stateChange)
+		case tim, ok := <-epochTick:
+			if !ok {
+				// disable channel,
+				// nil channel will block on send/receive
+				epochTick = nil
+				continue
+			}
+			logHandler("OnEpochTick", transition)
+			transition = transition.OnEpochTick(b, tim)
+		case epochID, ok := <-b.ConfirmedBatch:
+			if !ok {
+				// disable channel,
+				// nil channel will block on send/receive
+				b.ConfirmedBatch = nil
+				continue
+			}
+			logHandler("OnBatchConfirmation", transition)
+			transition = transition.OnBatchConfirmation(b, epochID)
+		case key, ok := <-b.DecryptionKey:
+			if !ok {
+				// disable channel,
+				// nil channel will block on send/receive
+				b.DecryptionKey = nil
+				continue
+			}
+			logHandler("OnDecryptionKey", transition)
+			transition = transition.OnDecryptionKey(b, key)
+		case tx, ok := <-b.Transaction:
+			if !ok {
+				// disable channel,
+				// nil channel will block on send/receive
+				b.Transaction = nil
+				continue
+			}
+			logHandler("OnTransaction", transition)
+			transition = transition.OnTransaction(b, tx)
+		case _, ok := <-b.stopSignal:
+			if !ok {
+				// disable channel,
+				// nil channel will block on send/receive
+				logHandler("OnStop", transition)
+				transition = transition.OnStop(b)
+			}
+		}
 	}
-	return txtypes.SignNewTx(privateKey, b.signer, btxData)
+}
+
+func (b *Batch) Stop() chan error {
+	close(b.stopSignal)
+	return b.stoppedResult
 }
