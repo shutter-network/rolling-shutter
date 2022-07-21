@@ -38,7 +38,8 @@ func main() {
 	panicIfErr(err)
 
 	var result string
-	err = client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(batchTxBytes))
+	// err = client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(batchTxBytes))
+	err = client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(batchTxBytes))
 	panicIfErr(err)
 }
 
