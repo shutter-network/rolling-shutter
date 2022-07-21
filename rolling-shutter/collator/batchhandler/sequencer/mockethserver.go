@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 )
 
@@ -72,16 +73,18 @@ type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 // The functionality of the MockEthServer is based on the
 // needs in the tests and might be extented in the future.
 type MockEthServer struct {
-	URL         string
-	t           *testing.T
-	balances    map[string]map[string]*big.Int
-	nonces      map[string]map[string]uint64
-	chainID     *big.Int
-	blocks      map[string]blockData
-	receivedTxs map[string]bool
-	HTTPServer  *httptest.Server
-	txs         map[string]*txtypes.Transaction
-	hooks       []txHookFunc
+	URL            string
+	t              *testing.T
+	balances       map[string]map[string]*big.Int
+	nonces         map[string]map[string]uint64
+	chainID        *big.Int
+	blocks         map[string]blockData
+	blockNumber    uint64
+	receivedTxs    map[string]bool
+	HTTPServer     *httptest.Server
+	txs            map[string]*txtypes.Transaction
+	hooks          []txHookFunc
+	previousTxHash string
 }
 
 // Teardown has to be called if the MockEthServer is run
@@ -125,7 +128,9 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 	case "eth_sendRawTransaction":
 		status, err = me.respondRawTx(&mess)
 	case "eth_getBlockByNumber":
-		status, err = me.getBlock(&mess)
+		status, err = me.getBlockByNumber(&mess)
+	case "eth_blockNumber":
+		status, err = me.getBlockNumber(&mess)
 	case "eth_getTransactionReceipt":
 		status, err = me.getReceipt(&mess)
 	default:
@@ -146,6 +151,10 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		err = errors.Wrapf(err, "error while encoding response in mock server")
 		me.t.Error(err)
 	}
+}
+
+func (me *MockEthServer) SetBlockNumber(blockNumber uint64) {
+	me.blockNumber = blockNumber
 }
 
 // SetBalance is used to set the state of the server for the "eth_getBalance" method.
@@ -196,7 +205,7 @@ func (me *MockEthServer) getNonce(mess *jsonrpcMessage) (int, error) {
 	address := normalizeAddress(mess.Params[0].(string))
 	block := mess.Params[1].(string)
 	nonce := me.nonces[block][address]
-	me.t.Logf("nonces:%v, addr:%s, nonce:%d, block:%s", me.nonces, address, nonce, block)
+	log.Debug().Msg(fmt.Sprintf("nonces:%v, addr:%s, nonce:%d, block:%s", me.nonces, address, nonce, block))
 
 	res := fmt.Sprintf("%q", hexutil.EncodeUint64(nonce))
 	mess.Result = json.RawMessage(res)
@@ -238,7 +247,16 @@ func (me *MockEthServer) SetBlock(baseFee *big.Int, gasLimit uint64, block strin
 	b.gasLimit = gasLimit
 }
 
-func (me *MockEthServer) getBlock(mess *jsonrpcMessage) (int, error) {
+func (me *MockEthServer) getBlockNumber(mess *jsonrpcMessage) (int, error) {
+	if len(mess.Params) > 0 {
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
+	}
+	res := fmt.Sprintf("%q", hexutil.EncodeUint64(me.blockNumber))
+	mess.Result = json.RawMessage(res)
+	return 200, nil
+}
+
+func (me *MockEthServer) getBlockByNumber(mess *jsonrpcMessage) (int, error) {
 	if len(mess.Params) > 2 {
 		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
 	}
