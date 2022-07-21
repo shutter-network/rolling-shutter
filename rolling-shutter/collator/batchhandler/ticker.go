@@ -14,12 +14,14 @@ type EpochTicker struct {
 	stop   chan struct{}
 }
 
-func StartEpochTicker(epochDuration time.Duration) *EpochTicker {
-	return &EpochTicker{
+func StartNewEpochTicker(epochDuration time.Duration) *EpochTicker {
+	et := &EpochTicker{
 		ticker: time.NewTicker(epochDuration),
-		broker: medley.NewBroker[time.Time](true),
+		broker: medley.StartNewBroker[time.Time](true),
 		stop:   make(chan struct{}),
 	}
+	go et.run()
+	return et
 }
 
 func (tick *EpochTicker) Unsubscribe(channel chan time.Time) {
@@ -27,12 +29,10 @@ func (tick *EpochTicker) Unsubscribe(channel chan time.Time) {
 }
 
 func (tick *EpochTicker) Subscribe() chan time.Time {
-	channel := make(chan time.Time)
-	tick.broker.Subscribe(channel)
-	return channel
+	return tick.broker.Subscribe(0)
 }
 
-func (tick *EpochTicker) Run() {
+func (tick *EpochTicker) run() {
 	// FIXME there seems to be one problem:
 	// since consumers subscribe to the ticker
 	// with a non-blocking send,
@@ -42,15 +42,14 @@ func (tick *EpochTicker) Run() {
 	// next tick is reached.
 	// In the ticker, a slow consumer will
 	// receive immediately when the time was reached
-	go tick.broker.Start()
 	for {
 		select {
 		case val := <-tick.ticker.C:
 			log.Debug().Str("time", val.String()).Msg("tick broadcast")
-			tick.broker.Publish(val)
+			tick.broker.Publish <- val
 		case <-tick.stop:
 			log.Debug().Msg("ticker received stop signal")
-			tick.broker.Stop()
+			close(tick.broker.Publish)
 			return
 		}
 	}
