@@ -1,4 +1,4 @@
-package batch
+package transaction
 
 import (
 	"github.com/ethereum/go-ethereum/common"
@@ -9,23 +9,23 @@ import (
 
 func NewTransactionQueue() *TransactionQueue {
 	return &TransactionQueue{
-		txqueue: make([]*PendingTransaction, 0),
+		txqueue: make([]*Pending, 0),
 		Senders: make(map[common.Address]bool, 0),
 	}
 }
 
 // TransactionQueue is a container struct allowing
-// for append-only operation on a list of `PendingTransaction`.
+// for append-only operation on a list of `Pending`.
 // TransactionQueue implements convenience methods to
-// join two queus, generate the hash of all queued transactions
+// join two queues, generate the hash of all queued transactions
 // and show the set of all transactions sender addresses.
 type TransactionQueue struct {
-	txqueue []*PendingTransaction
+	txqueue []*Pending
 	Senders map[common.Address]bool
 }
 
 func (q *TransactionQueue) JoinRight(other *TransactionQueue) *TransactionQueue {
-	txqueue := make([]*PendingTransaction, q.Len()+other.Len())
+	txqueue := make([]*Pending, q.Len()+other.Len())
 	n := copy(txqueue, q.txqueue)
 	copy(txqueue[n:], other.txqueue)
 
@@ -50,7 +50,7 @@ func (q *TransactionQueue) Hash() []byte {
 func (q *TransactionQueue) Transactions() []*txtypes.Transaction {
 	txs := make([]*txtypes.Transaction, len(q.txqueue))
 	for i, p := range q.txqueue {
-		txs[i] = p.tx
+		txs[i] = p.Tx
 	}
 	return txs
 }
@@ -58,14 +58,14 @@ func (q *TransactionQueue) Transactions() []*txtypes.Transaction {
 func (q *TransactionQueue) Bytes() [][]byte {
 	l := make([][]byte, q.Len())
 	for i, tx := range q.txqueue {
-		l[i] = tx.txBytes
+		l[i] = tx.TxBytes
 	}
 	return l
 }
 
 func (q *TransactionQueue) Len() int { return len(q.txqueue) }
 
-func (q *TransactionQueue) Enqueue(tx *PendingTransaction) {
-	q.Senders[tx.sender] = true
+func (q *TransactionQueue) Enqueue(tx *Pending) {
+	q.Senders[tx.Sender] = true
 	q.txqueue = append(q.txqueue, tx)
 }

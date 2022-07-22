@@ -21,7 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
