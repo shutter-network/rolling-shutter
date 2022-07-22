@@ -1,4 +1,4 @@
-package batch
+package sequencer
 
 import (
 	"context"
@@ -10,10 +10,26 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"gotest.tools/assert"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 )
 
+func newTestConfig(t *testing.T) config.Config {
+	t.Helper()
+
+	ethereumKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	return config.Config{
+		EthereumURL:         "http://127.0.0.1:8454",
+		SequencerURL:        "http://127.0.0.1:8455",
+		EthereumKey:         ethereumKey,
+		ExecutionBlockDelay: uint32(5),
+		InstanceID:          123,
+	}
+}
+
 func TestMockEth(t *testing.T) {
-	config := newTestConfig(t)
+	cfg := newTestConfig(t)
 	eth := RunMockEthServer(t)
 	defer eth.Teardown()
 
@@ -22,7 +38,7 @@ func TestMockEth(t *testing.T) {
 	ctx := context.Background()
 	ethClient := ethclient.NewClient(rpcClient)
 
-	address := ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+	address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
 	balance := big.NewInt(42)
 	nonce := uint64(42)
 	chainID := big.NewInt(0)
