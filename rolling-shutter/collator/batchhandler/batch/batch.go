@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -90,7 +89,7 @@ func NewCachedPendingBatch(
 		signer:        signer,
 		state:         state,
 		block:         block,
-		transactions:  transaction.NewTransactionQueue(),
+		transactions:  transaction.NewQueue(),
 	}
 	b.gasPool.AddGas(block.GasLimit())
 	return b, nil
@@ -111,7 +110,7 @@ type Batch struct {
 	block        sequencer.Block
 	signer       txtypes.Signer
 	state        sequencer.State
-	transactions *transaction.TransactionQueue
+	transactions *transaction.Queue
 
 	epochID       epochid.EpochID
 	l1BlockNumber uint64
@@ -198,7 +197,7 @@ func (b *Batch) ApplyTx(ctx context.Context, p *transaction.Pending) error {
 	return nil
 }
 
-func (b *Batch) Transactions() *transaction.TransactionQueue {
+func (b *Batch) Transactions() *transaction.Queue {
 	return b.transactions
 }
 
