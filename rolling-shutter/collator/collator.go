@@ -21,7 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
@@ -40,7 +40,7 @@ type collator struct {
 
 	l1Client     *ethclient.Client
 	contracts    *deployment.Contracts
-	batchHandler *batch.BatchHandler
+	batchHandler *batchhandler.BatchHandler
 
 	p2p    *p2p.P2PHandler
 	dbpool *pgxpool.Pool
@@ -82,7 +82,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	batchHandler, err := batch.NewBatchHandler(cfg, dbpool)
+	batchHandler, err := batchhandler.NewBatchHandler(cfg, dbpool)
 	if err != nil {
 		return err
 	}

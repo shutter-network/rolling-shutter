@@ -1,4 +1,4 @@
-package batch
+package batchhandler_test
 
 import (
 	"bytes"
@@ -13,6 +13,8 @@ import (
 	"gotest.tools/assert"
 	"gotest.tools/assert/cmp"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
@@ -45,8 +47,8 @@ type testParams struct {
 
 type fixture struct {
 	cfg          config.Config
-	ethServer    *MockEthServer
-	batchHandler *BatchHandler
+	ethServer    *sequencer.MockEthServer
+	batchHandler *batchhandler.BatchHandler
 	makeTx       func(batchIndex, nonce, gas int) ([]byte, []byte)
 	address      common.Address
 	coinbase     common.Address
@@ -56,7 +58,7 @@ func setup(ctx context.Context, t *testing.T, params testParams) *fixture {
 	t.Helper()
 
 	cfg := newTestConfig(t)
-	eth := RunMockEthServer(t)
+	eth := sequencer.RunMockEthServer(t)
 	cfg.SequencerURL = eth.URL
 
 	db, dbpool, dbteardown := testdb.NewCollatorTestDB(ctx, t)
@@ -85,7 +87,7 @@ func setup(ctx context.Context, t *testing.T, params testParams) *fixture {
 	assert.NilError(t, err)
 
 	// New batch handler, this will already query the eth-server
-	bh, err := NewBatchHandler(cfg, dbpool)
+	bh, err := batchhandler.NewBatchHandler(cfg, dbpool)
 	assert.NilError(t, err)
 	assert.Equal(t, bh.LatestEpochID(), params.initialEpochID)
 
@@ -155,8 +157,8 @@ func TestHandlerStateProgression(t *testing.T) {
 
 	// check there should be 2 tx in the current batch
 	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch1)
-	assert.Equal(t, fixtures.batchHandler.latestBatch.Transactions().Len(), 2)
-	assert.DeepEqual(t, fixtures.batchHandler.txpool.Batches().ToUint64s(), []uint64{2})
+	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
+	assert.DeepEqual(t, fixtures.batchHandler.Txpool.Batches().ToUint64s(), []uint64{2})
 
 	// batch 2
 	msgs, err := fixtures.batchHandler.StartNextEpoch(ctx, uint32(1))
@@ -168,7 +170,7 @@ func TestHandlerStateProgression(t *testing.T) {
 	// The new batch still doesn't exist yet when we haven't processed
 	// the decryption key of the previous one yet
 	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch1)
-	assert.Equal(t, fixtures.batchHandler.latestBatch.Transactions().Len(), 2)
+	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
 
 	// insert another tx in this batch, but not queued
 	tx4, _ := fixtures.makeTx(2, 3, 21000)
@@ -177,7 +179,7 @@ func TestHandlerStateProgression(t *testing.T) {
 	assertTransaction(t, fixtures.batchHandler, tx4, epoch2, 1)
 
 	// Register the state update on the next incoming tx
-	hookFunc := func(me *MockEthServer, tx *txtypes.Transaction) bool {
+	hookFunc := func(me *sequencer.MockEthServer, tx *txtypes.Transaction) bool {
 		assert.Equal(t, tx.Type(), uint8(txtypes.BatchTxType))
 		assert.Equal(t, len(tx.Transactions()), 2)
 		assert.Equal(t, tx.BatchIndex(), uint64(1))
@@ -203,8 +205,8 @@ func TestHandlerStateProgression(t *testing.T) {
 	// the transactions from the txpool should be applied
 	// to it already
 	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch2)
-	assert.Equal(t, fixtures.batchHandler.latestBatch.Transactions().Len(), 2)
-	assert.DeepEqual(t, fixtures.batchHandler.txpool.Batches().Len(), 0)
+	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
+	assert.DeepEqual(t, fixtures.batchHandler.Txpool.Batches().Len(), 0)
 
 	// insert another tx in this batch
 	tx5, _ := fixtures.makeTx(2, 4, 21000)
@@ -214,8 +216,8 @@ func TestHandlerStateProgression(t *testing.T) {
 
 	// this should not be queued but immediately be
 	// processed in the current batch state
-	assert.Equal(t, fixtures.batchHandler.txpool.Batches().Len(), 0)
-	assert.Equal(t, fixtures.batchHandler.latestBatch.Transactions().Len(), 3)
+	assert.Equal(t, fixtures.batchHandler.Txpool.Batches().Len(), 0)
+	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 3)
 }
 
 func TestHandlerFailingValidation(t *testing.T) {
@@ -289,12 +291,12 @@ func TestHandlerFailingValidation(t *testing.T) {
 	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch2)
 }
 
-func assertTransaction(t *testing.T, bh *BatchHandler, txBytes []byte, epochID epochid.EpochID, expectedIndex int) {
+func assertTransaction(t *testing.T, bh *batchhandler.BatchHandler, txBytes []byte, epochID epochid.EpochID, expectedIndex int) {
 	t.Helper()
 	ctx := context.Background()
 
 	foundIndex := -1
-	err := bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+	err := bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
 		txs, err := db.GetTransactionsByEpoch(ctx, epochID.Bytes())
 		assert.NilError(t, err)
@@ -312,7 +314,7 @@ func assertTransaction(t *testing.T, bh *BatchHandler, txBytes []byte, epochID e
 
 func assertDecryptionTrigger(t *testing.T,
 	cfg config.Config,
-	bh *BatchHandler,
+	bh *batchhandler.BatchHandler,
 	msgs []shmsg.P2PMessage,
 	txHashes [][]byte,
 	epochID epochid.EpochID,
@@ -322,7 +324,7 @@ func assertDecryptionTrigger(t *testing.T,
 
 	transactionsHash := shmsg.HashTransactions(txHashes)
 	// make sure decryption trigger is stored in db
-	err := bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+	err := bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
 		stored, err := db.GetTrigger(ctx, epochID.Bytes())
 		assert.NilError(t, err)

@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 )
@@ -35,7 +35,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	db := cltrdb.New(srv.c.dbpool)
-	epoch, _, err := batch.GetNextBatch(req.Context(), db)
+	epoch, _, err := batchhandler.GetNextBatch(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
