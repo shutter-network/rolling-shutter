@@ -1,4 +1,4 @@
-package batch
+package transaction
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ func TestTotalByteSize(t *testing.T) {
 	chainID := big.NewInt(1)
 	signer := txtypes.LatestSignerForChainID(chainID)
 
-	q := NewTransactionQueue()
+	q := NewQueue()
 	assert.Equal(t, q.TotalByteSize(), 0)
 
 	for _, payloadSize := range []int{0, 10, 100, 1000} {
@@ -35,7 +35,7 @@ func TestTotalByteSize(t *testing.T) {
 		assert.NilError(t, err)
 		txBytes, err := tx.MarshalBinary()
 		assert.NilError(t, err)
-		pendingTx, err := NewPendingTransaction(signer, txBytes, time.Now())
+		pendingTx, err := NewPending(signer, txBytes, time.Now())
 		assert.NilError(t, err)
 
 		sizeBefore := q.TotalByteSize()

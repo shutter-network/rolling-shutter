@@ -10,9 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
@@ -61,38 +64,36 @@ func CalculatePriorityFee(tx *txtypes.Transaction, baseFee *big.Int) *big.Int {
 	return new(big.Int).Mul(priorityFeeGasPrice, new(big.Int).SetUint64(tx.Gas()))
 }
 
-func NewPendingTransaction(signer txtypes.Signer, txBytes []byte, receiveTime time.Time) (*PendingTransaction, error) {
-	var tx txtypes.Transaction
-	err := tx.UnmarshalBinary(txBytes)
+func NewCachedPendingBatch(
+	ctx context.Context, epochID epochid.EpochID, l1BlockNumber uint64, client *ethclient.Client,
+) (*Batch, error) {
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
+	signer := txtypes.LatestSignerForChainID(chainID)
 
-	sender, err := signer.Sender(&tx)
+	// batchindex not necessarily the same as the l2blocknumber.
+	// just query for the current state of the addresses balance/nonce.
+	// since the collator is the only one progressing the balance/nonce state,
+	// this is fine as long as the current batch is not submitted
+	// number=nil means the latest state from the node
+	block, err := client.BlockByNumber(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	pendingTx := &PendingTransaction{
-		txBytes:     txBytes,
-		tx:          &tx,
-		sender:      sender,
-		receiveTime: receiveTime,
+	state := sequencer.NewChainBatchCache(client, nil)
+	b := &Batch{
+		ChainID:       chainID,
+		epochID:       epochID,
+		l1BlockNumber: l1BlockNumber,
+		signer:        signer,
+		state:         state,
+		block:         block,
+		transactions:  transaction.NewTransactionQueue(),
 	}
-	return pendingTx, nil
-}
-
-// PendingTransaction is a wrapper struct that associates additional
-// data to an incoming shutter transaction from a user.
-// It is used to keep track of sender, gas-fees and receive-time of
-// a shutter transaction.
-type PendingTransaction struct {
-	tx          *txtypes.Transaction
-	txBytes     []byte
-	sender      common.Address
-	minerFee    *big.Int
-	gasCost     *big.Int
-	receiveTime time.Time
+	b.gasPool.AddGas(block.GasLimit())
+	return b, nil
 }
 
 // Batch tracks the current local state of a
@@ -107,10 +108,10 @@ type Batch struct {
 	mux sync.Mutex
 
 	gasPool      core.GasPool
-	block        Block
+	block        sequencer.Block
 	signer       txtypes.Signer
-	state        State
-	transactions *TransactionQueue
+	state        sequencer.State
+	transactions *transaction.TransactionQueue
 
 	epochID       epochid.EpochID
 	l1BlockNumber uint64
@@ -129,21 +130,6 @@ func (b *Batch) EpochID() epochid.EpochID {
 	return b.epochID
 }
 
-func (b *Batch) NewPendingTransaction(tx *txtypes.Transaction, txRaw []byte, receiveTime time.Time) (*PendingTransaction, error) {
-	sender, err := b.signer.Sender(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	pendingTx := &PendingTransaction{
-		txBytes:     txRaw,
-		tx:          tx,
-		sender:      sender,
-		receiveTime: receiveTime,
-	}
-	return pendingTx, nil
-}
-
 // ValidateTx checks that the transaction `p` fulfills all preliminary
 // conditions to be included in the batch.
 // A valid transaction:
@@ -154,25 +140,25 @@ func (b *Batch) NewPendingTransaction(tx *txtypes.Transaction, txRaw []byte, rec
 //    b) has enough balance at the senders account in order to pay the
 //        tansactions gas fees, also considering all previous locally
 //        included transactions in that batch
-func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) error {
-	currentNonce, err := b.state.GetNonce(ctx, p.sender)
+func (b *Batch) ValidateTx(ctx context.Context, p *transaction.Pending) error {
+	currentNonce, err := b.state.GetNonce(ctx, p.Sender)
 	if err != nil {
 		return err
 	}
-	if p.tx.Nonce() != currentNonce {
-		return errors.Errorf("nonce mismatch, want: %d,got: %d", currentNonce, p.tx.Nonce())
+	if p.Tx.Nonce() != currentNonce {
+		return errors.Errorf("nonce mismatch, want: %d,got: %d", currentNonce, p.Tx.Nonce())
 	}
 
-	if err := ValidateGasParams(p.tx, b.block.BaseFee()); err != nil {
+	if err := ValidateGasParams(p.Tx, b.block.BaseFee()); err != nil {
 		return err
 	}
-	p.gasCost = CalculateGasCost(p.tx, b.block.BaseFee())
-	p.minerFee = CalculatePriorityFee(p.tx, b.block.BaseFee())
-	balance, err := b.state.GetBalance(ctx, p.sender)
+	p.GasCost = CalculateGasCost(p.Tx, b.block.BaseFee())
+	p.MinerFee = CalculatePriorityFee(p.Tx, b.block.BaseFee())
+	balance, err := b.state.GetBalance(ctx, p.Sender)
 	if err != nil {
 		return err
 	}
-	if balance.Cmp(p.gasCost) < 0 {
+	if balance.Cmp(p.GasCost) < 0 {
 		return errors.New("not enough funds to pay gas fee")
 	}
 	return nil
@@ -182,37 +168,37 @@ func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) error {
 // will modify the batches local state to include the nonce and balance changes.
 // ApplyTx can fail when the transaction's inclusion would surpass the batches
 // gas limit.
-func (b *Batch) ApplyTx(ctx context.Context, p *PendingTransaction) error {
+func (b *Batch) ApplyTx(ctx context.Context, p *transaction.Pending) error {
 	b.mux.Lock()
 	defer b.mux.Unlock()
 
-	err := b.gasPool.SubGas(p.tx.Gas())
+	err := b.gasPool.SubGas(p.Tx.Gas())
 	if err != nil {
 		// gas limit reached
 		return err
 	}
-	newTotalSize := b.transactions.TotalByteSize() + len(p.txBytes)
+	newTotalSize := b.transactions.TotalByteSize() + len(p.TxBytes)
 	if newTotalSize > BatchSizeLimit {
 		return errors.Errorf("size limit reached (%d + %d > %d)",
-			b.transactions.TotalByteSize(), len(p.txBytes), BatchSizeLimit)
+			b.transactions.TotalByteSize(), len(p.TxBytes), BatchSizeLimit)
 	}
 
-	err = b.state.SubBalance(ctx, p.sender, p.gasCost)
+	err = b.state.SubBalance(ctx, p.Sender, p.GasCost)
 	if err != nil {
 		return err
 	}
 	// not really necessary, only to e.g. observe the total gained fee
-	err = b.state.AddBalance(ctx, b.block.Coinbase(), p.minerFee)
+	err = b.state.AddBalance(ctx, b.block.Coinbase(), p.MinerFee)
 	if err != nil {
 		return err
 	}
-	b.state.SetNonce(p.sender, p.tx.Nonce()+1)
+	b.state.SetNonce(p.Sender, p.Tx.Nonce()+1)
 
 	b.transactions.Enqueue(p)
 	return nil
 }
 
-func (b *Batch) Transactions() *TransactionQueue {
+func (b *Batch) Transactions() *transaction.TransactionQueue {
 	return b.transactions
 }
 

@@ -1,4 +1,4 @@
-package batch
+package batchhandler
 
 import (
 	"context"
@@ -18,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -81,8 +83,8 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 		l2EthClient: l2EthClient,
 		config:      cfg,
 		signer:      signer,
-		txpool:      NewTransactionPool(signer),
-		dbpool:      dbpool,
+		Txpool:      transaction.NewPool(signer),
+		Dbpool:      dbpool,
 	}
 	// This will do more queries to the l2-client
 	err = bh.initialiseEpoch(ctx)
@@ -105,10 +107,10 @@ type BatchHandler struct {
 	// l2EthClient is the RPC l2Client wrapped by ethclient.Client
 	l2EthClient *ethclient.Client
 	config      config.Config
-	txpool      *TransactionPool
+	Txpool      *transaction.Pool
 	signer      txtypes.Signer
-	dbpool      *pgxpool.Pool
-	latestBatch *Batch
+	Dbpool      *pgxpool.Pool
+	LatestBatch *batch.Batch
 }
 
 func (bh *BatchHandler) Signer() txtypes.Signer {
@@ -118,7 +120,7 @@ func (bh *BatchHandler) Signer() txtypes.Signer {
 // LatestEpochID returns the epoch-id associated to
 // the current batch that is yet to be submitted to the sequencer.
 func (bh *BatchHandler) LatestEpochID() epochid.EpochID {
-	return bh.latestBatch.EpochID()
+	return bh.LatestBatch.EpochID()
 }
 
 func (bh *BatchHandler) privateKey() *ecdsa.PrivateKey {
@@ -151,7 +153,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 		return errors.New("batch index overflow")
 	}
 
-	err = bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+	err = bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
 		currentEpochID, _, err := GetNextBatch(ctx, db)
 		if err != nil {
@@ -172,7 +174,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 
 		// Set the transactions received timestamp to the current time.
 		receiveTime := time.Now()
-		pending, err := NewPendingTransaction(bh.Signer(), txBytes, receiveTime)
+		pending, err := transaction.NewPending(bh.Signer(), txBytes, receiveTime)
 		if err != nil {
 			return err
 		}
@@ -194,7 +196,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 		bh.mux.Lock()
 		defer bh.mux.Unlock()
 		var threshold uint64
-		if bh.latestBatch == nil {
+		if bh.LatestBatch == nil {
 			// this will push all transactions
 			// to the txpool, because we don't have
 			// a Batch initialized yet
@@ -203,14 +205,14 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 			// this will push all transactions
 			// other than the latest batch index to the txpool.
 
-			threshold, err = bh.latestBatch.BatchIndex()
+			threshold, err = bh.LatestBatch.BatchIndex()
 			if err != nil {
 				return err
 			}
 		}
 		if tx.BatchIndex() > threshold {
 			// push to the tx pool for future processing
-			bh.txpool.Push(pending)
+			bh.Txpool.Push(pending)
 			return nil
 		}
 		// If we are currently in between batches
@@ -238,8 +240,8 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 // be included.
 // ProcessTx should only ever be called for transactions that are meant to be
 // included specifically in the latest batch.
-func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *PendingTransaction) error {
-	batch := bh.latestBatch
+func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *transaction.Pending) error {
+	batch := bh.LatestBatch
 	if batch == nil {
 		return errors.New("batch is not submittable")
 	}
@@ -276,7 +278,7 @@ func (bh *BatchHandler) HandleDecryptionKey(
 		return nil, errors.New("received decryption key for wrong batch")
 	}
 
-	btx, err := bh.latestBatch.SignedBatchTx(bh.privateKey(), decryptionKey)
+	btx, err := bh.LatestBatch.SignedBatchTx(bh.privateKey(), decryptionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +301,7 @@ func (bh *BatchHandler) HandleDecryptionKey(
 	bh.mux.Lock()
 	defer bh.mux.Unlock()
 
-	err = bh.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+	err = bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		db := cltrdb.New(dbtx)
 		nextEpochID, nextL1BlockNumber, err = GetNextBatch(ctx, db)
 		if err != nil {
@@ -314,19 +316,19 @@ func (bh *BatchHandler) HandleDecryptionKey(
 	// The Batch relies on polling the new state from the sequencer.
 	// We could track nonces ourselves from the local previous state,
 	// but we have to let the sequencer update the balances with the decrypted transactions.
-	newBatch, err := NewCachedPendingBatch(ctx, nextEpochID, nextL1BlockNumber, bh.l2EthClient)
+	newBatch, err := batch.NewCachedPendingBatch(ctx, nextEpochID, nextL1BlockNumber, bh.l2EthClient)
 	if err != nil {
 		return nil, err
 	}
-	bh.latestBatch = newBatch
+	bh.LatestBatch = newBatch
 	batchIndex, err := newBatch.BatchIndex()
 	if err != nil {
 		return nil, err
 	}
-	for _, tx := range bh.txpool.Pop(batchIndex) {
+	for _, tx := range bh.Txpool.Pop(batchIndex) {
 		err := bh.ProcessTx(ctx, tx)
 		if err != nil {
-			err = errors.Wrapf(err, "pooled tx invalid (hash=%s), dropped", tx.tx.Hash())
+			err = errors.Wrapf(err, "pooled tx invalid (hash=%s), dropped", tx.Tx.Hash())
 			fmt.Println(err)
 			continue
 		}
@@ -339,7 +341,7 @@ func (bh *BatchHandler) HandleDecryptionKey(
 // Note that the collatordb's GetNextBatch() is used to determine the
 // current pending epoch-id and l1 block number.
 func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
-	return bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	return bh.Dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow processing transactions at the same time
 		_, err := tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
 		if err != nil {
@@ -358,7 +360,7 @@ func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "batch is non-submittable")
 		}
-		bh.latestBatch = batch
+		bh.LatestBatch = batch
 		return nil
 	})
 }
@@ -369,7 +371,7 @@ func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
 func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber uint32) ([]shmsg.P2PMessage, error) {
 	var outMessages []shmsg.P2PMessage
 
-	err := bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err := bh.Dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		// Disallow processing transactions at the same time
 		_, err := tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
 		if err != nil {
@@ -386,7 +388,7 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 			bh.config.InstanceID,
 			epochID,
 			l1BlockNumber,
-			bh.latestBatch.Transactions().Hash(),
+			bh.LatestBatch.Transactions().Hash(),
 			bh.config.EthereumKey,
 		)
 		if err != nil {
@@ -427,8 +429,8 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 // the current chain-state of the sequencer node.
 func (bh *BatchHandler) reconstructBatchFromDB(
 	ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID, l1BlockNumber uint64,
-) (*Batch, error) {
-	batch, err := NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
+) (*batch.Batch, error) {
+	batch, err := batch.NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +458,7 @@ func (bh *BatchHandler) reconstructBatchFromDB(
 		// But since the transactions are retrieved in the original insert order, the time will
 		// slightly increase monotonically (monotonic clock time) and preserve original insert-order.
 		recoverTime := time.Now()
-		p, err := batch.NewPendingTransaction(&tx, txBytes, recoverTime)
+		p, err := transaction.NewPending(bh.signer, txBytes, recoverTime)
 		if err != nil {
 			err = errors.Wrap(err, "error during recovering transactions from DB")
 			fmt.Println(err)

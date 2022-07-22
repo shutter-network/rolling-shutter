@@ -1,15 +1,11 @@
-package batch
+package sequencer
 
 import (
 	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	txtypes "github.com/shutter-network/txtypes/types"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 type Block interface {
@@ -26,47 +22,18 @@ type State interface {
 	SetNonce(a common.Address, nonce uint64)
 }
 
-func NewCachedPendingBatch(
-	ctx context.Context, epochID epochid.EpochID, l1BlockNumber uint64, client *ethclient.Client,
-) (*Batch, error) {
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	signer := txtypes.LatestSignerForChainID(chainID)
+type EthClient interface {
+	BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error)
+	NonceAt(context.Context, common.Address, *big.Int) (uint64, error)
+}
 
-	// batchindex not necessarily the same as the l2blocknumber.
-	// just query for the current state of the addresses balance/nonce.
-	// since the collator is the only one progressing the balance/nonce state,
-	// this is fine as long as the current batch is not submitted
-	// number=nil means the latest state from the node
-	block, err := client.BlockByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	state := &ChainBatchCache{
+func NewChainBatchCache(client EthClient, atBlockNumber *big.Int) *ChainBatchCache {
+	return &ChainBatchCache{
 		Client:        client,
 		AtBlockNumber: nil,
 		balances:      make(map[common.Address]*big.Int, 0),
 		nonces:        make(map[common.Address]uint64, 0),
 	}
-
-	b := &Batch{
-		ChainID:       chainID,
-		epochID:       epochID,
-		l1BlockNumber: l1BlockNumber,
-		signer:        signer,
-		state:         state,
-		block:         block,
-		transactions:  NewTransactionQueue(),
-	}
-	b.gasPool.AddGas(block.GasLimit())
-	return b, nil
-}
-
-type EthClient interface {
-	BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error)
-	NonceAt(context.Context, common.Address, *big.Int) (uint64, error)
 }
 
 // ChainBatchCache tracks the state of account's nonces and balances
