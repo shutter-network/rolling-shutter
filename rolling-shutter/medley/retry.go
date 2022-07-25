@@ -19,13 +19,13 @@ func Retry[T any](ctx context.Context, f func() (T, error)) (T, error) {
 		return res, nil
 	}
 
-	log.Printf("retrying request after error: %s", err)
 	for i := 0; i < numRetries-1; i++ {
 		select {
 		case <-ctx.Done():
 			return null, ctx.Err()
 		case <-time.After(retryInterval):
 		}
+		log.Printf("retrying request after error: %s", err)
 		res, err = f()
 		if err == nil {
 			return res, nil
