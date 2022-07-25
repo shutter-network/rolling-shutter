@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -73,6 +74,7 @@ type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 // The functionality of the MockEthServer is based on the
 // needs in the tests and might be extented in the future.
 type MockEthServer struct {
+	Mux            sync.RWMutex
 	URL            string
 	t              *testing.T
 	balances       map[string]map[string]*big.Int
@@ -116,23 +118,41 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		err = errors.Wrapf(err, "error while decoding request body")
 		me.t.Error(err)
 	}
-	me.t.Logf("JSONRPC method call: %s, params %v", mess.Method, mess.Params)
+	log.Debug().Msg(fmt.Sprintf("JSONRPC method call: %s, params %v", mess.Method, mess.Params))
 
 	switch mess.Method {
 	case "eth_getBalance":
+		me.Mux.RLock()
 		status, err = me.getBalance(&mess)
+		me.Mux.RUnlock()
 	case "eth_getTransactionCount":
+		me.Mux.RLock()
 		status, err = me.getNonce(&mess)
+		me.Mux.RUnlock()
 	case "eth_chainId":
+		me.Mux.RLock()
 		status, err = me.getChainID(&mess)
+		me.Mux.RUnlock()
 	case "eth_sendRawTransaction":
+		// set the write lock here,
+		// since we might modify the internal
+		// state in the hook-function
+		// that is called in `respondRawTx`
+		me.Mux.Lock()
 		status, err = me.respondRawTx(&mess)
+		me.Mux.Unlock()
 	case "eth_getBlockByNumber":
+		me.Mux.RLock()
 		status, err = me.getBlockByNumber(&mess)
+		me.Mux.RUnlock()
 	case "eth_blockNumber":
+		me.Mux.RLock()
 		status, err = me.getBlockNumber(&mess)
+		me.Mux.RUnlock()
 	case "eth_getTransactionReceipt":
+		me.Mux.RLock()
 		status, err = me.getReceipt(&mess)
+		me.Mux.RUnlock()
 	default:
 		me.t.Errorf("Eth JSON RPC method not known or not supported by MockServer: %s", mess.Method)
 		return
