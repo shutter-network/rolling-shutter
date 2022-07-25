@@ -25,7 +25,7 @@ type (
 	ValidatorRegistry                     map[string]pubsub.Validator
 )
 
-func getMessageType(msg shmsg.P2PMessage) protoreflect.FullName {
+func GetMessageType(msg shmsg.P2PMessage) protoreflect.FullName {
 	return msg.ProtoReflect().Type().Descriptor().FullName()
 }
 
@@ -103,7 +103,7 @@ func AddValidator[M shmsg.P2PMessage](handler *P2PHandler, valFunc ValidatorFunc
 // For each message type M, there can only be one handler registered per P2PHandler.
 func AddHandlerFunc[M shmsg.P2PMessage](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) HandlerFunc {
 	var messProto M
-	messageType := getMessageType(messProto)
+	messageType := GetMessageType(messProto)
 
 	_, exists := handler.handlerRegistry[messageType]
 	if exists {
@@ -202,7 +202,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 		return err
 	}
 
-	msgType := getMessageType(m)
+	msgType := GetMessageType(m)
 	handlerFunc, exists := h.handlerRegistry[msgType]
 	if !exists {
 		log.Printf("ignoring message received on topic '%s' (sender=%s)", msg.Topic, msg.SenderID)

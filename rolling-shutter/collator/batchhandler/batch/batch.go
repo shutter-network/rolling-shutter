@@ -63,32 +63,47 @@ func CalculatePriorityFee(tx *txtypes.Transaction, baseFee *big.Int) *big.Int {
 	return new(big.Int).Mul(priorityFeeGasPrice, new(big.Int).SetUint64(tx.Gas()))
 }
 
-func NewCachedPendingBatch(
-	ctx context.Context, epochID epochid.EpochID, l1BlockNumber uint64, client *ethclient.Client,
+func New(
+	ctx context.Context, instanceID uint64, epochID epochid.EpochID, l1BlockNumber uint64, client *ethclient.Client,
+	previousBatch *Batch,
 ) (*Batch, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	signer := txtypes.LatestSignerForChainID(chainID)
 
 	// batchindex not necessarily the same as the l2blocknumber.
 	// just query for the current state of the addresses balance/nonce.
 	// since the collator is the only one progressing the balance/nonce state,
 	// this is fine as long as the current batch is not submitted
 	// number=nil means the latest state from the node
+	// FIXME this might not work anymore with the async Batch creation model
 	block, err := client.BlockByNumber(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	b := &Batch{
-		ChainID:       chainID,
-		epochID:       epochID,
-		l1BlockNumber: l1BlockNumber,
-		signer:        signer,
-		state:         sequencer.NewCached(client, nil),
-		block:         block,
-		transactions:  transaction.NewQueue(),
+		mu:             sync.RWMutex{},
+		previous:       previousBatch,
+		Broker:         medley.NewBroker[StateChangeResult](1, true),
+		instanceID:     instanceID,
+		epochID:        epochID,
+		L1BlockNumber:  l1BlockNumber,
+		ChainID:        chainID,
+		decryptionKey:  []byte{},
+		gasPool:        0,
+		block:          block,
+		chainState:     sequencer.NewCached(client, nil),
+		committedTxs:   transaction.NewQueue(),
+		txPool:         transaction.NewQueue(),
+		ConfirmedBatch: make(chan epochid.EpochID),
+		DecryptionKey:  make(chan []byte),
+		Transaction:    make(chan *transaction.Pending),
+		stopSignal:     make(chan struct{}),
+		stoppedResult:  make(chan error, 1),
+		// this channel should be deactivated
+		// initially
+		subscription: nil,
 	}
 	b.gasPool.AddGas(block.GasLimit())
 	return b, nil
@@ -97,38 +112,55 @@ func NewCachedPendingBatch(
 // Batch tracks the current local state of a
 // batch and all its contained transactions.
 // Batch provides methods to handle instantiation
-// of new `PendingTransaction`, validation of
+// of new `transaction.Pending`, validation of
 // transactions based on the current batch state
 // (gas limit, account balances, account nonces)
 // and local inclusion/state application of
 // transactions to the batch.
 type Batch struct {
-	mux sync.Mutex
+	mu       sync.RWMutex
+	previous *Batch
+	Broker   *medley.Broker[StateChangeResult]
 
-	gasPool      core.GasPool
-	block        sequencer.Block
-	signer       txtypes.Signer
-	state        sequencer.State
-	transactions *transaction.Queue
-
+	instanceID    uint64
 	epochID       epochid.EpochID
-	l1BlockNumber uint64
+	L1BlockNumber uint64
 	ChainID       *big.Int
+	decryptionKey []byte
+
+	gasPool    core.GasPool
+	block      sequencer.Block
+	chainState sequencer.State
+
+	committedTxs *transaction.Queue
+	txPool       *transaction.Queue
+
+	DecryptionKey  chan []byte
+	ConfirmedBatch chan epochid.EpochID
+	Transaction    chan *transaction.Pending
+	subscription   chan StateChangeResult
+	stopSignal     chan struct{}
+	stoppedResult  chan error
 }
 
-func (b *Batch) BatchIndex() (uint64, error) {
-	i := b.epochID.Big()
-	if !i.IsUint64() {
-		return 0, errors.Errorf("epoch id %s does not represent a batch index", b.epochID)
-	}
-	return i.Uint64(), nil
+func (b *Batch) Index() uint64 {
+	return b.epochID.Big().Uint64()
 }
 
 func (b *Batch) EpochID() epochid.EpochID {
 	return b.epochID
 }
 
-// ValidateTx checks that the transaction `p` fulfills all preliminary
+func (b *Batch) Log() *zerolog.Logger {
+	logger := log.With().
+		Dict("batch",
+			zerolog.Dict().
+				Str("epochID", b.EpochID().String()),
+		).Logger()
+	return &logger
+}
+
+// validateTx checks that the transaction `p` fulfills all preliminary
 // conditions to be included in the batch.
 // A valid transaction:
 //    a) has a monotonically increasing nonce for the sender's
@@ -138,21 +170,20 @@ func (b *Batch) EpochID() epochid.EpochID {
 //    b) has enough balance at the senders account in order to pay the
 //        tansactions gas fees, also considering all previous locally
 //        included transactions in that batch
-func (b *Batch) ValidateTx(ctx context.Context, p *transaction.Pending) error {
-	currentNonce, err := b.state.GetNonce(ctx, p.Sender)
+func (b *Batch) validateTx(ctx context.Context, p *transaction.Pending) error {
+	currentNonce, err := b.chainState.GetNonce(ctx, p.Sender)
 	if err != nil {
 		return err
 	}
 	if p.Tx.Nonce() != currentNonce {
 		return errors.Errorf("nonce mismatch, want: %d,got: %d", currentNonce, p.Tx.Nonce())
 	}
-
 	if err := ValidateGasParams(p.Tx, b.block.BaseFee()); err != nil {
 		return err
 	}
 	p.GasCost = CalculateGasCost(p.Tx, b.block.BaseFee())
 	p.MinerFee = CalculatePriorityFee(p.Tx, b.block.BaseFee())
-	balance, err := b.state.GetBalance(ctx, p.Sender)
+	balance, err := b.chainState.GetBalance(ctx, p.Sender)
 	if err != nil {
 		return err
 	}
@@ -167,55 +198,40 @@ func (b *Batch) ValidateTx(ctx context.Context, p *transaction.Pending) error {
 // ApplyTx can fail when the transaction's inclusion would surpass the batches
 // gas limit.
 func (b *Batch) ApplyTx(ctx context.Context, p *transaction.Pending) error {
-	b.mux.Lock()
-	defer b.mux.Unlock()
+	err := b.validateTx(ctx, p)
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
+	}
 
-	err := b.gasPool.SubGas(p.Tx.Gas())
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	err = b.gasPool.SubGas(p.Tx.Gas())
 	if err != nil {
 		// gas limit reached
 		return err
 	}
-	newTotalSize := b.transactions.TotalByteSize() + len(p.TxBytes)
+	newTotalSize := b.committedTxs.TotalByteSize() + len(p.TxBytes)
 	if newTotalSize > BatchSizeLimit {
 		return errors.Errorf("size limit reached (%d + %d > %d)",
-			b.transactions.TotalByteSize(), len(p.TxBytes), BatchSizeLimit)
+			b.committedTxs.TotalByteSize(), len(p.TxBytes), BatchSizeLimit)
 	}
 
-	err = b.state.SubBalance(ctx, p.Sender, p.GasCost)
+	err = b.chainState.SubBalance(ctx, p.Sender, p.GasCost)
 	if err != nil {
 		return err
 	}
 	// not really necessary, only to e.g. observe the total gained fee
-	err = b.state.AddBalance(ctx, b.block.Coinbase(), p.MinerFee)
+	err = b.chainState.AddBalance(ctx, b.block.Coinbase(), p.MinerFee)
 	if err != nil {
 		return err
 	}
-	b.state.SetNonce(p.Sender, p.Tx.Nonce()+1)
-
-	b.transactions.Enqueue(p)
+	b.chainState.SetNonce(p.Sender, p.Tx.Nonce()+1)
+	b.committedTxs.Enqueue(p)
 	return nil
 }
 
-func (b *Batch) Transactions() *transaction.Queue {
-	return b.transactions
-}
-
-// SignedBatchTx constructs the signed Batch-Transaction to be sent to
-// the sequencer for batch submittal.
-func (b *Batch) SignedBatchTx(privateKey *ecdsa.PrivateKey, decryptionKey []byte) (*txtypes.Transaction, error) {
-	txs := b.Transactions()
-	ts := time.Now().Unix()
-	batchIndex, err := b.BatchIndex()
-	if err != nil {
-		return nil, err
-	}
-	btxData := &txtypes.BatchTx{
-		ChainID:       b.ChainID,
-		DecryptionKey: decryptionKey,
-		BatchIndex:    batchIndex,
-		L1BlockNumber: b.l1BlockNumber,
-		Timestamp:     big.NewInt(ts),
-		Transactions:  txs.Bytes(),
-	}
-	return txtypes.SignNewTx(privateKey, b.signer, btxData)
+func (b *Batch) Hash() []byte {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.committedTxs.Hash()
 }

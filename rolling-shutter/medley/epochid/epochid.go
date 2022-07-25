@@ -1,6 +1,7 @@
 package epochid
 
 import (
+	"bytes"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -35,7 +36,15 @@ func (e EpochID) Big() *big.Int {
 	return common.Hash(e).Big()
 }
 
+func (e EpochID) Uint64() uint64 {
+	return e.Big().Uint64()
+}
+
 func (e EpochID) String() string {
 	s := common.Hash(e).String()
 	return s[2:6] + ".." + s[len(s)-4:]
+}
+
+func Equal(a, b EpochID) bool {
+	return bytes.Equal(a.Bytes(), b.Bytes())
 }
