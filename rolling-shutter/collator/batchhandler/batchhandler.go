@@ -1,10 +1,9 @@
 package batchhandler
 
 import (
+	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -16,7 +15,9 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
@@ -24,12 +25,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 const (
-	//  The maximum number of future batches allowed for transaction submittal
-	TransactionAcceptanceInterval = 5
+	//  The maximum number of batches in the pool of Batches
+	SizeBatchPool = 5
 )
 
 // computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
@@ -70,6 +72,11 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 	if err != nil {
 		return nil, err
 	}
+	// XXX or re-use the one from collator?
+	l1EthClient, err := ethclient.Dial(cfg.EthereumURL)
+	if err != nil {
+		return nil, err
+	}
 	l2EthClient := ethclient.NewClient(l2Client)
 	// This will already do a query to the l2-client
 	chainID, err := l2EthClient.ChainID(ctx)
@@ -79,18 +86,25 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 	signer := txtypes.LatestSignerForChainID(chainID)
 
 	bh := &BatchHandler{
-		l2Client:    l2Client,
-		l2EthClient: l2EthClient,
-		config:      cfg,
-		signer:      signer,
-		Txpool:      transaction.NewPool(signer),
-		Dbpool:      dbpool,
+		l2Client:               l2Client,
+		l2EthClient:            l2EthClient,
+		l1EthClient:            l1EthClient,
+		config:                 cfg,
+		signer:                 signer,
+		dbpool:                 dbpool,
+		mux:                    sync.RWMutex{},
+		batches:                []*batch.Batch{},
+		outMessage:             make(chan shmsg.P2PMessage),
+		ticker:                 nil,
+		confirmedBatchesBroker: nil,
+		confirmedBatch:         make(chan epochid.EpochID),
+		stopSignal:             make(chan struct{}),
 	}
 	// This will do more queries to the l2-client
-	err = bh.initialiseEpoch(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// err = bh.initialiseEpoch(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return bh, nil
 }
 
@@ -98,36 +112,37 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 // - validate and enqueue incoming tx's either to the currently pending batch
 //    or for later validation in the transaction pool
 // - handle incoming decryption keys and send the currently pending batch-transaction
-//    to the sequencer
+
 // - start next epoch and initiate the broadcasting of the decryption-trigger to
-//    the keypers
+
 type BatchHandler struct {
-	mux      sync.Mutex
 	l2Client *rpc.Client
 	// l2EthClient is the RPC l2Client wrapped by ethclient.Client
 	l2EthClient *ethclient.Client
+	l1EthClient *ethclient.Client
 	config      config.Config
-	Txpool      *transaction.Pool
 	signer      txtypes.Signer
-	Dbpool      *pgxpool.Pool
-	LatestBatch *batch.Batch
+	dbpool      *pgxpool.Pool
+	// mux protects access to bh.batches and bh.pendingEpochID
+	mux        sync.RWMutex
+	batches    []*batch.Batch
+	outMessage chan shmsg.P2PMessage
+	ticker     *EpochTicker
+	stopSignal chan struct{}
+
+	confirmedBatchesBroker *medley.Broker[epochid.EpochID]
+	confirmedBatch         chan epochid.EpochID
 }
 
 func (bh *BatchHandler) Signer() txtypes.Signer {
 	return bh.signer
 }
 
-// LatestEpochID returns the epoch-id associated to
-// the current batch that is yet to be submitted to the sequencer.
-func (bh *BatchHandler) LatestEpochID() epochid.EpochID {
-	return bh.LatestBatch.EpochID()
+func (bh *BatchHandler) Messages() <-chan shmsg.P2PMessage {
+	return bh.outMessage
 }
 
-func (bh *BatchHandler) privateKey() *ecdsa.PrivateKey {
-	return bh.config.EthereumKey
-}
-
-// EnqueueTx handles the potential addition of a user's transaction
+// `EnqueueTx` handles the potential addition of a user's transaction
 // to the latest local batch or in case of future transactions to the transaction pool.
 // Future transactions can't be queued if they have a batch-index that is too
 // far in the future - the allowed difference is set by the `TransactionAcceptanceInterval` (const).
@@ -135,260 +150,412 @@ func (bh *BatchHandler) privateKey() *ecdsa.PrivateKey {
 // because the chain-state (balance, nonce) at the future batch is yet to be known.
 // Thus, even successfully queued transactions can't be guaranteed to be considered
 // later on for inclusion in the corresponding batch.
-// Due to the limitation that a user HAS to encrypt a transaction to a very specific
-// batch, a global priority-queue like transaction-pool like on Layer1 ethereum
+// Due to the limitation that a user has to encrypt a transaction to a very specific
+// batch, a global priority-queue-like transaction-pool (as on layer-1 Ethereum)
 // is not possible. Users have to re-submit a transaction that did not make it
 // to the specific batch explicitly.
-func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
+// The return value is the promise of the transaction result.
+// For a successful transaction, this will only receive a value once the transaction's batch
+// has been confirmed by the sequencer.
+// An unsuccessful transaction can fail anytime in-between submittal and delegation to the sequencer,
+// but mainly fails on validation as the Batch becomes pending.
+func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) <-chan transaction.Result {
 	var tx txtypes.Transaction
+	// create the result promise.
+	result := make(chan transaction.Result, 1)
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
-		return errors.New("can't decode transaction bytes")
+		result <- transaction.Result{
+			Err:     errors.New("can't decode transaction bytes"),
+			Success: false,
+		}
+		return result
 	}
 	if tx.Type() != txtypes.ShutterTxType {
-		return errors.New("only encrypted shutter transactions allowed")
+		result <- transaction.Result{
+			Err:     errors.New("only encrypted shutter transactions allowed"),
+			Success: false,
+		}
+		return result
+	}
+	txEpoch, err := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
+	if err != nil {
+		result <- transaction.Result{Err: err, Success: false}
+		return result
 	}
 
-	if tx.BatchIndex() > math.MaxUint32 {
-		return errors.New("batch index overflow")
+	receiveTime := time.Now()
+	pending, err := transaction.NewPending(bh.Signer(), txBytes, receiveTime)
+	if err != nil {
+		result <- transaction.Result{Err: err, Success: false}
+		return result
 	}
 
-	err = bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		db := cltrdb.New(dbtx)
-		currentEpochID, _, err := GetNextBatch(ctx, db)
+	bh.mux.RLock()
+	// dispatch to the correct `Batch` object
+	b := bh.getBatch(txEpoch)
+	bh.mux.RUnlock()
+
+	if b == nil {
+		result <- transaction.Result{
+			Err:     errors.Errorf("no batch found in batchhandler for epoch-id %s", txEpoch.String()),
+			Success: false,
+		}
+		return result
+	}
+	select {
+	case b.Transaction <- pending:
+	case <-ctx.Done():
+		result <- transaction.Result{
+			Err:     errors.New("server stopped"),
+			Success: false,
+		}
+		return result
+	}
+	return pending.Result
+}
+
+// `Run` is the main entrypoint for the BatchHandler's
+// go-routines.
+// It initialises the pool of currently active batches
+// and starts the go-routines that handle the individual
+// StateChangeResult's of the Batches state-transitions.
+func (bh *BatchHandler) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Start the EpochTicker in order to distribute
+	// new epoch events to the batches.
+	bh.ticker = StartNewEpochTicker(bh.config.EpochDuration)
+	defer bh.ticker.Stop()
+
+	// Start the broker that reads the newly confirmed
+	// batches from the sequencer and distributes that
+	// to the batches.
+	bh.confirmedBatchesBroker = medley.StartNewBroker[epochid.EpochID](false)
+	defer close(bh.confirmedBatchesBroker.Publish)
+
+	// Fill the pool of batches based on the `SizeBatchPool` constant
+	// and start the batches Run go-routines.
+	for i := 0; i < SizeBatchPool; i++ {
+		_, err := bh.appendHeadBatch(ctx)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "couldn't create new batch")
 		}
+	}
 
-		currentBatchIndex := currentEpochID.Big().Uint64()
-		if tx.BatchIndex() < currentBatchIndex {
-			// This will also be the case when we already started the
-			// next epoch but did not successfully receive the
-			// decryption key and got a confirmation from the
-			// sequencer for state inclusion
-			return errors.New("historic batch index")
-		} else if tx.BatchIndex() > currentBatchIndex+TransactionAcceptanceInterval {
-			// only allow future batch indices some batches ahead
-			return errors.New("batch too far in the future")
-		}
-
-		// Set the transactions received timestamp to the current time.
-		receiveTime := time.Now()
-		pending, err := transaction.NewPending(bh.Signer(), txBytes, receiveTime)
-		if err != nil {
-			return err
-		}
-		txEpoch, _ := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
-
-		if err := db.InsertTx(ctx, cltrdb.InsertTxParams{
-			TxHash:  tx.Hash().Bytes(),
-			EpochID: txEpoch.Bytes(),
-			TxBytes: txBytes,
-		}); err != nil {
-			return errors.Wrap(err, "can't insert tx into db")
-		}
-
-		// We could be in the process of updating the latest batch from a different thread,
-		// so this needs a sync barrier.
-		// This makes sure we don't still forward a transaction to the txpool, although
-		// the new batch hast just been initialized with the queued transactions from
-		// the txpool.
-		bh.mux.Lock()
-		defer bh.mux.Unlock()
-		var threshold uint64
-		if bh.LatestBatch == nil {
-			// this will push all transactions
-			// to the txpool, because we don't have
-			// a Batch initialized yet
-			threshold = currentBatchIndex - 1
-		} else {
-			// this will push all transactions
-			// other than the latest batch index to the txpool.
-
-			threshold, err = bh.LatestBatch.BatchIndex()
-			if err != nil {
-				return err
+	eg, errctx := errgroup.WithContext(ctx)
+	for _, b := range bh.batches {
+		// new variable to avoid the loop variable b being
+		// captured by func literal
+		bb := b
+		eg.Go(func() error {
+			// Start the StateChangeResult handler for all the batches
+			// in the pool of batches.
+			return bh.HandleStateTransitions(errctx, eg, bb)
+		})
+	}
+	for {
+		select {
+		case val, ok := <-bh.confirmedBatch:
+			if !ok {
+				bh.confirmedBatch = nil
+				continue
 			}
+			bh.confirmedBatchesBroker.Publish <- val
+		case <-bh.stopSignal:
+			// deferred cancel cancels the HandleStateTransitions
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-		if tx.BatchIndex() > threshold {
-			// push to the tx pool for future processing
-			bh.Txpool.Push(pending)
+	}
+}
+
+func (bh *BatchHandler) getInitialEpoch(ctx context.Context) (epochid.EpochID, uint64, error) {
+	var (
+		epochID       epochid.EpochID
+		l1BlockNumber uint64
+	)
+	err := bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		db := cltrdb.New(tx)
+		epochID, l1BlockNumber, err = GetNextBatch(ctx, db)
+		if err == pgx.ErrNoRows {
+			// TODO query the current blocknumber
+			// TODO initial epoch maybe a config parameter?
+			return err
+		} else if err != nil {
+			return err
+		} else {
 			return nil
 		}
-		// If we are currently in between batches
-		// (next epoch started, but latestBatch not updated yet due to incomplete
-		// HandleDecryptionKey), no transaction will have passed until this point!
-		// This means that all transactions will go to the pool and no transaction
-		// goes to the latestBatch during that phase.
-
-		// Don't allow starting a new epoch while that tx is still processed
-		_, err = dbtx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
-		if err != nil {
-			return err
-		}
-		// Only transactions with tx.BatchIndex() == bh.latestBatch.BatchIndex()
-		// will be pushed to the batch
-		return bh.ProcessTx(ctx, pending)
 	})
-
-	return err
+	return epochID, l1BlockNumber, err
 }
 
-// ProcessTx validates a transaction and includes it in the latest batch,
-// if the transaction is valid and applicable.
-// Otherwise, an error is thrown specifying why the transaction could not
-// be included.
-// ProcessTx should only ever be called for transactions that are meant to be
-// included specifically in the latest batch.
-func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *transaction.Pending) error {
-	latestBatch := bh.LatestBatch
-	if latestBatch == nil {
-		return errors.New("batch is not submittable")
-	}
-	err := latestBatch.ValidateTx(ctx, tx)
-	if err != nil {
-		return errors.Wrap(err, "tx not valid")
-	}
-	err = latestBatch.ApplyTx(ctx, tx)
-	if err != nil {
-		return errors.Wrap(err, "can't apply tx")
-	}
-
-	return err
+func (bh *BatchHandler) Stop() {
+	close(bh.stopSignal)
 }
 
-// HandleDecryptionKey handles incoming decryption keys as received by the keypers after the decryption trigger
-// was sent out from the collator.
-// HandleDecryptionKey finalizes the latestBatch by constructing the corresponding Batch-transaction and
-// sending that to the sequencer.
-// The function blocks until the sequencer has successfully updated the chain-state with the submitted Batch-transaction,
-// and only then creates a new latestBatch. This is due to the latest-batch state validation
-// relies on the polled state from the sequencer and only the sequencer knows how the state (balances and nonces)
-// progressed during the waited upon state update.
-func (bh *BatchHandler) HandleDecryptionKey(
-	ctx context.Context, epochID epochid.EpochID, decryptionKey []byte,
-) ([]shmsg.P2PMessage, error) {
+// `appendHeadBatch` intialises a new batch for the next future epoch-id that is not yet
+// in the pool of batches and appends that to the "HEAD" position of the pool of batches.
+func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, error) {
+	bh.mux.Lock()
 	var (
-		outMessages       []shmsg.P2PMessage
-		nextEpochID       epochid.EpochID
-		nextL1BlockNumber uint64
+		headBatch     *batch.Batch
+		epochID       epochid.EpochID
+		l1BlockNumber uint64
+		err           error
 	)
-
-	if bh.LatestEpochID() != epochID {
-		return nil, errors.New("received decryption key for wrong batch")
+	if len(bh.batches) == 0 {
+		headBatch = nil
+		epochID, l1BlockNumber, err = bh.getInitialEpoch(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		headBatch = bh.batches[len(bh.batches)-1]
+		epochID, _ = computeNextEpochID(headBatch.EpochID())
+		// TODO get next epochid and guess the l1blocknumber based on recent timings
+		l1BlockNumber = uint64(42)
 	}
 
-	btx, err := bh.LatestBatch.SignedBatchTx(bh.privateKey(), decryptionKey)
+	newBatch, err := batch.New(ctx, bh.config.InstanceID, epochID, l1BlockNumber, bh.l2EthClient, headBatch)
 	if err != nil {
 		return nil, err
 	}
+	bh.batches = append(bh.batches, newBatch)
+	newBatch.Log().Debug().Int("num-batches", len(bh.batches)).Str("block-number", fmt.Sprint(newBatch.L1BlockNumber)).Msg("added HEAD batch to batch pool")
+	bh.mux.Unlock()
+	return newBatch, nil
+}
 
-	err = sendTransaction(ctx, bh.l2Client, btx)
-	if err != nil {
-		return nil, err
+func (bh *BatchHandler) getBatch(epoch epochid.EpochID) *batch.Batch {
+	for _, candidate := range bh.batches {
+		if bytes.Equal(candidate.EpochID().Bytes(), epoch.Bytes()) {
+			return candidate
+		}
 	}
+	return nil
+}
 
-	// Wait until the batch-tx is processed and the rollup's latest state is updated
-	// to include the transactions in that batch
-	// We need this because the `Batch` struct relies on the rollup's latest state for tx validation etc.
-	err = waitConfirmation(ctx, bh.l2Client, btx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Sync barrier so that incoming transactions will only be funneled to the txpool or batch state
-	// after the new batch state has been created
+// `removeBatch` removes a batch from the pool of batches.
+// Should be called after the batch has stopped it's state-transition
+// and reached it's end of lifetime (confirmed and applied in the rollup).
+func (bh *BatchHandler) removeBatch(b *batch.Batch) {
 	bh.mux.Lock()
 	defer bh.mux.Unlock()
 
-	err = bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		db := cltrdb.New(dbtx)
-		nextEpochID, nextL1BlockNumber, err = GetNextBatch(ctx, db)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	// Only now that the state is updated in the sequencer, we can create the new Batch.
-	// The Batch relies on polling the new state from the sequencer.
-	// We could track nonces ourselves from the local previous state,
-	// but we have to let the sequencer update the balances with the decrypted transactions.
-	newBatch, err := batch.NewCachedPendingBatch(ctx, nextEpochID, nextL1BlockNumber, bh.l2EthClient)
-	if err != nil {
-		return nil, err
-	}
-	bh.LatestBatch = newBatch
-	batchIndex, err := newBatch.BatchIndex()
-	if err != nil {
-		return nil, err
-	}
-	for _, tx := range bh.Txpool.Pop(batchIndex) {
-		err := bh.ProcessTx(ctx, tx)
-		if err != nil {
-			err = errors.Wrapf(err, "pooled tx invalid (hash=%s), dropped", tx.Tx.Hash())
-			fmt.Println(err)
-			continue
+	index := -1
+	for i, a := range bh.batches {
+		if a == b {
+			index = i
+			break
 		}
 	}
-	return outMessages, nil
+	if index >= 0 {
+		// remove the batch at the found index from the slice via re-slicing
+		bh.batches = append(bh.batches[:index], bh.batches[index+1:]...)
+		log.Debug().Int("num-batches", len(bh.batches)).Msg("removed batch from pool")
+	}
 }
 
-// initialiseEpoch sets the state of the BatchHandler class upon startup
-// and looks for pending, but not updated transactions in the database.
-// Note that the collatordb's GetNextBatch() is used to determine the
-// current pending epoch-id and l1 block number.
-func (bh *BatchHandler) initialiseEpoch(ctx context.Context) error {
-	return bh.Dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		// Disallow processing transactions at the same time
-		_, err := tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
-		if err != nil {
-			return err
+// `HandleStateTransitions` tracks the StateChangeResults emitted by a certain batch
+// and takes action on some state-changes:
+// - when the batch becomes "committed",
+// a new HEAD-batch will be appended to the pool of batches
+// - when the batch becomes "confirmed" or the context is canceled,
+// the cleanup function is called, the batch is stopped
+// and the HandleStateTransitions returns with a optional error as return value.
+// `HandleStateTransitions` takes care of registering and deregistering
+// observers for the confirmed batches and epoch ticks.
+// It also delegates the input to and the output from the batches state-transition
+// loop:
+// - received confirmed batches and epoch ticks from the respective broker subscriptions are
+// delegated to the batches Input channels
+// - outbound P2P-messages and sequencer transactions are processed from the StateChangeResult
+// and delegated to the messaging / rpc layer.
+// - errors occuring during the state changes are logged
+func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup.Group, b *batch.Batch) error {
+	var stopChan chan error
+
+	batchState := b.Broker.Subscribe(1)
+	confirmedBatch := bh.confirmedBatchesBroker.Subscribe(0)
+	epochTick := bh.ticker.Subscribe()
+
+	go b.Run(epochTick)
+
+	stop := func() {
+		b.Broker.Unsubscribe(batchState)
+		bh.removeBatch(b)
+		bh.ticker.Unsubscribe(epochTick)
+		bh.confirmedBatchesBroker.Unsubscribe(confirmedBatch)
+		stopChan = b.Stop()
+	}
+	ctxDone := ctx.Done()
+
+	for {
+		select {
+		case stopErr := <-stopChan:
+			return stopErr
+
+		case confirmed, ok := <-confirmedBatch:
+			if !ok {
+				confirmedBatch = nil
+				continue
+			}
+			b.Log().Debug().Msg("received confirmed batch in batchhandler")
+			b.ConfirmedBatch <- confirmed
+
+		case stateTransition, ok := <-batchState:
+			if !ok {
+				batchState = nil
+				continue
+			}
+			b.Log().Debug().Int("to-state", int(stateTransition.ToState)).Msg("received state change in batchhandler")
+			switch stateTransition.ToState {
+			case batch.NoState:
+			case batch.InitialState:
+			case batch.PendingState:
+			case batch.CommittedState:
+				// add a new batch to the list of batches
+				headBatch, err := bh.appendHeadBatch(ctx)
+				if err != nil {
+					b.Log().Error().Err(err).Msg("couldn't create new batch, stopping.")
+					// stopping this batch and by means of the error group
+					// all other batches.
+					// we don't have any graceful handling of this currently,
+					// so it's best to shut down the batchhandler entirely
+					stop()
+					// this ensures stop is not called by other means twice
+					stop = func() {}
+					continue
+				}
+
+				// run the state-transitions of a new batch at the head
+				// of the list of batches.
+				// this initially allows for transactions to be queued up in the batch
+				eg.Go(func() error {
+					return bh.HandleStateTransitions(ctx, eg, headBatch)
+				})
+			case batch.DecryptedState:
+			case batch.ConfirmedState:
+				stop()
+				// this ensures the cleanup is not called by ctx.Done() as well
+				stop = func() {}
+			case batch.StoppingState:
+			}
+			for _, transitionError := range stateTransition.Errors {
+				if transitionError.Err != nil {
+					b.Log().Error().Err(transitionError.Err).Msg("error occurred during state-transition")
+				}
+			}
+			for _, mess := range stateTransition.P2PMessages {
+				err := bh.OnOutgoingMessage(ctx, mess)
+				if err != nil {
+					b.Log().Error().Err(err).Msg("error while handling state-transition messages in batch-handler")
+				}
+			}
+			for _, tx := range stateTransition.SequencerTransactions {
+				err := bh.OnSequencerTransaction(ctx, tx)
+				if err != nil {
+					b.Log().Error().Err(err).Msg("error while handling state-transition transactions in batch-handler")
+				}
+			}
+		case <-ctxDone:
+			b.Log().Debug().Msg("context canceled, stopping in HandleStateTransitions")
+			ctxDone = nil
+			stop()
+			// this ensures the cleanup is not called by "Confirmed" state-transition
+			// as well
+			stop = func() {}
 		}
-		db := cltrdb.New(tx)
-		epochID, l1BlockNumber, err := GetNextBatch(ctx, db)
-		if err == pgx.ErrNoRows {
-			return errors.Wrap(err, "next batch not initialized in database")
-		} else if err != nil {
-			return err
-		}
-		// either read in the latest unsubmitted txs from the DB,
-		// or create a new, empty batch
-		batch, err := bh.reconstructBatchFromDB(ctx, db, epochID, l1BlockNumber)
-		if err != nil {
-			return errors.Wrap(err, "batch is non-submittable")
-		}
-		bh.LatestBatch = batch
-		return nil
-	})
+	}
 }
 
-// StartNextEpoch puts a DecryptionTrigger in the collatordb to be sent to the keypers.
-// StartNextEpoch progresses the pending EpochID to the next value which will stop
+// `OnOutgoingMessage` signs and dispatches outbound P2P-messages
+// to the correct handler functions based on protoreflect type introspection.
+// Finally the message will be handed to the messaging layer via it's
+// send channel.
+// Note: This operation blocks if the messaging layer does not consume
+// the sent message!
+func (bh *BatchHandler) OnOutgoingMessage(ctx context.Context, msg shmsg.P2PMessage) error {
+	typ := p2p.GetMessageType(msg)
+	if typ == "shmsg.DecryptionTrigger" {
+		trigger, _ := msg.(*shmsg.DecryptionTrigger)
+		err := shmsg.Sign(trigger, bh.config.EthereumKey)
+		if err != nil {
+			return err
+		}
+		msg = trigger
+		bh.OnOutboundDecryptionTrigger(ctx, trigger)
+	}
+	bh.outMessage <- msg
+	return nil
+}
+
+// `OnSequencerTransaction` signs and sends outbound transactions (mainly BatchTx)
+// to the sequencers JSON-RPC endpoint.
+// Note: The send operation eventually retries sends if the sequencer is unresponsive
+// or an error is returned - the "OnSequencerTransaction" method-call is thus blocking during
+// the whole send operation.
+func (bh *BatchHandler) OnSequencerTransaction(ctx context.Context, tx txtypes.TxData) error {
+	signedTx, err := txtypes.SignNewTx(bh.config.EthereumKey, bh.signer, tx)
+	if err != nil {
+		// that's a bug!
+		return err
+	}
+	return sendTransaction(ctx, bh.l2Client, signedTx)
+}
+
+func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID epochid.EpochID, key []byte) error {
+	log.Debug().Str("epoch", epochID.String()).Msg("received decryption key")
+	bh.mux.RLock()
+	b := bh.getBatch(epochID)
+	bh.mux.RUnlock()
+
+	if b == nil {
+		err := errors.Errorf("no batch found in batchhandler for epoch-id %s", epochID.String())
+		log.Debug().Str("epoch", epochID.String()).Err(err).Msg("error during handle decryption key")
+		return nil
+	}
+	b.DecryptionKey <- key
+	return nil
+}
+
+func (bh *BatchHandler) HandleBatchConfirmation(epochID epochid.EpochID) error {
+	bh.confirmedBatch <- epochID
+	return nil
+}
+
+// `OnOutboundDecryptionTrigger` puts a DecryptionTrigger in the collatordb to be sent to the keypers.
+// `OnOutboundDecryptionTrigger` progresses the pending EpochID to the next value which will stop
 // transactions encrypted for the old epoch-id to be accepted by the collator.
-func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber uint32) ([]shmsg.P2PMessage, error) {
-	var outMessages []shmsg.P2PMessage
+// TODO maybe pass the batch as argument instead of getting it from the handler
+func (bh *BatchHandler) OnOutboundDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) error {
+	epochID, err := epochid.BytesToEpochID(trigger.GetEpochID())
+	if err != nil {
+		return errors.Wrap(err, "can't decode epoch-id bytes from DecryptionTrigger msg")
+	}
 
-	err := bh.Dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		// Disallow processing transactions at the same time
-		_, err := tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
-		if err != nil {
-			return err
-		}
+	bh.mux.RLock()
+	b := bh.getBatch(epochID)
+	bh.mux.RUnlock()
 
+	if b == nil {
+		return errors.Errorf("no batch found in batchhandler for epoch-id %s", epochID.String())
+	}
+
+	err = bh.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
-		epochID, l1BlockNumber, err := GetNextBatch(ctx, db)
-		if err != nil {
-			return err
-		}
 
-		trigger, err := shmsg.NewSignedDecryptionTrigger(
+		var err error
+		trigger, err = shmsg.NewSignedDecryptionTrigger(
 			bh.config.InstanceID,
 			epochID,
-			l1BlockNumber,
-			bh.LatestBatch.Transactions().Hash(),
+			b.L1BlockNumber,
+			b.Hash(),
 			bh.config.EthereumKey,
 		)
 		if err != nil {
@@ -402,82 +569,9 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 		}); err != nil {
 			return err
 		}
-
-		nextEpochID, err := computeNextEpochID(epochID)
-		if err != nil {
-			return err
-		}
-		if err := db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-			EpochID:       nextEpochID.Bytes(),
-			L1BlockNumber: int64(currentBlockNumber),
-		}); err != nil {
-			return err
-		}
-
-		// This will be read from the DB and broadcasted over the P2P Messaging layer.
-		// We then wait for the decryption key to be handled by BatchHandler.HandleDecryptionKey()
-		outMessages = []shmsg.P2PMessage{trigger}
 		return err
 	})
-	return outMessages, err
-}
-
-// reconstructBatchFromDB will re-apply already persisted and thus validated transactions for that epoch
-// to the in-memory batch-cache.
-// This method should only be used for immediate recovery of lost, unsubmitted batches,
-// e.g. due to a crash. It is only applicable for a pending, unsubmitted batch, since it relies on
-// the current chain-state of the sequencer node.
-func (bh *BatchHandler) reconstructBatchFromDB(
-	ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID, l1BlockNumber uint64,
-) (*batch.Batch, error) {
-	newBatch, err := batch.NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
-	if err != nil {
-		return nil, err
-	}
-
-	// Tx's are returned sorted in the db-insert order, and thus in the submitting
-	// insert order.
-	// This way we can replay all transactions on the batch
-	transactions, err := db.GetTransactionsByEpoch(ctx, epochID.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, txBytes := range transactions {
-		var tx txtypes.Transaction
-		err := tx.UnmarshalBinary(txBytes)
-		if err != nil {
-			// This shouldn't happen, since the tx was once unmarshalled
-			// before being written to DB
-			err = errors.Wrap(err, "error during unmarshaling transactions from DB")
-			fmt.Println(err)
-			continue
-		}
-
-		// This is not strictly the original receive time since we don't persist that (yet).
-		// But since the transactions are retrieved in the original insert order, the time will
-		// slightly increase monotonically (monotonic clock time) and preserve original insert-order.
-		recoverTime := time.Now()
-		p, err := transaction.NewPending(bh.signer, txBytes, recoverTime)
-		if err != nil {
-			err = errors.Wrap(err, "error during recovering transactions from DB")
-			fmt.Println(err)
-			continue
-		}
-		err = newBatch.ValidateTx(ctx, p)
-		if err != nil {
-			err = errors.Wrap(err, "validation error during recovering transactions from DB")
-			fmt.Println(err)
-			continue
-		}
-		err = newBatch.ApplyTx(ctx, p)
-		if err != nil {
-			err = errors.Wrap(err, "error during applying recovered transactions from DB")
-			fmt.Println(err)
-			continue
-		}
-	}
-	return newBatch, nil
+	return err
 }
 
 // sendTransaction uses the raw rpc.Client instead of the usual ethclient.Client wrapper
@@ -490,6 +584,7 @@ func sendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 	}
 	f := func() (string, error) {
 		var result string
+		//
 		err := client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(data))
 		if err != nil {
 			return result, err
@@ -500,12 +595,13 @@ func sendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 	if err != nil {
 		return errors.Wrap(err, "can't send transaction")
 	}
-	return nil
+	return err
 }
 
 // waitConfirmation polls for the transaction-receipt of the sent out batch-transaction.
 // Currently it only retries several times until it fails.
 // waitConfirmation returns nil when the transaction has been confirmed successfully.
+// TODO this is unused currently, since the endpoint in the sequencer is not clear yet
 func waitConfirmation(ctx context.Context, client *rpc.Client, tx *txtypes.Transaction) error {
 	f := func() (*txtypes.Receipt, error) {
 		var result txtypes.Receipt
@@ -527,4 +623,14 @@ func waitConfirmation(ctx context.Context, client *rpc.Client, tx *txtypes.Trans
 		return errors.New("receipt status failed")
 	}
 	return nil
+}
+
+func GetBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
+	blk, err := medley.Retry(ctx, func() (uint64, error) {
+		return client.BlockNumber(ctx)
+	})
+	if err != nil {
+		return 0, err
+	}
+	return blk, nil
 }
