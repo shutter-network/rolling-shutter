@@ -2,7 +2,6 @@ package batch
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"math/big"
 	"sync"
 	"time"
@@ -11,17 +10,137 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 const (
 	minimumTxGas   uint64 = 21000
 	BatchSizeLimit int    = 8 * 1024
 )
+
+const (
+	NoState StateEnum = iota
+	InitialState
+	PendingState
+	CommittedState
+	DecryptedState
+	ConfirmedState
+	StoppingState
+)
+
+type StateEnum int
+
+func (s StateEnum) String() string {
+	switch s {
+	case NoState:
+		return "nostate"
+	case InitialState:
+		return "initial"
+	case PendingState:
+		return "pending"
+	case CommittedState:
+		return "committed"
+	case DecryptedState:
+		return "decrypted"
+	case ConfirmedState:
+		return "confirmed"
+	case StoppingState:
+		return "stopping"
+	}
+	return ""
+}
+
+type StateChangeError struct {
+	Err error
+}
+
+type StateChangeResult struct {
+	EpochID               epochid.EpochID
+	FromState             StateEnum
+	ToState               StateEnum
+	P2PMessages           []shmsg.P2PMessage
+	SequencerTransactions []txtypes.TxData
+	Errors                []StateChangeError
+}
+
+func (st *StateChangeResult) Log() *zerolog.Logger {
+	logger := log.With().
+		Dict("StateTransition", zerolog.Dict().
+			// TODO the reflection based encoding is not
+			// consistent with the other logging (e.g. no hex encoding)
+			Interface("messages", st.P2PMessages).
+			Interface("transactions", st.SequencerTransactions).
+			Interface("errors", st.Errors).
+			Str("fromState", st.FromState.String()).
+			Str("toState", st.ToState.String()),
+		).
+		Logger()
+	return &logger
+}
+
+// `State` contains the state-transition logic of a batch on how to react to different
+// input-events during it's lifetime.
+//
+// For all methods of `State` that return a `State` object themselves,
+// the following holds true:
+// If the return value is the same as the `State` object it has been called
+// on, no state transition will be conducted.
+// If the return value is a different from the `State` object it has been called
+// on, no state transition will be conducted.
+type State interface {
+	// `StateEnum` returns the enum associated with that state.
+	// There has to be a 1:1 relationship from StateEnum <-> State.
+	StateEnum() StateEnum
+
+	// `Process` defines the actions to be taken as an immediate effect of
+	// the state-transition. This is the first method to be
+	// called after a state-transition and the resulting
+	// `StateChangeResult` will be emitted to all subscribed observers.
+	Process(*Batch) *StateChangeResult
+
+	// `Post` is called immediately after the state-change has been
+	// processed.
+	Post(*Batch) State
+
+	// `OnEpochTick` defines the actions to be taken as an immediate
+	// effect of a batch receiving an epoch tick.
+	// The second argument is the time value of the tick.
+	OnEpochTick(*Batch, time.Time) State
+
+	// `OnDecryptionKey` defines the actions to be taken as an immediate
+	// effect of a batch receiving an decryption key specificly dedicated
+	// for that batch.
+	// The second argument is the byte-encoded decryption-key.
+	OnDecryptionKey(*Batch, []byte) State
+
+	// `OnTransaction` defines the actions to be taken as an immediate
+	// effect of a batch receiving an epoch tick.
+	// The second argument is the users `Pending` transaction.
+	OnTransaction(*Batch, *transaction.Pending) State
+
+	// `OnTransaction` defines the actions to be taken as an immediate
+	// effect of a batch receiving a stop signal.
+	OnStop(*Batch) State
+
+	// `OnStateChangePrevious` defines the actions to be taken as an immediate
+	// effect of the previous batch emitting a state-change resulting
+	// from that batches `State`'s `Process` method.
+	// The second argument is that `States` emitted `StateChangeResult`
+	OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State
+
+	// `OnBatchConfirmation` defines the actions to be taken as an immediate
+	// effect of a batch receiving a newly confirmed batch on the rollup.
+	// The second argument is the confirmed batches epoch-id.
+	OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State
+}
 
 func ValidateGasParams(tx *txtypes.Transaction, baseFee *big.Int) error {
 	if tx.Gas() < minimumTxGas {
@@ -85,7 +204,7 @@ func New(
 	b := &Batch{
 		mu:             sync.RWMutex{},
 		previous:       previousBatch,
-		Broker:         medley.NewBroker[StateChangeResult](1, true),
+		Broker:         medley.StartNewBroker[StateChangeResult](false),
 		instanceID:     instanceID,
 		epochID:        epochID,
 		L1BlockNumber:  l1BlockNumber,
