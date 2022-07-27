@@ -81,13 +81,12 @@ func NewCachedPendingBatch(
 	if err != nil {
 		return nil, err
 	}
-	state := sequencer.NewChainBatchCache(client, nil)
 	b := &Batch{
 		ChainID:       chainID,
 		epochID:       epochID,
 		l1BlockNumber: l1BlockNumber,
 		signer:        signer,
-		state:         state,
+		state:         sequencer.NewCached(client, nil),
 		block:         block,
 		transactions:  transaction.NewQueue(),
 	}
