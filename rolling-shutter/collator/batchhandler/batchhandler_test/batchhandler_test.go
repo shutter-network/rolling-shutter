@@ -1,347 +1,232 @@
 package batchhandler_test
 
 import (
-	"bytes"
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/jackc/pgx/v4"
+	gocmp "github.com/google/go-cmp/cmp"
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
-	"gotest.tools/assert/cmp"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func newTestConfig(t *testing.T) config.Config {
-	t.Helper()
-
-	ethereumKey, err := ethcrypto.GenerateKey()
-	assert.NilError(t, err)
-	return config.Config{
-		EthereumURL:         "http://127.0.0.1:8454",
-		SequencerURL:        "http://127.0.0.1:8455",
-		EthereumKey:         ethereumKey,
-		ExecutionBlockDelay: uint32(5),
-		InstanceID:          123,
+// `TestBatchHandler` spawns a BatchHandler in conjunction with a
+// `p2pMessagingMock` and a mocked sequencer server (`MockEthServer`).
+// The BatchHandler then receives different user-transactions
+// during different epochs.
+// The coordination of spawning the user-transactions and ending
+// the test conducted in a registered hook-function in the MockEthServer,
+// that is called everytime the MockEthServer receives a BatchTx via the
+// `eth_sendRawTransaction` JSON-RPC endpoint.
+func TestBatchHandler(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
 	}
-}
-
-type testParams struct {
-	gasLimit       uint64
-	initialBalance *big.Int
-	baseFee        *big.Int
-	txGasTipCap    *big.Int
-	txGasFeeCap    *big.Int
-	initialEpochID epochid.EpochID
-}
-
-type fixture struct {
-	cfg          config.Config
-	ethServer    *sequencer.MockEthServer
-	batchHandler *batchhandler.BatchHandler
-	makeTx       func(batchIndex, nonce, gas int) ([]byte, []byte)
-	address      common.Address
-	coinbase     common.Address
-}
-
-func setup(ctx context.Context, t *testing.T, params testParams) *fixture {
-	t.Helper()
-
-	cfg := newTestConfig(t)
-	eth := sequencer.RunMockEthServer(t)
-	cfg.SequencerURL = eth.URL
-
-	db, dbpool, dbteardown := testdb.NewCollatorTestDB(ctx, t)
-	t.Cleanup(eth.Teardown)
-	t.Cleanup(dbteardown)
-
-	address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
-	chainID := big.NewInt(0)
-	gasLimit := params.gasLimit
-	signer := txtypes.LatestSignerForChainID(chainID)
-	coinbase := common.HexToAddress("0x0000000000000000000000000000000000000000")
-
-	// Set the values on the dummy rpc server
-	eth.SetBalance(address, params.initialBalance, "latest")
-	eth.SetBalance(coinbase, big.NewInt(0), "latest")
-	eth.SetNonce(address, uint64(0), "latest")
-	eth.SetChainID(chainID)
-	eth.SetBlock(params.baseFee, gasLimit, "latest")
-
-	// set initial ("next") epoch id and block number manually,
-	// this is usually done in the collator and not in the handler
-	err := db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-		EpochID:       params.initialEpochID.Bytes(),
-		L1BlockNumber: 0,
-	})
-	assert.NilError(t, err)
-
-	// New batch handler, this will already query the eth-server
-	bh, err := batchhandler.NewBatchHandler(cfg, dbpool)
-	assert.NilError(t, err)
-	assert.Equal(t, bh.LatestEpochID(), params.initialEpochID)
-
-	makeTx := func(batchIndex, nonce, gas int) ([]byte, []byte) {
-		// construct a valid transaction
-		txData := &txtypes.ShutterTx{
-			ChainID:          chainID,
-			Nonce:            uint64(nonce),
-			GasTipCap:        params.txGasTipCap,
-			GasFeeCap:        params.txGasFeeCap,
-			Gas:              uint64(gas),
-			EncryptedPayload: []byte("foo"),
-			BatchIndex:       uint64(batchIndex),
-		}
-		tx, err := txtypes.SignNewTx(cfg.EthereumKey, signer, txData)
-		assert.NilError(t, err)
-
-		// marshal tx to bytes
-		txBytes, err := tx.MarshalBinary()
-		assert.NilError(t, err)
-		return txBytes, tx.Hash().Bytes()
-	}
-
-	return &fixture{
-		cfg:          cfg,
-		ethServer:    eth,
-		batchHandler: bh,
-		makeTx:       makeTx,
-		address:      address,
-		coinbase:     coinbase,
-	}
-}
-
-func TestHandlerStateProgression(t *testing.T) {
 	ctx := context.Background()
+
 	epoch1, _ := epochid.BigToEpochID(common.Big1)
-	epoch2, _ := epochid.BigToEpochID(new(big.Int).Add(epoch1.Big(), common.Big1))
-	params := testParams{
-		gasLimit:       uint64(210000),
-		baseFee:        big.NewInt(1),
-		initialBalance: big.NewInt(210000),
-		txGasTipCap:    big.NewInt(1),
-		txGasFeeCap:    big.NewInt(2),
-		initialEpochID: epoch1,
+	params := TestParams{
+		GasLimit:       uint64(210000),
+		BaseFee:        big.NewInt(1),
+		InitialBalance: big.NewInt(1000000),
+		TxGasTipCap:    big.NewInt(1),
+		TxGasFeeCap:    big.NewInt(2),
+		InitialEpochID: epoch1,
+		EpochDuration:  2 * time.Second,
 	}
-	fixtures := setup(ctx, t, params)
+	dbctx := context.Background()
+	fixtures := Setup(dbctx, t, params)
+	done := make(chan error)
 
-	// enqueue a batch 2 tx
-	// check this should not be processed already, only enqueued for later
-	// in the txpool
-	tx3, _ := fixtures.makeTx(2, 2, 21000)
-	err := fixtures.batchHandler.EnqueueTx(ctx, tx3)
-	assert.NilError(t, err)
-	assertTransaction(t, fixtures.batchHandler, tx3, epoch2, 0)
+	userCtx := context.Background()
+	var txBytes1, txBytes2, txBytes3, txBytes4, txBytes5, txBytes6, txBytes7, txBytes8, txBytes9, txBytes10 []byte
 
-	// enqueue a batch 1 tx, this goes to the "Batch" state directly,
-	// since we already finalized the 0,0 epoch
-	tx1, tx1Hash := fixtures.makeTx(1, 0, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, tx1)
-	assert.NilError(t, err)
-	assertTransaction(t, fixtures.batchHandler, tx1, epoch1, 0)
-	// enqueue another batch 1 tx
-	tx2, tx2Hash := fixtures.makeTx(1, 1, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, tx2)
-	assert.NilError(t, err)
-	assertTransaction(t, fixtures.batchHandler, tx2, epoch1, 1)
+	// create the result promises
+	tx1Result := make(chan transaction.Result, 1)
+	tx2Result := make(chan transaction.Result, 1)
+	tx3Result := make(chan transaction.Result, 1)
+	tx4Result := make(chan transaction.Result, 1)
+	tx5Result := make(chan transaction.Result, 1)
+	tx6Result := make(chan transaction.Result, 1)
+	tx7Result := make(chan transaction.Result, 1)
+	tx8Result := make(chan transaction.Result, 1)
+	tx9Result := make(chan transaction.Result, 1)
+	tx10Result := make(chan transaction.Result, 1)
+	currentBatchIndex := uint64(0)
 
-	// check there should be 2 tx in the current batch
-	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch1)
-	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
-	assert.DeepEqual(t, fixtures.batchHandler.Txpool.Batches().ToUint64s(), []uint64{2})
-
-	// batch 2
-	msgs, err := fixtures.batchHandler.StartNextEpoch(ctx, uint32(1))
-	assert.NilError(t, err)
-
-	// make sure decryption trigger is stored in db
-	assertDecryptionTrigger(t, fixtures.cfg, fixtures.batchHandler, msgs, [][]byte{tx1Hash, tx2Hash}, epoch1)
-
-	// The new batch still doesn't exist yet when we haven't processed
-	// the decryption key of the previous one yet
-	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch1)
-	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
-
-	// insert another tx in this batch, but not queued
-	tx4, _ := fixtures.makeTx(2, 3, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, tx4)
-	assert.NilError(t, err)
-	assertTransaction(t, fixtures.batchHandler, tx4, epoch2, 1)
-
-	// Register the state update on the next incoming tx
-	hookFunc := func(me *sequencer.MockEthServer, tx *txtypes.Transaction) bool {
-		assert.Equal(t, tx.Type(), uint8(txtypes.BatchTxType))
-		assert.Equal(t, len(tx.Transactions()), 2)
-		assert.Equal(t, tx.BatchIndex(), uint64(1))
-
-		t.Logf("addr: %s, coinbase: %s", fixtures.address.Hex(), fixtures.coinbase.Hex())
-		me.SetBalance(fixtures.address, big.NewInt(126000), "latest")
-		me.SetBalance(fixtures.coinbase, big.NewInt(42000), "latest")
-		me.SetNonce(fixtures.address, uint64(2), "latest")
-		// return true to only execute the hook once on
-		// the next transaction
-		return true
+	failFunc := func(err error) {
+		done <- err
+		close(done)
 	}
-	fixtures.ethServer.RegisterTxHook(hookFunc)
 
-	// batch 1 decryption key
-	// this sends a BatchTx that triggers the registered hook function
-	mess, err := fixtures.batchHandler.HandleDecryptionKey(ctx, epoch1, []byte("key1"))
-	assert.Check(t, mess == nil)
-	assert.NilError(t, err)
+	fixtures.EthL2Server.RegisterTxHook(func(me *sequencer.MockEthServer, tx *txtypes.Transaction) bool {
+		assertEqual(t, failFunc, tx.Type(), uint8(txtypes.BatchTxType))
+		assertEqual(t, failFunc, tx.BatchIndex(), currentBatchIndex+1)
+		currentBatchIndex++
 
-	// Now that we handled the decryption key,
-	// the (2,1) batch should exist and
-	// the transactions from the txpool should be applied
-	// to it already
-	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch2)
-	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 2)
-	assert.DeepEqual(t, fixtures.batchHandler.Txpool.Batches().Len(), 0)
+		epoch, _ := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
+		// trigger the batch-confitmation handler in the batch-handler directly.
+		// we don't have an endpoint for batch-confirmation yet in the sequencer (and mock-sequencer)
+		defer fixtures.BatchHandler.HandleBatchConfirmation(epoch)
 
-	// insert another tx in this batch
-	tx5, _ := fixtures.makeTx(2, 4, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, tx5)
-	assert.NilError(t, err)
-	assertTransaction(t, fixtures.batchHandler, tx5, epoch2, 2)
+		switch tx.BatchIndex() {
+		case 1:
+			assertEqual(t, failFunc, len(tx.Transactions()), 0)
+			// valid, applied in batch 2
+			txBytes1, _ = fixtures.MakeTx(2, 0, 22000)
+			res1 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes1)
+			go func() {
+				tx1Result <- <-res1
+			}()
+			// valid, applied in batch 4
+			txBytes2, _ = fixtures.MakeTx(4, 1, 22000)
+			res2 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes2)
+			go func() {
+				tx2Result <- <-res2
+			}()
 
-	// this should not be queued but immediately be
-	// processed in the current batch state
-	assert.Equal(t, fixtures.batchHandler.Txpool.Batches().Len(), 0)
-	assert.Equal(t, fixtures.batchHandler.LatestBatch.Transactions().Len(), 3)
-}
+			// invalid (decreasing nonce), applied in batch 4
+			txBytes3, _ = fixtures.MakeTx(4, 0, 22000)
+			res3 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes3)
+			go func() {
+				// goes to the pool but will then be dropped due to invalid nonce
+				tx3Result <- <-res3
+			}()
 
-func TestHandlerFailingValidation(t *testing.T) {
-	ctx := context.Background()
-	epoch1, _ := epochid.BigToEpochID(common.Big0)
-	epoch2, _ := epochid.BigToEpochID(new(big.Int).Add(epoch1.Big(), common.Big1))
-	params := testParams{
-		gasLimit:       uint64(210000),
-		baseFee:        big.NewInt(1),
-		initialBalance: big.NewInt(420002),
-		txGasTipCap:    big.NewInt(1),
-		txGasFeeCap:    big.NewInt(2),
-		initialEpochID: epoch1,
-	}
-	fixtures := setup(ctx, t, params)
+			// invalid (non-monotonically increasing nonce), applied in batch 4
+			txBytes10, _ = fixtures.MakeTx(4, 3, 22000)
+			res10 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes10)
+			go func() {
+				// goes to the pool but will then be dropped due to invalid nonce
+				tx10Result <- <-res10
+			}()
 
-	// gas amount is lower than minimum (21000)
-	txBytes, _ := fixtures.makeTx(0, 0, 21000)
-	// mangle up the tx data
-	txBytes[0] = 0xe
-	txBytes[1] = 0xf
-	err := fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "can't decode transaction bytes")
+			// valid, applied in the batch that is just on the edge of too far in the future
+			txBytes9, _ = fixtures.MakeTx(batchhandler.SizeBatchPool+1, 3, 22000)
+			res9 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes9)
+			go func() {
+				tx9Result <- <-res9
+			}()
 
-	// gas amount is lower than minimum (21000)
-	txBytes, _ = fixtures.makeTx(0, 0, 20999)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "tx gas lower than minimum")
+		case 2:
+			assertEqual(
+				t,
+				failFunc,
+				tx.Transactions(),
+				[][]byte{txBytes1},
+				gocmp.Comparer(compareByte),
+			)
+			// with above test-parameters, a tx costs 2xGas of the tx
+			// and the node get's 1xGas
+			me.SetBalance(fixtures.Address, big.NewInt(1000000-44000), "latest")
+			me.SetBalance(fixtures.Coinbase, big.NewInt(22000), "latest")
+			me.SetNonce(fixtures.Address, uint64(1), "latest")
+		case 3:
+			assertEqual(t, failFunc, len(tx.Transactions()), 0)
 
-	// enqueue initial valid tx
-	txBytes, _ = fixtures.makeTx(0, 0, 189000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.NilError(t, err)
+			// Note: we can't really synchronize on the
+			// initial / pending transition in a black-box test, so we can't control
+			// in which state exactly the transaction will be enqueued
 
-	// this is above the gas-minimum, but it results
-	// in the gas limit overflowing
-	txBytes, _ = fixtures.makeTx(0, 1, 21001)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "gas limit reached")
+			// valid, applied in batch 4
+			txBytes4, _ = fixtures.MakeTx(4, 2, 22000)
+			res4 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes4)
+			go func() {
+				tx4Result <- <-res4
+			}()
 
-	// this is fine gas-wise, but does not increment the nonce
-	txBytes, _ = fixtures.makeTx(0, 0, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "nonce mismatch, want: 1,got: 0")
+			// invalid (higher than gas limit), applied in batch 4
+			txBytes5, _ = fixtures.MakeTx(4, 3, 210001-44000)
+			res5 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes5)
+			go func() {
+				tx5Result <- <-res5
+			}()
 
-	// don't allow transactions too far in the future
-	// current batch + 5 is the last one allowed
-	txBytes, _ = fixtures.makeTx(5, 0, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.NilError(t, err)
-	txBytes, _ = fixtures.makeTx(6, 0, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "batch too far in the future")
+			// invalid, batch too far in the future doesn't exist in the batch-pool
+			txBytes6, _ = fixtures.MakeTx(3+batchhandler.SizeBatchPool+1, 3, 22000)
+			res6 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes6)
+			go func() {
+				tx6Result <- <-res6
+			}()
 
-	// batch 1
-	_, err = fixtures.batchHandler.StartNextEpoch(ctx, uint32(1))
-	assert.NilError(t, err)
+		case 4:
+			assertEqual(
+				t,
+				failFunc,
+				tx.Transactions(),
+				[][]byte{txBytes2, txBytes4},
+				gocmp.Comparer(compareByte),
+			)
+			me.SetBalance(fixtures.Address, big.NewInt(1000000-(3*44000)), "latest")
+			me.SetBalance(fixtures.Coinbase, big.NewInt(3*22000), "latest")
+			me.SetNonce(fixtures.Address, uint64(3), "latest")
 
-	// don't allow transactions for the last epoch,
-	// once we started the next one.
-	// This has to be the case even when the latestBatch has
-	// not been updated yet (no decryption key received)
-	txBytes, _ = fixtures.makeTx(0, 0, 21000)
-	err = fixtures.batchHandler.EnqueueTx(ctx, txBytes)
-	assert.ErrorContains(t, err, "historic batch index")
+			// invalid, batch in the past doesn't exist in the batch pool
+			// or has a state that doesn't accept transactions
+			txBytes7, _ = fixtures.MakeTx(3, 3, 22000)
+			res7 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes7)
+			go func() {
+				tx7Result <- <-res7
+			}()
 
-	// batch 0 decryption key
-	mess, err := fixtures.batchHandler.HandleDecryptionKey(ctx, epoch1, []byte("key1"))
-	assert.Check(t, mess == nil)
-	assert.NilError(t, err)
-	assert.Equal(t, fixtures.batchHandler.LatestEpochID(), epoch2)
-}
+			// invalid (lower than gas-minimum), applied in batch 5
+			txBytes8, _ = fixtures.MakeTx(5, 3, 20999)
+			res8 := fixtures.BatchHandler.EnqueueTx(userCtx, txBytes8)
+			go func() {
+				tx8Result <- <-res8
+			}()
 
-func assertTransaction(t *testing.T, bh *batchhandler.BatchHandler, txBytes []byte, epochID epochid.EpochID, expectedIndex int) {
-	t.Helper()
-	ctx := context.Background()
-
-	foundIndex := -1
-	err := bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		db := cltrdb.New(dbtx)
-		txs, err := db.GetTransactionsByEpoch(ctx, epochID.Bytes())
-		assert.NilError(t, err)
-		for i, tx := range txs {
-			if cmp.DeepEqual(tx, txBytes)().Success() {
-				foundIndex = i
-				break
-			}
+		case batchhandler.SizeBatchPool + 1:
+			assertEqual(
+				t,
+				failFunc,
+				tx.Transactions(),
+				[][]byte{txBytes9},
+				gocmp.Comparer(compareByte),
+			)
+			me.SetBalance(fixtures.Address, big.NewInt(1000000-(4*44000)), "latest")
+			me.SetBalance(fixtures.Coinbase, big.NewInt(4*22000), "latest")
+			me.SetNonce(fixtures.Address, uint64(4), "latest")
+			assertEqual(t, failFunc, len(tx.Transactions()), 1)
+		case batchhandler.SizeBatchPool + 2:
+			close(done)
+			return true
+		default:
+			// in all other batches, we don't expect user transactions
+			// either becuase they were invalid, or because we didn't send any
+			assertEqual(t, failFunc, len(tx.Transactions()), 0)
 		}
-		return nil
+		// return false will not deregister the hook
+		// after the first execution
+		return false
 	})
-	assert.NilError(t, err)
-	assert.Equal(t, foundIndex, expectedIndex)
-}
+	p2pctx, p2pcancel := context.WithCancel(ctx)
+	defer p2pcancel()
 
-func assertDecryptionTrigger(t *testing.T,
-	cfg config.Config,
-	bh *batchhandler.BatchHandler,
-	msgs []shmsg.P2PMessage,
-	txHashes [][]byte,
-	epochID epochid.EpochID,
-) {
-	t.Helper()
-	ctx := context.Background()
+	go p2pMessagingMock(t, p2pctx, failFunc, fixtures.Cfg, fixtures.BatchHandler)
+	go fixtures.BatchHandler.Run(ctx)
 
-	transactionsHash := shmsg.HashTransactions(txHashes)
-	// make sure decryption trigger is stored in db
-	err := bh.Dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		db := cltrdb.New(dbtx)
-		stored, err := db.GetTrigger(ctx, epochID.Bytes())
-		assert.NilError(t, err)
-		assert.Check(t, bytes.Equal(stored.EpochID, epochID.Bytes()))
-		assert.DeepEqual(t, stored.BatchHash, transactionsHash)
-		return nil
-	})
-	assert.NilError(t, err)
+	err := <-done
+	fixtures.BatchHandler.Stop()
+	if err != nil {
+		t.FailNow()
+	}
 
-	// make sure output is trigger message
-	assert.Equal(t, len(msgs), 1)
-	triggerMsg := msgs[0].(*shmsg.DecryptionTrigger)
-	assert.Equal(t, triggerMsg.InstanceID, cfg.InstanceID)
-	assert.Check(t, bytes.Equal(triggerMsg.EpochID, epochID.Bytes()))
-	assert.DeepEqual(t, triggerMsg.TransactionsHash, transactionsHash)
-	address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
-	signatureCorrect, err := shmsg.VerifySignature(triggerMsg, address)
-	assert.NilError(t, err)
-	assert.Check(t, signatureCorrect)
+	assert.Check(t, ((<-tx1Result).Success))
+	assert.Check(t, ((<-tx2Result).Success))
+	assert.Check(t, !((<-tx3Result).Success))
+	assert.Check(t, ((<-tx4Result).Success))
+	assert.Check(t, !((<-tx5Result).Success))
+	assert.Check(t, !((<-tx6Result).Success))
+	assert.Check(t, !((<-tx7Result).Success))
+	assert.Check(t, !((<-tx8Result).Success))
+	assert.Check(t, ((<-tx9Result).Success))
+	assert.Check(t, !((<-tx10Result).Success))
 }
