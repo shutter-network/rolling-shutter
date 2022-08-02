@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// `Broker` allows to distribute a value to multiple
+// Broker allows to distribute a value to multiple
 // receiving channels, so that all channels receive the same value.
 // This is different to the Fan-Out pattern where multiple channels
 // are listening for a send on one channel, but only the first channel
@@ -32,24 +32,23 @@ type Broker[T any] struct {
 	unsubscribe          chan chan T
 	running              bool
 	bufferSizeSubscriber int
-	blockingSend         bool
+	nonBlockingSend      bool
 }
 
-func NewBroker[T any](buffer int, blocking bool) *Broker[T] {
+func NewBroker[T any](buffer int, nonBlocking bool) *Broker[T] {
 	return &Broker[T]{
-		stop:                 make(chan struct{}),
-		publish:              make(chan T, 1),
-		subscribe:            make(chan chan T),
-		unsubscribe:          make(chan chan T),
-		bufferSizeSubscriber: buffer,
-		blockingSend:         blocking,
-		running:              false,
+		stop:            make(chan struct{}),
+		publish:         make(chan T, 1),
+		subscribe:       make(chan chan T),
+		unsubscribe:     make(chan chan T),
+		nonBlockingSend: nonBlocking,
+		running:         false,
 	}
 }
 
-// `Start` starts the Broker's internal loop that processes
+// Start starts the Broker's internal loop that processes
 // the subscription and publish operations.
-// `initialSubscriptions` will be registered
+// initialSubscriptions will be registered
 // before the loop is started.
 // This is useful when the channels must not miss a published value
 // after the start or when the subscribers buffer size
@@ -85,7 +84,7 @@ func (b *Broker[T]) Start(initialSubscriptions ...chan T) {
 				close(msgCh)
 				log.Debug().Int("num-subscribers", len(subscriptions)).Msg("Unsubscribed")
 			case msg := <-b.publish:
-				if b.blockingSend {
+				if b.nonBlockingSend {
 					// use blocking send to make sure all subscribers
 					// got the value,
 					// could block the whole broker (+ successive Publish() calls) if a receiver
@@ -111,7 +110,7 @@ func (b *Broker[T]) Start(initialSubscriptions ...chan T) {
 	<-started
 }
 
-// `Stop` will close the internal stop channel
+// Stop will close the internal stop channel
 // and will stop the Brokers internal loop
 // as soon as the closed stop channel is selected.
 // A call to Stop() will also cause the subscribed
@@ -120,7 +119,7 @@ func (b *Broker[_]) Stop() {
 	close(b.stop)
 }
 
-// `Subscribe` registers the channel to the internal
+// Subscribe registers the channel to the internal
 // send operation. It will receive a published value
 // as soon as the other registered subscribers in line
 // received the value (in the blockingSend case),
@@ -134,7 +133,7 @@ func (b *Broker[T]) Subscribe() chan T {
 	return channel
 }
 
-// `Unsubscribe` deregisters the subscribed channel
+// Unsubscribe deregisters the subscribed channel
 // from the internal send operation and close the
 // subscribed channel.
 // This is a noop when the loop is not running.
@@ -159,7 +158,7 @@ func (b *Broker[T]) Unsubscribe(channel chan T) {
 	}
 }
 
-// `Publish` distributes the `value` to
+// Publish distributes the `value` to
 // all subscribers as soon as the
 // internal loop is not busy anymore.
 // Note that this could potentially block
