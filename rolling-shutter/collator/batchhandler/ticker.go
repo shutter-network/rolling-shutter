@@ -17,7 +17,7 @@ type EpochTicker struct {
 func StartEpochTicker(epochDuration time.Duration) *EpochTicker {
 	return &EpochTicker{
 		ticker: time.NewTicker(epochDuration),
-		broker: medley.NewBroker[time.Time](0, false),
+		broker: medley.NewBroker[time.Time](true),
 		stop:   make(chan struct{}),
 	}
 }
@@ -27,7 +27,9 @@ func (tick *EpochTicker) Unsubscribe(channel chan time.Time) {
 }
 
 func (tick *EpochTicker) Subscribe() chan time.Time {
-	return tick.broker.Subscribe()
+	channel := make(chan time.Time)
+	tick.broker.Subscribe(channel)
+	return channel
 }
 
 func (tick *EpochTicker) Run() {
