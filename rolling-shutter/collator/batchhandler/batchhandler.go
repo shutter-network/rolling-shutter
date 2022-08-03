@@ -241,15 +241,15 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) error {
 // ProcessTx should only ever be called for transactions that are meant to be
 // included specifically in the latest batch.
 func (bh *BatchHandler) ProcessTx(ctx context.Context, tx *transaction.Pending) error {
-	batch := bh.LatestBatch
-	if batch == nil {
+	latestBatch := bh.LatestBatch
+	if latestBatch == nil {
 		return errors.New("batch is not submittable")
 	}
-	err := batch.ValidateTx(ctx, tx)
+	err := latestBatch.ValidateTx(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "tx not valid")
 	}
-	err = batch.ApplyTx(ctx, tx)
+	err = latestBatch.ApplyTx(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "can't apply tx")
 	}
@@ -430,7 +430,7 @@ func (bh *BatchHandler) StartNextEpoch(ctx context.Context, currentBlockNumber u
 func (bh *BatchHandler) reconstructBatchFromDB(
 	ctx context.Context, db *cltrdb.Queries, epochID epochid.EpochID, l1BlockNumber uint64,
 ) (*batch.Batch, error) {
-	batch, err := batch.NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
+	newBatch, err := batch.NewCachedPendingBatch(ctx, epochID, l1BlockNumber, bh.l2EthClient)
 	if err != nil {
 		return nil, err
 	}
@@ -464,20 +464,20 @@ func (bh *BatchHandler) reconstructBatchFromDB(
 			fmt.Println(err)
 			continue
 		}
-		err = batch.ValidateTx(ctx, p)
+		err = newBatch.ValidateTx(ctx, p)
 		if err != nil {
 			err = errors.Wrap(err, "validation error during recovering transactions from DB")
 			fmt.Println(err)
 			continue
 		}
-		err = batch.ApplyTx(ctx, p)
+		err = newBatch.ApplyTx(ctx, p)
 		if err != nil {
 			err = errors.Wrap(err, "error during applying recovered transactions from DB")
 			fmt.Println(err)
 			continue
 		}
 	}
-	return batch, nil
+	return newBatch, nil
 }
 
 // sendTransaction uses the raw rpc.Client instead of the usual ethclient.Client wrapper
