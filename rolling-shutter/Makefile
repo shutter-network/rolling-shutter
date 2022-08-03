@@ -26,11 +26,11 @@ protoc:
 
 test-unit:
 	@echo "====================> Running unit tests"
-	gotestsum -- -short ${GOFLAGS} ./...
+	gotestsum -- -race -short ${GOFLAGS} ./...
 
 test-integration:
 	@echo "====================>  Running integration tests"
-	gotestsum -- -p 1 -run Integration -count=1 ${GOFLAGS} ./...
+	gotestsum -- -race -p 1 -run Integration -count=1 ${GOFLAGS} ./...
 
 test: test-unit
 
