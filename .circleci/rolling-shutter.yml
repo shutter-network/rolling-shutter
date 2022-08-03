@@ -74,7 +74,7 @@ jobs:
           name: "Run unit tests with gotestsum"
           command: |
             mkdir -p report/unit report/integration
-            gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short ./...
+            gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short -race ./...
       - run:
           name: Wait for PostgreSQL
           command: |
@@ -84,7 +84,7 @@ jobs:
       - run:
           name: "Run integration tests with gotestsum"
           command: |
-            gotestsum -f standard-verbose --junitfile report/integration/tests.xml -- -p 1 -run Integration -count=1 ./...
+            gotestsum -f standard-verbose --junitfile report/integration/tests.xml -- -race -p 1 -run Integration -count=1 ./...
       - store_test_results:
           path: report
       - save_cache:
