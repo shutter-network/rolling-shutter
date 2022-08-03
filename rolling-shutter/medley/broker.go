@@ -30,19 +30,20 @@ type Broker[T any] struct {
 	publish              chan T
 	subscribe            chan chan T
 	unsubscribe          chan chan T
+	initialSubscriptions []chan T
 	running              bool
-	bufferSizeSubscriber int
 	nonBlockingSend      bool
 }
 
-func NewBroker[T any](buffer int, nonBlocking bool) *Broker[T] {
+func NewBroker[T any](nonBlocking bool) *Broker[T] {
 	return &Broker[T]{
-		stop:            make(chan struct{}),
-		publish:         make(chan T, 1),
-		subscribe:       make(chan chan T),
-		unsubscribe:     make(chan chan T),
-		nonBlockingSend: nonBlocking,
-		running:         false,
+		stop:                 make(chan struct{}),
+		publish:              make(chan T, 1),
+		subscribe:            make(chan chan T),
+		unsubscribe:          make(chan chan T),
+		nonBlockingSend:      nonBlocking,
+		initialSubscriptions: []chan T{},
+		running:              false,
 	}
 }
 
@@ -54,9 +55,9 @@ func NewBroker[T any](buffer int, nonBlocking bool) *Broker[T] {
 // after the start or when the subscribers buffer size
 // should diverge from the default value `bufferSizeSubscriber`
 // set in the constructor.
-func (b *Broker[T]) Start(initialSubscriptions ...chan T) {
+func (b *Broker[T]) Start() {
 	subscriptions := map[chan T]struct{}{}
-	for _, sub := range initialSubscriptions {
+	for _, sub := range b.initialSubscriptions {
 		log.Debug().Int("num-subscribers", len(subscriptions)).Msg("subscribed initial subscription")
 		subscriptions[sub] = struct{}{}
 	}
@@ -127,10 +128,15 @@ func (b *Broker[_]) Stop() {
 // is currently waiting on the receive operation
 // (in the non blockingSend case).
 // This is blocking, even if the loop is not running.
-func (b *Broker[T]) Subscribe() chan T {
-	channel := make(chan T, b.bufferSizeSubscriber)
+func (b *Broker[T]) Subscribe(channel chan T) {
+	b.mux.RLock()
+	if !b.running {
+		b.initialSubscriptions = append(b.initialSubscriptions, channel)
+		b.mux.RUnlock()
+		return
+	}
+	b.mux.RUnlock()
 	b.subscribe <- channel
-	return channel
 }
 
 // Unsubscribe deregisters the subscribed channel
