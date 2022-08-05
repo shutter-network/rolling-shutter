@@ -26,8 +26,10 @@ func (s *EthService) name() string {
 }
 
 func (s *EthService) GetTransactionCount(address, block string) (string, error) {
-	addr := stringToAddress(address)
-	// TODO only allow block="latest"
+	addr, err := stringToAddress(address)
+	if err != nil {
+		return "", err
+	}
 	nonce := s.processor.getNonce(addr, block)
 	return hexutil.EncodeUint64(nonce), nil
 }
