@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -50,6 +51,11 @@ type RPCService interface {
 	injectProcessor(*SequencerProcessor)
 }
 
-func stringToAddress(addr string) common.Address {
-	return common.HexToAddress(addr)
+func stringToAddress(addr string) (common.Address, error) {
+	if !common.IsHexAddress(addr) {
+		var a common.Address
+		return a, errors.New("not a valid ethereum address")
+
+	}
+	return common.HexToAddress(addr), nil
 }

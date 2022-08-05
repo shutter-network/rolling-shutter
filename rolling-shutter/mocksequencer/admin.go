@@ -17,7 +17,10 @@ func (s *AdminService) name() string {
 }
 
 func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, error) {
-	collator := stringToAddress(address)
+	collator, err := stringToAddress(address)
+	if err != nil {
+		return 0, err
+	}
 	s.processor.collators[l1BlockNumber] = collator
 	return 1, nil
 }

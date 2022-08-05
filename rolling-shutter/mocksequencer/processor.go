@@ -43,41 +43,41 @@ func New(chainID *big.Int, port int16) *SequencerProcessor {
 	return sequencer
 }
 
-func (me *SequencerProcessor) setBlock(baseFee *big.Int, gasLimit uint64, block string) {
-	b, exists := me.blocks[block]
+func (proc *SequencerProcessor) setBlock(baseFee *big.Int, gasLimit uint64, block string) {
+	b, exists := proc.blocks[block]
 	if !exists {
 		b = blockData{baseFee: baseFee, gasLimit: gasLimit}
-		me.blocks[block] = b
+		proc.blocks[block] = b
 		return
 	}
 	b.baseFee = baseFee
 	b.gasLimit = gasLimit
 }
 
-func (me *SequencerProcessor) setNonce(a common.Address, nonce uint64, block string) {
-	nc, exists := me.nonces[block]
+func (proc *SequencerProcessor) setNonce(a common.Address, nonce uint64, block string) {
+	nc, exists := proc.nonces[block]
 	if !exists {
 		nc = make(map[string]uint64, 0)
-		me.nonces[block] = nc
+		proc.nonces[block] = nc
 	}
 	nc[a.Hex()] = nonce
 }
 
-func (me *SequencerProcessor) getNonce(a common.Address, block string) uint64 {
+func (proc *SequencerProcessor) getNonce(a common.Address, block string) uint64 {
 	nonce := uint64(0)
-	nc, exists := me.nonces[block]
+	nc, exists := proc.nonces[block]
 	if !exists {
 		nc = make(map[string]uint64, 0)
-		me.nonces[block] = nc
+		proc.nonces[block] = nc
 	}
 	nonce, exists = nc[a.Hex()]
 	if !exists {
-		me.setNonce(a, nonce, block)
+		proc.setNonce(a, nonce, block)
 	}
 	return nonce
 }
 
-func (me *SequencerProcessor) processEncryptedTx(txBytes []byte) error {
+func (proc *SequencerProcessor) processEncryptedTx(txBytes []byte) error {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
@@ -87,15 +87,15 @@ func (me *SequencerProcessor) processEncryptedTx(txBytes []byte) error {
 		return errors.New("no shutter tx type")
 	}
 
-	sender, err := me.signer.Sender(&tx)
+	sender, err := proc.signer.Sender(&tx)
 	if err != nil {
 		return errors.New("sender not recoverable")
 	}
-	nonce := me.getNonce(sender, "latest")
+	nonce := proc.getNonce(sender, "latest")
 	if tx.Nonce() != nonce+1 {
 		log.Info().Msg("nonce mismatch")
 		return nil
 	}
-	me.setNonce(sender, nonce+1, "latest")
+	proc.setNonce(sender, nonce+1, "latest")
 	return nil
 }
