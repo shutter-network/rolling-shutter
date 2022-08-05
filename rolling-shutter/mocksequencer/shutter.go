@@ -40,8 +40,6 @@ func (s *ShutterService) SubmitBatch(transaction string) (string, error) {
 	// - validate the batchtx
 	// - pretty log the batch tx
 	// - decrypt and pretty log all transactions
-	// - apply nonces of the transactions to the nonce counter
-	// - increase the batch index
 
 	log.Info().Msg("received batch-tx")
 	if s.processor.batchIndex != tx.BatchIndex()-1 {

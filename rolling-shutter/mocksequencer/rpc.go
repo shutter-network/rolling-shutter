@@ -15,7 +15,10 @@ func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices 
 	rpcServer := rpc.NewServer()
 	for _, service := range rpcServices {
 		service.injectProcessor(proc)
-		rpcServer.RegisterName(service.name(), service)
+		err := rpcServer.RegisterName(service.name(), service)
+		if err != nil {
+			return errors.Wrap(err, "error while trying to register RPCService")
+		}
 	}
 
 	mux := http.NewServeMux()
