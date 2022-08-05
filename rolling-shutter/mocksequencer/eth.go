@@ -11,8 +11,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
-const maxUInt64 uint64 = ^uint64(0)
-
 type EthService struct {
 	processor *SequencerProcessor
 }
