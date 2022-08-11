@@ -2,6 +2,8 @@ package mocksequencer
 
 import (
 	"math/big"
+	"sort"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -14,11 +16,65 @@ type blockData struct {
 	gasLimit uint64
 }
 
+type activationBlockMap[T any] struct {
+	mux sync.RWMutex
+	mp  map[uint64]T
+}
+
+func newActivationBlockMap[T any]() *activationBlockMap[T] {
+	return &activationBlockMap[T]{
+		mp:  map[uint64]T{},
+		mux: sync.RWMutex{},
+	}
+}
+
+func (a *activationBlockMap[T]) Set(val T, block uint64) {
+	a.mux.Lock()
+	defer a.mux.Unlock()
+	a.mp[block] = val
+}
+
+func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
+	var (
+		foundVal T
+		i        int
+	)
+	a.mux.RLock()
+	defer a.mux.RUnlock()
+
+	blocks := make([]uint64, len(a.mp))
+	for k := range a.mp {
+		blocks[i] = k
+		i++
+	}
+	if len(blocks) == 0 {
+		return foundVal, errors.New("no value was set")
+	}
+
+	// sort in descending order
+	sort.Slice(blocks, func(i, j int) bool { return blocks[i] > blocks[j] })
+
+	// search for first index that is within the range
+	idx := sort.Search(len(blocks), func(i int) bool {
+		return blocks[i] <= block
+	})
+
+	if idx == len(blocks) {
+		// nothing found, this means the queried block is lower
+		// than the lowest activation block
+		return foundVal, errors.New("no value was found")
+	}
+
+	activationBlockIndex := blocks[idx]
+	foundVal = a.mp[activationBlockIndex]
+	return foundVal, nil
+}
+
 type SequencerProcessor struct {
 	port       int16
 	nonces     map[string]map[string]uint64
-	collators  map[uint64]common.Address
-	eonKeys    map[uint64][]byte
+	collators  *activationBlockMap[common.Address]
+	eonKeys    *activationBlockMap[[]byte]
 	chainID    *big.Int
 	blocks     map[string]blockData
 	txs        map[string]*txtypes.Transaction
@@ -30,8 +86,8 @@ func New(chainID *big.Int, port int16) *SequencerProcessor {
 	sequencer := &SequencerProcessor{
 		port:       port,
 		nonces:     map[string]map[string]uint64{},
-		collators:  map[uint64]common.Address{},
-		eonKeys:    map[uint64][]byte{},
+		collators:  newActivationBlockMap[common.Address](),
+		eonKeys:    newActivationBlockMap[[]byte](),
 		chainID:    chainID,
 		blocks:     map[string]blockData{},
 		txs:        map[string]*txtypes.Transaction{},

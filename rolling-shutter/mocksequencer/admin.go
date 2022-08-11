@@ -21,16 +21,16 @@ func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, e
 	if err != nil {
 		return 0, err
 	}
-	s.processor.collators[l1BlockNumber] = collator
+	s.processor.collators.Set(collator, l1BlockNumber)
 	return 1, nil
 }
 
 func (s *AdminService) AddEonKey(eonKey string, l1BlockNumber uint64) (int, error) {
-	bytes, err := hexutil.Decode(eonKey)
+	eonKeyBytes, err := hexutil.Decode(eonKey)
 	if err != nil {
 		// TODO return specific decode error
 		return 0, err
 	}
-	s.processor.eonKeys[l1BlockNumber] = bytes
+	s.processor.eonKeys.Set(eonKeyBytes, l1BlockNumber)
 	return 1, nil
 }
