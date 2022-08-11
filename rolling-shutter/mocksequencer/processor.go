@@ -1,6 +1,7 @@
 package mocksequencer
 
 import (
+	"context"
 	"math/big"
 	"sort"
 	"sync"
@@ -10,6 +11,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
+)
+
+const (
+	BaseFee  = 22000
+	GasLimit = 2200000000
 )
 
 type blockData struct {
@@ -95,8 +101,8 @@ func New(chainID *big.Int, port int16) *SequencerProcessor {
 		signer:     txtypes.NewLondonSigner(chainID),
 		batchIndex: 0,
 	}
-	// TODO Expose as parameters
-	sequencer.setBlock(big.NewInt(22000), 2200000, "latest")
+	baseFee := big.NewInt(BaseFee)
+	sequencer.setBlock(baseFee, GasLimit, "latest")
 	return sequencer
 }
 
