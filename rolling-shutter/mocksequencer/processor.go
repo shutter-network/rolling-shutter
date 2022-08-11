@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
@@ -133,7 +134,12 @@ func (proc *SequencerProcessor) getNonce(a common.Address, block string) uint64 
 	return nonce
 }
 
-func (proc *SequencerProcessor) processEncryptedTx(txBytes []byte) error {
+func (proc *SequencerProcessor) processEncryptedTx(
+	ctx context.Context,
+	gasPool *core.GasPool,
+	batchIndex, batchL1BlockNumber uint64,
+	txBytes, decryptionKey, eonKey []byte,
+) error {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
@@ -147,11 +153,29 @@ func (proc *SequencerProcessor) processEncryptedTx(txBytes []byte) error {
 	if err != nil {
 		return errors.New("sender not recoverable")
 	}
+
+	shutterTxStr, _ := tx.MarshalJSON()
+	log.Ctx(ctx).Info().Str("signer", sender.Hex()).RawJSON("transaction", shutterTxStr).Msg("received shutter transaction")
+
+	if tx.L1BlockNumber() != batchL1BlockNumber {
+		return errors.New("l1-block-number mismatch")
+	}
+
+	if tx.BatchIndex() != batchIndex {
+		return errors.New("batch-index mismatch")
+	}
+	_ = decryptionKey
+	_ = eonKey
 	nonce := proc.getNonce(sender, "latest")
 	if tx.Nonce() != nonce+1 {
-		log.Info().Msg("nonce mismatch")
-		return nil
+		return errors.New("nonce mismatch")
 	}
+	err = gasPool.SubGas(tx.Gas())
+	if err != nil {
+		// can return core.ErrGasLimitReached
+		return err
+	}
+
 	proc.setNonce(sender, nonce+1, "latest")
 	return nil
 }
