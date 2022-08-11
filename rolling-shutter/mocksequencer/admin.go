@@ -1,6 +1,9 @@
 package mocksequencer
 
-import "github.com/ethereum/go-ethereum/common/hexutil"
+import (
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/pkg/errors"
+)
 
 type AdminService struct {
 	processor *SequencerProcessor
@@ -28,7 +31,7 @@ func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, e
 func (s *AdminService) AddEonKey(eonKey string, l1BlockNumber uint64) (int, error) {
 	eonKeyBytes, err := hexutil.Decode(eonKey)
 	if err != nil {
-		// TODO return specific decode error
+		err = errors.Wrap(err, "eon key could not be decoded")
 		return 0, err
 	}
 	s.processor.eonKeys.Set(eonKeyBytes, l1BlockNumber)

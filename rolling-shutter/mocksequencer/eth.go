@@ -46,7 +46,6 @@ func (s *EthService) ChainID() (string, error) {
 func (s *EthService) GetBlockByNumber(blockNumber string, _ bool) (json.RawMessage, error) {
 	b, exists := s.processor.blocks[blockNumber]
 	if !exists {
-		// TODO check spec for correct return value
 		return json.RawMessage("\"null\""), nil
 	}
 	return jsonBlock(b.baseFee, b.gasLimit), nil
