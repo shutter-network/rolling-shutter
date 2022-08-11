@@ -7,9 +7,35 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/justinas/alice"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/hlog"
 	"github.com/rs/zerolog/log"
 )
+
+func injectHTTPLogger(handler http.Handler) http.Handler {
+	logger := log.With().
+		Timestamp().
+		Str("role", "my-service").
+		Logger()
+
+	c := alice.New()
+	c = c.Append(hlog.NewHandler(logger))
+	c = c.Append(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
+		hlog.FromRequest(r).Info().
+			Str("method", r.Method).
+			Stringer("url", r.URL).
+			Int("status", status).
+			Int("size", size).
+			Dur("duration", duration).
+			Msg("finished request")
+	}))
+	c = c.Append(hlog.RemoteAddrHandler("ip"))
+	c = c.Append(hlog.UserAgentHandler("user_agent"))
+	c = c.Append(hlog.RefererHandler("referer"))
+	c = c.Append(hlog.RequestIDHandler("req_id", "Request-Id"))
+	return c.Then(handler)
+}
 
 func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices ...RPCService) error {
 	rpcServer := rpc.NewServer()
@@ -22,7 +48,8 @@ func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices 
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", http.HandlerFunc(rpcServer.ServeHTTP))
+	handler := injectHTTPLogger(rpcServer)
+	mux.Handle("/", handler)
 
 	server := &http.Server{Addr: ":8545", Handler: mux}
 

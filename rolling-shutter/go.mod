@@ -10,6 +10,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/jackc/pgconn v1.10.1
 	github.com/jackc/pgx/v4 v4.14.1
+	github.com/justinas/alice v1.2.0
 	github.com/kr/pretty v0.3.0
 	github.com/kyleconroy/sqlc v1.12.0
 	github.com/libp2p/go-libp2p v0.14.4
@@ -186,6 +187,7 @@ require (
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/rs/cors v1.8.2 // indirect
+	github.com/rs/xid v1.3.0 // indirect
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
