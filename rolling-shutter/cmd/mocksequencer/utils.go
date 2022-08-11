@@ -9,7 +9,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 )
 
-func makeTx(batchIndex, nonce int, gas uint64) []byte {
+func makeTx(l1BlockNumber, batchIndex, nonce int, gas uint64) []byte {
 	privKey, err := ethcrypto.GenerateKey()
 	if err != nil {
 		panic(err)
@@ -23,7 +23,8 @@ func makeTx(batchIndex, nonce int, gas uint64) []byte {
 		GasTipCap:        big.NewInt(2000000),
 		GasFeeCap:        big.NewInt(2),
 		Gas:              gas,
-		EncryptedPayload: []byte("foo"),
+		EncryptedPayload: []byte("bar"),
+		L1BlockNumber:    uint64(l1BlockNumber),
 		BatchIndex:       uint64(batchIndex),
 	}
 
@@ -40,19 +41,36 @@ func makeTx(batchIndex, nonce int, gas uint64) []byte {
 }
 
 func logDummyTransaction() {
+	chainID := big.NewInt(1)
+	l1BlockNumber := 42
+	batchIndex := 1
 	txData := &txtypes.BatchTx{
-		ChainID:       big.NewInt(1),
+		ChainID:       chainID,
 		DecryptionKey: []byte("foo"),
-		BatchIndex:    1,
-		L1BlockNumber: 42,
+		BatchIndex:    uint64(batchIndex),
+		L1BlockNumber: uint64(l1BlockNumber),
 		Timestamp:     big.NewInt(1231231),
-		Transactions:  [][]byte{makeTx(1, 1, 200000)},
+		Transactions:  [][]byte{makeTx(l1BlockNumber, batchIndex, 1, 200000)},
 	}
-	tx := txtypes.NewTx(txData)
+	privKey, err := ethcrypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	signer := txtypes.NewLondonSigner(chainID)
+
+	tx, err := txtypes.SignNewTx(privKey, signer, txData)
+	if err != nil {
+		panic(err)
+	}
+
+	collator, err := signer.Sender(tx)
+	if err != nil {
+		panic(err)
+	}
 	txBinary, err := tx.MarshalBinary()
 	if err != nil {
 		return
 	}
 	txHex := hexutil.Encode(txBinary)
-	log.Debug().Str("transaction", txHex).Msg("here is a dummy transaction for you, enjoy")
+	log.Debug().Str("transaction", txHex).Str("collator", collator.Hex()).Msg("here is a dummy transaction for you, enjoy")
 }
