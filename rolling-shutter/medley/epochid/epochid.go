@@ -12,7 +12,7 @@ type EpochID common.Hash
 // BytesToEpochID converts b to an epoch id. It fails if b is not 32 bytes.
 func BytesToEpochID(b []byte) (EpochID, error) {
 	if len(b) != len(common.Hash{}) {
-		return EpochID{}, errors.Errorf("epoch id must be %d bytes, got %d", len(b), len(common.Hash{}))
+		return EpochID{}, errors.Errorf("epoch id must be %d bytes, got %d", len(common.Hash{}), len(b))
 	}
 	return EpochID(common.BytesToHash(b)), nil
 }
