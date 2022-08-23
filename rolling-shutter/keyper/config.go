@@ -27,8 +27,8 @@ type Config struct {
 	DatabaseURL    string
 	DeploymentDir  string
 
+	ValidatorPublicKey ed25519.PublicKey
 	SigningKey         *ecdsa.PrivateKey
-	ValidatorKey       ed25519.PrivateKey `mapstructure:"ValidatorSeed"`
 	EncryptionKey      *ecies.PrivateKey
 	P2PKey             p2pcrypto.PrivKey
 	DKGPhaseLength     uint64 // in shuttermint blocks
@@ -64,10 +64,11 @@ DKGStartBlockDelta   = {{ .DKGStartBlockDelta }}
 ListenAddress	= "{{ .ListenAddress }}"
 PeerMultiaddrs	= [{{ .PeerMultiaddrs | QuoteList}}]
 
+ValidatorPublicKey	= "{{ .ValidatorPublicKey | printf "%x" }}"
+
 # Secret Keys
 EncryptionKey	= "{{ .EncryptionKey.ExportECDSA | FromECDSA | printf "%x" }}"
 SigningKey	= "{{ .SigningKey | FromECDSA | printf "%x" }}"
-ValidatorSeed	= "{{ .ValidatorKey.Seed | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
 
 # HTTP interface
@@ -91,14 +92,6 @@ func randomEncryptionKey() (*ecies.PrivateKey, error) {
 	return ecies.ImportECDSA(encryptionKeyECDSA), nil
 }
 
-func randomValidatorKey() (ed25519.PrivateKey, error) {
-	seed := make([]byte, ed25519.SeedSize)
-	if _, err := rand.Read(seed); err != nil {
-		return nil, err
-	}
-	return ed25519.NewKeyFromSeed(seed), nil
-}
-
 // GenerateNewKeys generates new keys and stores them inside the Config object.
 func (config *Config) GenerateNewKeys() error {
 	signingKey, err := randomSigningKey()
@@ -109,10 +102,7 @@ func (config *Config) GenerateNewKeys() error {
 	if err != nil {
 		return err
 	}
-	validatorKey, err := randomValidatorKey()
-	if err != nil {
-		return err
-	}
+	validatorPublicKey := make([]byte, ed25519.PublicKeySize)
 
 	p2pkey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -120,7 +110,7 @@ func (config *Config) GenerateNewKeys() error {
 	}
 
 	config.SigningKey = signingKey
-	config.ValidatorKey = validatorKey
+	config.ValidatorPublicKey = validatorPublicKey
 	config.EncryptionKey = encryptionKey
 	config.P2PKey = p2pkey
 	return nil
@@ -133,6 +123,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				medley.StringToEd25519PrivateKey,
+				medley.StringToEd25519PublicKey,
 				medley.StringToEcdsaPrivateKey,
 				medley.StringToEciesPrivateKey,
 				medley.StringToAddress,
