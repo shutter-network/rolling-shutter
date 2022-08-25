@@ -7,12 +7,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
+	"github.com/shutter-network/shutter/shuttermint/snapshot/snptopics"
 )
 
 // P2PMessage can be send via the p2p protocol.
@@ -28,7 +29,7 @@ func (*DecryptionTrigger) ImplementsP2PMessage() {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochid.LogInfo(trigger.EpochID))
+	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", trigger.EpochID)
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -38,10 +39,18 @@ func (*DecryptionTrigger) Topic() string {
 func (*DecryptionKeyShare) ImplementsP2PMessage() {
 }
 
+func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
+	epochSecretKeyShare := new(shcrypto.EpochSecretKeyShare)
+	if err := epochSecretKeyShare.Unmarshal(share.GetShare()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
+	}
+	return epochSecretKeyShare, nil
+}
+
 func (share *DecryptionKeyShare) LogInfo() string {
 	return fmt.Sprintf(
 		"DecryptionKeyShare{epochid=%s, keyperIndex=%d}",
-		epochid.LogInfo(share.EpochID),
+		share.EpochID,
 		share.KeyperIndex,
 	)
 }
@@ -54,7 +63,15 @@ func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%s}", epochid.LogInfo(key.EpochID))
+	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
+}
+
+func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
+	epochSecretKey := new(shcrypto.EpochSecretKey)
+	if err := epochSecretKey.Unmarshal(key.GetKey()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
+	}
+	return epochSecretKey, nil
 }
 
 func (*DecryptionKey) Topic() string {
@@ -67,7 +84,7 @@ func (*CipherBatch) ImplementsP2PMessage() {
 func (batch *CipherBatch) LogInfo() string {
 	return fmt.Sprintf(
 		"CipherBatch{epochid=%s, num tx=%d}",
-		epochid.LogInfo(batch.DecryptionTrigger.EpochID),
+		batch.DecryptionTrigger.EpochID,
 		len(batch.Transactions),
 	)
 }
@@ -86,7 +103,7 @@ func (*DecryptionSignature) ImplementsP2PMessage() {
 func (sig *DecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
 		"DecryptionSignature{epochid=%s}",
-		epochid.LogInfo(sig.EpochID),
+		sig.EpochID,
 	)
 }
 
@@ -100,7 +117,7 @@ func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 func (ads *AggregatedDecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
 		"AggregatedDecryptionSignature{epochid=%s}",
-		epochid.LogInfo(ads.EpochID),
+		ads.EpochID,
 	)
 }
 
@@ -120,6 +137,16 @@ func (e *EonPublicKey) LogInfo() string {
 
 func (*EonPublicKey) Topic() string {
 	return kprtopics.EonPublicKey
+}
+
+func (*TimedEpoch) ImplementsP2PMessage() {}
+
+func (te *TimedEpoch) LogInfo() string {
+	return fmt.Sprintf("TimedEpoch{EpochID=%s, NotBefore=%d}", te.EpochID, te.NotBefore)
+}
+
+func (*TimedEpoch) Topic() string {
+	return snptopics.TimedEpoch
 }
 
 // NewBatchConfig creates a new BatchConfig message.

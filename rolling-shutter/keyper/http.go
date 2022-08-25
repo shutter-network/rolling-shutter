@@ -1,7 +1,6 @@
 package keyper
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprdb"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kproapi"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
@@ -34,7 +34,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("pong"))
 }
 
-func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epochID kproapi.EpochID) {
+func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
 	db := kprdb.New(srv.kpr.dbpool)
 
@@ -44,7 +44,10 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, epoc
 		return
 	}
 
-	decryptionKey, err := db.GetDecryptionKey(ctx, epochIDBytes)
+	decryptionKey, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
+		Eon:     int64(eon),
+		EpochID: epochIDBytes,
+	})
 	if err == pgx.ErrNoRows {
 		sendError(w, http.StatusNotFound, "no decryption key found for given epoch")
 		return
@@ -117,19 +120,23 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, "Invalid request for SubmitDecryptionTrigger")
 		return
 	}
-	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(requestBody), "0x"))
+	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(requestBody.EpochId, "0x"))
 	if err != nil {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	epochID := binary.BigEndian.Uint64(epochIDBytes)
+	epochID, err := epochid.BytesToEpochID(epochIDBytes)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	ctx := r.Context()
 	handler := epochKGHandler{
 		config: srv.kpr.config,
 		db:     srv.kpr.db,
 	}
-	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID)
+	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())

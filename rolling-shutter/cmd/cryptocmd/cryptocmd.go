@@ -2,7 +2,6 @@ package cryptocmd
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -93,11 +92,11 @@ func encrypt(msg string) error {
 	if err != nil {
 		return err
 	}
-	epochIDInt, err := parseEpochID(epochIDFlag)
+	epochIDBytes, err := parseEpochID(epochIDFlag)
 	if err != nil {
 		return err
 	}
-	epochID := shcrypto.ComputeEpochID(epochIDInt)
+	epochID := shcrypto.ComputeEpochID(epochIDBytes)
 	sigma, err := parseSigma(sigmaFlag)
 	if err != nil {
 		return err
@@ -169,16 +168,15 @@ func parseEonKey(f string) (*shcrypto.EonPublicKey, error) {
 	return eonKey, err
 }
 
-func parseEpochID(f string) (uint64, error) {
+func parseEpochID(f string) ([]byte, error) {
 	epochIDBytes, err := parseHex(f)
 	if err != nil {
-		return 0, err
+		return []byte{}, err
 	}
-	if len(epochIDBytes) != 8 {
-		return 0, errors.Errorf("epoch id must be 8 bytes, got %d", len(epochIDBytes))
+	if len(epochIDBytes) != 32 {
+		return []byte{}, errors.Errorf("epoch id must be 32 bytes, got %d", len(epochIDBytes))
 	}
-	epochID := binary.BigEndian.Uint64(epochIDBytes)
-	return epochID, nil
+	return epochIDBytes, nil
 }
 
 func parseSigma(f string) (shcrypto.Block, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -45,27 +46,41 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2pM
 		return false
 	}
 
-	activationBlockNumber := epochid.BlockNumber(key.epochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+	if _, err := epochid.BytesToEpochID(key.EpochID); err != nil {
+		log.Printf("invalid epoch id")
+		return false
+	}
+	if key.Eon > math.MaxInt64 {
+		log.Printf("eon %d overflows int64", key.Eon)
+		return false
+	}
+
+	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
+		log.Printf("no DKG result found for eon %d", key.Eon)
 		return false
 	}
 	if err != nil {
-		log.Printf("failed to get dkg result for epoch %d from db", key.epochID)
+		log.Printf("failed to get dkg result for eon %d from db", key.Eon)
 		return false
 	}
 	if !dkgResultDB.Success {
+		log.Printf("no successful DKG result found for eon %d", key.Eon)
 		return false
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		log.Printf("error while decoding pure DKG result for epoch %d", key.epochID)
+		log.Printf("error while decoding pure DKG result for eon %d", key.Eon)
+		return false
+	}
+	epochSecretKey, err := key.GetEpochSecretKey()
+	if err != nil {
 		return false
 	}
 
-	ok, err = shcrypto.VerifyEpochSecretKey(key.key, pureDKGResult.PublicKey, key.epochID)
+	ok, err = shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, key.EpochID)
 	if err != nil {
-		log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
+		log.Printf("error while checking epoch secret key for epoch %v", key.EpochID)
 		return false
 	}
 	return ok
@@ -89,28 +104,43 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, _ peer.ID, li
 		return false
 	}
 
-	activationBlockNumber := epochid.BlockNumber(keyShare.epochID)
-	dkgResultDB, err := kpr.db.GetDKGResultForBlockNumber(ctx, int64(activationBlockNumber))
+	if _, err := epochid.BytesToEpochID(keyShare.EpochID); err != nil {
+		log.Printf("invalid epoch id")
+		return false
+	}
+	if keyShare.Eon > math.MaxInt64 {
+		log.Printf("eon %d overflows int64", keyShare.Eon)
+		return false
+	}
+
+	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
+		log.Printf("no DKG result found for eon %d", keyShare.Eon)
 		return false
 	}
 	if err != nil {
-		log.Printf("failed to get dkg result for epoch %d from db", keyShare.epochID)
+		log.Printf("failed to get dkg result for eon %d from db", keyShare.Eon)
 		return false
 	}
 	if !dkgResultDB.Success {
+		log.Printf("no successful DKG result found for eon %d", keyShare.Eon)
 		return false
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		log.Printf("error while decoding pure DKG result for epoch %d", keyShare.epochID)
+		log.Printf("error while decoding pure DKG result for eon %d", keyShare.Eon)
+		return false
+	}
+
+	epochSecretKeyShare, err := keyShare.GetEpochSecretKeyShare()
+	if err != nil {
 		return false
 	}
 
 	ok = shcrypto.VerifyEpochSecretKeyShare(
-		keyShare.share,
-		pureDKGResult.PublicKeyShares[keyShare.keyperIndex],
-		shcrypto.ComputeEpochID(keyShare.epochID),
+		epochSecretKeyShare,
+		pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
+		shcrypto.ComputeEpochID(keyShare.EpochID),
 	)
 	return ok
 }
@@ -136,15 +166,26 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 	if err != nil {
 		return false
 	}
-	if msg.GetInstanceID() != kpr.config.InstanceID {
-		return false
-	}
 
-	t, ok := msg.(*decryptionTrigger)
+	trigger, ok := msg.(*decryptionTrigger)
 	if !ok {
 		return false
 	}
-	blk := epochid.BlockNumber(t.EpochID)
+
+	if trigger.GetInstanceID() != kpr.config.InstanceID {
+		log.Printf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, trigger.GetInstanceID())
+		return false
+	}
+	if _, err := epochid.BytesToEpochID(trigger.EpochID); err != nil {
+		log.Printf("invalid epoch id")
+		return false
+	}
+
+	blk := trigger.BlockNumber
+	if blk > math.MaxInt64 {
+		log.Printf("block number %d overflows int64", blk)
+		return false
+	}
 	chainCollator, err := kpr.db.GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		log.Printf("got decryption trigger with no collator for given block number: %d", blk)
@@ -161,10 +202,10 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, _ peer.ID, lib
 		return false
 	}
 
-	trigger := (*shmsg.DecryptionTrigger)(t)
-	signatureValid, err := trigger.VerifySignature(collator)
+	shTrigger := (*shmsg.DecryptionTrigger)(trigger)
+	signatureValid, err := shTrigger.VerifySignature(collator)
 	if err != nil {
-		log.Printf("error while verifying decryption trigger signature for epoch: %d", t.EpochID)
+		log.Printf("error while verifying decryption trigger signature for epoch: %d", trigger.EpochID)
 		return false
 	}
 

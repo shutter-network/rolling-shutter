@@ -14,7 +14,6 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
 	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
@@ -49,7 +48,8 @@ func (d *Decryptor) validateCipherBatch(ctx context.Context, _ peer.ID, libp2pMe
 	}
 
 	// check that it's signed by the collator
-	activationBlockNumber := epochid.BlockNumber(cipherBatch.DecryptionTrigger.EpochID)
+	// XXX: This is broken, but the decryptor isn't used in Snapshot Shutter
+	activationBlockNumber := 1 // epochid.BlockNumber(cipherBatch.DecryptionTrigger.EpochID)
 	collatorDBEntry, err := d.db.GetChainCollator(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
 		log.Printf("error getting collator from db: %s", err)
@@ -99,25 +99,32 @@ func (d *Decryptor) validateDecryptionKey(ctx context.Context, _ peer.ID, libp2p
 		return false
 	}
 
-	activationBlockNumber := epochid.BlockNumber(key.epochID)
+	// XXX: This is broken, but the decryptor isn't used in Snapshot Shutter
+	activationBlockNumber := 1 // epochid.BlockNumber(key.epochID)
 	eonPublicKeyBytes, err := d.db.GetEonPublicKey(ctx, int64(activationBlockNumber))
 	if err == pgx.ErrNoRows {
-		log.Printf("received decryption key for epoch %d for which we don't have an eon public key", key.epochID)
+		log.Printf("received decryption key for epoch %s for which we don't have an eon public key", key.EpochID)
 		return false
 	}
 	if err != nil {
-		log.Printf("error while getting eon public key from database for epoch ID %v", key.epochID)
+		log.Printf("error while getting eon public key from database for epoch ID %s", key.EpochID)
 		return false
 	}
 	eonPublicKey := new(shcrypto.EonPublicKey)
 	err = eonPublicKey.Unmarshal(eonPublicKeyBytes)
 	if err != nil {
-		log.Printf("error while unmarshalling eon public key for epoch %v", key.epochID)
+		log.Printf("error while unmarshalling eon public key for epoch %s", key.EpochID)
 		return false
 	}
-	ok, err = shcrypto.VerifyEpochSecretKey(key.key, eonPublicKey, key.epochID)
+	epochSecretKey := new(shcrypto.EpochSecretKey)
+	err = epochSecretKey.Unmarshal(key.Key)
 	if err != nil {
-		log.Printf("error while checking epoch secret key for epoch %v", key.epochID)
+		log.Printf("error while encoding epoch secret key for epoch %s", key.EpochID)
+		return false
+	}
+	ok, err = shcrypto.VerifyEpochSecretKey(epochSecretKey, eonPublicKey, key.EpochID)
+	if err != nil {
+		log.Printf("error while checking epoch secret key for epoch %s", key.EpochID)
 		return false
 	}
 	return ok
@@ -142,7 +149,8 @@ func (d *Decryptor) validateDecryptionSignature(ctx context.Context, _ peer.ID, 
 		return false
 	}
 
-	activationBlockNumber := epochid.BlockNumber(signature.epochID)
+	// XXX: This is broken, but the decryptor isn't used in Snapshot Shutter
+	activationBlockNumber := 1 // epochid.BlockNumber(signature.epochID)
 	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) != 1 {
 		return false
@@ -188,7 +196,8 @@ func (d *Decryptor) validateAggregatedDecryptionSignature(ctx context.Context, _
 		return false
 	}
 
-	activationBlockNumber := epochid.BlockNumber(signature.epochID)
+	// XXX: This is broken, but the decryptor isn't used in Snapshot Shutter
+	activationBlockNumber := 1 // epochid.BlockNumber(signature.epochID)
 	decryptorIndexes := signature.signers.GetIndexes()
 	if len(decryptorIndexes) == 0 {
 		return false

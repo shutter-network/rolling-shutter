@@ -22,8 +22,8 @@ func (p *P2P) managePeers(ctx context.Context) error {
 		select {
 		case <-time.After(peerCheckInterval):
 			n := len(p.host.Network().Peers())
-			log.Printf("connected to %d peers, want at least %d", n, minPeers)
 			if n < minPeers {
+				log.Printf("connected to %d peers, want at least %d", n, minPeers)
 				if err := p.connectToConfiguredPeers(ctx); err != nil {
 					return err
 				}

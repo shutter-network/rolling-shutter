@@ -1,0 +1,17 @@
+FROM golang:1.16 as builder
+
+# Fetch go modules separately to improve cache usage
+RUN mkdir /gomod
+COPY /rolling-shutter/go.* /gomod/
+WORKDIR /gomod
+RUN go mod download
+
+# Build binary
+COPY /rolling-shutter /rolling-shutter
+WORKDIR /rolling-shutter
+RUN --mount=type=cache,target=/root/.cache CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-v make build
+
+FROM scratch as runner
+
+COPY --from=builder /rolling-shutter/bin/rolling-shutter /rolling-shutter
+ENTRYPOINT ["/rolling-shutter"]

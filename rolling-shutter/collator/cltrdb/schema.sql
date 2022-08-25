@@ -15,5 +15,6 @@ CREATE TABLE transaction(
 
 CREATE TABLE next_epoch(
     enforce_one_row BOOL PRIMARY KEY DEFAULT TRUE,
-    epoch_id bytea NOT NULL
+    epoch_id bytea NOT NULL,
+    block_number bigint NOT NULL
 );

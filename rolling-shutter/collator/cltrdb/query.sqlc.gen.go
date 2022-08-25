@@ -19,14 +19,19 @@ func (q *Queries) GetLastBatchEpochID(ctx context.Context) ([]byte, error) {
 }
 
 const getNextEpochID = `-- name: GetNextEpochID :one
-SELECT epoch_id FROM next_epoch LIMIT 1
+SELECT epoch_id, block_number FROM next_epoch LIMIT 1
 `
 
-func (q *Queries) GetNextEpochID(ctx context.Context) ([]byte, error) {
+type GetNextEpochIDRow struct {
+	EpochID     []byte
+	BlockNumber int64
+}
+
+func (q *Queries) GetNextEpochID(ctx context.Context) (GetNextEpochIDRow, error) {
 	row := q.db.QueryRow(ctx, getNextEpochID)
-	var epoch_id []byte
-	err := row.Scan(&epoch_id)
-	return epoch_id, err
+	var i GetNextEpochIDRow
+	err := row.Scan(&i.EpochID, &i.BlockNumber)
+	return i, err
 }
 
 const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
@@ -94,12 +99,17 @@ func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
 }
 
 const setNextEpochID = `-- name: SetNextEpochID :exec
-INSERT INTO next_epoch (epoch_id) VALUES ($1)
+INSERT INTO next_epoch (epoch_id, block_number) VALUES ($1, $2)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET epoch_id = $1
+SET epoch_id = $1, block_number = $2
 `
 
-func (q *Queries) SetNextEpochID(ctx context.Context, epochID []byte) error {
-	_, err := q.db.Exec(ctx, setNextEpochID, epochID)
+type SetNextEpochIDParams struct {
+	EpochID     []byte
+	BlockNumber int64
+}
+
+func (q *Queries) SetNextEpochID(ctx context.Context, arg SetNextEpochIDParams) error {
+	_, err := q.db.Exec(ctx, setNextEpochID, arg.EpochID, arg.BlockNumber)
 	return err
 }

@@ -33,6 +33,7 @@ var (
 	index                  = 0
 	blockTime      float64 = 1.0
 	genesisKeypers         = []string{}
+	listenAddress          = "tcp://127.0.0.1:26657"
 )
 
 func initCmd() *cobra.Command {
@@ -42,11 +43,25 @@ func initCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  initFiles,
 	}
-	cmd.PersistentFlags().StringVar(&rootDir, "root", "", "root directory")
-	cmd.PersistentFlags().BoolVar(&devMode, "dev", false, "turn on devmode (disables validator set changes)")
-	cmd.PersistentFlags().IntVar(&index, "index", 0, "keyper index")
-	cmd.PersistentFlags().Float64Var(&blockTime, "blocktime", 1.0, "block time in seconds")
-	cmd.PersistentFlags().StringSliceVar(&genesisKeypers, "genesis-keyper", nil, "genesis keyper address")
+	cmd.PersistentFlags().StringVar(&rootDir, "root", rootDir, "root directory")
+	cmd.PersistentFlags().BoolVar(
+		&devMode,
+		"dev",
+		devMode,
+		"turn on devmode (disables validator set changes)",
+	)
+	cmd.PersistentFlags().IntVar(&index, "index", index, "keyper index")
+	cmd.PersistentFlags().Float64Var(&blockTime, "blocktime", blockTime, "block time in seconds")
+	cmd.PersistentFlags().StringSliceVar(
+		&genesisKeypers,
+		"genesis-keyper",
+		nil,
+		"genesis keyper address",
+	)
+	cmd.PersistentFlags().StringVar(
+		&listenAddress, "listen-address", listenAddress, "RCP listen address, "+
+			"default: tcp://127.0.0.1:26657",
+	)
 	cmd.MarkPersistentFlagRequired("genesis-keyper")
 	cmd.MarkPersistentFlagRequired("root")
 	return cmd
@@ -78,6 +93,8 @@ func initFiles(_ *cobra.Command, _ []string) error {
 
 	config := cfg.DefaultConfig()
 	config.LogLevel = log.LogLevelError
+	config.RPC.ListenAddress = listenAddress
+
 	scaleToBlockTime(config, blockTime)
 	keyper0RPCAddress := config.RPC.ListenAddress
 	rpcAddress, err := adjustPort(keyper0RPCAddress, index)
@@ -138,16 +155,20 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 		if err != nil {
 			return err
 		}
-		logger.Info("Found private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
+		logger.Info(
+			"Found private validator", "keyFile", privValKeyFile,
+			"stateFile", privValStateFile,
+		)
 	} else {
 		pv, err = privval.GenFilePV(privValKeyFile, privValStateFile, types.ABCIPubKeyTypeEd25519)
 		if err != nil {
 			return err
 		}
 		pv.Save()
-		logger.Info("Generated private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
+		logger.Info(
+			"Generated private validator", "keyFile", privValKeyFile,
+			"stateFile", privValStateFile,
+		)
 	}
 
 	nodeKeyFile := config.NodeKeyFile()
@@ -186,11 +207,13 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 		if err != nil {
 			return errors.Wrap(err, "can't get pubkey")
 		}
-		genDoc.Validators = []types.GenesisValidator{{
-			Address: pubKey.Address(),
-			PubKey:  pubKey,
-			Power:   10,
-		}}
+		genDoc.Validators = []types.GenesisValidator{
+			{
+				Address: pubKey.Address(),
+				PubKey:  pubKey,
+				Power:   10,
+			},
+		}
 
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err

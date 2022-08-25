@@ -1,0 +1,134 @@
+services:
+  rs-build:
+    build:
+      dockerfile: docker/snapshot/Dockerfile
+      context: ..
+    image: snapshutter
+    command: "-v"
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready
+
+  node:
+    build:
+      dockerfile: docker/node/Dockerfile
+      context: ..
+    restart: always
+    volumes:
+      - ./data/deployments:/contracts/deployments
+      - ./config:/config
+    environment:
+      DEPLOY_CONF: /config/node-deploy.json
+
+  chain:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    command: "--config /chain/config/config.toml"
+    volumes:
+      - ./data/chain:/chain
+      - ./data/deployments:/deployments
+
+  snapshot:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - snapshot
+    command: "--config /config/snapshot.toml"
+    volumes:
+      - ./config:/config
+    ports:
+      - "8754:8754"
+    depends_on:
+      - db
+      - collator
+      - keyper-0
+      - keyper-1
+      - keyper-2
+    labels:
+      caddy: preview.snapshot.shutter.network
+      caddy.reverse_proxy: "{{upstreams 8754}}"
+
+  keyper-0:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - keyper
+    command: "--config /config/keyper-0.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      - db
+      - chain
+      - node
+
+  keyper-1:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - keyper
+    command: "--config /config/keyper-1.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      - db
+      - chain
+      - node
+
+  keyper-2:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - keyper
+    command: "--config /config/keyper-2.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      - db
+      - chain
+      - node
+
+  collator:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - collator
+    command: "--config /config/collator.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      - db
+      - chain
+      - node
+
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/caddy:/data
+    environment:
+      CADDY_INGRESS_NETWORKS: snapshutter_default
+    labels:
+      caddy.email: devops@brainbot.com

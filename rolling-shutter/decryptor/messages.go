@@ -17,7 +17,7 @@ import (
 
 type decryptionSignature struct {
 	instanceID uint64
-	epochID    uint64
+	epochID    []byte
 	signedHash common.Hash
 	signature  *shbls.Signature
 	signers    bitfield.Bitfield
@@ -25,18 +25,16 @@ type decryptionSignature struct {
 
 type aggregatedDecryptionSignature struct {
 	instanceID uint64
-	epochID    uint64
+	epochID    []byte
 	signedHash common.Hash
 	signature  *shbls.Signature
 	signers    bitfield.Bitfield
 }
 
-type decryptionKey struct {
-	instanceID uint64
-	epochID    uint64
-	key        *shcrypto.EpochSecretKey
-}
-type cipherBatch shmsg.CipherBatch
+type (
+	cipherBatch   shmsg.CipherBatch
+	decryptionKey shmsg.DecryptionKey
+)
 
 type message interface {
 	implementsMessage()
@@ -50,7 +48,7 @@ func (*cipherBatch) implementsMessage()                   {}
 
 func (d *decryptionSignature) GetInstanceID() uint64           { return d.instanceID }
 func (d *aggregatedDecryptionSignature) GetInstanceID() uint64 { return d.instanceID }
-func (d *decryptionKey) GetInstanceID() uint64                 { return d.instanceID }
+func (d *decryptionKey) GetInstanceID() uint64                 { return d.InstanceID }
 func (c *cipherBatch) GetInstanceID() uint64                   { return c.DecryptionTrigger.InstanceID }
 
 func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
@@ -68,11 +66,15 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 		if err := key.Unmarshal(decryptionKeyMsg.Key); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal decryption key")
 		}
+		encodedKey, err := key.GobEncode()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to encode decryption key")
+		}
 
 		return &decryptionKey{
-			instanceID: decryptionKeyMsg.InstanceID,
-			epochID:    decryptionKeyMsg.EpochID,
-			key:        key,
+			InstanceID: decryptionKeyMsg.InstanceID,
+			EpochID:    decryptionKeyMsg.EpochID,
+			Key:        encodedKey,
 		}, nil
 
 	case dcrtopics.CipherBatch:

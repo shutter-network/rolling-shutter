@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"io"
 	"text/template"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -20,9 +21,13 @@ type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 
-	EthereumURL    string
-	DatabaseURL    string
-	SnapshotHubURL string
+	EthereumURL          string
+	DatabaseURL          string
+	SnapshotHubURL       string
+	SnapshotPollInterval time.Duration
+
+	JSONRPCHost string
+	JSONRPCPort uint16
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
@@ -39,7 +44,12 @@ EthereumURL     = "{{ .EthereumURL }}"
 DatabaseURL     = "{{ .DatabaseURL }}"
 
 # Snapshot integration
-SnapshotHubURL  = "{{ .SnapshotHubURL }}"
+SnapshotHubURL       = "{{ .SnapshotHubURL }}"
+SnapshotPollInterval = {{ .SnapshotPollInterval }}
+
+# JSONRPC configuration
+JSONRPCHost     = "{{ .JSONRPCHost }}"
+JSONRPCPort     = {{ .JSONRPCPort }}
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"
@@ -65,6 +75,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.MultiaddrHook,
 				medley.P2PKeyHook,
 				medley.StringToEcdsaPrivateKey,
+				mapstructure.StringToTimeDurationHookFunc(),
 			),
 		),
 	)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
 
 type (
@@ -22,13 +23,13 @@ type EpochKG struct {
 	PublicKey       *shcrypto.EonPublicKey
 	PublicKeyShares []*shcrypto.EonPublicKeyShare
 
-	SecretShares map[uint64][]*EpochSecretKeyShare
-	SecretKeys   map[uint64]*shcrypto.EpochSecretKey
+	SecretShares map[epochid.EpochID][]*EpochSecretKeyShare
+	SecretKeys   map[epochid.EpochID]*shcrypto.EpochSecretKey
 }
 
 type EpochSecretKeyShare struct {
 	Eon    uint64
-	Epoch  uint64
+	Epoch  epochid.EpochID
 	Sender KeyperIndex
 	Share  *shcrypto.EpochSecretKeyShare
 }
@@ -43,13 +44,13 @@ func NewEpochKG(puredkgResult *puredkg.Result) *EpochKG {
 		PublicKey:       puredkgResult.PublicKey,
 		PublicKeyShares: puredkgResult.PublicKeyShares,
 
-		SecretShares: make(map[uint64][]*EpochSecretKeyShare),
-		SecretKeys:   make(map[uint64]*shcrypto.EpochSecretKey),
+		SecretShares: make(map[epochid.EpochID][]*EpochSecretKeyShare),
+		SecretKeys:   make(map[epochid.EpochID]*shcrypto.EpochSecretKey),
 	}
 }
 
-func (epochkg *EpochKG) ComputeEpochSecretKeyShare(epoch uint64) *shcrypto.EpochSecretKeyShare {
-	epochID := shcrypto.ComputeEpochID(epoch)
+func (epochkg *EpochKG) ComputeEpochSecretKeyShare(epoch epochid.EpochID) *shcrypto.EpochSecretKeyShare {
+	epochID := shcrypto.ComputeEpochID(epoch.Bytes())
 	return shcrypto.ComputeEpochSecretKeyShare(epochkg.SecretKeyShare, epochID)
 }
 
@@ -90,7 +91,7 @@ func (epochkg *EpochKG) HandleEpochSecretKeyShare(share *EpochSecretKeyShare) er
 		// We already have the key for this epoch
 		return nil
 	}
-	epochID := shcrypto.ComputeEpochID(share.Epoch)
+	epochID := shcrypto.ComputeEpochID(share.Epoch.Bytes())
 	if !shcrypto.VerifyEpochSecretKeyShare(
 		share.Share,
 		epochkg.PublicKeyShares[share.Sender],

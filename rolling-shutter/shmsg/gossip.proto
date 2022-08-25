@@ -5,23 +5,26 @@ option go_package = "./;shmsg";
 
 message DecryptionTrigger {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
-    bytes transactionsHash = 3;
-    bytes signature = 4;
+    bytes epochID = 2;
+    uint64 blockNumber = 3;
+    bytes transactionsHash = 4;
+    bytes signature = 5;
 }
 
 // TODO: replace keyper index by signature
 message DecryptionKeyShare {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
-    uint64 keyperIndex = 3;
-    bytes share = 4;
+    uint64 eon = 4;
+    bytes epochID = 2;
+    uint64 keyperIndex = 5;
+    bytes share = 6;
 }
 
 message DecryptionKey {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
-    bytes key = 3;
+    uint64 eon = 2;
+    bytes epochID = 3;
+    bytes key = 4;
 }
 
 message CipherBatch {
@@ -31,7 +34,7 @@ message CipherBatch {
 
 message DecryptionSignature {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
+    bytes epochID = 2;
     bytes signedHash = 3;
     bytes signature = 4;
     bytes signerBitfield = 5;
@@ -39,7 +42,7 @@ message DecryptionSignature {
 
 message AggregatedDecryptionSignature {
     uint64 instanceID = 1;
-    uint64 epochID = 2;
+    bytes epochID = 2;
     bytes signedHash = 3;
     bytes aggregatedSignature = 4;
     bytes signerBitfield = 5;
@@ -49,4 +52,10 @@ message EonPublicKey {
     uint64 instanceID = 1;
     bytes publicKey= 2;
     uint64 eon = 3;
+}
+
+message TimedEpoch {
+    uint64 instanceID = 1;
+    bytes epochID = 2;
+    uint64 notBefore = 3;
 }

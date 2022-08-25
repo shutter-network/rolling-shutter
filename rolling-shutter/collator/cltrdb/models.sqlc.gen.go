@@ -17,6 +17,7 @@ type MetaInf struct {
 type NextEpoch struct {
 	EnforceOneRow bool
 	EpochID       []byte
+	BlockNumber   int64
 }
 
 type Transaction struct {

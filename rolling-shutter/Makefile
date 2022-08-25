@@ -56,7 +56,7 @@ install-golangci-lint:
 	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 install-cobra:
-	${GO} install github.com/spf13/cobra/cobra@latest
+	${GO} install github.com/spf13/cobra/cobra@v1.3.0
 
 install-gofumpt:
 	${GO} install mvdan.cc/gofumpt@latest

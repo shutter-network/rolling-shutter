@@ -10,6 +10,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
@@ -41,9 +42,10 @@ type collator struct {
 	dbpool *pgxpool.Pool
 }
 
-var gossipTopicNames = [2]string{
+var gossipTopicNames = [3]string{
 	cltrtopics.CipherBatch,
 	cltrtopics.DecryptionTrigger,
+	cltrtopics.TimedEpoch,
 }
 
 func Run(ctx context.Context, config Config) error {
@@ -109,10 +111,19 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 			return errors.Errorf("block number too big: %d", blk)
 		}
 
-		epochID := epochid.New(0, uint32(blk))
-		return db.SetNextEpochID(ctx, shdb.EncodeUint64(epochID))
+		epochID, err := epochid.BigToEpochID(common.Big0)
+		if err != nil {
+			return err
+		}
+
+		return db.SetNextEpochID(ctx, cltrdb.SetNextEpochIDParams{
+			EpochID:     epochID.Bytes(),
+			BlockNumber: int64(blk),
+		})
+	} else if err != nil {
+		return err
 	}
-	return err
+	return nil
 }
 
 func (c *collator) setupAPIRouter(swagger *openapi3.T) http.Handler {
@@ -179,8 +190,11 @@ func (c *collator) run(ctx context.Context) error {
 	errorgroup.Go(func() error {
 		return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
 	})
+	//errorgroup.Go(func() error {
+	//	return c.processEpochLoop(errorctx)
+	//})
 	errorgroup.Go(func() error {
-		return c.processEpochLoop(errorctx)
+		return c.handleMessages(errorctx)
 	})
 
 	return errorgroup.Wait()
@@ -192,7 +206,7 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-time.After(sleepDuration):
-			if err := c.newEpoch(ctx); err != nil {
+			if err := c.newEpoch(ctx, []byte{}); err != nil {
 				log.Printf("error creating new epoch: %s", err)
 				return err
 			}
@@ -202,7 +216,7 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 	}
 }
 
-func (c *collator) newEpoch(ctx context.Context) error {
+func (c *collator) newEpoch(ctx context.Context, forcedEpochID []byte) error {
 	var outMessages []shmsg.P2PMessage
 
 	blockNumberUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
@@ -224,6 +238,17 @@ func (c *collator) newEpoch(ctx context.Context) error {
 		}
 
 		db := cltrdb.New(tx)
+
+		if len(forcedEpochID) != 0 {
+			err = db.SetNextEpochID(ctx, cltrdb.SetNextEpochIDParams{
+				EpochID:     forcedEpochID,
+				BlockNumber: int64(blockNumber),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 		outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
 		return err
 	})
@@ -239,6 +264,62 @@ func (c *collator) newEpoch(ctx context.Context) error {
 	return nil
 }
 
+func (c *collator) handleMessages(ctx context.Context) error {
+	for {
+		select {
+		case msg, ok := <-c.p2p.GossipMessages:
+			if !ok {
+				return nil
+			}
+			println("collator.handleMessages")
+			if err := c.handleMessage(ctx, msg); err != nil {
+				log.Printf("error handling message %+v: %s", msg, err)
+				continue
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (c *collator) handleMessage(ctx context.Context, msg *p2p.Message) error {
+	var msgsOut []shmsg.P2PMessage
+	var err error
+
+	unmarshalled, err := unmarshalP2PMessage(msg)
+	if topicError, ok := err.(*unhandledTopicError); ok {
+		log.Println(topicError.Error())
+	} else if err != nil {
+		return err
+	}
+
+	switch typedMsg := unmarshalled.(type) {
+	case *timedEpoch:
+		err = c.handleTimedEpochInput(ctx, typedMsg)
+	default:
+		log.Println("ignoring message received on topic", msg.Topic)
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+	for _, msgOut := range msgsOut {
+		if err := c.sendMessage(ctx, msgOut); err != nil {
+			log.Printf("error sending message %+v: %s", msgOut, err)
+			continue
+		}
+	}
+	return nil
+}
+
+func (c *collator) handleTimedEpochInput(ctx context.Context, msg *timedEpoch) error {
+	log.Printf("TimedEpoch: %s (notBefore: %d)", msg.EpochID, msg.NotBefore)
+	// FIXME: uint64 <> uint32
+	err := c.newEpoch(ctx, msg.EpochID)
+	return err
+}
+
 func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
@@ -250,11 +331,18 @@ func (c *collator) sendMessage(ctx context.Context, msg shmsg.P2PMessage) error 
 }
 
 // getNextEpochID gets the epochID that will be used for the next decryption trigger or cipher batch.
-func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (uint64, error) {
-	epochID, err := db.GetNextEpochID(ctx)
+func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uint64, error) {
+	b, err := db.GetNextEpochID(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error
-		return 0, err
+		return epochid.EpochID{}, 0, err
 	}
-	return shdb.DecodeUint64(epochID), nil
+	epochID, err := epochid.BytesToEpochID(b.EpochID)
+	if err != nil {
+		return epochid.EpochID{}, 0, err
+	}
+	if b.BlockNumber < 0 {
+		return epochid.EpochID{}, 0, errors.Errorf("negative l1 block number in db")
+	}
+	return epochID, uint64(b.BlockNumber), nil
 }

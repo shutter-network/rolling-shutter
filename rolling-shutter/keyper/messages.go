@@ -19,22 +19,11 @@ type message interface {
 }
 
 type (
-	decryptionTrigger shmsg.DecryptionTrigger
-	eonPublicKey      shmsg.EonPublicKey
+	decryptionKey      shmsg.DecryptionKey
+	decryptionKeyShare shmsg.DecryptionKeyShare
+	decryptionTrigger  shmsg.DecryptionTrigger
+	eonPublicKey       shmsg.EonPublicKey
 )
-
-type decryptionKeyShare struct {
-	instanceID  uint64
-	epochID     uint64
-	keyperIndex uint64
-	share       *shcrypto.EpochSecretKeyShare
-}
-
-type decryptionKey struct {
-	instanceID uint64
-	epochID    uint64
-	key        *shcrypto.EpochSecretKey
-}
 
 func (*decryptionTrigger) implementsMessage()  {}
 func (*decryptionKeyShare) implementsMessage() {}
@@ -42,9 +31,17 @@ func (*decryptionKey) implementsMessage()      {}
 func (*eonPublicKey) implementsMessage()       {}
 
 func (d *decryptionTrigger) GetInstanceID() uint64  { return d.InstanceID }
-func (d *decryptionKeyShare) GetInstanceID() uint64 { return d.instanceID }
-func (d *decryptionKey) GetInstanceID() uint64      { return d.instanceID }
+func (d *decryptionKeyShare) GetInstanceID() uint64 { return d.InstanceID }
+func (d *decryptionKey) GetInstanceID() uint64      { return d.InstanceID }
 func (e *eonPublicKey) GetInstanceID() uint64       { return e.InstanceID }
+
+func (d *decryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
+	return (*shmsg.DecryptionKey)(d).GetEpochSecretKey()
+}
+
+func (d *decryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
+	return (*shmsg.DecryptionKeyShare)(d).GetEpochSecretKeyShare()
+}
 
 func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 	if msg == nil {
@@ -78,16 +75,12 @@ func unmarshalDecryptionKeyShare(msg *p2p.Message) (message, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
 	}
 
-	share := new(shcrypto.EpochSecretKeyShare)
-	if err := share.Unmarshal(decryptionKeyShareMsg.Share); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
-	}
-
 	return &decryptionKeyShare{
-		instanceID:  decryptionKeyShareMsg.InstanceID,
-		epochID:     decryptionKeyShareMsg.EpochID,
-		keyperIndex: decryptionKeyShareMsg.KeyperIndex,
-		share:       share,
+		InstanceID:  decryptionKeyShareMsg.InstanceID,
+		EpochID:     decryptionKeyShareMsg.EpochID,
+		Eon:         decryptionKeyShareMsg.Eon,
+		KeyperIndex: decryptionKeyShareMsg.KeyperIndex,
+		Share:       decryptionKeyShareMsg.Share,
 	}, nil
 }
 
@@ -97,15 +90,11 @@ func unmarshalDecryptionKey(msg *p2p.Message) (message, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
 	}
 
-	key := new(shcrypto.EpochSecretKey)
-	if err := key.Unmarshal(decryptionKeyMsg.Key); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
-	}
-
 	return &decryptionKey{
-		instanceID: decryptionKeyMsg.InstanceID,
-		epochID:    decryptionKeyMsg.EpochID,
-		key:        key,
+		InstanceID: decryptionKeyMsg.InstanceID,
+		EpochID:    decryptionKeyMsg.EpochID,
+		Eon:        decryptionKeyMsg.Eon,
+		Key:        decryptionKeyMsg.Key,
 	}, nil
 }
 

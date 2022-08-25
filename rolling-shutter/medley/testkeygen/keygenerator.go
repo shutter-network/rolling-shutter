@@ -9,6 +9,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
 
 // TestKeyGenerator is a helper tool to generate secret and public eon and epoch keys and key
@@ -87,21 +88,16 @@ func (tkg *TestKeyGenerator) populateEonKeysUntilEon(eonIndex uint64) {
 	}
 }
 
-func (tkg *TestKeyGenerator) populateEonKeysUntilEpoch(epochID uint64) {
-	eonIndex := tkg.EonIndex(epochID)
-	tkg.populateEonKeysUntilEon(eonIndex)
-}
-
-func (tkg *TestKeyGenerator) EonIndex(epochID uint64) uint64 {
+func (tkg *TestKeyGenerator) EonIndex(epochID epochid.EpochID) uint64 {
 	tkg.t.Helper()
 
 	if tkg.eonInterval == 0 {
 		return 0
 	}
-	return epochID / tkg.eonInterval
+	return epochID.Big().Uint64() / tkg.eonInterval
 }
 
-func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID uint64, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
+func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
 	tkg.t.Helper()
 
 	eonIndex := tkg.EonIndex(epochID)
@@ -109,7 +105,7 @@ func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID uint64, keyperIndex uint6
 	return tkg.eonPublicKeyShares[eonIndex][keyperIndex]
 }
 
-func (tkg *TestKeyGenerator) EonPublicKey(epochID uint64) *shcrypto.EonPublicKey {
+func (tkg *TestKeyGenerator) EonPublicKey(epochID epochid.EpochID) *shcrypto.EonPublicKey {
 	tkg.t.Helper()
 
 	eonIndex := tkg.EonIndex(epochID)
@@ -117,7 +113,7 @@ func (tkg *TestKeyGenerator) EonPublicKey(epochID uint64) *shcrypto.EonPublicKey
 	return tkg.eonPublicKeys[eonIndex]
 }
 
-func (tkg *TestKeyGenerator) EonSecretKeyShare(epochID uint64, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
+func (tkg *TestKeyGenerator) EonSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
 	tkg.t.Helper()
 
 	eonIndex := tkg.EonIndex(epochID)
@@ -125,14 +121,14 @@ func (tkg *TestKeyGenerator) EonSecretKeyShare(epochID uint64, keyperIndex uint6
 	return tkg.eonSecretKeyShares[eonIndex][keyperIndex]
 }
 
-func (tkg *TestKeyGenerator) EpochSecretKeyShare(epochID uint64, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
+func (tkg *TestKeyGenerator) EpochSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
 	tkg.t.Helper()
 	eonKeyShare := tkg.EonSecretKeyShare(epochID, keyperIndex)
-	epochIDG1 := shcrypto.ComputeEpochID(epochID)
+	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
 	return shcrypto.ComputeEpochSecretKeyShare(eonKeyShare, epochIDG1)
 }
 
-func (tkg *TestKeyGenerator) EpochSecretKey(epochID uint64) *shcrypto.EpochSecretKey {
+func (tkg *TestKeyGenerator) EpochSecretKey(epochID epochid.EpochID) *shcrypto.EpochSecretKey {
 	tkg.t.Helper()
 
 	keyperIndices := []int{}

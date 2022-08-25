@@ -7,16 +7,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 )
 
 var triggerHashPrefix = []byte{0x19, 't', 'r', 'i', 'g', 'g', 'e', 'r'}
 
 func NewSignedDecryptionTrigger(
-	instanceID uint64, epochID uint64, transactions [][]byte, privKey *ecdsa.PrivateKey,
+	instanceID uint64, epochID epochid.EpochID, blockNumber uint64, transactions [][]byte, privKey *ecdsa.PrivateKey,
 ) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
 		InstanceID:       instanceID,
-		EpochID:          epochID,
+		EpochID:          epochID.Bytes(),
+		BlockNumber:      blockNumber,
 		TransactionsHash: HashTransactions(transactions),
 	}
 	var err error

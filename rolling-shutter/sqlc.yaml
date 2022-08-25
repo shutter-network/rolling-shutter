@@ -59,3 +59,21 @@ packages:
     output_db_file_name: "db.sqlc.gen.go"
     output_models_file_name: "models.sqlc.gen.go"
     output_files_suffix: "c.gen"
+
+  - path: "snapshot/snpdb"
+    name: "snpdb"
+    schema:
+      [
+          "snapshot/snpdb/schema.sql",
+          "commondb/meta-schema.sql",
+      ]
+    queries:
+      [
+          "snapshot/snpdb/query.sql",
+          "commondb/meta-query.sql",
+      ]
+    engine: "postgresql"
+    sql_package: "pgx/v4"
+    output_db_file_name: "db.sqlc.gen.go"
+    output_models_file_name: "models.sqlc.gen.go"
+    output_files_suffix: "c.gen"

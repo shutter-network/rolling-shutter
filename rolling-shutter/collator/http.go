@@ -10,7 +10,6 @@ import (
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/collator/oapi"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 )
 
 type server struct {
@@ -34,13 +33,13 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	db := cltrdb.New(srv.c.dbpool)
-	epoch, err := getNextEpochID(req.Context(), db)
+	epoch, _, err := getNextEpochID(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(oapi.NextEpoch{
-		Id: shdb.EncodeUint64(epoch),
+		Id: epoch.Bytes(),
 	})
 }
 

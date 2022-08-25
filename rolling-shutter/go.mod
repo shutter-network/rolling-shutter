@@ -3,6 +3,8 @@ module github.com/shutter-network/shutter/shuttermint
 go 1.16
 
 require (
+	github.com/AdamSLevy/jsonrpc2/v14 v14.1.0
+	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
@@ -48,7 +50,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/shutter-network/shutter/shlib v0.1.9
+	github.com/shutter-network/shutter/shlib v0.1.10
 	github.com/spf13/afero v1.8.1 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5

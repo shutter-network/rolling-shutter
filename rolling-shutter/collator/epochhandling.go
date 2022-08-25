@@ -2,48 +2,37 @@ package collator
 
 import (
 	"context"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/shutter-network/shutter/shuttermint/collator/cltrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
 // computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-// The function also depends on the current mainchain block number and the configured execution
-// block delay. The result will encode a block number and a sequence number. The sequence number
-// will be the sequence number of the previous epoch id plus one. The block number will be
-// max(current block number - execution block delay, block number encoded in previous epoch id, 0).
-func computeNextEpochID(epochID uint64, currentBlockNumber uint32, executionBlockDelay uint32) uint64 {
-	executionBlockNumber := uint32(0)
-	if currentBlockNumber >= executionBlockDelay {
-		executionBlockNumber = currentBlockNumber - executionBlockDelay
-	}
-
-	previousExecutionBlockNumber := epochid.BlockNumber(epochID)
-	if executionBlockNumber < previousExecutionBlockNumber {
-		executionBlockNumber = previousExecutionBlockNumber
-	}
-
-	sequenceNumber := epochid.SequenceNumber(epochID)
-	return epochid.New(sequenceNumber+1, executionBlockNumber)
+func computeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
+	n := epochID.Big()
+	nextN := new(big.Int).Add(n, common.Big1)
+	return epochid.BigToEpochID(nextN)
 }
 
 func startNextEpoch(
 	ctx context.Context, config Config, db *cltrdb.Queries, currentBlockNumber uint32,
 ) ([]shmsg.P2PMessage, error) {
-	epochID, err := getNextEpochID(ctx, db)
+	epochID, blockNumber, err := getNextEpochID(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 
-	transactions, err := db.GetTransactionsByEpoch(ctx, shdb.EncodeUint64(epochID))
+	transactions, err := db.GetTransactionsByEpoch(ctx, epochID.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
 	trigger, err := shmsg.NewSignedDecryptionTrigger(
-		config.InstanceID, epochID, transactions, config.EthereumKey,
+		config.InstanceID, epochID, uint64(currentBlockNumber), transactions, config.EthereumKey,
 	)
 	if err != nil {
 		return nil, err
@@ -51,15 +40,21 @@ func startNextEpoch(
 
 	// Write back the generated trigger to the database
 	err = db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
-		EpochID:   shdb.EncodeUint64(trigger.EpochID),
+		EpochID:   trigger.EpochID,
 		BatchHash: trigger.TransactionsHash,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	nextEpochID := computeNextEpochID(epochID, currentBlockNumber, config.ExecutionBlockDelay)
-	err = db.SetNextEpochID(ctx, shdb.EncodeUint64(nextEpochID))
+	nextEpochID, err := computeNextEpochID(epochID)
+	if err != nil {
+		return nil, err
+	}
+	err = db.SetNextEpochID(ctx, cltrdb.SetNextEpochIDParams{
+		EpochID:     nextEpochID.Bytes(),
+		BlockNumber: int64(blockNumber),
+	})
 	if err != nil {
 		return nil, err
 	}

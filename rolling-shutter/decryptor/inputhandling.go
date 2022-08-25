@@ -13,8 +13,6 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto/shbls"
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrdb"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
-	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -24,19 +22,18 @@ func handleDecryptionKeyInput(
 	db *dcrdb.Queries,
 	key *decryptionKey,
 ) ([]shmsg.P2PMessage, error) {
-	keyBytes := key.key.Marshal()
 	tag, err := db.InsertDecryptionKey(ctx, dcrdb.InsertDecryptionKeyParams{
-		EpochID: shdb.EncodeUint64(key.epochID),
-		Key:     keyBytes,
+		EpochID: key.EpochID,
+		Key:     key.Key,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %d into db", key.epochID)
+		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %s into db", key.EpochID)
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to store multiple keys for same epoch %d", key.epochID)
+		log.Printf("attempted to store multiple keys for same epoch %s", key.EpochID)
 		return nil, nil
 	}
-	return handleEpoch(ctx, config, db, key.epochID)
+	return handleEpoch(ctx, config, db, key.EpochID)
 }
 
 func handleCipherBatchInput(
@@ -46,7 +43,7 @@ func handleCipherBatchInput(
 	cipherBatch *cipherBatch,
 ) ([]shmsg.P2PMessage, error) {
 	tag, err := db.InsertCipherBatch(ctx, dcrdb.InsertCipherBatchParams{
-		EpochID:      shdb.EncodeUint64(cipherBatch.DecryptionTrigger.EpochID),
+		EpochID:      cipherBatch.DecryptionTrigger.EpochID,
 		Transactions: cipherBatch.Transactions,
 	})
 	if err != nil {
@@ -71,7 +68,7 @@ func handleSignatureInput(
 		return nil, nil
 	}
 	tag, err := db.InsertDecryptionSignature(ctx, dcrdb.InsertDecryptionSignatureParams{
-		EpochID:         shdb.EncodeUint64(signature.epochID),
+		EpochID:         signature.epochID,
 		SignedHash:      signature.signedHash.Bytes(),
 		SignersBitfield: signature.signers,
 		Signature:       signature.signature.Marshal(),
@@ -94,7 +91,7 @@ func handleSignatureInput(
 
 	// check if we have enough signatures
 	dbSignatures, err := db.GetDecryptionSignatures(ctx, dcrdb.GetDecryptionSignaturesParams{
-		EpochID:    shdb.EncodeUint64(signature.epochID),
+		EpochID:    signature.epochID,
 		SignedHash: signature.signedHash.Bytes(),
 	})
 	if err != nil {
@@ -104,7 +101,8 @@ func handleSignatureInput(
 		return nil, nil
 	}
 
-	activationBlockNumber := epochid.BlockNumber(signature.epochID)
+	// XXX: This is broken, but the decryptor isn't used in Snapshot Shutter
+	activationBlockNumber := 1
 	decryptorSet, err := db.GetDecryptorSet(ctx, int64(activationBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query decryptor set from db")
@@ -162,7 +160,7 @@ func handleSignatureInput(
 	}
 
 	_, err = db.InsertAggregatedSignature(ctx, dcrdb.InsertAggregatedSignatureParams{
-		EpochID:         shdb.EncodeUint64(signature.epochID),
+		EpochID:         signature.epochID,
 		SignedHash:      signature.signedHash.Bytes(),
 		SignersBitfield: aggregatedSigners,
 		Signature:       aggregatedSignature.Marshal(),
@@ -189,35 +187,34 @@ func handleEpoch(
 	ctx context.Context,
 	config Config,
 	db *dcrdb.Queries,
-	epochID uint64,
+	epochIDBytes []byte,
 ) ([]shmsg.P2PMessage, error) {
-	epochIDBytes := shdb.EncodeUint64(epochID)
 	cipherBatch, err := db.GetCipherBatch(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to get cipher batch for epoch %d from db", epochID)
+		return nil, errors.Wrapf(err, "failed to get cipher batch for epoch %s from db", epochIDBytes)
 	}
 
 	decryptionKeyDB, err := db.GetDecryptionKey(ctx, epochIDBytes)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to get decryption key for epoch %d from db", epochID)
+		return nil, errors.Wrapf(err, "failed to get decryption key for epoch %s from db", epochIDBytes)
 	}
 
-	log.Printf("decrypting batch for epoch %d", epochID)
+	log.Printf("decrypting batch for epoch %s", epochIDBytes)
 
 	decryptionKey := new(shcrypto.EpochSecretKey)
 	err = decryptionKey.Unmarshal(decryptionKeyDB.Key)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid decryption key for epoch %d in db", epochID)
+		return nil, errors.Wrapf(err, "invalid decryption key for epoch %s in db", epochIDBytes)
 	}
 
 	decryptedBatch := decryptCipherBatch(cipherBatch.Transactions, decryptionKey)
 	signingData := DecryptionSigningData{
 		InstanceID:     config.InstanceID,
-		EpochID:        epochID,
+		EpochID:        epochIDBytes,
 		CipherBatch:    cipherBatch.Transactions,
 		DecryptedBatch: decryptedBatch,
 	}
@@ -227,7 +224,7 @@ func handleEpoch(
 
 	msgs, err := handleSignatureInput(ctx, config, db, &decryptionSignature{
 		instanceID: config.InstanceID,
-		epochID:    epochID,
+		epochID:    epochIDBytes,
 		signedHash: common.BytesToHash(signedHash),
 		signature:  signature,
 		signers:    signersBitfield,
@@ -238,7 +235,7 @@ func handleEpoch(
 
 	signatureMsg := &shmsg.DecryptionSignature{
 		InstanceID:     config.InstanceID,
-		EpochID:        epochID,
+		EpochID:        epochIDBytes,
 		SignedHash:     signedHash,
 		Signature:      signature.Marshal(),
 		SignerBitfield: signersBitfield,

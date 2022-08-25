@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -22,8 +23,8 @@ import (
 	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
 	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
 	"github.com/shutter-network/shutter/shuttermint/medley/bitfield"
+	"github.com/shutter-network/shutter/shuttermint/medley/epochid"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
 	"github.com/shutter-network/shutter/shuttermint/shmsg"
 )
 
@@ -46,8 +47,8 @@ type MockNode struct {
 	eonSecretKeyShare *shcrypto.EonSecretKeyShare
 	eonPublicKey      *shcrypto.EonPublicKey
 
-	plainTxsSent  map[uint64][][]byte
-	cipherTxsSent map[uint64][][]byte
+	plainTxsSent  map[string][][]byte
+	cipherTxsSent map[string][][]byte
 }
 
 func New(config Config) (*MockNode, error) {
@@ -77,8 +78,8 @@ func New(config Config) (*MockNode, error) {
 		eonSecretKeyShare: eonSecretKeyShare,
 		eonPublicKey:      eonPublicKey,
 
-		plainTxsSent:  make(map[uint64][][]byte),
-		cipherTxsSent: make(map[uint64][][]byte),
+		plainTxsSent:  make(map[string][][]byte),
+		cipherTxsSent: make(map[string][][]byte),
 	}, nil
 }
 
@@ -194,8 +195,8 @@ func (m *MockNode) handleDecryptionSignature(msg *shmsg.AggregatedDecryptionSign
 	func() {
 		m.mux.Lock()
 		defer m.mux.Unlock()
-		expectedCipherBatch = m.cipherTxsSent[msg.EpochID]
-		expectedDecryptedBatch = m.plainTxsSent[msg.EpochID]
+		expectedCipherBatch = m.cipherTxsSent[string(msg.EpochID)]
+		expectedDecryptedBatch = m.plainTxsSent[string(msg.EpochID)]
 	}()
 	expectedSigningData := decryptor.DecryptionSigningData{
 		InstanceID:     m.Config.InstanceID,
@@ -243,7 +244,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				continue
 			}
 
-			epochID := shdb.DecodeUint64(nextEpochResponse.JSON200.Id)
+			epochID := nextEpochResponse.JSON200.Id
 			_, encryptedTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
 			if err != nil {
 				return err
@@ -252,7 +253,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
 					EncryptedTx: encryptedTx,
-					Epoch:       shdb.EncodeUint64(epochID),
+					Epoch:       epochID,
 				})
 			if err != nil {
 				return err
@@ -277,14 +278,14 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 func (m *MockNode) sendMessages(ctx context.Context) error {
 	sleepDuration := time.Duration(1000/m.Config.Rate) * time.Millisecond
 
-	epochID := uint64(0)
+	epochID, _ := epochid.BigToEpochID(common.Big0)
 	for {
 		select {
 		case <-time.After(sleepDuration):
-			if err := m.sendMessagesForEpoch(ctx, epochID); err != nil {
+			if err := m.sendMessagesForEpoch(ctx, epochID.Bytes()); err != nil {
 				return err
 			}
-			epochID++
+			epochID, _ = epochid.BigToEpochID(new(big.Int).Add(epochID.Big(), common.Big1))
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -305,7 +306,7 @@ func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPubli
 	return eonSecretKeyShare, eonPublicKey, nil
 }
 
-func computeEpochSecretKey(epochID uint64, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
+func computeEpochSecretKey(epochID []byte, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
 	epochIDG1 := shcrypto.ComputeEpochID(epochID)
 	epochSecretKeyShare := shcrypto.ComputeEpochSecretKeyShare(eonSecretKeyShare, epochIDG1)
 	return shcrypto.ComputeEpochSecretKey(
@@ -315,7 +316,7 @@ func computeEpochSecretKey(epochID uint64, eonSecretKeyShare *shcrypto.EonSecret
 	)
 }
 
-func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
+func encryptRandomMessage(epochID []byte, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
 	_, err := rand.Read(message[3:])
 	if err != nil {
@@ -334,7 +335,7 @@ func encryptRandomMessage(epochID uint64, eonPublicKey *shcrypto.EonPublicKey) (
 	return message, encryptedMessage.Marshal(), nil
 }
 
-func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) error {
+func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID []byte) error {
 	if m.Config.SendDecryptionTriggers {
 		if err := m.sendDecryptionTrigger(ctx, epochID); err != nil {
 			return err
@@ -353,8 +354,8 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID uint64) err
 	return nil
 }
 
-func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) error {
-	log.Printf("sending decryption trigger for epoch %d", epochID)
+func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID []byte) error {
+	log.Printf("sending decryption trigger for epoch %s", epochID)
 	msg := &shmsg.DecryptionTrigger{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID,
@@ -366,11 +367,11 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID uint64) er
 	return m.p2p.Publish(ctx, kprtopics.DecryptionTrigger, msgBytes)
 }
 
-func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) error {
-	if _, ok := m.plainTxsSent[epochID]; ok {
-		return errors.Errorf("cipher batch for epoch %d already sent", epochID)
+func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID []byte) error {
+	if _, ok := m.plainTxsSent[string(epochID)]; ok {
+		return errors.Errorf("cipher batch for epoch %s already sent", epochID)
 	}
-	log.Printf("sending cipher batch for epoch %d", epochID)
+	log.Printf("sending cipher batch for epoch %s", epochID)
 
 	plainTxs := [][]byte{}
 	cipherTxs := [][]byte{}
@@ -401,13 +402,13 @@ func (m *MockNode) sendCipherBatchMessage(ctx context.Context, epochID uint64) e
 
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	m.plainTxsSent[epochID] = plainTxs
-	m.cipherTxsSent[epochID] = cipherTxs
+	m.plainTxsSent[string(epochID)] = plainTxs
+	m.cipherTxsSent[string(epochID)] = cipherTxs
 
 	return nil
 }
 
-func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID uint64) error {
+func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID []byte) error {
 	log.Printf("sending decryption key for epoch %d", epochID)
 
 	epochSecretKey, err := computeEpochSecretKey(epochID, m.eonSecretKeyShare)

@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -16,6 +11,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/shutter-network/shutter/shuttermint/medley"
 	"github.com/shutter-network/shutter/shuttermint/p2p"
@@ -148,8 +148,10 @@ func exampleConfig() (*snapshot.Config, error) {
 		EthereumURL:    "http://[::1]:8545/",
 		ListenAddress:  p2p.MustMultiaddr("/ip6/::1/tcp/2000"),
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
-		DatabaseURL:    "",
-		SnapshotHubURL: "",
+		DatabaseURL:    "postgres://localhost:5432/shutter_snapshot",
+
+		SnapshotHubURL:       "",
+		SnapshotPollInterval: 10 * time.Second,
 
 		EthereumKey: ethereumKey,
 		P2PKey:      p2pkey,
@@ -185,8 +187,8 @@ func main() error {
 		cancel()
 	}()
 
-	d := snapshot.New(config)
-	err = d.Run(ctx)
+	snp := snapshot.New(config)
+	err = snp.Run(ctx)
 	if err == context.Canceled {
 		log.Printf("Bye.")
 		return nil

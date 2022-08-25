@@ -12,7 +12,7 @@ import (
 
 type DecryptionSigningData struct {
 	InstanceID     uint64
-	EpochID        uint64
+	EpochID        []byte
 	CipherBatch    [][]byte
 	DecryptedBatch [][]byte
 }
@@ -35,8 +35,7 @@ func (d DecryptionSigningData) Hash() common.Hash {
 	binary.BigEndian.PutUint64(b, d.InstanceID)
 	s.Write(b)
 
-	binary.BigEndian.PutUint64(b, d.EpochID)
-	s.Write(b)
+	s.Write(d.EpochID)
 
 	s.Write(hashChain(d.CipherBatch).Bytes())
 	s.Write(hashChain(d.DecryptedBatch).Bytes())
