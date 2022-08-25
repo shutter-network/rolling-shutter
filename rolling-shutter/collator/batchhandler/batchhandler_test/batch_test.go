@@ -255,7 +255,6 @@ func TestStateTransition(t *testing.T) {
 		t.Log("stopped head batch")
 		// the batch was stopped
 
-		// FIXME wrap error maybe
 		return eg.Wait()
 	}
 
@@ -418,7 +417,6 @@ func TestStateTransition(t *testing.T) {
 		// the batch was stopped
 		t.Log("stopped next batch")
 
-		// FIXME wrap err maybe
 		return eg.Wait()
 	}
 
