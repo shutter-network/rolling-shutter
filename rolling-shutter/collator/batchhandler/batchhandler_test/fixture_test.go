@@ -60,7 +60,7 @@ func assertEqual(t *testing.T, cancel func(error), x, y any, opts ...gocmp.Optio
 	opts = append(opts, gocmp.Reporter(rep))
 	res := gocmp.Equal(x, y, opts...)
 	if !res {
-		// TODO this does not have the AST based reporting
+		// NOTE: this does not have the AST based reporting
 		// of the expression being evaluated.
 		// This would be nice to have, but is not a must.
 		msg := "assertEqual failed " + rep.String()
@@ -196,10 +196,10 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 // for that epoch.
 // The data of the DecryptionTrigger is not fully validated.
 func p2pMessagingMock(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	failFunc func(error),
-	config config.Config,
+	cfg config.Config,
 	batchHandler *batchhandler.BatchHandler,
 ) error {
 	t.Helper()
@@ -219,8 +219,8 @@ func p2pMessagingMock(
 				trigger, _ := out.(*shmsg.DecryptionTrigger)
 				epoch, _ := epochid.BytesToEpochID(trigger.EpochID)
 
-				assertEqual(t, failFunc, trigger.InstanceID, config.InstanceID)
-				address := ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+				assertEqual(t, failFunc, trigger.InstanceID, cfg.InstanceID)
+				address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
 				signatureCorrect, err := shmsg.VerifySignature(trigger, address)
 				assertEqual(t, failFunc, err, nil)
 				assertEqual(t, failFunc, signatureCorrect, true)

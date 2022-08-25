@@ -202,7 +202,7 @@ func TestBatchHandler(t *testing.T) {
 			return true
 		default:
 			// in all other batches, we don't expect user transactions
-			// either becuase they were invalid, or because we didn't send any
+			// either because they were invalid, or because we didn't send any
 			assertEqual(t, failFunc, len(tx.Transactions()), 0)
 		}
 		// return false will not deregister the hook
