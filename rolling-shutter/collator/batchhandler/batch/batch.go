@@ -355,8 +355,11 @@ func (b *Batch) Hash() []byte {
 	return b.committedTxs.Hash()
 }
 
-func (b *Batch) Run(epochTick <-chan time.Time) error {
-	var transition State
+func (b *Batch) Run(ctx context.Context, epochTick <-chan time.Time) error {
+	var (
+		transition State
+		err        error
+	)
 
 	logHandler := func(handler string, transition State) {
 		b.Log().Debug().
@@ -365,6 +368,7 @@ func (b *Batch) Run(epochTick <-chan time.Time) error {
 			Msg("received value, calling handler")
 	}
 	transition = &Initial{}
+	ctxDone := ctx.Done()
 	for {
 		stateChange := transition.Process(b)
 		if stateChange != nil {
@@ -377,15 +381,14 @@ func (b *Batch) Run(epochTick <-chan time.Time) error {
 				// skip the select
 				continue
 			} else if next.StateEnum() == NoState {
-				b.stoppedResult <- nil
+				b.stoppedResult <- err
 				// transitions have been stopped.
 				// this is only the case for Stopped{}
 				close(b.Broker.Publish)
 				b.Log().Debug().
 					Str("state", transition.StateEnum().String()).
 					Msg("stopped running")
-				return nil
-
+				return err
 			} else {
 				transition = next
 			}
@@ -441,6 +444,11 @@ func (b *Batch) Run(epochTick <-chan time.Time) error {
 				logHandler("OnStop", transition)
 				transition = transition.OnStop(b)
 			}
+		case <-ctxDone:
+			ctxDone = nil
+			err = ctx.Err()
+			logHandler("OnStop", transition)
+			transition = transition.OnStop(b)
 		}
 	}
 }

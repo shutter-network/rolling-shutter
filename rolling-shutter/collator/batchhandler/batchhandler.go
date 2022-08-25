@@ -72,7 +72,6 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 	if err != nil {
 		return nil, err
 	}
-	// XXX or re-use the one from collator?
 	l1EthClient, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {
 		return nil, err
@@ -100,20 +99,8 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 		confirmedBatch:         make(chan epochid.EpochID),
 		stopSignal:             make(chan struct{}),
 	}
-	// This will do more queries to the l2-client
-	// err = bh.initialiseEpoch(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return bh, nil
 }
-
-// BatchHandler is a threadsafe handler to process the following actions
-// - validate and enqueue incoming tx's either to the currently pending batch
-//    or for later validation in the transaction pool
-// - handle incoming decryption keys and send the currently pending batch-transaction
-
-// - start next epoch and initiate the broadcasting of the decryption-trigger to
 
 type BatchHandler struct {
 	l2Client *rpc.Client
@@ -123,12 +110,11 @@ type BatchHandler struct {
 	config      config.Config
 	signer      txtypes.Signer
 	dbpool      *pgxpool.Pool
-	// mux protects access to bh.batches and bh.pendingEpochID
-	mux        sync.RWMutex
-	batches    []*batch.Batch
-	outMessage chan shmsg.P2PMessage
-	ticker     *EpochTicker
-	stopSignal chan struct{}
+	mux         sync.RWMutex
+	batches     []*batch.Batch
+	outMessage  chan shmsg.P2PMessage
+	ticker      *EpochTicker
+	stopSignal  chan struct{}
 
 	confirmedBatchesBroker *medley.Broker[epochid.EpochID]
 	confirmedBatch         chan epochid.EpochID
@@ -142,7 +128,11 @@ func (bh *BatchHandler) Messages() <-chan shmsg.P2PMessage {
 	return bh.outMessage
 }
 
-// `EnqueueTx` handles the potential addition of a user's transaction
+func (bh *BatchHandler) ConfirmedBatch() chan<- epochid.EpochID {
+	return bh.confirmedBatch
+}
+
+// EnqueueTx handles the potential addition of a user's transaction
 // to the latest local batch or in case of future transactions to the transaction pool.
 // Future transactions can't be queued if they have a batch-index that is too
 // far in the future - the allowed difference is set by the `TransactionAcceptanceInterval` (const).
@@ -215,9 +205,9 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) <-chan tr
 	return pending.Result
 }
 
-// `Run` is the main entrypoint for the BatchHandler's
+// Run is the main entrypoint for the BatchHandler's
 // go-routines.
-// It initialises the pool of currently active batches
+// Run initializes the pool of currently active batches
 // and starts the go-routines that handle the individual
 // StateChangeResult's of the Batches state-transitions.
 func (bh *BatchHandler) Run(ctx context.Context) error {
@@ -244,7 +234,13 @@ func (bh *BatchHandler) Run(ctx context.Context) error {
 		}
 	}
 
+	// if any of the spawned HandleStateTransitions
+	// and batch.Run() methods return an error, this context is
+	// canceled and thus all other routines under this
+	// errorgroup's umbrella are canceled
 	eg, errctx := errgroup.WithContext(ctx)
+
+	bh.mux.RLock()
 	for _, b := range bh.batches {
 		// new variable to avoid the loop variable b being
 		// captured by func literal
@@ -255,6 +251,7 @@ func (bh *BatchHandler) Run(ctx context.Context) error {
 			return bh.HandleStateTransitions(errctx, eg, bb)
 		})
 	}
+	bh.mux.RUnlock()
 	for {
 		select {
 		case val, ok := <-bh.confirmedBatch:
@@ -266,8 +263,8 @@ func (bh *BatchHandler) Run(ctx context.Context) error {
 		case <-bh.stopSignal:
 			// deferred cancel cancels the HandleStateTransitions
 			return nil
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-errctx.Done():
+			return errctx.Err()
 		}
 	}
 }
@@ -298,7 +295,7 @@ func (bh *BatchHandler) Stop() {
 	close(bh.stopSignal)
 }
 
-// `appendHeadBatch` intialises a new batch for the next future epoch-id that is not yet
+// appendHeadBatch initializes a new batch for the next future epoch-id that is not yet
 // in the pool of batches and appends that to the "HEAD" position of the pool of batches.
 func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, error) {
 	bh.mux.Lock()
@@ -326,7 +323,10 @@ func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, erro
 		return nil, err
 	}
 	bh.batches = append(bh.batches, newBatch)
-	newBatch.Log().Debug().Int("num-batches", len(bh.batches)).Str("block-number", fmt.Sprint(newBatch.L1BlockNumber)).Msg("added HEAD batch to batch pool")
+	newBatch.Log().Debug().
+		Int("num-batches", len(bh.batches)).
+		Str("block-number", fmt.Sprint(newBatch.L1BlockNumber)).
+		Msg("added HEAD batch to batch pool")
 	bh.mux.Unlock()
 	return newBatch, nil
 }
@@ -361,14 +361,14 @@ func (bh *BatchHandler) removeBatch(b *batch.Batch) {
 	}
 }
 
-// `HandleStateTransitions` tracks the StateChangeResults emitted by a certain batch
+// HandleStateTransitions tracks the StateChangeResults emitted by a certain batch
 // and takes action on some state-changes:
 // - when the batch becomes "committed",
 // a new HEAD-batch will be appended to the pool of batches
 // - when the batch becomes "confirmed" or the context is canceled,
 // the cleanup function is called, the batch is stopped
 // and the HandleStateTransitions returns with a optional error as return value.
-// `HandleStateTransitions` takes care of registering and deregistering
+// HandleStateTransitions takes care of registering and deregistering
 // observers for the confirmed batches and epoch ticks.
 // It also delegates the input to and the output from the batches state-transition
 // loop:
@@ -376,7 +376,7 @@ func (bh *BatchHandler) removeBatch(b *batch.Batch) {
 // delegated to the batches Input channels
 // - outbound P2P-messages and sequencer transactions are processed from the StateChangeResult
 // and delegated to the messaging / rpc layer.
-// - errors occuring during the state changes are logged
+// - errors occurring during the state changes are logged.
 func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup.Group, b *batch.Batch) error {
 	var stopChan chan error
 
@@ -384,7 +384,9 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 	confirmedBatch := bh.confirmedBatchesBroker.Subscribe(0)
 	epochTick := bh.ticker.Subscribe()
 
-	go b.Run(epochTick)
+	eg.Go(func() error {
+		return b.Run(ctx, epochTick)
+	})
 
 	stop := func() {
 		b.Broker.Unsubscribe(batchState)
@@ -392,6 +394,7 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 		bh.ticker.Unsubscribe(epochTick)
 		bh.confirmedBatchesBroker.Unsubscribe(confirmedBatch)
 		stopChan = b.Stop()
+		b.Log().Debug().Msg("stop func executed")
 	}
 	ctxDone := ctx.Done()
 
@@ -489,13 +492,16 @@ func (bh *BatchHandler) OnOutgoingMessage(ctx context.Context, msg shmsg.P2PMess
 			return err
 		}
 		msg = trigger
-		bh.OnOutboundDecryptionTrigger(ctx, trigger)
+		err = bh.OnOutboundDecryptionTrigger(ctx, trigger)
+		if err != nil {
+			log.Error().Err(err).Msg("error during processing of DecryptionTrigger")
+		}
 	}
 	bh.outMessage <- msg
 	return nil
 }
 
-// `OnSequencerTransaction` signs and sends outbound transactions (mainly BatchTx)
+// OnSequencerTransaction signs and sends outbound transactions (mainly BatchTx)
 // to the sequencers JSON-RPC endpoint.
 // Note: The send operation eventually retries sends if the sequencer is unresponsive
 // or an error is returned - the "OnSequencerTransaction" method-call is thus blocking during
@@ -509,7 +515,7 @@ func (bh *BatchHandler) OnSequencerTransaction(ctx context.Context, tx txtypes.T
 	return sendTransaction(ctx, bh.l2Client, signedTx)
 }
 
-func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID epochid.EpochID, key []byte) error {
+func (bh *BatchHandler) HandleDecryptionKey(_ context.Context, epochID epochid.EpochID, key []byte) error {
 	log.Debug().Str("epoch", epochID.String()).Msg("received decryption key")
 	bh.mux.RLock()
 	b := bh.getBatch(epochID)
@@ -524,13 +530,8 @@ func (bh *BatchHandler) HandleDecryptionKey(ctx context.Context, epochID epochid
 	return nil
 }
 
-func (bh *BatchHandler) HandleBatchConfirmation(epochID epochid.EpochID) error {
-	bh.confirmedBatch <- epochID
-	return nil
-}
-
-// `OnOutboundDecryptionTrigger` puts a DecryptionTrigger in the collatordb to be sent to the keypers.
-// `OnOutboundDecryptionTrigger` progresses the pending EpochID to the next value which will stop
+// OnOutboundDecryptionTrigger puts a DecryptionTrigger in the collatordb to be sent to the keypers.
+// OnOutboundDecryptionTrigger progresses the pending EpochID to the next value which will stop
 // transactions encrypted for the old epoch-id to be accepted by the collator.
 func (bh *BatchHandler) OnOutboundDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) error {
 	epochID, err := epochid.BytesToEpochID(trigger.GetEpochID())
@@ -595,33 +596,6 @@ func sendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 		return errors.Wrap(err, "can't send transaction")
 	}
 	return err
-}
-
-// waitConfirmation polls for the transaction-receipt of the sent out batch-transaction.
-// Currently it only retries several times until it fails.
-// waitConfirmation returns nil when the transaction has been confirmed successfully.
-// TODO this is unused currently, since the endpoint in the sequencer is not clear yet
-func waitConfirmation(ctx context.Context, client *rpc.Client, tx *txtypes.Transaction) error {
-	f := func() (*txtypes.Receipt, error) {
-		var result txtypes.Receipt
-		err := client.CallContext(ctx, &result, "eth_getTransactionReceipt", tx.Hash().Hex())
-		if err != nil {
-			return nil, err
-		}
-		return &result, nil
-	}
-
-	receipt, err := medley.Retry(ctx, f)
-	if err != nil {
-		return errors.Wrapf(err, "can't retrieve receipt for tx-hash: %s", tx.Hash().Hex())
-	}
-	if receipt.TxHash.Hex() != tx.Hash().Hex() {
-		return errors.New("couldn't poll result")
-	}
-	if receipt.Status == txtypes.ReceiptStatusFailed {
-		return errors.New("receipt status failed")
-	}
-	return nil
 }
 
 func GetBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
