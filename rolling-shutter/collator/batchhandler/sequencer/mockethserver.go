@@ -74,18 +74,18 @@ type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 // The functionality of the MockEthServer is based on the
 // needs in the tests and might be extented in the future.
 type MockEthServer struct {
-	Mux            sync.RWMutex
-	URL            string
-	t              *testing.T
-	balances       map[string]map[string]*big.Int
-	nonces         map[string]map[string]uint64
-	chainID        *big.Int
-	blocks         map[string]blockData
-	blockNumber    uint64
-	receivedTxs    map[string]bool
-	HTTPServer     *httptest.Server
-	txs            map[string]*txtypes.Transaction
-	hooks          []txHookFunc
+	Mux         sync.RWMutex
+	URL         string
+	t           *testing.T
+	balances    map[string]map[string]*big.Int
+	nonces      map[string]map[string]uint64
+	chainID     *big.Int
+	blocks      map[string]blockData
+	blockNumber uint64
+	receivedTxs map[string]bool
+	HTTPServer  *httptest.Server
+	txs         map[string]*txtypes.Transaction
+	hooks       []txHookFunc
 }
 
 // Teardown has to be called if the MockEthServer is run

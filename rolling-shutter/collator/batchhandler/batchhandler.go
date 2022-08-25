@@ -340,7 +340,7 @@ func (bh *BatchHandler) getBatch(epoch epochid.EpochID) *batch.Batch {
 	return nil
 }
 
-// `removeBatch` removes a batch from the pool of batches.
+// removeBatch removes a batch from the pool of batches.
 // Should be called after the batch has stopped it's state-transition
 // and reached it's end of lifetime (confirmed and applied in the rollup).
 func (bh *BatchHandler) removeBatch(b *batch.Batch) {
@@ -532,7 +532,6 @@ func (bh *BatchHandler) HandleBatchConfirmation(epochID epochid.EpochID) error {
 // `OnOutboundDecryptionTrigger` puts a DecryptionTrigger in the collatordb to be sent to the keypers.
 // `OnOutboundDecryptionTrigger` progresses the pending EpochID to the next value which will stop
 // transactions encrypted for the old epoch-id to be accepted by the collator.
-// TODO maybe pass the batch as argument instead of getting it from the handler
 func (bh *BatchHandler) OnOutboundDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) error {
 	epochID, err := epochid.BytesToEpochID(trigger.GetEpochID())
 	if err != nil {
