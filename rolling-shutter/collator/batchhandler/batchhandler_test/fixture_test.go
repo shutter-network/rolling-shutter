@@ -232,8 +232,11 @@ func p2pMessagingMock(
 			}
 
 		case <-ctx.Done():
-			log.Debug().Msg("P2P message mock: closed")
-			return ctx.Err()
+			err := ctx.Err()
+			if err == context.Canceled {
+				return nil
+			}
+			return err
 		}
 	}
 }

@@ -103,12 +103,18 @@ func TestStateTransition(t *testing.T) {
 	// to the next state.
 	// In every state, we also trigger all other events that should
 	// not effect the state or cause a state transition.
-	headBatchHandler := func(b *batch.Batch, subscription chan batch.StateChangeResult) error {
-		eg, _ := errgroup.WithContext(context.Background())
+	headBatchHandler := func(ctx context.Context, b *batch.Batch, subscription chan batch.StateChangeResult) error {
+		eg, egctx := errgroup.WithContext(ctx)
 		eg.Go(func() error {
-			return headBatch.Run(epochChan1)
+			return headBatch.Run(egctx, epochChan1)
 		})
-		stateChange := <-subscription
+
+		// the Run() returns with an error, so the errorgroup context is canceled,
+		// -> but we don't check for the cancel but only wait to get a subscription value
+		stateChange, err := getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.NoState && stateChange.ToState == batch.InitialState) {
 			return errors.New("assert failed")
 		}
@@ -127,8 +133,10 @@ func TestStateTransition(t *testing.T) {
 			true,  // spam a batch confirmation
 		)
 
-		stateChange = <-subscription
-
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.InitialState && stateChange.ToState == batch.PendingState) {
 			return errors.New("assert failed")
 		}
@@ -150,7 +158,10 @@ func TestStateTransition(t *testing.T) {
 		epochChan1 <- epochTime1
 
 		// State Committed
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.PendingState && stateChange.ToState == batch.CommittedState) {
 			return errors.New("assert failed")
 		}
@@ -172,7 +183,10 @@ func TestStateTransition(t *testing.T) {
 		b.DecryptionKey <- decryptionKey
 
 		// State Decrypted
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.CommittedState && stateChange.ToState == batch.DecryptedState) {
 			return errors.New("assert failed")
 		}
@@ -201,7 +215,10 @@ func TestStateTransition(t *testing.T) {
 		b.ConfirmedBatch <- epoch1
 
 		// Wait for state Confirmed
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.DecryptedState && stateChange.ToState == batch.ConfirmedState) {
 			return errors.New("assert failed")
 		}
@@ -218,21 +235,20 @@ func TestStateTransition(t *testing.T) {
 		b.Stop()
 
 		// subscription will get closed after one more transition
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.ConfirmedState && stateChange.ToState == batch.StoppingState) {
 			return errors.New("assert failed")
 		}
 
-		stateChange, ok := <-subscription
-		if !ok {
-			// DEbugging
-			return errors.New("subscription closed")
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
 		}
 		stateChange.Log().Error().Msg("got this state - head batch")
 		if !assert.Check(t, stateChange.FromState == batch.StoppingState && stateChange.ToState == batch.NoState) {
-			// FIXME somehow we (sometimes only) receive a FromState==NoState ToState==NoState here
-			// probably an error in the run function or the state transitions?
-			// -> or this is a copy by value error here!!
 			return errors.New("assert failed")
 		}
 
@@ -250,15 +266,19 @@ func TestStateTransition(t *testing.T) {
 	// to the next state.
 	// In every state, we also trigger all other events that should
 	// not effect the state or cause a state transition.
-	nextBatchHandler := func(b *batch.Batch, subscription chan batch.StateChangeResult) error {
+	nextBatchHandler := func(ctx context.Context, b *batch.Batch, subscription chan batch.StateChangeResult) error {
 		// if the batch is stopped correctly,
 		// the subs channel will be closed anyways
 		// defer b.Unsubscribe(subscription)
-		eg, _ := errgroup.WithContext(context.Background())
+		eg, egctx := errgroup.WithContext(ctx)
 		eg.Go(func() error {
-			return nextBatch.Run(epochChan2)
+			return nextBatch.Run(egctx, epochChan2)
 		})
-		stateChange := <-subscription
+
+		stateChange, err := getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.NoState && stateChange.ToState == batch.InitialState) {
 			return errors.New("assert failed")
 		}
@@ -281,7 +301,10 @@ func TestStateTransition(t *testing.T) {
 		// once we transition to state "Pending"
 		b.Transaction <- tx5
 
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.InitialState && stateChange.ToState == batch.PendingState) {
 			return errors.New("assert failed")
 		}
@@ -301,7 +324,10 @@ func TestStateTransition(t *testing.T) {
 		epochChan2 <- epochTime2
 
 		// State Committed
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.PendingState && stateChange.ToState == batch.CommittedState) {
 			return errors.New("assert failed")
 		}
@@ -324,7 +350,10 @@ func TestStateTransition(t *testing.T) {
 		b.DecryptionKey <- decryptionKey
 
 		// State Decrypted
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.CommittedState && stateChange.ToState == batch.DecryptedState) {
 			return errors.New("assert failed")
 		}
@@ -351,7 +380,10 @@ func TestStateTransition(t *testing.T) {
 		b.ConfirmedBatch <- epoch2
 
 		// Wait for state Confirmed
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.DecryptedState && stateChange.ToState == batch.ConfirmedState) {
 			return errors.New("assert failed")
 		}
@@ -366,12 +398,18 @@ func TestStateTransition(t *testing.T) {
 		b.Stop()
 
 		// subscription will get closed after one more transition
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		if !assert.Check(t, stateChange.FromState == batch.ConfirmedState && stateChange.ToState == batch.StoppingState) {
 			return errors.New("assert failed")
 		}
 
-		stateChange = <-subscription
+		stateChange, err = getStateChange(egctx, subscription, false)
+		if err != nil {
+			return err
+		}
 		stateChange.Log().Error().Msg("got this state - next batch")
 		if !assert.Check(t, stateChange.FromState == batch.StoppingState && stateChange.ToState == batch.NoState) {
 			return errors.New("assert failed")
@@ -391,10 +429,10 @@ func TestStateTransition(t *testing.T) {
 	// they will block until the subscription
 	// to the state changes is finished
 	egroup.Go(func() error {
-		return headBatchHandler(headBatch, headBatchSubscription)
+		return headBatchHandler(ctx, headBatch, headBatchSubscription)
 	})
 	egroup.Go(func() error {
-		return nextBatchHandler(nextBatch, nextBatchSubscription)
+		return nextBatchHandler(ctx, nextBatch, nextBatchSubscription)
 	})
 
 	err = egroup.Wait()
@@ -477,4 +515,21 @@ func checkBatchTx(t *testing.T,
 		return errors.New("assert failed")
 	}
 	return nil
+}
+
+func getStateChange(
+	ctx context.Context,
+	subscription chan batch.StateChangeResult,
+	expectClosedChan bool,
+) (batch.StateChangeResult, error) {
+	select {
+	case stateChange, ok := <-subscription:
+		if expectClosedChan == ok {
+			return batch.StateChangeResult{}, errors.New("expectClosedChan parameter didn't meet expectations")
+		}
+		return stateChange, nil
+	case <-ctx.Done():
+		err := errors.Wrap(ctx.Err(), "batch Run context got canceled")
+		return batch.StateChangeResult{}, err
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gocmp "github.com/google/go-cmp/cmp"
 	txtypes "github.com/shutter-network/txtypes/types"
+	"golang.org/x/sync/errgroup"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
@@ -75,7 +76,9 @@ func TestBatchHandler(t *testing.T) {
 		// trigger the batch-confitmation handler in the batch-handler directly.
 		// we don't have an endpoint for batch-confirmation yet in the sequencer (and mock-sequencer)
 
-		defer fixtures.BatchHandler.HandleBatchConfirmation(epoch)
+		defer func() {
+			fixtures.BatchHandler.ConfirmedBatch() <- epoch
+		}()
 
 		switch tx.BatchIndex() {
 		case 1:
@@ -193,6 +196,8 @@ func TestBatchHandler(t *testing.T) {
 			me.SetNonce(fixtures.Address, uint64(4), "latest")
 			assertEqual(t, failFunc, len(tx.Transactions()), 1)
 		case batchhandler.SizeBatchPool + 2:
+			// FIXME this is closed in the test at batch 7, and then somehow the batchhandler goes on..
+			// -> this causes batch 8 to never receive the  batch inclusion confirmation
 			close(done)
 			return true
 		default:
@@ -204,17 +209,35 @@ func TestBatchHandler(t *testing.T) {
 		// after the first execution
 		return false
 	})
-	p2pctx, p2pcancel := context.WithCancel(ctx)
-	defer p2pcancel()
 
-	go p2pMessagingMock(t, p2pctx, failFunc, fixtures.Cfg, fixtures.BatchHandler)
-	go fixtures.BatchHandler.Run(ctx)
+	eg, errctx := errgroup.WithContext(ctx)
 
-	err := <-done
-	fixtures.BatchHandler.Stop()
-	if err != nil {
-		t.FailNow()
-	}
+	p2pctx, p2pcancel := context.WithCancel(errctx)
+
+	eg.Go(func() error {
+		return p2pMessagingMock(p2pctx, t, failFunc, fixtures.Cfg, fixtures.BatchHandler)
+	})
+	eg.Go(func() error {
+		return fixtures.BatchHandler.Run(errctx)
+	})
+
+	eg.Go(func() error {
+		defer p2pcancel()
+		defer fixtures.BatchHandler.Stop()
+
+		select {
+		case err := <-done:
+			if err == nil {
+				return nil
+			}
+			return err
+		case <-errctx.Done():
+			return errctx.Err()
+		}
+	})
+
+	err := eg.Wait()
+	assert.NilError(t, err)
 
 	assert.Check(t, ((<-tx1Result).Success))
 	assert.Check(t, ((<-tx2Result).Success))
