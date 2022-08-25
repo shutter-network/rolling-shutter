@@ -3,7 +3,6 @@ package collator
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -12,12 +11,14 @@ import (
 	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
@@ -32,13 +33,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 type collator struct {
 	Config config.Config
 
 	l1Client     *ethclient.Client
+	l2Client     *rpc.Client
 	contracts    *deployment.Contracts
 	batchHandler *batchhandler.BatchHandler
 
@@ -77,12 +78,12 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	err = initializeNextBatch(ctx, cltrdb.New(dbpool), l1Client)
+	batchHandler, err := batchhandler.NewBatchHandler(cfg, dbpool)
 	if err != nil {
 		return err
 	}
 
-	batchHandler, err := batchhandler.NewBatchHandler(cfg, dbpool)
+	l2RPCClient, err := rpc.Dial(cfg.SequencerURL)
 	if err != nil {
 		return err
 	}
@@ -91,6 +92,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		Config: cfg,
 
 		l1Client:  l1Client,
+		l2Client:  l2RPCClient,
 		contracts: contracts,
 		p2p: p2p.New(p2p.Config{
 			ListenAddr:     cfg.ListenAddress,
@@ -210,10 +212,13 @@ func (c *collator) run(ctx context.Context) error {
 		return c.p2p.Run(errorctx)
 	})
 	errorgroup.Go(func() error {
-		return c.processEpochLoop(errorctx)
+		return c.batchHandler.Run(errorctx)
 	})
 	errorgroup.Go(func() error {
-		return c.submitBatches(errorctx)
+		return c.sendMessages(errorctx)
+	})
+	errorgroup.Go(func() error {
+		return c.pollBatchConfirmations(errorctx)
 	})
 
 	return errorgroup.Wait()
@@ -226,15 +231,70 @@ func (c *collator) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }
 
-func (c *collator) processEpochLoop(ctx context.Context) error {
-	sleepDuration := c.Config.EpochDuration
+func (c *collator) sendMessages(ctx context.Context) error {
+	messages := c.batchHandler.Messages()
+	for msgOut := range messages {
+		if err := c.p2p.SendMessage(ctx, msgOut); err != nil {
+			log.Error().Err(err).Str("message", msgOut.LogInfo()).Msg("error sending message")
+			continue
+		}
+	}
+	return nil
+}
+
+func (c *collator) pollBatchConfirmations(ctx context.Context) error {
+	var (
+		batchIndex, newBatchIndex uint64
+		epochID                   epochid.EpochID
+	)
+
+	// poll ten times during one epoch duration.
+	// this is arbitrary for now, but allows to easily catch the next batch
+	// confirmation and not wait too long until
+	// this is noticed and progress is made
+	pollTime := time.Duration(int64(c.Config.EpochDuration) / 10)
+	ticker := time.NewTicker(pollTime)
+	initial := true
 
 	for {
 		select {
-		case <-time.After(sleepDuration):
-			if err := c.newEpoch(ctx); err != nil {
-				log.Printf("error creating new epoch: %s", err)
-				return err
+		case <-ticker.C:
+			var err error
+			epochID, err = c.getBatchConfirmation(ctx)
+			// for now only log errors but keep trying
+			if err != nil {
+				log.Error().Err(err).Msg("error retrieving the current batch-index from sequencer")
+				continue
+			}
+			newBatchIndex = epochID.Uint64()
+
+			if initial {
+				initial = false
+				batchIndex = newBatchIndex
+				continue
+			}
+
+			delta := int(newBatchIndex - batchIndex)
+			if delta > 1 {
+				// this shouldn't happen because collator is needed to progress the batches
+				log.Warn().Err(err).Msg("skipped batch-index")
+			}
+			for delta > 0 {
+				// if we skipped indices, they still have to be pushed
+				// to the batchhandler
+				batchIndex++
+				delta--
+
+				nextEpochID, err := epochid.Uint64ToEpochID(batchIndex)
+				if err != nil {
+					log.Error().Err(err).Msg("can't decode batch-index to epochid")
+					continue
+				}
+				select {
+				case c.batchHandler.ConfirmedBatch() <- nextEpochID:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -242,28 +302,29 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 	}
 }
 
-func (c *collator) newEpoch(ctx context.Context) error {
-	var outMessages []shmsg.P2PMessage
+func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, error) {
+	var epochID epochid.EpochID
 
-	blockNumber, err := getBlockNumber(ctx, c.l1Client)
-	if err != nil {
-		return err
-	}
-	if blockNumber > math.MaxUint32 {
-		return errors.Errorf("block number too big: %d", blockNumber)
-	}
-
-	outMessages, err = c.batchHandler.StartNextEpoch(ctx, uint32(blockNumber))
-	if err != nil {
-		return err
-	}
-	for _, msgOut := range outMessages {
-		if err := c.p2p.SendMessage(ctx, msgOut); err != nil {
-			log.Printf("error sending message %+v: %s", msgOut, err)
-			continue
+	f := func() (*string, error) {
+		var result string
+		log.Debug().Msg("polling batch-index from sequencer")
+		err := c.l2Client.CallContext(ctx, &result, "shutter_getBatchIndex")
+		if err != nil {
+			return nil, err
 		}
+		return &result, nil
 	}
-	return nil
+
+	result, err := medley.Retry(ctx, f)
+	if err != nil {
+		return epochID, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
+	}
+
+	epochID, err = epochid.HexToEpochID(*result)
+	if err != nil {
+		return epochID, errors.Wrap(err, "can't decode batch-index")
+	}
+	return epochID, nil
 }
 
 func getBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
