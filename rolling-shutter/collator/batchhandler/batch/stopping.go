@@ -37,33 +37,33 @@ func (tr *Stopping) Process(batch *Batch) *StateChangeResult {
 	}
 }
 
-func (tr *Stopping) Post(batch *Batch) State {
+func (tr *Stopping) Post(_ *Batch) State {
 	tr.processed = true
 	return &Stopped{previous: tr}
 }
 
-func (tr *Stopping) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Stopping) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
 
-func (tr *Stopping) OnEpochTick(batch *Batch, tickTime time.Time) State { return tr }
+func (tr *Stopping) OnEpochTick(_ *Batch, _ time.Time) State { return tr }
 
-func (tr *Stopping) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
+func (tr *Stopping) OnDecryptionKey(_ *Batch, _ []byte) State {
 	return tr
 }
 
-func (tr *Stopping) OnTransaction(batch *Batch, tx *transaction.Pending) State {
+func (tr *Stopping) OnTransaction(_ *Batch, tx *transaction.Pending) State {
 	err := errors.New("the batch this transaction is signed for has already been committed")
 	tx.Result <- transaction.Result{Err: err, Success: false}
 	close(tx.Result)
 	return tr
 }
 
-func (tr *Stopping) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Stopping) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
 
-func (tr *Stopping) OnStop(batch *Batch) State { return &Stopped{previous: tr} }
+func (tr *Stopping) OnStop(_ *Batch) State { return &Stopped{previous: tr} }
 
 type Stopped struct {
 	processed bool
@@ -83,24 +83,24 @@ func (tr *Stopped) Process(batch *Batch) *StateChangeResult {
 	}
 }
 
-func (tr *Stopped) Post(batch *Batch) State {
+func (tr *Stopped) Post(_ *Batch) State {
 	tr.processed = true
 	return tr
 }
 
-func (tr *Stopped) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Stopped) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
-func (tr *Stopped) OnEpochTick(batch *Batch, tickTime time.Time) State       { return tr }
-func (tr *Stopped) OnDecryptionKey(batch *Batch, decryptionKey []byte) State { return tr }
-func (tr *Stopped) OnTransaction(batch *Batch, tx *transaction.Pending) State {
+func (tr *Stopped) OnEpochTick(_ *Batch, _ time.Time) State  { return tr }
+func (tr *Stopped) OnDecryptionKey(_ *Batch, _ []byte) State { return tr }
+func (tr *Stopped) OnTransaction(_ *Batch, tx *transaction.Pending) State {
 	err := errors.New("the batch this transaction is signed for has already been committed")
 	tx.Result <- transaction.Result{Err: err, Success: false}
 	close(tx.Result)
 	return tr
 }
 
-func (tr *Stopped) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Stopped) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
-func (tr *Stopped) OnStop(batch *Batch) State { return tr }
+func (tr *Stopped) OnStop(_ *Batch) State { return tr }

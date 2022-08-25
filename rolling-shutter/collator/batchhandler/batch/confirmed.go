@@ -42,26 +42,26 @@ func (tr *Confirmed) Post(_ *Batch) State {
 	return tr
 }
 
-func (tr *Confirmed) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Confirmed) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
 
-func (tr *Confirmed) OnEpochTick(batch *Batch, tickTime time.Time) State {
+func (tr *Confirmed) OnEpochTick(_ *Batch, _ time.Time) State {
 	return tr
 }
 
-func (tr *Confirmed) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
+func (tr *Confirmed) OnDecryptionKey(_ *Batch, _ []byte) State {
 	return tr
 }
 
-func (tr *Confirmed) OnTransaction(batch *Batch, tx *transaction.Pending) State {
+func (tr *Confirmed) OnTransaction(_ *Batch, _ *transaction.Pending) State {
 	return tr
 }
 
-func (tr *Confirmed) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Confirmed) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
 
-func (tr *Confirmed) OnStop(batch *Batch) State {
+func (tr *Confirmed) OnStop(_ *Batch) State {
 	return &Stopping{previous: tr}
 }

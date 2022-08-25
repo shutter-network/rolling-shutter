@@ -48,24 +48,24 @@ func (tr *Decrypted) Process(batch *Batch) *StateChangeResult {
 	}
 }
 
-func (tr *Decrypted) Post(batch *Batch) State {
+func (tr *Decrypted) Post(_ *Batch) State {
 	tr.processed = true
 	return tr
 }
 
-func (tr *Decrypted) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Decrypted) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
 
-func (tr *Decrypted) OnEpochTick(batch *Batch, tickTime time.Time) State {
+func (tr *Decrypted) OnEpochTick(_ *Batch, _ time.Time) State {
 	return tr
 }
 
-func (tr *Decrypted) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
+func (tr *Decrypted) OnDecryptionKey(_ *Batch, _ []byte) State {
 	return tr
 }
 
-func (tr *Decrypted) OnTransaction(batch *Batch, tx *transaction.Pending) State {
+func (tr *Decrypted) OnTransaction(_ *Batch, tx *transaction.Pending) State {
 	err := errors.New("the batch this transaction is signed for has already been committed")
 	tx.Result <- transaction.Result{Err: err, Success: false}
 	close(tx.Result)
@@ -79,6 +79,6 @@ func (tr *Decrypted) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) 
 	return tr
 }
 
-func (tr *Decrypted) OnStop(batch *Batch) State {
+func (tr *Decrypted) OnStop(_ *Batch) State {
 	return &Stopping{previous: tr}
 }

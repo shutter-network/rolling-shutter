@@ -40,16 +40,16 @@ func (tr *Committed) Process(batch *Batch) *StateChangeResult {
 	}
 }
 
-func (tr *Committed) Post(batch *Batch) State {
+func (tr *Committed) Post(_ *Batch) State {
 	tr.processed = true
 	return tr
 }
 
-func (tr *Committed) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Committed) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
 
-func (tr *Committed) OnEpochTick(batch *Batch, tickTime time.Time) State {
+func (tr *Committed) OnEpochTick(_ *Batch, _ time.Time) State {
 	return tr
 }
 
@@ -58,17 +58,17 @@ func (tr *Committed) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
 	return &Decrypted{previous: tr}
 }
 
-func (tr *Committed) OnTransaction(batch *Batch, tx *transaction.Pending) State {
+func (tr *Committed) OnTransaction(_ *Batch, tx *transaction.Pending) State {
 	err := errors.New("the batch this transaction is signed for has already been committed")
 	tx.Result <- transaction.Result{Err: err, Success: false}
 	close(tx.Result)
 	return tr
 }
 
-func (tr *Committed) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Committed) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
 
-func (tr *Committed) OnStop(batch *Batch) State {
+func (tr *Committed) OnStop(_ *Batch) State {
 	return &Stopping{previous: tr}
 }

@@ -54,11 +54,11 @@ func (tr *Initial) OnStateChangePrevious(batch *Batch, stateChange StateChangeRe
 	return tr
 }
 
-func (tr *Initial) OnEpochTick(batch *Batch, tickTime time.Time) State {
+func (tr *Initial) OnEpochTick(_ *Batch, _ time.Time) State {
 	return tr
 }
 
-func (tr *Initial) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
+func (tr *Initial) OnDecryptionKey(_ *Batch, _ []byte) State {
 	return tr
 }
 
@@ -69,10 +69,10 @@ func (tr *Initial) OnTransaction(batch *Batch, tx *transaction.Pending) State {
 	return tr
 }
 
-func (tr *Initial) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Initial) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
 
-func (tr *Initial) OnStop(batch *Batch) State {
+func (tr *Initial) OnStop(_ *Batch) State {
 	return &Stopping{previous: tr}
 }

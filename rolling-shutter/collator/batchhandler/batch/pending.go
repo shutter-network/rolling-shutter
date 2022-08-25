@@ -36,15 +36,11 @@ func (tr *Pending) Process(batch *Batch) *StateChangeResult {
 }
 
 func (tr *Pending) Post(batch *Batch) State {
-	// TODO query the current block
-	// in order to get the base-fee etc?
-
 	// FIXME the block query and ApplyTx
 	// calls could be problematic,
 	// because they can block the transition
 	// function for quite some time
 
-	// FIXME context!!!!!
 	ctx := context.Background()
 
 	// first apply all the pooled transactions
@@ -61,21 +57,20 @@ func (tr *Pending) Post(batch *Batch) State {
 	return tr
 }
 
-func (tr *Pending) OnStateChangePrevious(batch *Batch, stateChange StateChangeResult) State {
+func (tr *Pending) OnStateChangePrevious(_ *Batch, _ StateChangeResult) State {
 	return tr
 }
 
-func (tr *Pending) OnEpochTick(batch *Batch, tickTime time.Time) State {
+func (tr *Pending) OnEpochTick(batch *Batch, _ time.Time) State {
 	batch.Log().Debug().Msg("received epoch tick in pending state")
 	return &Committed{previous: tr}
 }
 
-func (tr *Pending) OnDecryptionKey(batch *Batch, decryptionKey []byte) State {
+func (tr *Pending) OnDecryptionKey(_ *Batch, _ []byte) State {
 	return tr
 }
 
 func (tr *Pending) OnTransaction(batch *Batch, tx *transaction.Pending) State {
-	// FIXME ctx
 	ctx := context.Background()
 
 	// apply incoming txs directly while we wait for
@@ -97,10 +92,10 @@ func (tr *Pending) OnTransaction(batch *Batch, tx *transaction.Pending) State {
 	return tr
 }
 
-func (tr *Pending) OnBatchConfirmation(batch *Batch, epochID epochid.EpochID) State {
+func (tr *Pending) OnBatchConfirmation(_ *Batch, _ epochid.EpochID) State {
 	return tr
 }
 
-func (tr *Pending) OnStop(batch *Batch) State {
+func (tr *Pending) OnStop(_ *Batch) State {
 	return &Stopping{previous: tr}
 }
