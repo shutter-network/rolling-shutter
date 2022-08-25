@@ -168,7 +168,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) <-chan tr
 		}
 		return result
 	}
-	txEpoch, err := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
+	txEpoch, err := epochid.Uint64ToEpochID(tx.BatchIndex())
 	if err != nil {
 		result <- transaction.Result{Err: err, Success: false}
 		return result
@@ -314,7 +314,7 @@ func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, erro
 	} else {
 		headBatch = bh.batches[len(bh.batches)-1]
 		epochID, _ = computeNextEpochID(headBatch.EpochID())
-		// TODO get next epochid and guess the l1blocknumber based on recent timings
+		// TODO guess the l1blocknumber based on recent timings
 		l1BlockNumber = uint64(42)
 	}
 

@@ -3,10 +3,10 @@ package collator
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
@@ -59,9 +59,25 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	hash.Write(x.EncryptedTx)
 	txid := hash.Sum(nil)
 
-	err := srv.c.batchHandler.EnqueueTx(ctx, x.EncryptedTx)
+	// NOTE: We still have to decide how the caller can query for tx
+	// success / failure.
+
+	// there are some conditions where the tx can fail directly
+	// this should be checked, and then the request should return
+
+	// if initially valid, it could fail later
+	// during inclusion in the batch, e.g. because of nonce mismatch
+	// or lack of funds
+
+	// for now this waits until the final async result is set on the tx.
+	// this will block the request potentially for
+	// quite some time (until there is finality on the tx),
+	// worst case until the tx has been included in the batch and
+	// the batch has been confirmed
+	res := <-srv.c.batchHandler.EnqueueTx(ctx, x.EncryptedTx)
+	err := res.Err
 	if err != nil {
-		log.Printf("Error in SubmitTransaction: %s", err)
+		log.Error().Err(err).Msg("Error in SubmitTransaction")
 		sendError(w, http.StatusConflict, err.Error())
 		return
 	}
