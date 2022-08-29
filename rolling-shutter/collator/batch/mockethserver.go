@@ -64,9 +64,9 @@ func RunMockEthServer(t *testing.T) *MockEthServer {
 type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 
 // Single client Mock eth server that implements some Ethereum
-// JSON RPC methods (eth_getBalance, eth_getTransactionCount,
-//  eth_chainId, eth_sendRawTransaction, eth_getBlockByNumber,
-//  eth_getTransactionReceipt).
+// JSON RPC methods (eth_getBalance, eth_getTransactionCount, eth_chainId, eth_sendRawTransaction,
+// eth_getBlockByNumber, eth_getTransactionReceipt).
+//
 // Not all methods will strictly follow a Ethereum nodes logic
 // in terms of error response and response data integrety.
 // The functionality of the MockEthServer is based on the

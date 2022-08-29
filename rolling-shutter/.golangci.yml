@@ -20,6 +20,7 @@ linters-settings:
     lines: 100
     statements: 50
   gci:
+    custom-order: true
     sections:
       - Standard
       - Default

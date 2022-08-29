@@ -50,7 +50,7 @@ repos:
       - id: eslint
 
   - repo: https://github.com/shutter-network/pre-commit-go-hooks
-    rev: "b1789745a6645db269f6b26dda36d9a029e680a9"
+    rev: "ed735ca2048f831625cd155cf6a38b4a42d79d9b"
     hooks:
       - id: go-mod-tidy
         args: ["./rolling-shutter"]
@@ -58,6 +58,7 @@ repos:
       - id: gci
         args:
           [
+            "--custom-order",
             "-sStandard",
             "-sDefault",
             "-sPrefix(github.com/shutter-network/shutter)",

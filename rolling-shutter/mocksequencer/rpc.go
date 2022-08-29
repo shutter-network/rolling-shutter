@@ -85,7 +85,6 @@ func stringToAddress(addr string) (common.Address, error) {
 	if !common.IsHexAddress(addr) {
 		var a common.Address
 		return a, errors.New("not a valid ethereum address")
-
 	}
 	return common.HexToAddress(addr), nil
 }

@@ -3,25 +3,24 @@
 // Testing functions should be skipped if `NodeURLEnv` or `DeploymentsDirEnv` env are not set.
 // Test functions should look like:
 //
-//     func Test(t *testinng.T) {
-//       SkipChainTests(t)
-//       ctx := context.Background()
-//       contracts, cleanup := NewTestContracts(t, ctx)
-//       defer cleanup()
-//     }
+//	func Test(t *testinng.T) {
+//	  SkipChainTests(t)
+//	  ctx := context.Background()
+//	  contracts, cleanup := NewTestContracts(t, ctx)
+//	  defer cleanup()
+//	}
 //
 // Or if snapshots need to be taken during the test:
 //
-//     func Test(t *testing.T) {
-//       SkipChainTests(t)
-//       ctx := context.Background()
-//       client := GetChainClient(t, ctx)
-//       contracts := client.NewTestContracts(t)
+//	func Test(t *testing.T) {
+//	  SkipChainTests(t)
+//	  ctx := context.Background()
+//	  client := GetChainClient(t, ctx)
+//	  contracts := client.NewTestContracts(t)
 //
-//       snapshotID := client.TakeSnapshot(t, ctx)
-//       client.RevertToSnapshot(t, ctx, snapshotID)
-//     }
-//
+//	  snapshotID := client.TakeSnapshot(t, ctx)
+//	  client.RevertToSnapshot(t, ctx, snapshotID)
+//	}
 package chaintesthelpers
 
 import (

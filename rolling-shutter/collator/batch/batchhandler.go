@@ -93,12 +93,11 @@ func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, er
 }
 
 // BatchHandler is a threadsafe handler to process the following actions
-// - validate and enqueue incoming tx's either to the currently pending batch
-//    or for later validation in the transaction pool
-// - handle incoming decryption keys and send the currently pending batch-transaction
-//    to the sequencer
-// - start next epoch and initiate the broadcasting of the decryption-trigger to
-//    the keypers
+//   - validate and enqueue incoming tx's either to the currently pending batch or for later
+//     validation in the transaction pool
+//   - handle incoming decryption keys and send the currently pending batch-transaction to the
+//     sequencer
+//   - start next epoch and initiate the broadcasting of the decryption-trigger to the keypers
 type BatchHandler struct {
 	mux      sync.Mutex
 	l2Client *rpc.Client

@@ -495,6 +495,7 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Payload:
+	//
 	//	*Message_BatchConfig
 	//	*Message_BlockSeen
 	//	*Message_CheckIn

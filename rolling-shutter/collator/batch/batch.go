@@ -144,16 +144,15 @@ func (b *Batch) NewPendingTransaction(tx *txtypes.Transaction, txRaw []byte, rec
 	return pendingTx, nil
 }
 
-// ValidateTx checks that the transaction `p` fulfills all preliminary
-// conditions to be included in the batch.
+// ValidateTx checks that the transaction `p` fulfills all preliminary conditions to be included in
+// the batch.
 // A valid transaction:
-//    a) has a monotonically increasing nonce for the sender's
-//        account at the latest chain-state, also considering all
-//        previous locally
-//        included transactions in that batch
-//    b) has enough balance at the senders account in order to pay the
-//        tansactions gas fees, also considering all previous locally
-//        included transactions in that batch
+//
+//   - has a monotonically increasing nonce for the sender's account at the latest chain-state,
+//     also considering all previous locally included transactions in that batch
+//
+//   - has enough balance at the senders account in order to pay the tansactions gas fees, also
+//     considering all previous locally included transactions in that batch
 func (b *Batch) ValidateTx(ctx context.Context, p *PendingTransaction) error {
 	currentNonce, err := b.state.GetNonce(ctx, p.sender)
 	if err != nil {

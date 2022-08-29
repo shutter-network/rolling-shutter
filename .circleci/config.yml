@@ -6,12 +6,12 @@ version: 2.1
 setup: true
 
 orbs:
-  continuation: circleci/continuation@0.2.0
+  continuation: circleci/continuation@0.3.1
 
 executors:
   cimg-base:
     docker:
-      - image: cimg/base:2022.04
+      - image: cimg/base:2022.08
 
 jobs:
   gen:
@@ -21,7 +21,7 @@ jobs:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v11
+          key: gen-clj-v12
       - run:
           name: Install babashka with asdf
           command: |
@@ -39,7 +39,7 @@ jobs:
           command: |
             bb -gen-ci
       - save_cache:
-          key: gen-clj-v11
+          key: gen-clj-v12
           paths:
             - ~/.asdf
       - continuation/continue:
