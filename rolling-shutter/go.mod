@@ -7,12 +7,12 @@ require (
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/getkin/kin-openapi v0.87.0
 	github.com/go-chi/chi/v5 v5.0.7
-	github.com/google/go-cmp v0.5.7
-	github.com/jackc/pgconn v1.10.1
-	github.com/jackc/pgx/v4 v4.14.1
+	github.com/google/go-cmp v0.5.8
+	github.com/jackc/pgconn v1.12.1
+	github.com/jackc/pgx/v4 v4.16.1
 	github.com/justinas/alice v1.2.0
 	github.com/kr/pretty v0.3.0
-	github.com/kyleconroy/sqlc v1.12.0
+	github.com/kyleconroy/sqlc v1.15.0
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-pubsub v0.5.6
@@ -23,7 +23,7 @@ require (
 	github.com/rs/zerolog v1.26.1
 	github.com/shutter-network/shutter/shlib v0.1.10
 	github.com/shutter-network/txtypes v0.0.5
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.11.0
 	github.com/tendermint/go-amino v0.16.0
@@ -31,7 +31,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220518034528-6f7dac969898
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	golang.org/x/tools v0.1.10
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.3
 )
@@ -39,13 +39,15 @@ require (
 require (
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/Workiva/go-datastructures v1.0.53 // indirect
-	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220626175859-9abda183db8e // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd v0.22.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.1.3 // indirect
+	github.com/bytecodealliance/wasmtime-go v0.39.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cosmos/gorocksdb v1.2.0 // indirect
+	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
@@ -95,9 +97,9 @@ require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jackc/pgtype v1.9.1 // indirect
+	github.com/jackc/pgtype v1.11.0 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
@@ -173,16 +175,17 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7 // indirect
 	github.com/petermattis/goid v0.0.0-20220512133901-1f93b0c1af58 // indirect
-	github.com/pganalyze/pg_query_go/v2 v2.1.0 // indirect
+	github.com/pganalyze/pg_query_go/v2 v2.1.2 // indirect
 	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee // indirect
-	github.com/pingcap/parser v0.0.0-20210914110036-002913dd28ec // indirect
+	github.com/pingcap/tidb/parser v0.0.0-20220725134311-c80026e61f00 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
@@ -213,6 +216,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
+	golang.org/x/exp v0.0.0-20220428152302-39d4317da171 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
