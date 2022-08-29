@@ -49,10 +49,10 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: go get -d ./...
       - save_cache:
-          key: go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: go-mod-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - ~/go/pkg/
       - restore_cache:
@@ -163,7 +163,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
             - rs-lint-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}

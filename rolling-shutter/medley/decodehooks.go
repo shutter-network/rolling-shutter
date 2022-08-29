@@ -54,6 +54,20 @@ func StringToURL(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 	return url.Parse(data.(string))
 }
 
+func StringToEd25519PublicKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PublicKey{}) {
+		return data, nil
+	}
+	p, err := hex.DecodeString(data.(string))
+	if err != nil {
+		return nil, err
+	}
+	if len(p) != ed25519.PublicKeySize {
+		return nil, errors.New("badly formed ed25519 public key")
+	}
+	return ed25519.PublicKey(p), nil
+}
+
 func StringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PrivateKey{}) {
 		return data, nil

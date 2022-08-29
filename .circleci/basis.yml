@@ -6,7 +6,7 @@ commands:
       - run:
           name: Install go
           command: |
-            curl -sSL "https://go.dev/dl/go1.18.1.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+            curl -sSL "https://go.dev/dl/go1.19.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
             mkdir -p ~/go/bin
             echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
 
@@ -50,13 +50,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.18.1@sha256:88f7af79869ed580fc38bde8bc9fe34578c3b293426880c5d5722cc29e4d8f33
+      - image: cimg/go:1.19.0@sha256:a6adde8f9cef732fc576ae2c5970f4537861c5beadb8ca9234b351c7d71659ab
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.18.1@sha256:88f7af79869ed580fc38bde8bc9fe34578c3b293426880c5d5722cc29e4d8f33
+      - image: cimg/go:1.19.0@sha256:a6adde8f9cef732fc576ae2c5970f4537861c5beadb8ca9234b351c7d71659ab
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -80,9 +80,9 @@ jobs:
       - install-go
       - restore_cache:
           keys:
-            - go-mod-v4-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
+            - go-mod-v5-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
-          key: pre-commit-cache-v8-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v9-{{ checksum ".pre-commit-config.yaml" }}
       - run:
           name: Install pre-commit
           command: |
@@ -93,7 +93,7 @@ jobs:
             fi
       - run: pre-commit install-hooks
       - save_cache:
-          key: pre-commit-cache-v8-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v9-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local

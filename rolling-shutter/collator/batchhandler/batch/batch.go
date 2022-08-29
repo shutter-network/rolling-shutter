@@ -282,13 +282,11 @@ func (b *Batch) Log() *zerolog.Logger {
 // validateTx checks that the transaction `p` fulfills all preliminary
 // conditions to be included in the batch.
 // A valid transaction:
-//    a) has a monotonically increasing nonce for the sender's
-//        account at the latest chain-state, also considering all
-//        previous locally
-//        included transactions in that batch
-//    b) has enough balance at the senders account in order to pay the
-//        tansactions gas fees, also considering all previous locally
-//        included transactions in that batch
+//
+//  1. has a monotonically increasing nonce for the sender's account at the latest chain-state,
+//     also considering all previous locally included transactions in that batch
+//  2. has enough balance at the senders account in order to pay the tansactions gas fees, also
+//     considering all previous locally included transactions in that batch
 func (b *Batch) validateTx(ctx context.Context, p *transaction.Pending) error {
 	currentNonce, err := b.chainState.GetNonce(ctx, p.Sender)
 	if err != nil {

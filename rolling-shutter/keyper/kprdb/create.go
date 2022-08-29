@@ -15,8 +15,9 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-//go:embed schema.sql
 // CreateKeyperTables contains the SQL statements to create the keyper tables.
+//
+//go:embed schema.sql
 var CreateKeyperTables string
 
 // schemaVersion is used to check that we use the right schema.

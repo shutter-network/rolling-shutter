@@ -164,6 +164,10 @@
     sys))
 
 
+(defn get-public-validator-key
+  "get the public validator key from a priv_validator_key.json map"
+  [m]
+  (base64/decode (get-in m ["pub_key" "value"])))
 
 (defn get-private-validator-key
   "get the private validator key from a priv_validator_key.json map"
@@ -179,6 +183,12 @@
   [path]
   (let [m (json/decode (slurp path))]
     (get-private-validator-key m)))
+
+(defn- read-public-validator-key
+  "read the validators private key from the given priv_validator_key.json file"
+  [path]
+  (let [m (json/decode (slurp path))]
+    (get-public-validator-key m)))
 
 (defn- merge-genesis
   "merge multiple genesis.json maps. This returns the first map with the validators key set to the
@@ -216,20 +226,18 @@
   build/sys-write-config-files afterwards."
   [sys]
   (let [keypers (:sys/keypers sys)
-        seeds (mapv (fn [n]
-                      (let [privkey (read-private-validator-key
-                                     (sys-chain-config-path sys n "priv_validator_key.json"))
-                            seed (seed-from-private-validator-key privkey)
-                            seed-str (format-hex seed)]
-                        seed-str))
+        pubkeys (mapv (fn [n]
+                      (let [pubkey (read-public-validator-key
+                                    (sys-chain-config-path sys n "priv_validator_key.json"))]
+                        (format-hex pubkey)))
                     (range (count keypers)))
-        keypers (mapv (fn [k seed n]
+        keypers (mapv (fn [k pubkey n]
                         (-> k
-                            (assoc-in [:subcommand/toml-edits "ValidatorSeed"] seed)
+                            (assoc-in [:subcommand/toml-edits "ValidatorPublicKey"] pubkey)
                             (assoc-in [:subcommand/toml-edits "ShuttermintURL"]
                                       (format "http://localhost:%d" (+ 28000 n)))))
                       keypers
-                      seeds
+                      pubkeys
                       (range (count keypers)))]
     (assoc sys :sys/keypers keypers)))
 

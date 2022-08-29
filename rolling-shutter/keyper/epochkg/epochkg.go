@@ -1,5 +1,5 @@
-/*epochkg implements the epoch key generation given the result of a successful DKG generation with
-  puredkg*/
+/*Package epochkg implements the epoch key generation given the result of a successful DKG generation with puredkg.
+ */
 package epochkg
 
 import (

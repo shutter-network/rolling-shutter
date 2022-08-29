@@ -2,7 +2,6 @@ package keyper
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
 	"fmt"
@@ -264,7 +263,7 @@ func (st *ShuttermintState) handleBatchConfig(
 			queries,
 			"check-in",
 			shmsg.NewCheckIn(
-				st.config.ValidatorKey.Public().(ed25519.PublicKey),
+				st.config.ValidatorPublicKey,
 				&st.config.EncryptionKey.PublicKey,
 			),
 		)

@@ -66,26 +66,26 @@ func RunMockEthServer(t *testing.T) *MockEthServer {
 type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 
 // Single client Mock eth server that implements some Ethereum
-// JSON RPC methods (eth_getBalance, eth_getTransactionCount,
-//  eth_chainId, eth_sendRawTransaction, eth_getBlockByNumber,
-//  eth_getTransactionReceipt).
+// JSON RPC methods (eth_getBalance, eth_getTransactionCount, eth_chainId, eth_sendRawTransaction,
+// eth_getBlockByNumber, eth_getTransactionReceipt).
+//
 // Not all methods will strictly follow a Ethereum nodes logic
 // in terms of error response and response data integrety.
 // The functionality of the MockEthServer is based on the
 // needs in the tests and might be extented in the future.
 type MockEthServer struct {
-	Mux            sync.RWMutex
-	URL            string
-	t              *testing.T
-	balances       map[string]map[string]*big.Int
-	nonces         map[string]map[string]uint64
-	chainID        *big.Int
-	blocks         map[string]blockData
-	blockNumber    uint64
-	receivedTxs    map[string]bool
-	HTTPServer     *httptest.Server
-	txs            map[string]*txtypes.Transaction
-	hooks          []txHookFunc
+	Mux         sync.RWMutex
+	URL         string
+	t           *testing.T
+	balances    map[string]map[string]*big.Int
+	nonces      map[string]map[string]uint64
+	chainID     *big.Int
+	blocks      map[string]blockData
+	blockNumber uint64
+	receivedTxs map[string]bool
+	HTTPServer  *httptest.Server
+	txs         map[string]*txtypes.Transaction
+	hooks       []txHookFunc
 }
 
 // Teardown has to be called if the MockEthServer is run

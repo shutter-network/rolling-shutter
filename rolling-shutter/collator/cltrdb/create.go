@@ -13,8 +13,9 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-//go:embed schema.sql
 // CreateCollatorTables contains the SQL statements to create the collator tables.
+//
+//go:embed schema.sql
 var CreateCollatorTables string
 
 // schemaVersion is used to check that we use the right schema.
