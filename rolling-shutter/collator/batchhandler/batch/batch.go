@@ -26,6 +26,7 @@ const (
 	BatchSizeLimit int    = 8 * 1024
 )
 
+//go:generate stringer -type=StateEnum -output stateenum_string.gen.go
 const (
 	NoState StateEnum = iota
 	InitialState
@@ -37,26 +38,6 @@ const (
 )
 
 type StateEnum int
-
-func (s StateEnum) String() string {
-	switch s {
-	case NoState:
-		return "nostate"
-	case InitialState:
-		return "initial"
-	case PendingState:
-		return "pending"
-	case CommittedState:
-		return "committed"
-	case DecryptedState:
-		return "decrypted"
-	case ConfirmedState:
-		return "confirmed"
-	case StoppingState:
-		return "stopping"
-	}
-	return ""
-}
 
 type StateChangeError struct {
 	Err error
