@@ -168,11 +168,7 @@ func (bh *BatchHandler) EnqueueTx(ctx context.Context, txBytes []byte) <-chan tr
 		}
 		return result
 	}
-	txEpoch, err := epochid.Uint64ToEpochID(tx.BatchIndex())
-	if err != nil {
-		result <- transaction.Result{Err: err, Success: false}
-		return result
-	}
+	txEpoch := epochid.Uint64ToEpochID(tx.BatchIndex())
 
 	receiveTime := time.Now()
 	pending, err := transaction.NewPending(bh.Signer(), txBytes, receiveTime)

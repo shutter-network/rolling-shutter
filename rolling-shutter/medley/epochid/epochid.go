@@ -32,8 +32,9 @@ func HexToEpochID(n string) (EpochID, error) {
 	return BytesToEpochID(common.FromHex(n))
 }
 
-func Uint64ToEpochID(n uint64) (EpochID, error) {
-	return BigToEpochID(new(big.Int).SetUint64(n))
+func Uint64ToEpochID(n uint64) EpochID {
+	r, _ := BigToEpochID(new(big.Int).SetUint64(n))
+	return r
 }
 
 func (e EpochID) Bytes() []byte {

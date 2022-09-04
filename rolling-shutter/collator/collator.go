@@ -285,11 +285,7 @@ func (c *collator) pollBatchConfirmations(ctx context.Context) error {
 				batchIndex++
 				delta--
 
-				nextEpochID, err := epochid.Uint64ToEpochID(batchIndex)
-				if err != nil {
-					log.Error().Err(err).Msg("can't decode batch-index to epochid")
-					continue
-				}
+				nextEpochID := epochid.Uint64ToEpochID(batchIndex)
 				select {
 				case c.batchHandler.ConfirmedBatch() <- nextEpochID:
 				case <-ctx.Done():
