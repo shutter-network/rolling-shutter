@@ -178,7 +178,7 @@ func (m *MockNode) sendMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-time.After(sleepDuration):
-			epochID, _ := epochid.BigToEpochID(new(big.Int).SetUint64(epochIDUint64))
+			epochID := epochid.Uint64ToEpochID(epochIDUint64)
 			if err := m.sendMessagesForEpoch(ctx, epochID); err != nil {
 				return err
 			}

@@ -4,7 +4,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -17,8 +16,8 @@ func main() {
 	keygen := testkeygen.NewTestKeyGenerator(&testing.T{}, 3, 2)
 
 	var prevEonPublicKey *shcrypto.EonPublicKey
-	for i := int64(0); i < 200; i++ {
-		epochID, _ := epochid.BigToEpochID(big.NewInt(i))
+	for i := uint64(0); i < 200; i++ {
+		epochID := epochid.Uint64ToEpochID(i)
 		eonPublicKey := keygen.EonPublicKey(epochID)
 		decryptionKey := keygen.EpochSecretKey(epochID)
 

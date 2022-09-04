@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"math/big"
 	"testing"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -147,9 +146,9 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 
-	epoch1, _ := epochid.BigToEpochID(big.NewInt(1))
-	epoch1000, _ := epochid.BigToEpochID(big.NewInt(1000))
-	epoch2000, _ := epochid.BigToEpochID(big.NewInt(2000))
+	epoch1 := epochid.Uint64ToEpochID(1)
+	epoch1000 := epochid.Uint64ToEpochID(1000)
+	epoch2000 := epochid.Uint64ToEpochID(2000)
 
 	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(epoch1).GobEncode()
 	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(epoch1000).GobEncode()

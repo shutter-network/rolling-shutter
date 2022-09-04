@@ -72,8 +72,8 @@ func TestBatchHandler(t *testing.T) {
 		assertEqual(t, failFunc, tx.BatchIndex(), currentBatchIndex+1)
 		currentBatchIndex++
 
-		epoch, _ := epochid.BigToEpochID(new(big.Int).SetUint64(tx.BatchIndex()))
-		// trigger the batch-confitmation handler in the batch-handler directly.
+		epoch := epochid.Uint64ToEpochID(tx.BatchIndex())
+		// trigger the batch-confirmation handler in the batch-handler directly.
 		// we don't have an endpoint for batch-confirmation yet in the sequencer (and mock-sequencer)
 
 		defer func() {

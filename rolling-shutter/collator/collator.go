@@ -120,10 +120,7 @@ func initializeNextBatch(ctx context.Context, db *cltrdb.Queries, l1Client *ethc
 			return errors.Errorf("block number too big: %d", blk)
 		}
 
-		epochID, err := epochid.BigToEpochID(common.Big0)
-		if err != nil {
-			return err
-		}
+		epochID, _ := epochid.BigToEpochID(common.Big0)
 		return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
 			EpochID:       epochID.Bytes(),
 			L1BlockNumber: int64(blk),
