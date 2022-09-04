@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -37,8 +36,7 @@ const (
 // computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
 func computeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
 	n := epochID.Big()
-	nextN := new(big.Int).Add(n, common.Big1)
-	return epochid.BigToEpochID(nextN)
+	return epochid.BigToEpochID(n.Add(n, common.Big1))
 }
 
 // GetNextBatch gets the epochID and block number that will be used in the next batch.
