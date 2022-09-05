@@ -293,6 +293,7 @@ func (bh *BatchHandler) Stop() {
 // in the pool of batches and appends that to the "HEAD" position of the pool of batches.
 func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, error) {
 	bh.mux.Lock()
+	defer bh.mux.Unlock()
 	var (
 		headBatch     *batch.Batch
 		epochID       epochid.EpochID
@@ -321,7 +322,6 @@ func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, erro
 		Int("num-batches", len(bh.batches)).
 		Str("block-number", fmt.Sprint(newBatch.L1BlockNumber)).
 		Msg("added HEAD batch to batch pool")
-	bh.mux.Unlock()
 	return newBatch, nil
 }
 
