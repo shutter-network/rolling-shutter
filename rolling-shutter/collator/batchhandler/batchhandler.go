@@ -382,6 +382,7 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 		return b.Run(ctx, epochTick)
 	})
 
+	once := sync.Once{}
 	stop := func() {
 		b.Broker.Unsubscribe(batchState)
 		bh.removeBatch(b)
@@ -424,9 +425,7 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 					// all other batches.
 					// we don't have any graceful handling of this currently,
 					// so it's best to shut down the batchhandler entirely
-					stop()
-					// this ensures stop is not called by other means twice
-					stop = func() {}
+					once.Do(stop)
 					continue
 				}
 
@@ -438,9 +437,7 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 				})
 			case batch.DecryptedState:
 			case batch.ConfirmedState:
-				stop()
-				// this ensures the cleanup is not called by ctx.Done() as well
-				stop = func() {}
+				once.Do(stop)
 			case batch.StoppingState:
 			}
 			for _, transitionError := range stateTransition.Errors {
@@ -463,10 +460,7 @@ func (bh *BatchHandler) HandleStateTransitions(ctx context.Context, eg *errgroup
 		case <-ctxDone:
 			b.Log().Debug().Msg("context canceled, stopping in HandleStateTransitions")
 			ctxDone = nil
-			stop()
-			// this ensures the cleanup is not called by "Confirmed" state-transition
-			// as well
-			stop = func() {}
+			once.Do(stop)
 		}
 	}
 }
