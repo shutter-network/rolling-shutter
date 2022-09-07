@@ -1,4 +1,4 @@
-package batch
+package transaction
 
 import (
 	"container/heap"
@@ -87,21 +87,21 @@ func (bt *SortedUint64s) Insert(x uint64) {
 // It allows to sort `PendingTransaction` transactions by Nonce,
 // and if the nonces are the same the transaction with
 // earlier receival time will come first in the sorted slice.
-type SortableTransactions []*PendingTransaction
+type SortableTransactions []*Pending
 
 func (s SortableTransactions) Len() int { return len(s) }
 func (s SortableTransactions) Less(i, j int) bool {
 	// If the nonces are equal, use the time the transaction was last seen for
 	// deterministic sorting
-	if s[i].tx.Nonce() == s[j].tx.Nonce() {
-		return s[j].receiveTime.Before(s[i].receiveTime)
+	if s[i].Tx.Nonce() == s[j].Tx.Nonce() {
+		return s[j].ReceiveTime.Before(s[i].ReceiveTime)
 	}
-	return s[i].tx.Nonce() < s[j].tx.Nonce()
+	return s[i].Tx.Nonce() < s[j].Tx.Nonce()
 }
 func (s SortableTransactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s *SortableTransactions) Push(x interface{}) {
-	*s = append(*s, x.(*PendingTransaction))
+	*s = append(*s, x.(*Pending))
 }
 
 func (s *SortableTransactions) Pop() interface{} {
@@ -124,8 +124,8 @@ func (s *SortableTransactions) Peek() interface{} {
 	return old[n-1]
 }
 
-func NewTransactionPool(signer txtypes.Signer) *TransactionPool {
-	return &TransactionPool{
+func NewPool(signer txtypes.Signer) *Pool {
+	return &Pool{
 		txs:          make(map[common.Address]*SortableTransactions, 0),
 		batchSenders: make(map[uint64]map[common.Address]bool, 0),
 		signer:       signer,
@@ -133,9 +133,9 @@ func NewTransactionPool(signer txtypes.Signer) *TransactionPool {
 	}
 }
 
-// TransactionPool represents a set of transactions that can pop
+// Pool represents a set of transactions that can pop
 // (remove and return) transactions in a profit-maximizing sorted order per batch.
-type TransactionPool struct {
+type Pool struct {
 	signer txtypes.Signer
 	mux    sync.Mutex
 	// Per account nonce-sorted list of transactions
@@ -146,7 +146,7 @@ type TransactionPool struct {
 	batches SortedUint64s
 }
 
-func (t *TransactionPool) Batches() SortedUint64s {
+func (t *Pool) Batches() SortedUint64s {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
@@ -155,7 +155,7 @@ func (t *TransactionPool) Batches() SortedUint64s {
 
 // Senders returns the set of all sender addresses that have transactions
 // pooled for that `batchIndex`.
-func (t *TransactionPool) Senders(batchIndex uint64) []common.Address {
+func (t *Pool) Senders(batchIndex uint64) []common.Address {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
@@ -175,10 +175,10 @@ func (t *TransactionPool) Senders(batchIndex uint64) []common.Address {
 // If there were transactions for batches prior to the popped batch,
 // those transactions are removed from the pool - they are NOT
 // returned by Pop.
-func (t *TransactionPool) Pop(batchIndex uint64) []*PendingTransaction {
+func (t *Pool) Pop(batchIndex uint64) []*Pending {
 	t.mux.Lock()
 	defer t.mux.Unlock()
-	txs := make([]*PendingTransaction, 0)
+	txs := make([]*Pending, 0)
 	senders, ok := t.batchSenders[batchIndex]
 	if !ok {
 		return txs
@@ -190,11 +190,11 @@ func (t *TransactionPool) Pop(batchIndex uint64) []*PendingTransaction {
 				// We popped the queue empty!
 				break
 			}
-			p, _ := heap.Pop(tq).(*PendingTransaction)
-			if p.tx.BatchIndex() < batchIndex {
+			p, _ := heap.Pop(tq).(*Pending)
+			if p.Tx.BatchIndex() < batchIndex {
 				// forget this tx
 				continue
-			} else if p.tx.BatchIndex() > batchIndex {
+			} else if p.Tx.BatchIndex() > batchIndex {
 				// process this transaction at a later Pop()
 				// push on the heap again
 				heap.Push(tq, p)
@@ -214,24 +214,24 @@ func (t *TransactionPool) Pop(batchIndex uint64) []*PendingTransaction {
 // It also adds the transaction's sender address to the
 // set of senders for that `batchIndex`, retrievable by
 // the Sender() method.
-func (t *TransactionPool) Push(pending *PendingTransaction) {
+func (t *Pool) Push(pending *Pending) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
-	batch := pending.tx.BatchIndex()
+	batch := pending.Tx.BatchIndex()
 	senders, exists := t.batchSenders[batch]
 	if !exists {
 		senders = make(map[common.Address]bool, 1)
 		t.batchSenders[batch] = senders
 	}
 
-	senders[pending.sender] = true
-	txs, exists := t.txs[pending.sender]
+	senders[pending.Sender] = true
+	txs, exists := t.txs[pending.Sender]
 	if !exists {
 		tx := make(SortableTransactions, 0)
 		txs = &tx
 		heap.Init(txs)
-		t.txs[pending.sender] = txs
+		t.txs[pending.Sender] = txs
 	}
 	heap.Push(txs, pending)
 	t.batches.Insert(batch)

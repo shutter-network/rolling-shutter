@@ -1,15 +1,11 @@
-package batch
+package sequencer
 
 import (
 	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	txtypes "github.com/shutter-network/txtypes/types"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 type Block interface {
@@ -26,58 +22,29 @@ type State interface {
 	SetNonce(a common.Address, nonce uint64)
 }
 
-func NewCachedPendingBatch(
-	ctx context.Context, epochID epochid.EpochID, l1BlockNumber uint64, client *ethclient.Client,
-) (*Batch, error) {
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	signer := txtypes.LatestSignerForChainID(chainID)
-
-	// batchindex not necessarily the same as the l2blocknumber.
-	// just query for the current state of the addresses balance/nonce.
-	// since the collator is the only one progressing the balance/nonce state,
-	// this is fine as long as the current batch is not submitted
-	// number=nil means the latest state from the node
-	block, err := client.BlockByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	state := &ChainBatchCache{
-		Client:        client,
-		AtBlockNumber: nil,
-		balances:      make(map[common.Address]*big.Int, 0),
-		nonces:        make(map[common.Address]uint64, 0),
-	}
-
-	b := &Batch{
-		ChainID:       chainID,
-		epochID:       epochID,
-		l1BlockNumber: l1BlockNumber,
-		signer:        signer,
-		state:         state,
-		block:         block,
-		transactions:  NewTransactionQueue(),
-	}
-	b.gasPool.AddGas(block.GasLimit())
-	return b, nil
-}
-
 type EthClient interface {
 	BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error)
 	NonceAt(context.Context, common.Address, *big.Int) (uint64, error)
 }
 
-// ChainBatchCache tracks the state of account's nonces and balances
+func NewCached(client EthClient, atBlockNumber *big.Int) *Cached {
+	return &Cached{
+		balances:      make(map[common.Address]*big.Int),
+		nonces:        make(map[common.Address]uint64),
+		Client:        client,
+		AtBlockNumber: atBlockNumber,
+	}
+}
+
+// Cached tracks the state of account's nonces and balances
 // for a certain Batch.
 // If an address is not cached yet, it polls initial balances or nonces
 // on a GetBalance or GetNonce call from the underlying ethereum node via the
-// ChainBatchCache.Client. Then the value is cached and never polled again for
+// Cached.Client. Then the value is cached and never polled again for
 // that address.
 // This allows to poll chain-state and then modify it locally, e.g. while
 // accepting user transactions to be proposed as the next block to the sequencer.
-type ChainBatchCache struct {
+type Cached struct {
 	balances map[common.Address]*big.Int
 	nonces   map[common.Address]uint64
 
@@ -87,7 +54,7 @@ type ChainBatchCache struct {
 
 // GetBalance polls and caches the state of account `a` balance at the
 // block number ChainBatchCache.AtBlockNumber.
-func (c *ChainBatchCache) GetBalance(ctx context.Context, a common.Address) (*big.Int, error) {
+func (c *Cached) GetBalance(ctx context.Context, a common.Address) (*big.Int, error) {
 	var err error
 
 	bal, exists := c.balances[a]
@@ -105,7 +72,7 @@ func (c *ChainBatchCache) GetBalance(ctx context.Context, a common.Address) (*bi
 // If no balance is cached yet, SubBalance will conduct a call to the ethereum
 // node to get the state of the balance before modifying it.
 // The modified value is then persisted in the internal state cache.
-func (c *ChainBatchCache) SubBalance(ctx context.Context, a common.Address, diff *big.Int) error {
+func (c *Cached) SubBalance(ctx context.Context, a common.Address, diff *big.Int) error {
 	old, err := c.GetBalance(ctx, a)
 	if err != nil {
 		return err
@@ -122,7 +89,7 @@ func (c *ChainBatchCache) SubBalance(ctx context.Context, a common.Address, diff
 // If no balance is cached yet, AddBalance will conduct a call to the ethereum
 // node to get the state of the balance before modifying it.
 // The modified value is then persisted in the internal state cache.
-func (c *ChainBatchCache) AddBalance(ctx context.Context, a common.Address, diff *big.Int) error {
+func (c *Cached) AddBalance(ctx context.Context, a common.Address, diff *big.Int) error {
 	old, err := c.GetBalance(ctx, a)
 	if err != nil {
 		return err
@@ -133,8 +100,11 @@ func (c *ChainBatchCache) AddBalance(ctx context.Context, a common.Address, diff
 
 // GetNonce polls and caches the state of account `a` balance at the
 // block number ChainBatchCache.AtBlockNumber.
-func (c *ChainBatchCache) GetNonce(ctx context.Context, a common.Address) (uint64, error) {
-	var err error
+func (c *Cached) GetNonce(ctx context.Context, a common.Address) (uint64, error) {
+	var (
+		err   error
+		nonce uint64
+	)
 	nonce, exists := c.nonces[a]
 	if !exists {
 		nonce, err = c.Client.NonceAt(ctx, a, c.AtBlockNumber)
@@ -149,13 +119,13 @@ func (c *ChainBatchCache) GetNonce(ctx context.Context, a common.Address) (uint6
 // SetNonce sets the value in the nonce cache of account `a` to value `nonce`.
 // Once this is set, a call to GetNonce() will not poll the node but simply
 // return the set value.
-func (c *ChainBatchCache) SetNonce(a common.Address, nonce uint64) {
+func (c *Cached) SetNonce(a common.Address, nonce uint64) {
 	c.nonces[a] = nonce
 }
 
-func (c *ChainBatchCache) Purge(a common.Address) {
+func (c *Cached) Purge(a common.Address) {
 	delete(c.nonces, a)
 	delete(c.balances, a)
 }
 
-var _ State = (*ChainBatchCache)(nil)
+var _ State = (*Cached)(nil)

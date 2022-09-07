@@ -1,4 +1,4 @@
-package batch
+package sequencer
 
 import (
 	"context"
@@ -26,12 +26,7 @@ func TestCaching(t *testing.T) {
 	eth.SetNonce(addr, nonce1, "latest")
 
 	ctx := context.Background()
-	cbc := &ChainBatchCache{
-		balances:      make(map[common.Address]*big.Int, 0),
-		nonces:        make(map[common.Address]uint64, 0),
-		Client:        client,
-		AtBlockNumber: nil, // nil means latest block
-	}
+	cbc := NewCached(client, nil)
 
 	// initial state should be polled from the client
 	bal, err := cbc.GetBalance(ctx, addr)

@@ -1,4 +1,4 @@
-package batch
+package sequencer
 
 import (
 	"encoding/json"
@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 )
 
@@ -72,12 +74,14 @@ type txHookFunc func(me *MockEthServer, tx *txtypes.Transaction) bool
 // The functionality of the MockEthServer is based on the
 // needs in the tests and might be extented in the future.
 type MockEthServer struct {
+	Mux         sync.RWMutex
 	URL         string
 	t           *testing.T
 	balances    map[string]map[string]*big.Int
 	nonces      map[string]map[string]uint64
 	chainID     *big.Int
 	blocks      map[string]blockData
+	blockNumber uint64
 	receivedTxs map[string]bool
 	HTTPServer  *httptest.Server
 	txs         map[string]*txtypes.Transaction
@@ -113,21 +117,41 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		err = errors.Wrapf(err, "error while decoding request body")
 		me.t.Error(err)
 	}
-	me.t.Logf("JSONRPC method call: %s, params %v", mess.Method, mess.Params)
+	log.Debug().Msg(fmt.Sprintf("JSONRPC method call: %s, params %v", mess.Method, mess.Params))
 
 	switch mess.Method {
 	case "eth_getBalance":
+		me.Mux.RLock()
 		status, err = me.getBalance(&mess)
+		me.Mux.RUnlock()
 	case "eth_getTransactionCount":
+		me.Mux.RLock()
 		status, err = me.getNonce(&mess)
+		me.Mux.RUnlock()
 	case "eth_chainId":
+		me.Mux.RLock()
 		status, err = me.getChainID(&mess)
+		me.Mux.RUnlock()
 	case "eth_sendRawTransaction":
+		// set the write lock here,
+		// since we might modify the internal
+		// state in the hook-function
+		// that is called in `respondRawTx`
+		me.Mux.Lock()
 		status, err = me.respondRawTx(&mess)
+		me.Mux.Unlock()
 	case "eth_getBlockByNumber":
-		status, err = me.getBlock(&mess)
+		me.Mux.RLock()
+		status, err = me.getBlockByNumber(&mess)
+		me.Mux.RUnlock()
+	case "eth_blockNumber":
+		me.Mux.RLock()
+		status, err = me.getBlockNumber(&mess)
+		me.Mux.RUnlock()
 	case "eth_getTransactionReceipt":
+		me.Mux.RLock()
 		status, err = me.getReceipt(&mess)
+		me.Mux.RUnlock()
 	default:
 		me.t.Errorf("Eth JSON RPC method not known or not supported by MockServer: %s", mess.Method)
 		return
@@ -146,6 +170,10 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		err = errors.Wrapf(err, "error while encoding response in mock server")
 		me.t.Error(err)
 	}
+}
+
+func (me *MockEthServer) SetBlockNumber(blockNumber uint64) {
+	me.blockNumber = blockNumber
 }
 
 // SetBalance is used to set the state of the server for the "eth_getBalance" method.
@@ -196,7 +224,7 @@ func (me *MockEthServer) getNonce(mess *jsonrpcMessage) (int, error) {
 	address := normalizeAddress(mess.Params[0].(string))
 	block := mess.Params[1].(string)
 	nonce := me.nonces[block][address]
-	me.t.Logf("nonces:%v, addr:%s, nonce:%d, block:%s", me.nonces, address, nonce, block)
+	log.Debug().Msg(fmt.Sprintf("nonces:%v, addr:%s, nonce:%d, block:%s", me.nonces, address, nonce, block))
 
 	res := fmt.Sprintf("%q", hexutil.EncodeUint64(nonce))
 	mess.Result = json.RawMessage(res)
@@ -238,7 +266,16 @@ func (me *MockEthServer) SetBlock(baseFee *big.Int, gasLimit uint64, block strin
 	b.gasLimit = gasLimit
 }
 
-func (me *MockEthServer) getBlock(mess *jsonrpcMessage) (int, error) {
+func (me *MockEthServer) getBlockNumber(mess *jsonrpcMessage) (int, error) {
+	if len(mess.Params) > 0 {
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
+	}
+	res := fmt.Sprintf("%q", hexutil.EncodeUint64(me.blockNumber))
+	mess.Result = json.RawMessage(res)
+	return 200, nil
+}
+
+func (me *MockEthServer) getBlockByNumber(mess *jsonrpcMessage) (int, error) {
 	if len(mess.Params) > 2 {
 		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
 	}

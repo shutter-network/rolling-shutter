@@ -1,13 +1,30 @@
-package batch
+package transaction
 
 import (
 	"math/big"
 	"testing"
 	"time"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 )
+
+func newTestConfig(t *testing.T) config.Config {
+	t.Helper()
+
+	ethereumKey, err := ethcrypto.GenerateKey()
+	assert.NilError(t, err)
+	return config.Config{
+		EthereumURL:         "http://127.0.0.1:8454",
+		SequencerURL:        "http://127.0.0.1:8455",
+		EthereumKey:         ethereumKey,
+		ExecutionBlockDelay: uint32(5),
+		InstanceID:          123,
+	}
+}
 
 func TestBatches(t *testing.T) {
 	batches := make(SortedUint64s, 0)
@@ -44,7 +61,7 @@ func TestTxByNonceAndTime(t *testing.T) {
 	chainID := big.NewInt(0)
 	signer := txtypes.LatestSignerForChainID(chainID)
 
-	makeTx := func(batchIndex, nonce int, tm time.Time) *PendingTransaction {
+	makeTx := func(batchIndex, nonce int, tm time.Time) *Pending {
 		// construct a valid transaction
 		txData := &txtypes.ShutterTx{
 			ChainID:          chainID,
@@ -61,7 +78,7 @@ func TestTxByNonceAndTime(t *testing.T) {
 		// marshal tx to bytes
 		txBytes, err := tx.MarshalBinary()
 		assert.NilError(t, err)
-		ptx, err := NewPendingTransaction(signer, txBytes, tm)
+		ptx, err := NewPending(signer, txBytes, tm)
 		assert.NilError(t, err)
 		return ptx
 	}
@@ -80,9 +97,9 @@ func TestTxByNonceAndTime(t *testing.T) {
 	// just check that insert order equals pop order
 	// the classes' methods can be used by a heap,
 	// but the class does not keep sorted order by itself
-	assert.DeepEqual(t, txs.Pop().(*PendingTransaction).txBytes, tx3.txBytes)
-	assert.DeepEqual(t, txs.Pop().(*PendingTransaction).txBytes, tx1.txBytes)
-	assert.DeepEqual(t, txs.Pop().(*PendingTransaction).txBytes, tx2.txBytes)
+	assert.DeepEqual(t, txs.Pop().(*Pending).TxBytes, tx3.TxBytes)
+	assert.DeepEqual(t, txs.Pop().(*Pending).TxBytes, tx1.TxBytes)
+	assert.DeepEqual(t, txs.Pop().(*Pending).TxBytes, tx2.TxBytes)
 }
 
 func TestTxPool(t *testing.T) {
@@ -90,7 +107,7 @@ func TestTxPool(t *testing.T) {
 	chainID := big.NewInt(0)
 	signer := txtypes.LatestSignerForChainID(chainID)
 
-	makeTx := func(batchIndex, nonce int, tm time.Time) *PendingTransaction {
+	makeTx := func(batchIndex, nonce int, tm time.Time) *Pending {
 		// construct a valid transaction
 		txData := &txtypes.ShutterTx{
 			ChainID:          chainID,
@@ -107,12 +124,12 @@ func TestTxPool(t *testing.T) {
 		// marshal tx to bytes
 		txBytes, err := tx.MarshalBinary()
 		assert.NilError(t, err)
-		ptx, err := NewPendingTransaction(signer, txBytes, tm)
+		ptx, err := NewPending(signer, txBytes, tm)
 		assert.NilError(t, err)
 		return ptx
 	}
 
-	txpool := NewTransactionPool(signer)
+	txpool := NewPool(signer)
 	tm := time.Now()
 
 	tx1 := makeTx(1, 1, tm.AddDate(0, 0, 1))
@@ -137,9 +154,9 @@ func TestTxPool(t *testing.T) {
 	assert.Equal(t, len(batch2), 2)
 	// per batch the tx's should now be sorted by (nonce, insert time)
 	// independent on insert order
-	assert.DeepEqual(t, batch1[0].txBytes, tx1.txBytes)
-	assert.DeepEqual(t, batch2[0].txBytes, tx2.txBytes)
-	assert.DeepEqual(t, batch2[1].txBytes, tx3.txBytes)
+	assert.DeepEqual(t, batch1[0].TxBytes, tx1.TxBytes)
+	assert.DeepEqual(t, batch2[0].TxBytes, tx2.TxBytes)
+	assert.DeepEqual(t, batch2[1].TxBytes, tx3.TxBytes)
 
 	// The batches should be removed from the pool
 	batch1 = txpool.Pop(1)

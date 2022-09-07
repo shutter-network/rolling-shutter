@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -95,7 +94,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
+	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
@@ -139,7 +138,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
+	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
@@ -186,7 +185,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	defer closedb()
 
 	eon := uint64(2)
-	epochID, _ := epochid.BigToEpochID(big.NewInt(50))
+	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
 	config := newTestConfig(t)
