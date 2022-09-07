@@ -19,6 +19,7 @@ var (
 	decryptionKeyFlag string
 	epochIDFlag       string
 	sigmaFlag         string
+	threshold         uint64
 )
 
 func Cmd() *cobra.Command {
@@ -31,6 +32,7 @@ key, decrypt them with a decryption key, and check that a decryption key is corr
 	cmd.AddCommand(encryptCmd())
 	cmd.AddCommand(decryptCmd())
 	cmd.AddCommand(verifyKeyCmd())
+	cmd.AddCommand(aggregateCmd())
 	return cmd
 }
 
@@ -85,6 +87,33 @@ func verifyKeyCmd() *cobra.Command {
 
 	cmd.MarkPersistentFlagRequired("eon-key")
 	cmd.MarkPersistentFlagRequired("epoch-id")
+
+	return cmd
+}
+
+func aggregateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "aggregate",
+		Short: "Aggregate key shares to construct a decryption key",
+		Long: `Aggregate key shares to construct a decryption key.
+
+Pass the shares as the first and only positional argument in the form of hex
+values separated by commas. The shares must be ordered by keyper index and
+missing shares must be denoted by empty strings. Exactly "threshold" shares
+must be provided.
+
+Example: rolling-shutter crypto aggregate -t 2 0BC5CDC5778D473B881E73297AFB830
+1D35830786C6A80CD289672536655470A0149BA7394DF240C96F7D60BAF94D0FD2A39B4314088E
+AF94E3D1EB52106E718,,03646AE08A8EF00D0AE04294529466C0F7AC65C4D9B0ADEAD1461964A
+6F784202B61B2EBD5DE8B80E787E9FD4DE4899880C2263B67EC478D88D3558B0C22DA66`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return aggregate(args[0])
+		},
+	}
+
+	cmd.PersistentFlags().Uint64VarP(&threshold, "threshold", "t", 0, "threshold parameter")
+	cmd.MarkPersistentFlagRequired("threshold")
 
 	return cmd
 }
@@ -157,6 +186,30 @@ func verifyKey(key string) error {
 	return errors.Errorf("the given decryption key is invalid")
 }
 
+func aggregate(commaSeparatedHexShares string) error {
+	hexShares := strings.Split(commaSeparatedHexShares, ",")
+	indices := []int{}
+	shares := []*shcrypto.EpochSecretKeyShare{}
+	for i, hexShare := range hexShares {
+		if hexShare == "" {
+			continue
+		}
+		share, err := parseDecryptionKeyShare(hexShare)
+		if err != nil {
+			return errors.Wrapf(err, "key share %d is neither empty nor a valid hex encoded secret key share", i)
+		}
+		indices = append(indices, i)
+		shares = append(shares, share)
+	}
+
+	key, err := shcrypto.ComputeEpochSecretKey(indices, shares, threshold)
+	if err != nil {
+		return err
+	}
+	fmt.Println("0x" + hex.EncodeToString(key.Marshal()))
+	return nil
+}
+
 func parseEonKey(f string) (*shcrypto.EonPublicKey, error) {
 	eonKeyBytes, err := parseHex(f)
 	if err != nil {
@@ -205,6 +258,19 @@ func parseDecryptionKey(f string) (*shcrypto.EpochSecretKey, error) {
 		return nil, errors.Wrapf(err, "invalid decryption key")
 	}
 	return decryptionKey, nil
+}
+
+func parseDecryptionKeyShare(f string) (*shcrypto.EpochSecretKeyShare, error) {
+	decryptionKeyShareBytes, err := parseHex(f)
+	if err != nil {
+		return nil, err
+	}
+	decryptionKeyShare := new(shcrypto.EpochSecretKeyShare)
+	err = decryptionKeyShare.Unmarshal(decryptionKeyShareBytes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid decryption key share")
+	}
+	return decryptionKeyShare, nil
 }
 
 func parseHex(f string) ([]byte, error) {
