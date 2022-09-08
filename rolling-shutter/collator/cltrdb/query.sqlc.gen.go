@@ -153,23 +153,59 @@ func (q *Queries) GetNextBatch(ctx context.Context) (NextBatch, error) {
 	return i, err
 }
 
-const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
-SELECT tx_bytes FROM transaction WHERE epoch_id = $1 ORDER BY id ASC
+const getNonRejectedTransactionsByEpoch = `-- name: GetNonRejectedTransactionsByEpoch :many
+SELECT tx_hash, id, epoch_id, tx_bytes, status FROM transaction WHERE status<>'rejected' AND epoch_id = $1 ORDER BY id ASC
 `
 
-func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([][]byte, error) {
+func (q *Queries) GetNonRejectedTransactionsByEpoch(ctx context.Context, epochID []byte) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, getNonRejectedTransactionsByEpoch, epochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.TxHash,
+			&i.ID,
+			&i.EpochID,
+			&i.TxBytes,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTransactionsByEpoch = `-- name: GetTransactionsByEpoch :many
+SELECT tx_hash, id, epoch_id, tx_bytes, status FROM transaction WHERE epoch_id = $1 ORDER BY id ASC
+`
+
+func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([]Transaction, error) {
 	rows, err := q.db.Query(ctx, getTransactionsByEpoch, epochID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items [][]byte
+	var items []Transaction
 	for rows.Next() {
-		var tx_bytes []byte
-		if err := rows.Scan(&tx_bytes); err != nil {
+		var i Transaction
+		if err := rows.Scan(
+			&i.TxHash,
+			&i.ID,
+			&i.EpochID,
+			&i.TxBytes,
+			&i.Status,
+		); err != nil {
 			return nil, err
 		}
-		items = append(items, tx_bytes)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -269,17 +305,34 @@ func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) er
 }
 
 const insertTx = `-- name: InsertTx :exec
-INSERT INTO transaction (tx_hash, epoch_id, tx_bytes) VALUES ($1, $2, $3)
+INSERT INTO transaction (tx_hash, epoch_id, tx_bytes, status) VALUES ($1, $2, $3, $4)
 `
 
 type InsertTxParams struct {
 	TxHash  []byte
 	EpochID []byte
 	TxBytes []byte
+	Status  Txstatus
 }
 
 func (q *Queries) InsertTx(ctx context.Context, arg InsertTxParams) error {
-	_, err := q.db.Exec(ctx, insertTx, arg.TxHash, arg.EpochID, arg.TxBytes)
+	_, err := q.db.Exec(ctx, insertTx,
+		arg.TxHash,
+		arg.EpochID,
+		arg.TxBytes,
+		arg.Status,
+	)
+	return err
+}
+
+const rejectNewTransactions = `-- name: RejectNewTransactions :exec
+UPDATE transaction
+SET status='rejected'
+WHERE epoch_id=$1 AND status='new'
+`
+
+func (q *Queries) RejectNewTransactions(ctx context.Context, epochID []byte) error {
+	_, err := q.db.Exec(ctx, rejectNewTransactions, epochID)
 	return err
 }
 
@@ -296,5 +349,21 @@ type SetNextBatchParams struct {
 
 func (q *Queries) SetNextBatch(ctx context.Context, arg SetNextBatchParams) error {
 	_, err := q.db.Exec(ctx, setNextBatch, arg.EpochID, arg.L1BlockNumber)
+	return err
+}
+
+const setTransactionStatus = `-- name: SetTransactionStatus :exec
+UPDATE transaction
+SET status=$2
+WHERE tx_hash = $1
+`
+
+type SetTransactionStatusParams struct {
+	TxHash []byte
+	Status Txstatus
+}
+
+func (q *Queries) SetTransactionStatus(ctx context.Context, arg SetTransactionStatusParams) error {
+	_, err := q.db.Exec(ctx, setTransactionStatus, arg.TxHash, arg.Status)
 	return err
 }

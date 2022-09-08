@@ -11,14 +11,16 @@ CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,
        decryption_key bytea
 );
+CREATE TYPE txstatus AS ENUM ('new', 'rejected', 'committed');
 
 CREATE TABLE transaction(
        tx_hash bytea PRIMARY KEY,
        -- id persists the input ordering of txs
        id INTEGER GENERATED ALWAYS AS IDENTITY,
        epoch_id bytea,
-       tx_bytes bytea
-);
+       tx_bytes bytea,
+       status txstatus NOT NULL
+       );
 
 -- next_batch contains data to be used in the next batch to be submitted. It will be populated
 -- as soon as the previous batch has been finalized.

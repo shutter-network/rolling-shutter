@@ -6,7 +6,52 @@ package cltrdb
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
 )
+
+type Txstatus string
+
+const (
+	TxstatusNew       Txstatus = "new"
+	TxstatusRejected  Txstatus = "rejected"
+	TxstatusCommitted Txstatus = "committed"
+)
+
+func (e *Txstatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = Txstatus(s)
+	case string:
+		*e = Txstatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for Txstatus: %T", src)
+	}
+	return nil
+}
+
+type NullTxstatus struct {
+	Txstatus Txstatus
+	Valid    bool // Valid is true if String is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTxstatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.Txstatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.Txstatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTxstatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return ns.Txstatus, nil
+}
 
 type DecryptionKey struct {
 	EpochID       []byte
@@ -51,4 +96,5 @@ type Transaction struct {
 	ID      sql.NullInt32
 	EpochID []byte
 	TxBytes []byte
+	Status  Txstatus
 }

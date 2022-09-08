@@ -86,6 +86,7 @@ type MockEthServer struct {
 	HTTPServer  *httptest.Server
 	txs         map[string]*txtypes.Transaction
 	hooks       []txHookFunc
+	batchIndex  uint64
 }
 
 // Teardown has to be called if the MockEthServer is run
@@ -152,6 +153,10 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		me.Mux.RLock()
 		status, err = me.getReceipt(&mess)
 		me.Mux.RUnlock()
+	case "shutter_getBatchIndex":
+		me.Mux.RLock()
+		status, err = me.getBatchIndex(&mess)
+		me.Mux.RUnlock()
 	default:
 		me.t.Errorf("Eth JSON RPC method not known or not supported by MockServer: %s", mess.Method)
 		return
@@ -170,6 +175,19 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		err = errors.Wrapf(err, "error while encoding response in mock server")
 		me.t.Error(err)
 	}
+}
+
+func (me *MockEthServer) SetBatchIndex(batchIndex uint64) {
+	me.batchIndex = batchIndex
+}
+
+func (me *MockEthServer) getBatchIndex(mess *jsonrpcMessage) (int, error) {
+	if len(mess.Params) > 0 {
+		return -1, errors.Errorf("got more parameters then expected: %v", mess.Params)
+	}
+	res := fmt.Sprintf("%q", hexutil.EncodeUint64(me.batchIndex))
+	mess.Result = json.RawMessage(res)
+	return 200, nil
 }
 
 func (me *MockEthServer) SetBlockNumber(blockNumber uint64) {
@@ -198,7 +216,14 @@ func (me *MockEthServer) getBalance(mess *jsonrpcMessage) (int, error) {
 	}
 	address := normalizeAddress(mess.Params[0].(string))
 	block := mess.Params[1].(string)
-	balance := me.balances[block][address]
+	var balance *big.Int
+	blockBalanceMap, ok := me.balances[block]
+	if ok {
+		balance = blockBalanceMap[address]
+	}
+	if balance == nil {
+		balance = big.NewInt(0)
+	}
 	res := fmt.Sprintf("%q", hexutil.EncodeBig(balance))
 	mess.Result = json.RawMessage(res)
 	return 200, nil
