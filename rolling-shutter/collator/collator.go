@@ -78,7 +78,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	batchHandler, err := batchhandler.NewBatchHandler(cfg, dbpool)
+	batchHandler, err := batchhandler.NewBatchHandler(ctx, cfg, dbpool)
 	if err != nil {
 		return err
 	}

@@ -154,7 +154,7 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	assert.NilError(t, err)
 
 	// New batch handler, this will already query the eth-server
-	bh, err := batchhandler.NewBatchHandler(cfg, dbpool)
+	bh, err := batchhandler.NewBatchHandler(ctx, cfg, dbpool)
 	assert.NilError(t, err)
 
 	makeTx := func(batchIndex, nonce, gas int) ([]byte, []byte) {

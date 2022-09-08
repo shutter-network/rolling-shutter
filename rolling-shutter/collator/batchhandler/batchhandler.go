@@ -63,14 +63,15 @@ func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uin
 // pending transactions from the database it will also query state
 // information for the corresponding accounts (nonce, balance) in
 // order to validate and apply the transactions to the current pending batch.
-func NewBatchHandler(cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, error) {
-	ctx := context.Background()
-
-	l2Client, err := rpc.Dial(cfg.SequencerURL)
+func NewBatchHandler(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*BatchHandler, error) {
+	// l1 client initialisation
+	l1EthClient, err := ethclient.DialContext(ctx, cfg.EthereumURL)
 	if err != nil {
 		return nil, err
 	}
-	l1EthClient, err := ethclient.Dial(cfg.EthereumURL)
+
+	// l2 client initialisation
+	l2Client, err := rpc.DialContext(ctx, cfg.SequencerURL)
 	if err != nil {
 		return nil, err
 	}
