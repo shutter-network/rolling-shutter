@@ -2,7 +2,6 @@ package snapshot
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v4"
@@ -167,7 +166,7 @@ func (snp *Snapshot) handleDecryptionKeyInput(
 	if seen {
 		return nil
 	}
-	log.Printf("Sending Proposal %d key to hub", key.EpochID)
+	log.Printf("Sending key %X for proposal %X to hub", key.Key, key.EpochID)
 	err := snp.hubapi.SubmitProposalKey(key.EpochID, key.Key)
 	if err != nil {
 		return err
@@ -226,7 +225,7 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochId []b
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Trigger decryption for proposal %s\n", epochId)
+	log.Printf("Trigger decryption for proposal %X", epochId)
 	return nil
 }
 
