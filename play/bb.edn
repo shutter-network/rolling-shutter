@@ -177,6 +177,9 @@
   -install:sqlc
   (go-install "sqlc" "github.com/kyleconroy/sqlc/cmd/sqlc")
 
+  -install:stringer
+  (go-install "stringer" "golang.org/x/tools/cmd/stringer")
+
   -install:gotestsum
   (go-install "gotestsum" "gotest.tools/gotestsum@latest")
 
@@ -253,6 +256,7 @@
    :depends [-oapi-files]
    :task (when (seq (fs/modified-since exe -oapi-files))
            (run '-install:oapi-codegen)
+           (run '-install:stringer)
            (run-process ["go" "generate" "-x" "./collator/..."] {:dir src-dir}))}
 
   build:sqlc
