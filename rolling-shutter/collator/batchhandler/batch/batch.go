@@ -23,7 +23,7 @@ import (
 
 const (
 	minimumTxGas   uint64 = 21000
-	BatchSizeLimit int    = 8 * 1024
+	BatchSizeLimit        = 8 * 1024
 )
 
 //go:generate stringer -type=StateEnum -output stateenum_string.gen.go

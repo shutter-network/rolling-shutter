@@ -33,8 +33,8 @@ const (
 	SizeBatchPool = 5
 )
 
-// computeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-func computeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
+// ComputeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
+func ComputeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
 	n := epochID.Big()
 	return epochid.BigToEpochID(n.Add(n, common.Big1))
 }
@@ -309,7 +309,7 @@ func (bh *BatchHandler) appendHeadBatch(ctx context.Context) (*batch.Batch, erro
 		}
 	} else {
 		headBatch = bh.batches[len(bh.batches)-1]
-		epochID, _ = computeNextEpochID(headBatch.EpochID())
+		epochID, _ = ComputeNextEpochID(headBatch.EpochID())
 		// TODO guess the l1blocknumber based on recent timings
 		l1BlockNumber = uint64(42)
 	}

@@ -33,11 +33,11 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (epochid.EpochID, 
 		return epochID, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
 	}
 
-	epochID, err = epochid.HexToEpochID(*result)
+	e, err := hexutil.DecodeUint64(*result)
 	if err != nil {
-		return epochID, errors.Wrap(err, "can't decode batch-index")
+		return epochID, errors.Wrapf(err, "can't decode batch-index: %s", *result)
 	}
-	return epochID, nil
+	return epochid.Uint64ToEpochID(e), nil
 }
 
 // SendTransaction sends a transaction to the sequencer. It uses the raw rpc.Client instead of the
