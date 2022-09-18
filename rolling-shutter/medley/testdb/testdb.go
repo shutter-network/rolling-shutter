@@ -24,6 +24,12 @@ BEGIN
     FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
 	EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
     END LOOP;
+
+    FOR r in (select typname from pg_type where typelem=0 AND typnamespace IN (select oid from pg_namespace where nspname=current_schema()))
+    LOOP
+      EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname);
+    END LOOP;
+
 END $$;
 `
 
