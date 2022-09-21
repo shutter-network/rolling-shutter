@@ -26,6 +26,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -296,28 +297,7 @@ func (c *collator) pollBatchConfirmations(ctx context.Context) error {
 }
 
 func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, error) {
-	var epochID epochid.EpochID
-
-	f := func() (*string, error) {
-		var result string
-		log.Debug().Msg("polling batch-index from sequencer")
-		err := c.l2Client.CallContext(ctx, &result, "shutter_getBatchIndex")
-		if err != nil {
-			return nil, err
-		}
-		return &result, nil
-	}
-
-	result, err := medley.Retry(ctx, f)
-	if err != nil {
-		return epochID, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
-	}
-
-	epochID, err = epochid.HexToEpochID(*result)
-	if err != nil {
-		return epochID, errors.Wrap(err, "can't decode batch-index")
-	}
-	return epochID, nil
+	return l2client.GetBatchIndex(ctx, c.l2Client)
 }
 
 func getBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/jackc/pgx/v4"
@@ -22,6 +21,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -501,7 +501,7 @@ func (bh *BatchHandler) OnSequencerTransaction(ctx context.Context, tx txtypes.T
 		// that's a bug!
 		return err
 	}
-	return sendTransaction(ctx, bh.l2Client, signedTx)
+	return l2client.SendTransaction(ctx, bh.l2Client, signedTx)
 }
 
 func (bh *BatchHandler) HandleDecryptionKey(_ context.Context, epochID epochid.EpochID, key []byte) error {
@@ -561,30 +561,6 @@ func (bh *BatchHandler) OnOutboundDecryptionTrigger(ctx context.Context, trigger
 		}
 		return err
 	})
-	return err
-}
-
-// sendTransaction uses the raw rpc.Client instead of the usual ethclient.Client wrapper
-// because we want to use the modified txtypes marshaling here instead of the one from the
-// go-ethereum repository.
-func sendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transaction) error {
-	data, err := tx.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	f := func() (string, error) {
-		var result string
-		//
-		err := client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(data))
-		if err != nil {
-			return result, err
-		}
-		return result, nil
-	}
-	_, err = medley.Retry(ctx, f)
-	if err != nil {
-		return errors.Wrap(err, "can't send transaction")
-	}
 	return err
 }
 
