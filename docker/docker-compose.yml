@@ -1,7 +1,12 @@
+x-logging: &logging
+  driver: local
+  options:
+    max-file: 10
+
 services:
   rs-build:
     build:
-      dockerfile: docker/snapshot/Dockerfile
+      dockerfile: docker/build-src/snapshot/Dockerfile
       context: ..
     image: snapshutter
     command: "-v"
@@ -14,18 +19,38 @@ services:
     volumes:
       - ./data/db:/var/lib/postgresql/data
     healthcheck:
-      test: pg_isready
+      test: pg_isready -U postgres
+    logging: *logging
 
-  node:
+  geth:
     build:
-      dockerfile: docker/node/Dockerfile
+      dockerfile: docker/build-src/geth/Dockerfile
       context: ..
     restart: always
+    volumes:
+      - ./data/geth:/data
+    command: >
+      --datadir /data
+      --dev
+      --dev.period 15
+      --http
+      --http.addr 0.0.0.0
+      --http.vhosts geth
+    logging: *logging
+
+  deploy-contracts:
+    build:
+      dockerfile: docker/build-src/deploy_contracts/Dockerfile
+      context: ..
     volumes:
       - ./data/deployments:/contracts/deployments
       - ./config:/config
     environment:
       DEPLOY_CONF: /config/node-deploy.json
+    depends_on:
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   chain:
     image: snapshutter
@@ -33,10 +58,14 @@ services:
     entrypoint:
       - /rolling-shutter
       - chain
-    command: "--config /chain/config/config.toml"
     volumes:
       - ./data/chain:/chain
       - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   snapshot:
     image: snapshutter
@@ -50,13 +79,19 @@ services:
     ports:
       - "8754:8754"
     depends_on:
-      - db
-      - collator
-      - keyper-0
-      - keyper-1
-      - keyper-2
+      db:
+        condition: service_healthy
+      collator:
+        condition: service_started
+      keyper-0:
+        condition: service_started
+      keyper-1:
+        condition: service_started
+      keyper-2:
+        condition: service_started
+    logging: *logging
     labels:
-      caddy: preview.snapshot.shutter.network
+      caddy: live.snapshot.shutter.network
       caddy.reverse_proxy: "{{upstreams 8754}}"
 
   keyper-0:
@@ -70,9 +105,13 @@ services:
       - ./config:/config
       - ./data/deployments:/deployments
     depends_on:
-      - db
-      - chain
-      - node
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   keyper-1:
     image: snapshutter
@@ -85,9 +124,13 @@ services:
       - ./config:/config
       - ./data/deployments:/deployments
     depends_on:
-      - db
-      - chain
-      - node
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   keyper-2:
     image: snapshutter
@@ -100,9 +143,13 @@ services:
       - ./config:/config
       - ./data/deployments:/deployments
     depends_on:
-      - db
-      - chain
-      - node
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   collator:
     image: snapshutter
@@ -115,9 +162,13 @@ services:
       - ./config:/config
       - ./data/deployments:/deployments
     depends_on:
-      - db
-      - chain
-      - node
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
 
   caddy:
     image: lucaslorentz/caddy-docker-proxy:ci-alpine

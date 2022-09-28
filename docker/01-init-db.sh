@@ -13,7 +13,7 @@ $DC rm -f db
 rm -rf data/db
 
 $DC up -d db
-sleep 20
+sleep 40
 
 for cmd in collator snapshot keyper-0 keyper-1 keyper-2; do
   $DC exec db createdb -U postgres $cmd

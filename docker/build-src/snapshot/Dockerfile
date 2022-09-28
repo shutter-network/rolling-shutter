@@ -14,4 +14,8 @@ RUN --mount=type=cache,target=/root/.cache CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 FROM scratch as runner
 
 COPY --from=builder /rolling-shutter/bin/rolling-shutter /rolling-shutter
+
+RUN --mount=from=busybox:latest,src=/bin/,dst=/bin/ mkdir -p /etc/ssl
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+
 ENTRYPOINT ["/rolling-shutter"]
