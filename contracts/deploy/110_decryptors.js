@@ -10,5 +10,6 @@ module.exports = async function (hre) {
     log: true,
   });
   const c = await ethers.getContract("Decryptors");
-  await c.append();
+  let tx = await c.append();
+  await tx.wait();
 };

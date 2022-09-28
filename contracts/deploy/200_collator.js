@@ -10,5 +10,6 @@ module.exports = async function (hre) {
     log: true,
   });
   const c = await ethers.getContract("Collator");
-  await c.append();
+  const tx = await c.append();
+  await tx.wait();
 };
