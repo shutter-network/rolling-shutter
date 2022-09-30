@@ -1,21 +1,23 @@
-package mocksequencer
+package rpc
 
 import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 )
 
 type AdminService struct {
-	processor *SequencerProcessor
+	processor *mocksequencer.Processor
 }
 
-var _ RPCService = (*AdminService)(nil)
+var _ mocksequencer.RPCService = (*AdminService)(nil)
 
-func (s *AdminService) injectProcessor(p *SequencerProcessor) {
+func (s *AdminService) InjectProcessor(p *mocksequencer.Processor) {
 	s.processor = p
 }
 
-func (s *AdminService) name() string {
+func (s *AdminService) Name() string {
 	return "admin"
 }
 
@@ -24,7 +26,7 @@ func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, e
 	if err != nil {
 		return 0, err
 	}
-	s.processor.collators.Set(collator, l1BlockNumber)
+	s.processor.Collators.Set(collator, l1BlockNumber)
 	return 1, nil
 }
 
@@ -34,6 +36,6 @@ func (s *AdminService) AddEonKey(eonKey string, l1BlockNumber uint64) (int, erro
 		err = errors.Wrap(err, "eon key could not be decoded")
 		return 0, err
 	}
-	s.processor.eonKeys.Set(eonKeyBytes, l1BlockNumber)
+	s.processor.EonKeys.Set(eonKeyBytes, l1BlockNumber)
 	return 1, nil
 }

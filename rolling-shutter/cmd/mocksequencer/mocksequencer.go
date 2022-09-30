@@ -13,6 +13,12 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/rpc"
+)
+
+var (
+	l1RPCURL     string
+	sequencerURL string
 )
 
 func Cmd() *cobra.Command {
@@ -24,6 +30,10 @@ func Cmd() *cobra.Command {
 			return mockSequencerMain()
 		},
 	}
+	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "", "layer-1 node JSON RPC endpoint")
+	cmd.PersistentFlags().StringVarP(&sequencerURL, "rpc", "r", ":8545", "url of the sequencer's JSON RPC endpoint")
+	cmd.MarkPersistentFlagRequired("l1-url")
+	cmd.MarkPersistentFlagRequired("rpc")
 	return cmd
 }
 
@@ -31,7 +41,6 @@ func mockSequencerMain() error {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	log.Info().Msgf("Starting mock sequencer version %s", shversion.Version())
-	logDummyTransaction()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -43,12 +52,13 @@ func mockSequencerMain() error {
 		cancel()
 	}()
 
-	sequencer := mocksequencer.New(big.NewInt(1), 8545)
+	sequencer := mocksequencer.New(big.NewInt(1), sequencerURL, l1RPCURL)
+
 	err := sequencer.ListenAndServe(
 		ctx,
-		&mocksequencer.AdminService{},
-		&mocksequencer.EthService{},
-		&mocksequencer.ShutterService{},
+		&rpc.AdminService{},
+		&rpc.EthService{},
+		&rpc.ShutterService{},
 	)
 	if err == context.Canceled {
 		log.Info().Msg("Bye.")

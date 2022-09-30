@@ -5,13 +5,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/justinas/alice"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/hlog"
 	"github.com/rs/zerolog/log"
 )
+
+type RPCService interface {
+	Name() string
+	InjectProcessor(*Processor)
+}
 
 func injectHTTPLogger(handler http.Handler) http.Handler {
 	logger := log.With().
@@ -37,11 +41,13 @@ func injectHTTPLogger(handler http.Handler) http.Handler {
 	return c.Then(handler)
 }
 
-func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices ...RPCService) error {
+func (proc *Processor) ListenAndServe(ctx context.Context, rpcServices ...RPCService) error {
 	rpcServer := rpc.NewServer()
+	backgroundError := proc.RunBackgroundTasks(ctx)
+
 	for _, service := range rpcServices {
-		service.injectProcessor(proc)
-		err := rpcServer.RegisterName(service.name(), service)
+		service.InjectProcessor(proc)
+		err := rpcServer.RegisterName(service.Name(), service)
 		if err != nil {
 			return errors.Wrap(err, "error while trying to register RPCService")
 		}
@@ -51,7 +57,7 @@ func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices 
 	handler := injectHTTPLogger(rpcServer)
 	mux.Handle("/", handler)
 
-	server := &http.Server{Addr: ":8545", Handler: mux}
+	server := &http.Server{Addr: proc.URL, Handler: mux}
 
 	failed := make(chan error)
 	go func() {
@@ -69,22 +75,13 @@ func (proc *SequencerProcessor) ListenAndServe(ctx context.Context, rpcServices 
 	}()
 
 	select {
+	case err := <-backgroundError:
+		// For now, fail the whole server when the background task
+		// of the processor fails.
+		return err
 	case err := <-failed:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-type RPCService interface {
-	name() string
-	injectProcessor(*SequencerProcessor)
-}
-
-func stringToAddress(addr string) (common.Address, error) {
-	if !common.IsHexAddress(addr) {
-		var a common.Address
-		return a, errors.New("not a valid ethereum address")
-	}
-	return common.HexToAddress(addr), nil
 }

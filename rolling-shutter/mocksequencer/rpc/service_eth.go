@@ -1,4 +1,4 @@
-package mocksequencer
+package rpc
 
 import (
 	"encoding/json"
@@ -9,19 +9,21 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 )
 
 type EthService struct {
-	processor *SequencerProcessor
+	processor *mocksequencer.Processor
 }
 
-var _ RPCService = (*EthService)(nil)
+var _ mocksequencer.RPCService = (*EthService)(nil)
 
-func (s *EthService) injectProcessor(p *SequencerProcessor) {
+func (s *EthService) InjectProcessor(p *mocksequencer.Processor) {
 	s.processor = p
 }
 
-func (s *EthService) name() string {
+func (s *EthService) Name() string {
 	return "eth"
 }
 
@@ -30,7 +32,7 @@ func (s *EthService) GetTransactionCount(address, block string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	nonce := s.processor.getNonce(addr, block)
+	nonce := s.processor.GetNonce(addr, block)
 	return hexutil.EncodeUint64(nonce), nil
 }
 
@@ -40,15 +42,15 @@ func (*EthService) GetBalance(_, _ string) (string, error) {
 }
 
 func (s *EthService) ChainID() (string, error) {
-	return hexutil.EncodeBig(s.processor.chainID), nil
+	return hexutil.EncodeBig(s.processor.ChainID), nil
 }
 
 func (s *EthService) GetBlockByNumber(blockNumber string, _ bool) (json.RawMessage, error) {
-	b, exists := s.processor.blocks[blockNumber]
+	b, exists := s.processor.Blocks[blockNumber]
 	if !exists {
 		return json.RawMessage("\"null\""), nil
 	}
-	return jsonBlock(b.baseFee, b.gasLimit), nil
+	return jsonBlock(b.BaseFee, b.GasLimit), nil
 }
 
 func jsonBlock(baseFee *big.Int, gasLimit uint64) json.RawMessage {
