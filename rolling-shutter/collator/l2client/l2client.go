@@ -10,18 +10,17 @@ import (
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 )
 
 // GetBatchIndex retrieves the current batch index from the sequencer.
-func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (epochid.EpochID, error) {
-	var epochID epochid.EpochID
+func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (uint64, error) {
+	var blockNumber uint64
 
 	f := func(ctx context.Context) (*string, error) {
 		var result string
 		log.Debug().Msg("polling batch-index from sequencer")
-		err := l2Client.CallContext(ctx, &result, "shutter_getBatchIndex")
+		err := l2Client.CallContext(ctx, &result, "shutter_batchIndex")
 		if err != nil {
 			return nil, err
 		}
@@ -30,14 +29,14 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (epochid.EpochID, 
 
 	result, err := retry.FunctionCall(ctx, f)
 	if err != nil {
-		return epochID, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
+		return blockNumber, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
 	}
 
-	e, err := hexutil.DecodeUint64(*result)
+	blockNumber, err = hexutil.DecodeUint64(*result)
 	if err != nil {
-		return epochID, errors.Wrapf(err, "can't decode batch-index: %s", *result)
+		return blockNumber, errors.Wrap(err, "can't decode batch-index")
 	}
-	return epochid.Uint64ToEpochID(e), nil
+	return blockNumber, nil
 }
 
 // SendTransaction sends a transaction to the sequencer. It uses the raw rpc.Client instead of the

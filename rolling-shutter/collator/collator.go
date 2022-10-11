@@ -271,7 +271,7 @@ func (c *collator) getUnsentDecryptionTriggers(
 	return trigMsgs, nil
 }
 
-func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, error) {
+func (c *collator) getBatchConfirmation(ctx context.Context) (uint64, error) {
 	return l2client.GetBatchIndex(ctx, c.l2Client)
 }
 

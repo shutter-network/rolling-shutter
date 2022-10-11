@@ -24,8 +24,8 @@ func (s *ShutterService) Name() string {
 	return "shutter"
 }
 
-func (s *ShutterService) GetBatchIndex() (string, error) {
-	return hexutil.EncodeUint64(s.processor.BatchIndex), nil
+func (s *ShutterService) BatchIndex() hexutil.Uint64 {
+	return hexutil.Uint64(s.processor.BatchIndex)
 }
 
 func (s *ShutterService) SubmitBatch(ctx context.Context, batchTransaction string) (string, error) {
