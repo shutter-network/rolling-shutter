@@ -14,7 +14,7 @@ import (
 
 type RPCService interface {
 	Name() string
-	InjectProcessor(*Processor)
+	InjectProcessor(*Sequencer)
 }
 
 func injectHTTPLogger(handler http.Handler) http.Handler {
@@ -41,7 +41,7 @@ func injectHTTPLogger(handler http.Handler) http.Handler {
 	return c.Then(handler)
 }
 
-func (proc *Processor) ListenAndServe(ctx context.Context, rpcServices ...RPCService) error {
+func (proc *Sequencer) ListenAndServe(ctx context.Context, rpcServices ...RPCService) error {
 	rpcServer := rpc.NewServer()
 	backgroundError := proc.RunBackgroundTasks(ctx)
 

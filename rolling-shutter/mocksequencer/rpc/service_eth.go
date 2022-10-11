@@ -9,12 +9,12 @@ import (
 )
 
 type EthService struct {
-	processor *mocksequencer.Processor
+	processor *mocksequencer.Sequencer
 }
 
 var _ mocksequencer.RPCService = (*EthService)(nil)
 
-func (s *EthService) InjectProcessor(p *mocksequencer.Processor) {
+func (s *EthService) InjectProcessor(p *mocksequencer.Sequencer) {
 	s.processor = p
 }
 

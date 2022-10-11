@@ -138,9 +138,7 @@ func CreateNextBlockData(baseFee *big.Int, gasLimit uint64, feeBeneficiary commo
 	buf := make([]byte, binary.MaxVarintLen64)
 	_ = binary.PutUvarint(buf, bd.Number)
 	d.Write(buf)
-
-	d.Read(bd.Hash[:])
-
+	_, _ = d.Read(bd.Hash[:])
 	return bd
 }
 
@@ -198,7 +196,7 @@ func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
 	return foundVal, nil
 }
 
-type Processor struct {
+type Sequencer struct {
 	URL       string
 	Collators *activationBlockMap[common.Address]
 	EonKeys   *activationBlockMap[[]byte]
@@ -220,8 +218,8 @@ type TransactionIdentifier struct {
 	Index     int
 }
 
-func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Processor {
-	sequencer := &Processor{
+func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Sequencer {
+	sequencer := &Sequencer{
 		URL:           sequencerURL,
 		Collators:     newActivationBlockMap[common.Address](),
 		EonKeys:       newActivationBlockMap[[]byte](),
@@ -240,7 +238,7 @@ func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Processor {
 	return sequencer
 }
 
-func (proc *Processor) RunBackgroundTasks(ctx context.Context) <-chan error {
+func (proc *Sequencer) RunBackgroundTasks(ctx context.Context) <-chan error {
 	errChan := make(chan error, 1)
 	setError := func(err error) <-chan error {
 		errChan <- err
@@ -282,7 +280,7 @@ func (proc *Processor) RunBackgroundTasks(ctx context.Context) <-chan error {
 	return errChan
 }
 
-func (proc *Processor) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *BlockData, err error) {
+func (proc *Sequencer) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *BlockData, err error) {
 	if blockNrOrHash.BlockHash != nil {
 		var ok bool
 		block, ok = proc.Blocks[*blockNrOrHash.BlockHash]
@@ -310,16 +308,17 @@ func (proc *Processor) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *
 // datastructures for later retrieval.
 // The Sequencer write-lock has to held during this operation,
 // when there is potential concurrent access.
-func (proc *Processor) setLatestBlock(b *BlockData) {
+func (proc *Sequencer) setLatestBlock(b *BlockData) {
 	proc.Blocks[b.Hash] = b
 	// make the transactions locateable by hash
 	for i, tx := range b.Transactions {
+		log.Info().Msg("added transaction")
 		proc.Txs[tx.Hash()] = TransactionIdentifier{BlockHash: b.Hash, Index: i}
 	}
 	proc.LatestBlock = b.Hash
 }
 
-func (proc *Processor) validateBatch(tx *txtypes.Transaction) (common.Address, error) {
+func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, error) {
 	var sender common.Address
 	if tx.Type() != txtypes.BatchTxType {
 		return sender, errors.New("unexpected transaction type")
@@ -349,7 +348,7 @@ func (proc *Processor) validateBatch(tx *txtypes.Transaction) (common.Address, e
 	return sender, nil
 }
 
-func (proc *Processor) ProcessEncryptedTx(
+func (proc *Sequencer) ProcessEncryptedTx(
 	ctx context.Context,
 	batchIndex, batchL1BlockNumber uint64,
 	txBytes, decryptionKey, eonKey []byte,
@@ -390,7 +389,7 @@ func (proc *Processor) ProcessEncryptedTx(
 	return nil
 }
 
-func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transaction) (string, error) {
+func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transaction) (string, error) {
 	var gasPool core.GasPool
 
 	proc.Mux.Lock()
@@ -457,7 +456,6 @@ func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 	// commit the "state change"
 	proc.BatchIndex = batchTx.BatchIndex()
 	proc.setLatestBlock(pendingBlock)
-	proc.Mux.Unlock()
 
 	log.Ctx(ctx).Info().Str("signer", collator.Hex()).RawJSON("transaction", txStr).Msg("included batch transaction")
 	log.Ctx(ctx).Info().Str("batch", hexutil.EncodeUint64(proc.BatchIndex)).Msg("started new batch")

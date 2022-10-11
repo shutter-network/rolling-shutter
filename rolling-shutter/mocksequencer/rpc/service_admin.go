@@ -8,12 +8,12 @@ import (
 )
 
 type AdminService struct {
-	processor *mocksequencer.Processor
+	processor *mocksequencer.Sequencer
 }
 
 var _ mocksequencer.RPCService = (*AdminService)(nil)
 
-func (s *AdminService) InjectProcessor(p *mocksequencer.Processor) {
+func (s *AdminService) InjectProcessor(p *mocksequencer.Sequencer) {
 	s.processor = p
 }
 

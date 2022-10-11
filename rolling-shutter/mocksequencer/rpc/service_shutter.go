@@ -11,12 +11,12 @@ import (
 )
 
 type ShutterService struct {
-	processor *mocksequencer.Processor
+	processor *mocksequencer.Sequencer
 }
 
 var _ mocksequencer.RPCService = (*ShutterService)(nil)
 
-func (s *ShutterService) InjectProcessor(p *mocksequencer.Processor) {
+func (s *ShutterService) InjectProcessor(p *mocksequencer.Sequencer) {
 	s.processor = p
 }
 
