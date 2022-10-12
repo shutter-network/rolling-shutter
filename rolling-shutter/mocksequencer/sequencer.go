@@ -462,3 +462,16 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 
 	return batchTx.Hash().Hex(), nil
 }
+
+func decryptMessage(messageBytes []byte, epochSecretKey *shcrypto.EpochSecretKey) (*txtypes.DecryptedPayload, error) {
+	message := &shcrypto.EncryptedMessage{}
+	err := message.Unmarshal(messageBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "can't unmarshal message")
+	}
+	decryptedBytes, err := message.Decrypt(epochSecretKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "can't decrypt message")
+	}
+	return txtypes.DecodeDecryptedPayload(decryptedBytes)
+}
