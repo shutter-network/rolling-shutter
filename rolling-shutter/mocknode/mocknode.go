@@ -10,6 +10,7 @@ import (
 
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
+	txtypes "github.com/shutter-network/txtypes/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -219,17 +220,8 @@ func encryptRandomMessage(epochID epochid.EpochID, eonPublicKey *shcrypto.EonPub
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to generate random batch data")
 	}
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	sigma, err := shcrypto.RandomSigma(r)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to generate random sigma")
-	}
-
-	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
-	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
-
-	return message, encryptedMessage.Marshal(), nil
+	encryptedMessage, err := EncryptMessage(message, epochID, eonPublicKey)
+	return message, encryptedMessage, err
 }
 
 func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID epochid.EpochID) error {
@@ -271,4 +263,24 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochI
 		Key:        keyBytes,
 	}
 	return m.p2p.SendMessage(ctx, msg)
+}
+
+func EncryptShutterPayload(payload *txtypes.ShutterPayload, epoch epochid.EpochID, eonPubKey *shcrypto.EonPublicKey) ([]byte, error) {
+	var encryptedMessage []byte
+	message, err := payload.Encode()
+	if err != nil {
+		return encryptedMessage, err
+	}
+	encryptedMessage, err = EncryptMessage(message, epoch, eonPubKey)
+	return encryptedMessage, err
+}
+
+func EncryptMessage(message []byte, epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, error) {
+	sigma, err := shcrypto.RandomSigma(cryptorand.Reader)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate random sigma")
+	}
+	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
+	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
+	return encryptedMessage.Marshal(), nil
 }
