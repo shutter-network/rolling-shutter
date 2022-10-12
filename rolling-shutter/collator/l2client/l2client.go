@@ -50,7 +50,7 @@ func SendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 	f := func(ctx context.Context) (string, error) {
 		var result string
 		//
-		err := client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(data))
+		err := client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(data))
 		if err != nil {
 			return result, err
 		}
