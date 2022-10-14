@@ -8,6 +8,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 type ShutterService struct {
@@ -33,12 +34,14 @@ func (s *ShutterService) SubmitBatch(ctx context.Context, batchTransaction strin
 
 	txBytes, err := hexutil.Decode(batchTransaction)
 	if err != nil {
-		return "", errors.Wrap(err, "can't decode incoming tx bytes")
+		err := errors.Wrap(err, "can't decode incoming tx bytes")
+		return "", rpcerrors.ParseError(err)
 	}
 
 	err = tx.UnmarshalBinary(txBytes)
 	if err != nil {
-		return "", errors.Wrap(err, "can't unmarshal incoming bytes to transaction")
+		err := errors.Wrap(err, "can't unmarshal incoming bytes to transaction")
+		return "", rpcerrors.ParseError(err)
 	}
 	return s.processor.SubmitBatch(ctx, &tx)
 }

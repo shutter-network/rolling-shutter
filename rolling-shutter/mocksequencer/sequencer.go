@@ -21,6 +21,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
+	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 const (
@@ -54,7 +55,8 @@ func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) erro
 
 	nonce := b.GetNonce(sender)
 	if tx.Nonce() != nonce {
-		return errors.New("nonce mismatch")
+		err := errors.New("nonce mismatch for payload transaction")
+		return rpcerrors.TransactionRejected(err)
 	}
 	balance := b.GetBalance(sender)
 
@@ -64,13 +66,13 @@ func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) erro
 	priorityFee := batch.CalculatePriorityFee(tx, b.BaseFee)
 
 	if balance.Cmp(gasCost) == -1 {
-		return errors.New("insufficient funds for gas fee")
+		err := errors.New("insufficient funds for gas fee")
+		return rpcerrors.TransactionRejected(err)
 	}
 
 	err := b.gasPool.SubGas(tx.Gas())
 	if err != nil {
-		// can return core.ErrGasLimitReached
-		return err
+		return rpcerrors.TransactionRejected(core.ErrGasLimitReached)
 	}
 	// if this didn't error, the transaction has
 	// to be committed to the block now
@@ -298,7 +300,8 @@ func (proc *Sequencer) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *
 			return nil, errors.New("block not found")
 		}
 	} else {
-		return nil, errors.New("block argument invalid")
+		err := errors.New("block argument invalid")
+		return nil, rpcerrors.ParseError(err)
 	}
 	return block, nil
 }
@@ -321,27 +324,33 @@ func (proc *Sequencer) setLatestBlock(b *BlockData) {
 func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, error) {
 	var sender common.Address
 	if tx.Type() != txtypes.BatchTxType {
-		return sender, errors.New("unexpected transaction type")
+		err := errors.New("unexpected transaction type")
+		return sender, rpcerrors.ParseError(err)
 	}
 
 	if tx.ChainId().Cmp(proc.ChainID) != 0 {
-		return sender, errors.New("chain-id mismatch")
+		err := errors.New("chain-id mismatch")
+		return sender, rpcerrors.TransactionRejected(err)
 	}
 
 	if proc.BatchIndex != tx.BatchIndex()-1 {
-		return sender, errors.New("incorrect batch-index for next batch")
+		err := errors.New("incorrect batch-index for next batch")
+		return sender, rpcerrors.TransactionRejected(err)
 	}
 
 	collator, err := proc.Collators.Find(tx.L1BlockNumber())
 	if err != nil {
-		return sender, errors.Wrap(err, "collator validation failed")
+		err := errors.Wrap(err, "collator validation failed")
+		return sender, rpcerrors.TransactionRejected(err)
 	}
 	sender, err = proc.Signer.Sender(tx)
 	if err != nil {
-		return sender, errors.Wrap(err, "error recovering batch tx sender")
+		err := errors.Wrap(err, "error recovering batch tx sender")
+		return sender, rpcerrors.TransactionRejected(err)
 	}
 	if collator != sender {
-		return sender, errors.Wrap(err, "not signed by correct collator")
+		err := errors.Wrap(err, "not signed by correct collator")
+		return sender, rpcerrors.TransactionRejected(err)
 	}
 
 	// all checks passed, the batch-tx is valid (disregarding validity of included encrypted transactions)
@@ -357,10 +366,11 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
-		return errors.Wrap(err, "can't unmarshal incoming bytes to transaction")
+		err = errors.Wrap(err, "can't unmarshal incoming bytes")
+		return rpcerrors.ParseError(err)
 	}
 	if tx.Type() != txtypes.ShutterTxType {
-		return errors.New("no shutter tx type")
+		return errors.New("wrong transaction type")
 	}
 
 	sender, err := proc.Signer.Sender(&tx)
@@ -384,7 +394,8 @@ func (proc *Sequencer) ProcessEncryptedTx(
 
 	err = pendingBlock.ApplyTx(&tx, sender)
 	if err != nil {
-		return errors.Wrap(err, "couldn't apply transaction")
+		err = errors.Wrap(err, "couldn't apply transaction")
+		return rpcerrors.TransactionRejected(err)
 	}
 	return nil
 }
@@ -401,15 +412,14 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 	txStr, _ := batchTx.MarshalJSON()
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
-		return "", errors.Wrap(err, "batch-tx invalid")
+		return "", err
 	}
 
 	currentL1Block := proc.l1BlockNumber
 	latestBlock, ok := proc.Blocks[proc.LatestBlock]
 	if !ok {
-		// TODO panic
-		// internal server error
-		return "", errors.New("latest block is not initialized")
+		err := errors.New("latest block is not initialized")
+		return "", rpcerrors.InternalServerError(err)
 	}
 
 	// calculate l1-block-number deviation between collator and sequencer:
@@ -422,14 +432,14 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		// the deviation between batch-tx's l1-block-number and sequencer's
 		// known l1-block-number is greater than allowed:
 		// |delta| > |maximum-delta|
-		return "", errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", allowedL1Deviation)
+		err := errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", allowedL1Deviation)
+		return "", rpcerrors.TransactionRejected(err)
 	}
 
 	eonKey, err := proc.EonKeys.Find(batchTx.L1BlockNumber())
 	if err != nil {
 		err = errors.Wrap(err, "no eon key found for batch transaction")
-		log.Ctx(ctx).Error().Err(err).Msg("error while retrieving eon key")
-		return "", err
+		return "", rpcerrors.TransactionRejected(err)
 	}
 
 	pendingBlock := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, collator, latestBlock)
@@ -447,8 +457,8 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		if err != nil {
 			// those are conditions that the collator can check,
 			// so an error here means the whole batch is invalid
-			err := errors.Wrap(err, "transaction invalid")
-			return "", err
+			err := errors.Wrap(err, "invalid shutter transaction in batch")
+			return "", rpcerrors.TransactionRejected(err)
 		}
 		log.Info().Msg("successfully applied shutter-tx")
 	}

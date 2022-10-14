@@ -4,8 +4,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 type EthService struct {
@@ -27,7 +29,8 @@ func (s *EthService) GetTransactionCount(address common.Address, blockNrOrHash e
 	defer s.processor.Mux.RUnlock()
 	block, err := s.processor.GetBlock(blockNrOrHash)
 	if err != nil {
-		return nil, err
+		err := errors.New("header for hash not found")
+		return nil, rpcerrors.Default(err)
 	}
 	nonce := hexutil.Uint64(block.GetNonce(address))
 	return &nonce, nil
@@ -38,7 +41,8 @@ func (s *EthService) GetBalance(address common.Address, blockNrOrHash ethrpc.Blo
 	defer s.processor.Mux.RUnlock()
 	block, err := s.processor.GetBlock(blockNrOrHash)
 	if err != nil {
-		return nil, err
+		err := errors.New("header for hash not found")
+		return nil, rpcerrors.Default(err)
 	}
 	balance := (*hexutil.Big)(block.GetBalance(address))
 	return balance, nil
