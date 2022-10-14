@@ -1,10 +1,13 @@
 package rpc
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 type AdminService struct {
@@ -27,6 +30,35 @@ func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, e
 		return 0, err
 	}
 	s.processor.Collators.Set(collator, l1BlockNumber)
+	return 1, nil
+}
+
+func (s *AdminService) SetNonce(address common.Address, nonce *hexutil.Uint64) (int, error) {
+	s.processor.Mux.Lock()
+	defer s.processor.Mux.Unlock()
+
+	blockHash := ethrpc.BlockNumberOrHash{BlockHash: &s.processor.LatestBlock}
+	b, err := s.processor.GetBlock(blockHash)
+	if err != nil {
+		// this shouldn't happen
+		return 0, rpcerrors.ExtractRPCError(err)
+	}
+
+	b.SetNonce(address, uint64(*nonce))
+	return 1, nil
+}
+
+func (s *AdminService) SetBalance(address common.Address, balance *hexutil.Big) (int, error) {
+	s.processor.Mux.Lock()
+	defer s.processor.Mux.Unlock()
+
+	blockHash := ethrpc.BlockNumberOrHash{BlockHash: &s.processor.LatestBlock}
+	b, err := s.processor.GetBlock(blockHash)
+	if err != nil {
+		// this shouldn't happen
+		return 0, rpcerrors.ExtractRPCError(err)
+	}
+	b.SetBalance(address, balance.ToInt())
 	return 1, nil
 }
 
