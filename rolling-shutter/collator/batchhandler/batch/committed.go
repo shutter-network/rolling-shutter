@@ -35,7 +35,7 @@ func (tr *Committed) Process(batch *Batch) *StateChangeResult {
 		FromState:             tr.previous.StateEnum(),
 		ToState:               tr.StateEnum(),
 		P2PMessages:           msgs,
-		SequencerTransactions: []txtypes.TxData{},
+		SequencerTransactions: []txtypes.TxInner{},
 		Errors:                []StateChangeError{},
 	}
 }

@@ -27,7 +27,7 @@ func (tr *Initial) Process(batch *Batch) *StateChangeResult {
 		FromState:             NoState,
 		ToState:               tr.StateEnum(),
 		P2PMessages:           []shmsg.P2PMessage{},
-		SequencerTransactions: []txtypes.TxData{},
+		SequencerTransactions: []txtypes.TxInner{},
 		Errors:                []StateChangeError{},
 	}
 }

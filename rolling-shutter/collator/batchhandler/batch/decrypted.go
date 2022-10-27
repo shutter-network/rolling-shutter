@@ -36,7 +36,7 @@ func (tr *Decrypted) Process(batch *Batch) *StateChangeResult {
 		Timestamp:     big.NewInt(ts),
 		Transactions:  batch.committedTxs.Bytes(),
 	}
-	txs := make([]txtypes.TxData, 1)
+	txs := make([]txtypes.TxInner, 1)
 	txs[0] = btxData
 	return &StateChangeResult{
 		EpochID:               batch.EpochID(),
