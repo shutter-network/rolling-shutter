@@ -20,7 +20,12 @@ import (
 var (
 	l1RPCURL     string
 	sequencerURL string
+	chainID      uint64
+	debugPtr     *bool
+	adminPtr     *bool
 )
+
+type Config struct{}
 
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -31,22 +36,23 @@ func Cmd() *cobra.Command {
 			return mockSequencerMain()
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "", "layer-1 node JSON RPC endpoint")
+	debugPtr = cmd.PersistentFlags().Bool("debug", false, "debug mode (higher log verbosity)")
+	adminPtr = cmd.PersistentFlags().Bool("admin", true, "expose the 'admin_' RPC namespace methods")
+	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "http://localhost:8545", "layer-1 node JSON RPC endpoint")
 	cmd.PersistentFlags().StringVarP(&sequencerURL, "rpc", "r", ":8545", "url of the sequencer's JSON RPC endpoint")
-	cmd.MarkPersistentFlagRequired("l1-url")
-
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-	// TODO make configurable
-	// zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	// if *debug {
-	// 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	// }
+	cmd.PersistentFlags().Uint64VarP(&chainID, "chain-id", "c", 4242, "the chain-id")
 	return cmd
 }
 
 func mockSequencerMain() error {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if debugPtr != nil {
+		if *debugPtr {
+			zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		}
+	}
 
 	log.Info().Msgf("Starting mock sequencer version %s", shversion.Version())
 
@@ -60,13 +66,20 @@ func mockSequencerMain() error {
 		cancel()
 	}()
 
-	sequencer := mocksequencer.New(big.NewInt(1), sequencerURL, l1RPCURL)
+	sequencer := mocksequencer.New(new(big.Int).SetUint64(chainID), sequencerURL, l1RPCURL)
 
-	err := sequencer.ListenAndServe(
-		ctx,
-		&rpc.AdminService{},
+	services := []mocksequencer.RPCService{
 		&rpc.EthService{},
 		&rpc.ShutterService{},
+	}
+	if adminPtr != nil {
+		if *adminPtr {
+			services = append(services, &rpc.AdminService{})
+		}
+	}
+	err := sequencer.ListenAndServe(
+		ctx,
+		services...,
 	)
 	if err == context.Canceled {
 		log.Info().Msg("Bye.")
