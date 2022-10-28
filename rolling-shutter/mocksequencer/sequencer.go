@@ -21,6 +21,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/encoding"
 	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
@@ -211,10 +212,10 @@ func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
 }
 
 type Sequencer struct {
-	URL       string
-	Collators *activationBlockMap[common.Address]
-	EonKeys   *activationBlockMap[[]byte]
-	ChainID   *big.Int
+	URL         string
+	Collators   *activationBlockMap[common.Address]
+	EonKeys     *activationBlockMap[[]byte]
+	ChainConfig *encoding.ChainConfig
 
 	LatestBlock common.Hash
 	Blocks      map[common.Hash]*BlockData
@@ -234,10 +235,13 @@ type TransactionIdentifier struct {
 
 func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Sequencer {
 	sequencer := &Sequencer{
-		URL:           sequencerURL,
-		Collators:     newActivationBlockMap[common.Address](),
-		EonKeys:       newActivationBlockMap[[]byte](),
-		ChainID:       chainID,
+		URL:       sequencerURL,
+		Collators: newActivationBlockMap[common.Address](),
+		EonKeys:   newActivationBlockMap[[]byte](),
+		ChainConfig: &encoding.ChainConfig{
+			ChainID:      chainID,
+			ShutterBlock: &big.Int{},
+		},
 		LatestBlock:   common.Hash{},
 		Blocks:        make(map[common.Hash]*BlockData),
 		Txs:           map[common.Hash]TransactionIdentifier{},
@@ -250,6 +254,10 @@ func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Sequencer {
 	blockData := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, coinbase, nil)
 	sequencer.setLatestBlock(blockData)
 	return sequencer
+}
+
+func (proc *Sequencer) ChainID() *big.Int {
+	return proc.ChainConfig.ChainID
 }
 
 func (proc *Sequencer) RunBackgroundTasks(ctx context.Context) <-chan error {
