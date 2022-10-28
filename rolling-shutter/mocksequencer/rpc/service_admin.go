@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/encoding"
 	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
@@ -25,7 +26,7 @@ func (s *AdminService) Name() string {
 }
 
 func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, error) {
-	collator, err := stringToAddress(address)
+	collator, err := encoding.StringToAddress(address)
 	if err != nil {
 		return 0, err
 	}
