@@ -53,6 +53,10 @@ func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) erro
 	b.mux.Lock()
 	defer b.mux.Unlock()
 
+	//nolint:godox
+	// TODO nil checks
+
+	receiver := *tx.To()
 	nonce := b.GetNonce(sender)
 	if tx.Nonce() != nonce {
 		err := errors.New("nonce mismatch for payload transaction")
@@ -74,14 +78,22 @@ func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) erro
 	if err != nil {
 		return rpcerrors.TransactionRejected(core.ErrGasLimitReached)
 	}
+
 	// if this didn't error, the transaction has
 	// to be committed to the block now
-
-	b.SetBalance(sender, big.NewInt(0).Sub(balance, gasCost))
-
 	gbBalance := b.GetBalance(b.feeBeneficiary)
-	b.SetBalance(b.feeBeneficiary, big.NewInt(0).Add(gbBalance, priorityFee))
+	receiverBalance := b.GetBalance(receiver)
 
+	balance = big.NewInt(0).Sub(balance, gasCost)
+	gbBalance = big.NewInt(0).Add(gbBalance, priorityFee)
+
+	// transfer the value of the transaction
+	balance = big.NewInt(0).Sub(balance, tx.Value())
+	receiverBalance = big.NewInt(0).Add(receiverBalance, tx.Value())
+
+	b.SetBalance(b.feeBeneficiary, gbBalance)
+	b.SetBalance(sender, balance)
+	b.SetBalance(receiver, receiverBalance)
 	b.SetNonce(sender, nonce+1)
 	b.Transactions = append(b.Transactions, tx)
 	return nil
