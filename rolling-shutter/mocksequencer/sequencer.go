@@ -328,7 +328,7 @@ func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, e
 		return sender, rpcerrors.ParseError(err)
 	}
 
-	if tx.ChainId().Cmp(proc.ChainID) != 0 {
+	if tx.ChainId().Cmp(proc.ChainID()) != 0 {
 		err := errors.New("chain-id mismatch")
 		return sender, rpcerrors.TransactionRejected(err)
 	}
@@ -360,14 +360,14 @@ func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, e
 func (proc *Sequencer) ProcessEncryptedTx(
 	ctx context.Context,
 	batchIndex, batchL1BlockNumber uint64,
-	txBytes, decryptionKey, eonKey []byte,
+	txBytes []byte,
+	epochSecretKey *shcrypto.EpochSecretKey,
 	pendingBlock *BlockData,
 ) error {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
 	if err != nil {
-		err = errors.Wrap(err, "can't unmarshal incoming bytes")
-		return rpcerrors.ParseError(err)
+		return errors.Wrap(err, "can't unmarshal incoming bytes")
 	}
 	if tx.Type() != txtypes.ShutterTxType {
 		return errors.New("wrong transaction type")
@@ -388,14 +388,23 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	if tx.BatchIndex() != batchIndex {
 		return errors.New("batch-index mismatch")
 	}
-	_ = decryptionKey
-	_ = eonKey
-	// TODO decrypt encrypted payload and decode rlp to transaction
 
-	err = pendingBlock.ApplyTx(&tx, sender)
+	payload, err := decryptPayload(tx.EncryptedPayload(), epochSecretKey)
 	if err != nil {
-		err = errors.Wrap(err, "couldn't apply transaction")
-		return rpcerrors.TransactionRejected(err)
+		return errors.Wrap(err, "couldn't decrypt payload")
+	}
+
+	txInner := tx.TxInner()
+	shutterTx, ok := txInner.(*txtypes.ShutterTx)
+	if !ok {
+		return errors.New("could not extract ShutterTx")
+	}
+	shutterTx.Payload = payload
+	shutterTxWithPayload := txtypes.NewTx(shutterTx)
+
+	err = pendingBlock.ApplyTx(shutterTxWithPayload, sender)
+	if err != nil {
+		return errors.Wrap(err, "couldn't apply transaction")
 	}
 	return nil
 }
@@ -406,10 +415,21 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 	proc.Mux.Lock()
 	defer proc.Mux.Unlock()
 
+	if batchTx == nil {
+		return "", errors.New("missing argument: batch-transaction")
+	}
+
 	collator, err := proc.validateBatch(batchTx)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to validate batch")
+	}
 
 	// marshal to JSON just for logging output
-	txStr, _ := batchTx.MarshalJSON()
+	txStr, err2 := batchTx.MarshalJSON()
+	if err2 != nil {
+		panic(err2)
+	}
+
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
 		return "", err
@@ -432,26 +452,27 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		// the deviation between batch-tx's l1-block-number and sequencer's
 		// known l1-block-number is greater than allowed:
 		// |delta| > |maximum-delta|
-		err := errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", allowedL1Deviation)
-		return "", rpcerrors.TransactionRejected(err)
-	}
-
-	eonKey, err := proc.EonKeys.Find(batchTx.L1BlockNumber())
-	if err != nil {
-		err = errors.Wrap(err, "no eon key found for batch transaction")
+		err := errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", AllowedL1Deviation)
 		return "", rpcerrors.TransactionRejected(err)
 	}
 
 	pendingBlock := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, collator, latestBlock)
 	gasPool.AddGas(GasLimit)
+
+	epochSecretKey := &shcrypto.EpochSecretKey{}
+	err = epochSecretKey.GobDecode(batchTx.DecryptionKey())
+	if err != nil {
+		err = errors.Wrap(err, "couldn't decode decryption key")
+		return "", rpcerrors.TransactionRejected(err)
+	}
+
 	for _, shutterTx := range batchTx.Transactions() {
 		err := proc.ProcessEncryptedTx(
 			ctx,
 			batchTx.BatchIndex(),
 			batchTx.L1BlockNumber(),
 			shutterTx,
-			batchTx.DecryptionKey(),
-			eonKey,
+			epochSecretKey,
 			pendingBlock,
 		)
 		if err != nil {
