@@ -34,6 +34,12 @@ func injectHTTPLogger(handler http.Handler) http.Handler {
 			Dur("duration", duration).
 			Msg("finished request")
 	}))
+	//nolint:godox //this is not worth an issue at the moment
+	// TODO(ezdac) It would be good to decode the request body already
+	// and deduct some domain-specific information about the request,
+	// mainly the JSON RPC method.
+	// In go this means copying the request body though, because
+	// the stream-buffer can only be read once ...
 	c = c.Append(hlog.RemoteAddrHandler("ip"))
 	c = c.Append(hlog.UserAgentHandler("user_agent"))
 	c = c.Append(hlog.RefererHandler("referer"))
@@ -65,7 +71,7 @@ func RPCListenAndServe(
 	handler := injectHTTPLogger(rpcServer)
 	mux.Handle("/", handler)
 
-	server := &http.Server{Addr: proc.URL, Handler: mux}
+	server := &http.Server{Addr: url, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
 	failed := make(chan error)
 	go func() {
