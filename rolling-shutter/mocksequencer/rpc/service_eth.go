@@ -1,14 +1,9 @@
 package rpc
 
 import (
-	"encoding/json"
-	"fmt"
-	"math/big"
-	"strings"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 )
@@ -27,55 +22,28 @@ func (s *EthService) Name() string {
 	return "eth"
 }
 
-func (s *EthService) GetTransactionCount(address, block string) (string, error) {
-	addr, err := stringToAddress(address)
+func (s *EthService) GetTransactionCount(address common.Address, blockNrOrHash ethrpc.BlockNumberOrHash) (*hexutil.Uint64, error) {
+	s.processor.Mux.RLock()
+	defer s.processor.Mux.RUnlock()
+	block, err := s.processor.GetBlock(blockNrOrHash)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	nonce := s.processor.GetNonce(addr, block)
-	return hexutil.EncodeUint64(nonce), nil
+	nonce := hexutil.Uint64(block.GetNonce(address))
+	return &nonce, nil
 }
 
-func (*EthService) GetBalance(_, _ string) (string, error) {
-	// always return constant max amount
-	return hexutil.EncodeBig(abi.MaxUint256), nil
-}
-
-func (s *EthService) ChainID() (string, error) {
-	return hexutil.EncodeBig(s.processor.ChainID), nil
-}
-
-func (s *EthService) GetBlockByNumber(blockNumber string, _ bool) (json.RawMessage, error) {
-	b, exists := s.processor.Blocks[blockNumber]
-	if !exists {
-		return json.RawMessage("\"null\""), nil
+func (s *EthService) GetBalance(address common.Address, blockNrOrHash ethrpc.BlockNumberOrHash) (*hexutil.Big, error) {
+	s.processor.Mux.RLock()
+	defer s.processor.Mux.RUnlock()
+	block, err := s.processor.GetBlock(blockNrOrHash)
+	if err != nil {
+		return nil, err
 	}
-	return jsonBlock(b.BaseFee, b.GasLimit), nil
+	balance := (*hexutil.Big)(block.GetBalance(address))
+	return balance, nil
 }
 
-func jsonBlock(baseFee *big.Int, gasLimit uint64) json.RawMessage {
-	var bloom ethtypes.Bloom
-	bloomHex, _ := bloom.MarshalText()
-	blockString := fmt.Sprintf(`{"baseFeePerGas": "%s",
-"difficulty": "0x1",
-"extraData": "0x00",
-"gasLimit": "%s",
-"gasUsed": "0x7defcf",
-"hash": "0xc7608dbb166f66c00ca8a7b0674c982b1cc12d390d7b3a3572e9185b583621f7",
-"logsBloom": "%s",
-"miner": "0x0000000000000000000000000000000000000000",
-"mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-"nonce": "0x0000000000000000",
-"number": "0x68d6c6",
-"parentHash": "0x9c07b52b71bda063c864b57cc28e49397d4eedadf7c91ed83ab776db78cfec8b",
-"receiptsRoot": "0x7617c2f379f393dbc5dae56f9095aab437ed3bed63947d708b6a4e54c551964c",
-"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-"size": "0x1509e",
-"stateRoot": "0x239f82f65838272e6dfe4ebbd755f6d4f2d12a09aa4df65f8346ab9afd0b2e43",
-"timestamp": "0x627ccb76",
-"totalDifficulty": "0x99c2ec",
-"transactions": [],
-"transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-"uncles": []}`, hexutil.EncodeBig(baseFee), hexutil.EncodeUint64(gasLimit), bloomHex)
-	return json.RawMessage(strings.ReplaceAll(blockString, "\n", ""))
+func (s *EthService) ChainID() *hexutil.Big {
+	return (*hexutil.Big)(s.processor.ChainID())
 }

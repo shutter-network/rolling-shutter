@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
@@ -33,7 +34,14 @@ func Cmd() *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "", "layer-1 node JSON RPC endpoint")
 	cmd.PersistentFlags().StringVarP(&sequencerURL, "rpc", "r", ":8545", "url of the sequencer's JSON RPC endpoint")
 	cmd.MarkPersistentFlagRequired("l1-url")
-	cmd.MarkPersistentFlagRequired("rpc")
+
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+	// TODO make configurable
+	// zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	// if *debug {
+	// 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	// }
 	return cmd
 }
 

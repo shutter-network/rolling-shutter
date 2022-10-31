@@ -2,6 +2,7 @@ package mocksequencer
 
 import (
 	"context"
+	"encoding/binary"
 	"math/big"
 	"sort"
 	"sync"
@@ -10,22 +11,137 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
+
+	"github.com/shutter-network/shutter/shlib/shcrypto"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
 )
 
 const (
 	BaseFee            = 22000
 	GasLimit           = 2200000000
-	allowedL1Deviation = 5
-	l1PollInterVal     = 7 * time.Second
+	AllowedL1Deviation = 5
+	L1PollInterVal     = 1 * time.Second
+)
+
+var (
+	coinbase              = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	allowedL1DeviationBig = big.NewInt(AllowedL1Deviation)
 )
 
 type BlockData struct {
-	BaseFee  *big.Int
-	GasLimit uint64
+	mux            sync.Mutex
+	Hash           common.Hash
+	BaseFee        *big.Int
+	GasLimit       uint64
+	Number         uint64
+	Transactions   txtypes.Transactions
+	Nonces         map[common.Address]uint64
+	Balances       map[common.Address]*big.Int
+	gasPool        *core.GasPool
+	feeBeneficiary common.Address
+}
+
+func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) error {
+	b.mux.Lock()
+	defer b.mux.Unlock()
+
+	nonce := b.GetNonce(sender)
+	if tx.Nonce() != nonce {
+		return errors.New("nonce mismatch")
+	}
+	balance := b.GetBalance(sender)
+
+	// deductable from the sender's account
+	gasCost := batch.CalculateGasCost(tx, b.BaseFee)
+	// add to the gasBeneficiary's account (collator)
+	priorityFee := batch.CalculatePriorityFee(tx, b.BaseFee)
+
+	if balance.Cmp(gasCost) == -1 {
+		return errors.New("insufficient funds for gas fee")
+	}
+
+	err := b.gasPool.SubGas(tx.Gas())
+	if err != nil {
+		// can return core.ErrGasLimitReached
+		return err
+	}
+	// if this didn't error, the transaction has
+	// to be committed to the block now
+
+	b.SetBalance(sender, big.NewInt(0).Sub(balance, gasCost))
+
+	gbBalance := b.GetBalance(b.feeBeneficiary)
+	b.SetBalance(b.feeBeneficiary, big.NewInt(0).Add(gbBalance, priorityFee))
+
+	b.SetNonce(sender, nonce+1)
+	b.Transactions = append(b.Transactions, tx)
+	return nil
+}
+
+func (b *BlockData) SetBalance(a common.Address, balance *big.Int) {
+	b.Balances[a] = balance
+}
+
+func (b *BlockData) GetBalance(a common.Address) *big.Int {
+	balance, ok := b.Balances[a]
+	if !ok {
+		return big.NewInt(0)
+	}
+	return balance
+}
+
+func (b *BlockData) SetNonce(a common.Address, nonce uint64) {
+	b.Nonces[a] = nonce
+}
+
+func (b *BlockData) GetNonce(a common.Address) uint64 {
+	nonce := b.Nonces[a]
+	return nonce
+}
+
+func CreateNextBlockData(baseFee *big.Int, gasLimit uint64, feeBeneficiary common.Address, previous *BlockData) *BlockData {
+	gasPool := core.GasPool(gasLimit)
+	bd := &BlockData{
+		mux:            sync.Mutex{},
+		Hash:           common.Hash{},
+		BaseFee:        baseFee,
+		GasLimit:       gasLimit,
+		Number:         0,
+		Transactions:   []*txtypes.Transaction{},
+		Nonces:         map[common.Address]uint64{},
+		Balances:       map[common.Address]*big.Int{},
+		gasPool:        &gasPool,
+		feeBeneficiary: feeBeneficiary,
+	}
+
+	d := crypto.NewKeccakState()
+	if previous != nil {
+		// copy the maps
+		for addr, nonce := range previous.Nonces {
+			bd.Nonces[addr] = nonce
+		}
+		for addr, balance := range previous.Balances {
+			bd.Balances[addr] = balance
+		}
+		bd.Number = previous.Number + 1
+		d.Write(previous.Hash[:])
+	}
+	// block-hash is simply the keccak256 of
+	// the byte representation of the block-number
+	buf := make([]byte, binary.MaxVarintLen64)
+	_ = binary.PutUvarint(buf, bd.Number)
+	d.Write(buf)
+
+	d.Read(bd.Hash[:])
+
+	return bd
 }
 
 type activationBlockMap[T any] struct {
@@ -83,38 +199,44 @@ func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
 }
 
 type Processor struct {
-	URL        string
-	Nonces     map[string]map[string]uint64
-	Collators  *activationBlockMap[common.Address]
-	EonKeys    *activationBlockMap[[]byte]
-	ChainID    *big.Int
-	Blocks     map[string]BlockData
-	Txs        map[string]*txtypes.Transaction
-	BatchIndex uint64
-	Signer     txtypes.Signer
+	URL       string
+	Collators *activationBlockMap[common.Address]
+	EonKeys   *activationBlockMap[[]byte]
+	ChainID   *big.Int
 
-	mux           sync.RWMutex
+	LatestBlock common.Hash
+	Blocks      map[common.Hash]*BlockData
+	Txs         map[common.Hash]TransactionIdentifier
+	BatchIndex  uint64
+	Signer      txtypes.Signer
+
+	Mux           sync.RWMutex
 	l1BlockNumber uint64
 	l1RPCURL      string
+}
+
+type TransactionIdentifier struct {
+	BlockHash common.Hash
+	Index     int
 }
 
 func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Processor {
 	sequencer := &Processor{
 		URL:           sequencerURL,
-		Nonces:        map[string]map[string]uint64{},
 		Collators:     newActivationBlockMap[common.Address](),
 		EonKeys:       newActivationBlockMap[[]byte](),
 		ChainID:       chainID,
-		Blocks:        map[string]BlockData{},
-		Txs:           map[string]*txtypes.Transaction{},
+		LatestBlock:   common.Hash{},
+		Blocks:        make(map[common.Hash]*BlockData),
+		Txs:           map[common.Hash]TransactionIdentifier{},
 		BatchIndex:    0,
 		Signer:        txtypes.NewLondonSigner(chainID),
-		mux:           sync.RWMutex{},
+		Mux:           sync.RWMutex{},
 		l1BlockNumber: 0,
 		l1RPCURL:      l1RPCURL,
 	}
-	baseFee := big.NewInt(BaseFee)
-	sequencer.setBlock(baseFee, GasLimit, "latest")
+	blockData := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, coinbase, nil)
+	sequencer.setLatestBlock(blockData)
 	return sequencer
 }
 
@@ -126,7 +248,7 @@ func (proc *Processor) RunBackgroundTasks(ctx context.Context) <-chan error {
 		return errChan
 	}
 
-	ticker := time.NewTicker(l1PollInterVal)
+	ticker := time.NewTicker(L1PollInterVal)
 	l1Client, err := ethclient.DialContext(ctx, proc.l1RPCURL)
 	if err != nil {
 		return setError(errors.Wrap(err, "error connecting to layer 1 JSON RPC endpoint"))
@@ -144,83 +266,94 @@ func (proc *Processor) RunBackgroundTasks(ctx context.Context) <-chan error {
 					setError(errors.Wrap(err, "error retrieving block-number from layer 1 RPC"))
 					return
 				}
-				proc.mux.Lock()
-				proc.l1BlockNumber = newBlockNumber
-				proc.mux.Unlock()
+				proc.Mux.Lock()
+				if newBlockNumber > proc.l1BlockNumber {
+					proc.l1BlockNumber = newBlockNumber
+					log.Debug().Int("l1-block-number", int(newBlockNumber)).Msg("updated state from layer 1 node")
+				} else if newBlockNumber < proc.l1BlockNumber {
+					log.Warn().Int("new-l1-block-number", int(newBlockNumber)).
+						Int("cached-l1-block-number", int(proc.l1BlockNumber)).
+						Msg("l1 cache inconsistency")
+				}
+				proc.Mux.Unlock()
 			}
 		}
 	}()
 	return errChan
 }
 
-func (proc *Processor) setBlock(baseFee *big.Int, gasLimit uint64, block string) {
-	b, exists := proc.Blocks[block]
-	if !exists {
-		b = BlockData{BaseFee: baseFee, GasLimit: gasLimit}
-		proc.Blocks[block] = b
-		return
+func (proc *Processor) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *BlockData, err error) {
+	if blockNrOrHash.BlockHash != nil {
+		var ok bool
+		block, ok = proc.Blocks[*blockNrOrHash.BlockHash]
+		if !ok {
+			return nil, errors.New("block not found")
+		}
+	} else if blockNrOrHash.BlockNumber != nil {
+		var ok bool
+		// only possible for "latest" (-1) currently
+		if *blockNrOrHash.BlockNumber != ethrpc.LatestBlockNumber {
+			return nil, errors.New("provided block number argument currently not supported")
+		}
+		block, ok = proc.Blocks[proc.LatestBlock]
+		if !ok {
+			return nil, errors.New("block not found")
+		}
+	} else {
+		return nil, errors.New("block argument invalid")
 	}
-	b.BaseFee = baseFee
-	b.GasLimit = gasLimit
+	return block, nil
 }
 
-func (proc *Processor) setNonce(a common.Address, nonce uint64, block string) {
-	nc, exists := proc.Nonces[block]
-	if !exists {
-		nc = make(map[string]uint64, 0)
-		proc.Nonces[block] = nc
+// setNextBlock sets the provided block-data as the next
+// latest-block and persist the data in the internal
+// datastructures for later retrieval.
+// The Sequencer write-lock has to held during this operation,
+// when there is potential concurrent access.
+func (proc *Processor) setLatestBlock(b *BlockData) {
+	proc.Blocks[b.Hash] = b
+	// make the transactions locateable by hash
+	for i, tx := range b.Transactions {
+		proc.Txs[tx.Hash()] = TransactionIdentifier{BlockHash: b.Hash, Index: i}
 	}
-	nc[a.Hex()] = nonce
+	proc.LatestBlock = b.Hash
 }
 
-func (proc *Processor) GetNonce(a common.Address, block string) uint64 {
-	nonce := uint64(0)
-	nc, exists := proc.Nonces[block]
-	if !exists {
-		nc = make(map[string]uint64, 0)
-		proc.Nonces[block] = nc
-	}
-	nonce, exists = nc[a.Hex()]
-	if !exists {
-		proc.setNonce(a, nonce, block)
-	}
-	return nonce
-}
-
-func (proc *Processor) validateBatch(tx *txtypes.Transaction) error {
+func (proc *Processor) validateBatch(tx *txtypes.Transaction) (common.Address, error) {
+	var sender common.Address
 	if tx.Type() != txtypes.BatchTxType {
-		return errors.New("unexpected transaction type")
+		return sender, errors.New("unexpected transaction type")
 	}
 
 	if tx.ChainId().Cmp(proc.ChainID) != 0 {
-		return errors.New("chain-id mismatch")
+		return sender, errors.New("chain-id mismatch")
 	}
 
 	if proc.BatchIndex != tx.BatchIndex()-1 {
-		return errors.New("incorrect batch-index for next batch")
+		return sender, errors.New("incorrect batch-index for next batch")
 	}
 
 	collator, err := proc.Collators.Find(tx.L1BlockNumber())
 	if err != nil {
-		return errors.Wrap(err, "collator validation failed")
+		return sender, errors.Wrap(err, "collator validation failed")
 	}
-	sender, err := proc.Signer.Sender(tx)
+	sender, err = proc.Signer.Sender(tx)
 	if err != nil {
-		return errors.Wrap(err, "error recovering batch tx sender")
+		return sender, errors.Wrap(err, "error recovering batch tx sender")
 	}
 	if collator != sender {
-		return errors.Wrap(err, "not signed by correct collator")
+		return sender, errors.Wrap(err, "not signed by correct collator")
 	}
 
 	// all checks passed, the batch-tx is valid (disregarding validity of included encrypted transactions)
-	return nil
+	return sender, nil
 }
 
 func (proc *Processor) ProcessEncryptedTx(
 	ctx context.Context,
-	gasPool *core.GasPool,
 	batchIndex, batchL1BlockNumber uint64,
 	txBytes, decryptionKey, eonKey []byte,
+	pendingBlock *BlockData,
 ) error {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
@@ -248,24 +381,22 @@ func (proc *Processor) ProcessEncryptedTx(
 	}
 	_ = decryptionKey
 	_ = eonKey
-	nonce := proc.GetNonce(sender, "latest")
-	if tx.Nonce() != nonce+1 {
-		return errors.New("nonce mismatch")
-	}
-	err = gasPool.SubGas(tx.Gas())
-	if err != nil {
-		// can return core.ErrGasLimitReached
-		return err
-	}
+	// TODO decrypt encrypted payload and decode rlp to transaction
 
-	proc.setNonce(sender, nonce+1, "latest")
+	err = pendingBlock.ApplyTx(&tx, sender)
+	if err != nil {
+		return errors.Wrap(err, "couldn't apply transaction")
+	}
 	return nil
 }
 
 func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transaction) (string, error) {
 	var gasPool core.GasPool
 
-	err := proc.validateBatch(batchTx)
+	proc.Mux.Lock()
+	defer proc.Mux.Unlock()
+
+	collator, err := proc.validateBatch(batchTx)
 
 	// marshal to JSON just for logging output
 	txStr, _ := batchTx.MarshalJSON()
@@ -274,17 +405,25 @@ func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		return "", errors.Wrap(err, "batch-tx invalid")
 	}
 
-	proc.mux.RLock()
 	currentL1Block := proc.l1BlockNumber
-	proc.mux.RUnlock()
-
-	l1BlockDeviation := batchTx.L1BlockNumber() - currentL1Block
-	if l1BlockDeviation < 0 {
-		// the collator is lacking behind
-		l1BlockDeviation = -l1BlockDeviation
+	latestBlock, ok := proc.Blocks[proc.LatestBlock]
+	if !ok {
+		// TODO panic
+		// internal server error
+		return "", errors.New("latest block is not initialized")
 	}
-	if l1BlockDeviation > allowedL1Deviation {
-		return "", errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks.", allowedL1Deviation)
+
+	// calculate l1-block-number deviation between collator and sequencer:
+	// delta = batch-l1-blocknumber - sequencer-l1-block-number
+	l1BlockDeviation := new(big.Int).Sub(
+		new(big.Int).SetUint64(batchTx.L1BlockNumber()),
+		new(big.Int).SetUint64(currentL1Block),
+	)
+	if l1BlockDeviation.CmpAbs(allowedL1DeviationBig) == 1 {
+		// the deviation between batch-tx's l1-block-number and sequencer's
+		// known l1-block-number is greater than allowed:
+		// |delta| > |maximum-delta|
+		return "", errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", allowedL1Deviation)
 	}
 
 	eonKey, err := proc.EonKeys.Find(batchTx.L1BlockNumber())
@@ -294,9 +433,18 @@ func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		return "", err
 	}
 
+	pendingBlock := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, collator, latestBlock)
 	gasPool.AddGas(GasLimit)
 	for _, shutterTx := range batchTx.Transactions() {
-		err := proc.ProcessEncryptedTx(ctx, &gasPool, batchTx.BatchIndex(), batchTx.L1BlockNumber(), shutterTx, batchTx.DecryptionKey(), eonKey)
+		err := proc.ProcessEncryptedTx(
+			ctx,
+			batchTx.BatchIndex(),
+			batchTx.L1BlockNumber(),
+			shutterTx,
+			batchTx.DecryptionKey(),
+			eonKey,
+			pendingBlock,
+		)
 		if err != nil {
 			// those are conditions that the collator can check,
 			// so an error here means the whole batch is invalid
@@ -306,10 +454,12 @@ func (proc *Processor) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		log.Info().Msg("successfully applied shutter-tx")
 	}
 
-	sender, _ := proc.Signer.Sender(batchTx)
-	log.Ctx(ctx).Info().Str("signer", sender.Hex()).RawJSON("transaction", txStr).Msg("received batch transaction")
+	// commit the "state change"
 	proc.BatchIndex = batchTx.BatchIndex()
+	proc.setLatestBlock(pendingBlock)
+	proc.Mux.Unlock()
 
+	log.Ctx(ctx).Info().Str("signer", collator.Hex()).RawJSON("transaction", txStr).Msg("included batch transaction")
 	log.Ctx(ctx).Info().Str("batch", hexutil.EncodeUint64(proc.BatchIndex)).Msg("started new batch")
 
 	return batchTx.Hash().Hex(), nil
