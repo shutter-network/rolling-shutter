@@ -52,7 +52,15 @@ func (proc *Sequencer) ListenAndServe(ctx context.Context, rpcServices ...RPCSer
 			return errors.Wrap(err, "error while trying to register RPCService")
 		}
 	}
+	return RPCListenAndServe(ctx, rpcServer, proc.URL, backgroundError)
+}
 
+func RPCListenAndServe(
+	ctx context.Context,
+	rpcServer *rpc.Server,
+	url string,
+	backgroundError <-chan error,
+) error {
 	mux := http.NewServeMux()
 	handler := injectHTTPLogger(rpcServer)
 	mux.Handle("/", handler)
