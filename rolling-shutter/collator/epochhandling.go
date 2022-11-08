@@ -20,33 +20,20 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.Decryptio
 	if err != nil {
 		return nil, err
 	}
+
 	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		_, err := db.InsertDecryptionKey(ctx, cltrdb.InsertDecryptionKeyParams{
 			EpochID:       epochID.Bytes(),
 			DecryptionKey: msg.Key,
 		})
-		if err != nil {
-			return errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochID)
-		}
-		return nil
+		return err
 	})
 	if err != nil {
-		return make([]shmsg.P2PMessage, 0), errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
+		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
 	}
 	log.Printf("inserted decryption key for epoch %s to database", epochID)
-	msgs := []shmsg.P2PMessage{}
-
-	// The one-time receival of the decryption key is the only event
-	// that triggers the submitting of the batch-tx currently.
-	// This call is not guaranteed to succeed and could fail e.g. due to networking issues.
-	err = c.batchHandler.HandleDecryptionKey(ctx, epochID, msg.Key)
-	if err != nil {
-		// NOTE: If this fails then the batch will never be re-submitted to the sequencer
-		// because we don't memorize the key and try to re-submit it later.
-		return msgs, errors.Wrapf(err, "error while processing the batch (epoch %s)", epochID)
-	}
-	return msgs, nil
+	return []shmsg.P2PMessage{}, nil
 }
 
 func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) (bool, error) {

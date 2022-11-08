@@ -69,13 +69,7 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	// during inclusion in the batch, e.g. because of nonce mismatch
 	// or lack of funds
 
-	// for now this waits until the final async result is set on the tx.
-	// this will block the request potentially for
-	// quite some time (until there is finality on the tx),
-	// worst case until the tx has been included in the batch and
-	// the batch has been confirmed
-	res := <-srv.c.batchHandler.EnqueueTx(ctx, x.EncryptedTx)
-	err := res.Err
+	err := srv.c.batcher.EnqueueTx(ctx, x.EncryptedTx)
 	if err != nil {
 		log.Error().Err(err).Msg("Error in SubmitTransaction")
 		sendError(w, http.StatusConflict, err.Error())

@@ -22,7 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
@@ -39,13 +39,12 @@ import (
 type collator struct {
 	Config config.Config
 
-	l1Client     *ethclient.Client
-	l2Client     *rpc.Client
-	contracts    *deployment.Contracts
-	batchHandler *batchhandler.BatchHandler
-
-	p2p    *p2p.P2PHandler
-	dbpool *pgxpool.Pool
+	l1Client  *ethclient.Client
+	l2Client  *rpc.Client
+	contracts *deployment.Contracts
+	batcher   *batcher.Batcher
+	p2p       *p2p.P2PHandler
+	dbpool    *pgxpool.Pool
 }
 
 func Run(ctx context.Context, cfg config.Config) error {
@@ -79,7 +78,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	batchHandler, err := batchhandler.NewBatchHandler(ctx, cfg, dbpool)
+	btchr, err := batcher.NewBatcher(ctx, cfg, dbpool)
 	if err != nil {
 		return err
 	}
@@ -100,9 +99,8 @@ func Run(ctx context.Context, cfg config.Config) error {
 			PeerMultiaddrs: cfg.PeerMultiaddrs,
 			PrivKey:        cfg.P2PKey,
 		}),
-
-		batchHandler: batchHandler,
-		dbpool:       dbpool,
+		batcher: btchr,
+		dbpool:  dbpool,
 	}
 	c.setupP2PHandler()
 
@@ -209,15 +207,6 @@ func (c *collator) run(ctx context.Context) error {
 	errorgroup.Go(func() error {
 		return c.p2p.Run(errorctx)
 	})
-	errorgroup.Go(func() error {
-		return c.batchHandler.Run(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return c.sendMessages(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return c.pollBatchConfirmations(errorctx)
-	})
 
 	return errorgroup.Wait()
 }
@@ -227,73 +216,6 @@ func (c *collator) handleContractEvents(ctx context.Context) error {
 		c.contracts.KeypersConfigsListNewConfig,
 	}
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
-}
-
-func (c *collator) sendMessages(ctx context.Context) error {
-	messages := c.batchHandler.Messages()
-	for msgOut := range messages {
-		if err := c.p2p.SendMessage(ctx, msgOut); err != nil {
-			log.Error().Err(err).Str("message", msgOut.LogInfo()).Msg("error sending message")
-			continue
-		}
-	}
-	return nil
-}
-
-func (c *collator) pollBatchConfirmations(ctx context.Context) error {
-	var (
-		batchIndex, newBatchIndex uint64
-		epochID                   epochid.EpochID
-	)
-
-	// poll ten times during one epoch duration.
-	// this is arbitrary for now, but allows to easily catch the next batch
-	// confirmation and not wait too long until
-	// this is noticed and progress is made
-	pollTime := time.Duration(int64(c.Config.EpochDuration) / 10)
-	ticker := time.NewTicker(pollTime)
-	initial := true
-
-	for {
-		select {
-		case <-ticker.C:
-			var err error
-			epochID, err = c.getBatchConfirmation(ctx)
-			// for now only log errors but keep trying
-			if err != nil {
-				log.Error().Err(err).Msg("error retrieving the current batch-index from sequencer")
-				continue
-			}
-			newBatchIndex = epochID.Uint64()
-
-			if initial {
-				initial = false
-				batchIndex = newBatchIndex
-				continue
-			}
-
-			delta := int(newBatchIndex - batchIndex)
-			if delta > 1 {
-				// this shouldn't happen because collator is needed to progress the batches
-				log.Warn().Err(err).Msg("skipped batch-index")
-			}
-			for delta > 0 {
-				// if we skipped indices, they still have to be pushed
-				// to the batchhandler
-				batchIndex++
-				delta--
-
-				nextEpochID := epochid.Uint64ToEpochID(batchIndex)
-				select {
-				case c.batchHandler.ConfirmedBatch() <- nextEpochID:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
 }
 
 func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, error) {
