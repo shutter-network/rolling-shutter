@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,6 +35,7 @@ type Batcher struct {
 	signer              txtypes.Signer
 	dbpool              *pgxpool.Pool
 	nextBatchChainState *ChainState
+	mux                 sync.Mutex
 }
 
 func newBatcherFromClients(
@@ -216,6 +218,8 @@ func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1
 
 // CloseBatch closes the current batch.
 func (btchr *Batcher) CloseBatch(ctx context.Context) error {
+	btchr.mux.Lock()
+	defer btchr.mux.Unlock()
 	l1blockNumber, err := btchr.l1EthClient.BlockNumber(ctx)
 	if err != nil {
 		return err
@@ -263,6 +267,9 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	if err != nil {
 		return err
 	}
+
+	btchr.mux.Lock()
+	defer btchr.mux.Unlock()
 
 	if btchr.nextBatchChainState == nil {
 		err = btchr.initChainState(ctx)
