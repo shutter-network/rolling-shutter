@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -97,12 +99,15 @@ func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
 				continue
 			}
 			for _, msg := range triggers {
-				err := c.p2p.SendMessage(ctx, msg)
+				err := c.p2p.SendMessage(ctx,
+					msg,
+					retry.Interval(time.Second),
+					retry.ExponentialBackoff(),
+					retry.NumberOfRetries(3),
+					retry.LogIdentifier(msg.LogInfo()),
+					retry.LogCaptureStackFrameContext(),
+				)
 				if err != nil {
-					// this message will be retried on the next tick, since we don't mark it as sent.
-					// this might be too frequent, since DB poll time is likely shorter
-					// than is suited for a transport resend timer
-					log.Error().Err(err).Str("message", msg.LogInfo()).Msg("error sending message")
 					continue // continue sending other messages
 				}
 				err = c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
@@ -112,6 +117,10 @@ func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
+				log.Info().
+					Str("msg", msg.LogInfo()).
+					Str("commitment", hexutil.Encode(msg.TransactionsHash)).
+					Msg("sent decryption trigger")
 			}
 		case <-ctx.Done():
 			return ctx.Err()
