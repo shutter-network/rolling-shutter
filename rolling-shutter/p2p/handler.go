@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -223,12 +224,28 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 	return nil
 }
 
-func (h *P2PHandler) SendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
+func (h *P2PHandler) SendMessage(ctx context.Context, msg shmsg.P2PMessage, retryOpts ...retry.Option) error {
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")
 	}
-	log.Printf("sending %s", msg.LogInfo())
 
-	return h.P2P.Publish(ctx, msg.Topic(), msgBytes)
+	// if no retry options are passed, don't do any retries!
+	if len(retryOpts) == 0 {
+		retryOpts = []retry.Option{retry.NumberOfRetries(0)}
+	}
+
+	log.Printf("sending %s", msg.LogInfo())
+	_, callErr := retry.FunctionCall(
+		ctx,
+		func(ctx context.Context) (bool, error) {
+			err := h.P2P.Publish(ctx, msg.Topic(), msgBytes)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+		retryOpts...,
+	)
+	return callErr
 }
