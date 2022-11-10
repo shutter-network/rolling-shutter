@@ -16,6 +16,7 @@ import (
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 // All messages to be used in the P2P Gossip have to be included in this slice,
@@ -100,7 +101,8 @@ func (*DecryptionTrigger) ImplementsP2PMessage() {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", trigger.EpochID)
+	epochID, _ := epochid.BytesToEpochID(trigger.EpochID)
+	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochID.String())
 }
 
 func (*DecryptionTrigger) Topic() string {
