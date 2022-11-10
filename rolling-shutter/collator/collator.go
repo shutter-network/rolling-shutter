@@ -29,9 +29,9 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -276,7 +276,7 @@ func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, e
 }
 
 func getBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
-	blk, err := medley.Retry(ctx, func() (uint64, error) {
+	blk, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
 		return client.BlockNumber(ctx)
 	})
 	if err != nil {

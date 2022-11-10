@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 )
 
 const (
@@ -137,7 +137,7 @@ func (s *EventSyncer) Run(ctx context.Context) error {
 func (s *EventSyncer) sync(ctx context.Context) error {
 	fromBlock := s.FromBlock
 	for {
-		currentBlock, err := medley.Retry(ctx, func() (uint64, error) {
+		currentBlock, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
 			return s.Client.BlockNumber(ctx)
 		})
 		if err != nil {
@@ -230,7 +230,7 @@ func (s *EventSyncer) syncSingleInRange(ctx context.Context, event *EventType, f
 		Topics:    [][]common.Hash{{topic}},
 	}
 
-	logs, err := medley.Retry(ctx, func() ([]types.Log, error) {
+	logs, err := retry.FunctionCall(ctx, func(ctx context.Context) ([]types.Log, error) {
 		return s.Client.FilterLogs(ctx, query)
 	})
 	if err != nil {

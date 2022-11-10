@@ -24,6 +24,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -565,7 +566,7 @@ func (bh *BatchHandler) OnOutboundDecryptionTrigger(ctx context.Context, trigger
 }
 
 func GetBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
-	blk, err := medley.Retry(ctx, func() (uint64, error) {
+	blk, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
 		return client.BlockNumber(ctx)
 	})
 	if err != nil {

@@ -28,8 +28,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -348,7 +348,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 
 func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	for {
-		l1BlockNumber, err := medley.Retry(ctx, func() (uint64, error) {
+		l1BlockNumber, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
 			return kpr.l1Client.BlockNumber(ctx)
 		})
 		if err != nil {
