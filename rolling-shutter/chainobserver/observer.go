@@ -15,8 +15,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -30,7 +30,7 @@ func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) (
 		BlockNumber: nil,
 		Context:     ctx,
 	}
-	addrs, err := medley.Retry(ctx, func() ([]common.Address, error) {
+	addrs, err := retry.FunctionCall(ctx, func(_ context.Context) ([]common.Address, error) {
 		return addrsSeq.GetAddrs(callOpts, n)
 	})
 	if err != nil {

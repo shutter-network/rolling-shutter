@@ -10,15 +10,15 @@ import (
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 )
 
 // GetBatchIndex retrieves the current batch index from the sequencer.
 func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (epochid.EpochID, error) {
 	var epochID epochid.EpochID
 
-	f := func() (*string, error) {
+	f := func(ctx context.Context) (*string, error) {
 		var result string
 		log.Debug().Msg("polling batch-index from sequencer")
 		err := l2Client.CallContext(ctx, &result, "shutter_getBatchIndex")
@@ -28,7 +28,7 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (epochid.EpochID, 
 		return &result, nil
 	}
 
-	result, err := medley.Retry(ctx, f)
+	result, err := retry.FunctionCall(ctx, f)
 	if err != nil {
 		return epochID, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
 	}
@@ -48,7 +48,7 @@ func SendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 	if err != nil {
 		return err
 	}
-	f := func() (string, error) {
+	f := func(ctx context.Context) (string, error) {
 		var result string
 		//
 		err := client.CallContext(ctx, &result, "eth_sendRawTransaction", hexutil.Encode(data))
@@ -57,7 +57,7 @@ func SendTransaction(ctx context.Context, client *rpc.Client, tx *txtypes.Transa
 		}
 		return result, nil
 	}
-	_, err = medley.Retry(ctx, f)
+	_, err = retry.FunctionCall(ctx, f)
 	if err != nil {
 		return errors.Wrap(err, "can't send transaction")
 	}
