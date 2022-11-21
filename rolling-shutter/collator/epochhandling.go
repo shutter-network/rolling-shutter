@@ -85,11 +85,49 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	return true, nil
 }
 
+func (c *collator) listenNewDecryptionTrigger(ctx context.Context) <-chan time.Time {
+	chann := make(chan time.Time, 1)
+
+	go func() {
+		defer close(chann)
+		defer log.Debug().Msg("stop listening for new_decryption_trigger")
+
+		conn, err := c.dbpool.Acquire(ctx)
+		defer conn.Release()
+		if err != nil {
+			log.Error().Msg("error acquiring connection")
+			return
+		}
+
+		_, err = conn.Exec(ctx, "listen new_decryption_trigger")
+		if err != nil {
+			log.Error().Msg("error listening to channel")
+			return
+		}
+
+		for {
+			notification, err := conn.Conn().WaitForNotification(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if err != nil {
+					log.Error().Err(err).Msg("error waiting for notification")
+					continue
+				}
+				log.Info().Str("channel", notification.Channel).Msg("database notification received")
+				chann <- time.Now()
+			}
+		}
+	}()
+	return chann
+}
+
 func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
-	ticker := time.NewTicker(dBPollTime)
+	newTrigger := c.listenNewDecryptionTrigger(ctx)
 	for {
 		select {
-		case <-ticker.C:
+		case <-newTrigger:
 			triggers, err := c.getUnsentDecryptionTriggers(ctx, c.Config)
 			if err != nil {
 				return err
