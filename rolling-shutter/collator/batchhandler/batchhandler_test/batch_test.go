@@ -460,7 +460,7 @@ func checkDecryptionTrigger(t *testing.T,
 	}
 
 	trigger := stateChange.P2PMessages[0].(*shmsg.DecryptionTrigger)
-	expectedTxHash := shmsg.HashTransactions(txHashes)
+	expectedTxHash := shmsg.HashByteList(txHashes)
 	expectedTrigger := &shmsg.DecryptionTrigger{
 		InstanceID:       fixtures.Cfg.InstanceID,
 		EpochID:          epochID.Bytes(),

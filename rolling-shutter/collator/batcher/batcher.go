@@ -2,7 +2,6 @@ package batcher
 
 import (
 	"context"
-	"errors"
 	"log"
 	"sync"
 	"time"
@@ -11,12 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 var (
@@ -204,6 +205,21 @@ func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1
 	if err != nil {
 		return err
 	}
+	txs, err := db.GetCommittedTransactionsByEpoch(ctx, nextBatchEpochID.Bytes())
+	if err != nil {
+		return err
+	}
+	txsHash := hashTransactions(txs)
+
+	// Write back the generated trigger to the database
+	err = db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
+		EpochID:       nextBatchEpochID.Bytes(),
+		BatchHash:     txsHash,
+		L1BlockNumber: l1blockNumber,
+	})
+	if err != nil {
+		return err
+	}
 
 	newEpoch, err := batchhandler.ComputeNextEpochID(nextBatchEpochID)
 	if err != nil {
@@ -360,4 +376,13 @@ func (btchr *Batcher) ensureAccountsInitialized(ctx context.Context, txs []txtyp
 		}
 	}
 	return nil
+}
+
+func hashTransactions(txs []cltrdb.Transaction) []byte {
+	txHashes := make([][]byte, len(txs))
+	for i, t := range txs {
+		txHashes[i] = t.TxHash
+	}
+	// Hash the list of transaction hashes
+	return shmsg.HashByteList(txHashes)
 }

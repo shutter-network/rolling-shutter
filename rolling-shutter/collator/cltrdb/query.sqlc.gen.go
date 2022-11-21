@@ -99,6 +99,36 @@ func (q *Queries) FindEonPublicKeyVotes(ctx context.Context, hash []byte) ([]Eon
 	return items, nil
 }
 
+const getCommittedTransactionsByEpoch = `-- name: GetCommittedTransactionsByEpoch :many
+SELECT tx_hash, id, epoch_id, tx_bytes, status FROM transaction WHERE status = 'committed' AND epoch_id = $1 ORDER BY id ASC
+`
+
+func (q *Queries) GetCommittedTransactionsByEpoch(ctx context.Context, epochID []byte) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, getCommittedTransactionsByEpoch, epochID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.TxHash,
+			&i.ID,
+			&i.EpochID,
+			&i.TxBytes,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT epoch_id, decryption_key FROM decryption_key
 WHERE epoch_id = $1
@@ -214,14 +244,52 @@ func (q *Queries) GetTransactionsByEpoch(ctx context.Context, epochID []byte) ([
 }
 
 const getTrigger = `-- name: GetTrigger :one
-SELECT epoch_id, batch_hash FROM decryption_trigger WHERE epoch_id = $1
+SELECT epoch_id, id, batch_hash, l1_block_number, sent FROM decryption_trigger WHERE epoch_id = $1
 `
 
 func (q *Queries) GetTrigger(ctx context.Context, epochID []byte) (DecryptionTrigger, error) {
 	row := q.db.QueryRow(ctx, getTrigger, epochID)
 	var i DecryptionTrigger
-	err := row.Scan(&i.EpochID, &i.BatchHash)
+	err := row.Scan(
+		&i.EpochID,
+		&i.ID,
+		&i.BatchHash,
+		&i.L1BlockNumber,
+		&i.Sent,
+	)
 	return i, err
+}
+
+const getUnsentTriggers = `-- name: GetUnsentTriggers :many
+SELECT epoch_id, id, batch_hash, l1_block_number, sent FROM decryption_trigger
+WHERE sent IS NULL
+ORDER BY id ASC
+`
+
+func (q *Queries) GetUnsentTriggers(ctx context.Context) ([]DecryptionTrigger, error) {
+	rows, err := q.db.Query(ctx, getUnsentTriggers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DecryptionTrigger
+	for rows.Next() {
+		var i DecryptionTrigger
+		if err := rows.Scan(
+			&i.EpochID,
+			&i.ID,
+			&i.BatchHash,
+			&i.L1BlockNumber,
+			&i.Sent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
@@ -291,16 +359,17 @@ func (q *Queries) InsertEonPublicKeyVote(ctx context.Context, arg InsertEonPubli
 }
 
 const insertTrigger = `-- name: InsertTrigger :exec
-INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2)
+INSERT INTO decryption_trigger (epoch_id, batch_hash, l1_block_number) VALUES ($1, $2, $3)
 `
 
 type InsertTriggerParams struct {
-	EpochID   []byte
-	BatchHash []byte
+	EpochID       []byte
+	BatchHash     []byte
+	L1BlockNumber int64
 }
 
 func (q *Queries) InsertTrigger(ctx context.Context, arg InsertTriggerParams) error {
-	_, err := q.db.Exec(ctx, insertTrigger, arg.EpochID, arg.BatchHash)
+	_, err := q.db.Exec(ctx, insertTrigger, arg.EpochID, arg.BatchHash, arg.L1BlockNumber)
 	return err
 }
 
@@ -365,5 +434,16 @@ type SetTransactionStatusParams struct {
 
 func (q *Queries) SetTransactionStatus(ctx context.Context, arg SetTransactionStatusParams) error {
 	_, err := q.db.Exec(ctx, setTransactionStatus, arg.TxHash, arg.Status)
+	return err
+}
+
+const updateDecryptionTriggerSent = `-- name: UpdateDecryptionTriggerSent :exec
+UPDATE decryption_trigger
+SET sent=NOW()
+WHERE epoch_id=$1
+`
+
+func (q *Queries) UpdateDecryptionTriggerSent(ctx context.Context, epochID []byte) error {
+	_, err := q.db.Exec(ctx, updateDecryptionTriggerSent, epochID)
 	return err
 }
