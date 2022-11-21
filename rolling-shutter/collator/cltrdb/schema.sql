@@ -1,4 +1,4 @@
--- schema-version: collator-10 --
+-- schema-version: collator-11 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -15,6 +15,19 @@ CREATE TABLE decryption_trigger(
 
 CREATE INDEX unsent_decryption_trigger_idx
 ON decryption_trigger((sent IS NULL)) WHERE (sent IS NULL);
+
+CREATE OR REPLACE FUNCTION notify_new_decryption_trigger()
+  RETURNS TRIGGER AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('new_decryption_trigger', 'payload');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_decryption_trigger
+         AFTER INSERT ON decryption_trigger
+    FOR EACH STATEMENT EXECUTE PROCEDURE notify_new_decryption_trigger();
 
 CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,
