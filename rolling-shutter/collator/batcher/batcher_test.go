@@ -6,11 +6,13 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func DefaultTestParams() TestParams {
@@ -192,4 +194,95 @@ func TestOpenNextBatch(t *testing.T) {
 
 	assert.Equal(t, txs[0].Status, cltrdb.TxstatusCommitted)
 	assert.Equal(t, txs[1].Status, cltrdb.TxstatusRejected)
+}
+
+// TestDecryptionTrigger tests that closing a batch
+// will fill the DB with a DecryptionTrigger that
+// includes the hash of the committed transactions hashes.
+func TestDecryptionTriggerGeneratedIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	var err error
+	ctx := context.Background()
+	fixtures := Setup(ctx, t, DefaultTestParams())
+
+	nextBatchEpoch, _, err := batchhandler.GetNextBatch(ctx, fixtures.DB)
+	assert.NilError(t, err)
+	nextBatchIndex := nextBatchEpoch.Uint64()
+
+	assert.Equal(t, nextBatchIndex, fixtures.Params.InitialEpochID.Uint64())
+
+	tx, txHash := fixtures.MakeTx(t, 0, int(nextBatchIndex), 0, 22000)
+	err = fixtures.Batcher.EnqueueTx(ctx, tx)
+	assert.NilError(t, err)
+	tx2, tx2Hash := fixtures.MakeTx(t, 0, int(nextBatchIndex), 1, 22000)
+	err = fixtures.Batcher.EnqueueTx(ctx, tx2)
+	assert.NilError(t, err)
+
+	err = fixtures.Batcher.CloseBatch(ctx)
+	assert.NilError(t, err)
+
+	triggers, err := fixtures.DB.GetUnsentTriggers(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(triggers), 1)
+	trigger := triggers[0]
+
+	expectedHash := shmsg.HashByteList([][]byte{txHash, tx2Hash})
+	assert.DeepEqual(t, expectedHash, trigger.BatchHash)
+
+	err = fixtures.DB.UpdateDecryptionTriggerSent(ctx, trigger.EpochID)
+	assert.NilError(t, err)
+
+	triggers, err = fixtures.DB.GetUnsentTriggers(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(triggers), 0)
+}
+
+func TestDecryptionTriggerInsertOrderingIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	var err error
+	ctx := context.Background()
+	fixtures := Setup(ctx, t, DefaultTestParams())
+
+	trigger1 := cltrdb.InsertTriggerParams{
+		EpochID:       epochid.Uint64ToEpochID(2).Bytes(),
+		BatchHash:     common.BytesToHash([]byte{1, 0}).Bytes(),
+		L1BlockNumber: 666,
+	}
+
+	trigger2 := cltrdb.InsertTriggerParams{
+		EpochID:       epochid.Uint64ToEpochID(1).Bytes(),
+		BatchHash:     common.BytesToHash([]byte{0, 1}).Bytes(),
+		L1BlockNumber: 42,
+	}
+	// insert trigger2 first
+	err = fixtures.DB.InsertTrigger(ctx, trigger2)
+	assert.NilError(t, err)
+	// insert trigger1 second
+	err = fixtures.DB.InsertTrigger(ctx, trigger1)
+	assert.NilError(t, err)
+
+	triggers, err := fixtures.DB.GetUnsentTriggers(ctx)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(triggers), 2)
+
+	// ordering is by insert order,
+	// independent of the epochid or l1blocknumber
+	assert.DeepEqual(t, cltrdb.DecryptionTrigger{
+		EpochID:       trigger2.EpochID,
+		ID:            1,
+		BatchHash:     trigger2.BatchHash,
+		L1BlockNumber: trigger2.L1BlockNumber,
+	}, triggers[0])
+
+	assert.DeepEqual(t, cltrdb.DecryptionTrigger{
+		EpochID:       trigger1.EpochID,
+		ID:            2,
+		BatchHash:     trigger1.BatchHash,
+		L1BlockNumber: trigger1.L1BlockNumber,
+	}, triggers[1])
 }

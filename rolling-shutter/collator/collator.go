@@ -34,7 +34,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
+
+var errTriggerAlreadySent error = errors.New("decryption-trigger already sent")
 
 type collator struct {
 	Config config.Config
@@ -207,6 +210,9 @@ func (c *collator) run(ctx context.Context) error {
 	errorgroup.Go(func() error {
 		return c.p2p.Run(errorctx)
 	})
+	errorgroup.Go(func() error {
+		return c.handleNewDecryptionTrigger(errorctx)
+	})
 
 	return errorgroup.Wait()
 }
@@ -216,6 +222,53 @@ func (c *collator) handleContractEvents(ctx context.Context) error {
 		c.contracts.KeypersConfigsListNewConfig,
 	}
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
+}
+
+func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, error) {
+	var nextEpochID epochid.EpochID
+	b, err := db.GetNextBatch(ctx)
+	if err != nil {
+		return nextEpochID, err
+	}
+	return epochid.BytesToEpochID(b.EpochID)
+}
+
+func (c *collator) getUnsentDecryptionTriggers(
+	ctx context.Context,
+	cfg config.Config,
+) (
+	[]*shmsg.DecryptionTrigger,
+	error,
+) {
+	var triggers []cltrdb.DecryptionTrigger
+	err := c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+		var err error
+		db := cltrdb.New(dbtx)
+		triggers, err = db.GetUnsentTriggers(ctx)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	trigMsgs := make([]*shmsg.DecryptionTrigger, len(triggers))
+	for i, trig := range triggers {
+		epochID, err := epochid.BytesToEpochID(trig.EpochID)
+		if err != nil {
+			return nil, err
+		}
+		trigMsg, err := shmsg.NewSignedDecryptionTrigger(
+			cfg.InstanceID,
+			epochID,
+			uint64(trig.L1BlockNumber),
+			trig.BatchHash,
+			cfg.EthereumKey,
+		)
+		if err != nil {
+			return nil, err
+		}
+		trigMsgs[i] = trigMsg
+	}
+	return trigMsgs, nil
 }
 
 func (c *collator) getBatchConfirmation(ctx context.Context) (epochid.EpochID, error) {

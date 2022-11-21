@@ -1,11 +1,20 @@
--- schema-version: collator-9 --
+-- schema-version: collator-10 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
 CREATE TABLE decryption_trigger(
     epoch_id bytea PRIMARY KEY,
-    batch_hash bytea
+    -- id persists the input ordering of trigger
+    -- this is useful for implementing a message send queue
+    -- since the epoch_id does not have to be incremental
+    id INTEGER GENERATED ALWAYS AS IDENTITY NOT NULL,
+    batch_hash bytea,
+    l1_block_number bigint NOT NULL,
+    sent timestamp
 );
+
+CREATE INDEX unsent_decryption_trigger_idx
+ON decryption_trigger((sent IS NULL)) WHERE (sent IS NULL);
 
 CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,

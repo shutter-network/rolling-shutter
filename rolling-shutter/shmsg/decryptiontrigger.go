@@ -40,10 +40,10 @@ func (trigger *DecryptionTrigger) Hash() []byte {
 	return hash.Sum(nil)
 }
 
-func HashTransactions(transactions [][]byte) []byte {
+func HashByteList(l [][]byte) []byte {
 	hash := sha3.New256()
-	for _, transaction := range transactions {
-		h := sha3.Sum256(transaction)
+	for _, bytes := range l {
+		h := sha3.Sum256(bytes)
 		hash.Write(h[:])
 	}
 	return hash.Sum(nil)

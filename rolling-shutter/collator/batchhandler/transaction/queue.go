@@ -53,7 +53,7 @@ func (q *Queue) Hash() []byte {
 	for i, t := range q.txqueue {
 		txHashes[i] = t.Tx.Hash().Bytes()
 	}
-	return shmsg.HashTransactions(txHashes)
+	return shmsg.HashByteList(txHashes)
 }
 
 func (q *Queue) Transactions() []*Pending {

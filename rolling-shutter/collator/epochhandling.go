@@ -2,11 +2,12 @@ package collator
 
 import (
 	"context"
-	"log"
 	"math"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
+
+const dBPollTime = 500 * time.Millisecond
 
 func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
@@ -78,4 +81,40 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
 	}
 	return true, nil
+}
+
+func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
+	ticker := time.NewTicker(dBPollTime)
+	for {
+		select {
+		case <-ticker.C:
+			triggers, err := c.getUnsentDecryptionTriggers(ctx, c.Config)
+			if err != nil {
+				return err
+			}
+			if len(triggers) == 0 {
+				// no unsent triggers, continue and wait for next tick
+				continue
+			}
+			for _, msg := range triggers {
+				err := c.p2p.SendMessage(ctx, msg)
+				if err != nil {
+					// this message will be retried on the next tick, since we don't mark it as sent.
+					// this might be too frequent, since DB poll time is likely shorter
+					// than is suited for a transport resend timer
+					log.Error().Err(err).Str("message", msg.LogInfo()).Msg("error sending message")
+					continue // continue sending other messages
+				}
+				err = c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+					db := cltrdb.New(dbtx)
+					return db.UpdateDecryptionTriggerSent(ctx, msg.EpochID)
+				})
+				if err != nil {
+					return err
+				}
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

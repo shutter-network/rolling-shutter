@@ -59,8 +59,11 @@ type DecryptionKey struct {
 }
 
 type DecryptionTrigger struct {
-	EpochID   []byte
-	BatchHash []byte
+	EpochID       []byte
+	ID            int32
+	BatchHash     []byte
+	L1BlockNumber int64
+	Sent          sql.NullTime
 }
 
 type EonPublicKeyCandidate struct {

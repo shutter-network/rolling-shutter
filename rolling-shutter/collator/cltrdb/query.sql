@@ -32,7 +32,17 @@ LIMIT 1;
 SELECT * FROM eon_public_key_vote WHERE hash=$1 ORDER BY sender;
 
 -- name: InsertTrigger :exec
-INSERT INTO decryption_trigger (epoch_id, batch_hash) VALUES ($1, $2);
+INSERT INTO decryption_trigger (epoch_id, batch_hash, l1_block_number) VALUES ($1, $2, $3);
+
+-- name: UpdateDecryptionTriggerSent :exec
+UPDATE decryption_trigger
+SET sent=NOW()
+WHERE epoch_id=$1;
+
+-- name: GetUnsentTriggers :many
+SELECT * FROM decryption_trigger
+WHERE sent IS NULL
+ORDER BY id ASC;
 
 -- name: GetTrigger :one
 SELECT * FROM decryption_trigger WHERE epoch_id = $1;
@@ -64,6 +74,9 @@ SELECT * FROM transaction WHERE epoch_id = $1 ORDER BY id ASC;
 
 -- name: GetNonRejectedTransactionsByEpoch :many
 SELECT * FROM transaction WHERE status<>'rejected' AND epoch_id = $1 ORDER BY id ASC;
+
+-- name: GetCommittedTransactionsByEpoch :many
+SELECT * FROM transaction WHERE status = 'committed' AND epoch_id = $1 ORDER BY id ASC;
 
 -- name: RejectNewTransactions :exec
 UPDATE transaction
