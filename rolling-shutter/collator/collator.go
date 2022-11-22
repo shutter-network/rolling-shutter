@@ -13,6 +13,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -37,6 +38,12 @@ import (
 
 var errTriggerAlreadySent error = errors.New("decryption-trigger already sent")
 
+type signals struct {
+	newDecryptionTrigger shdb.SignalFunc
+	newDecryptionKey     shdb.SignalFunc
+	newBatchTx           shdb.SignalFunc
+}
+
 type collator struct {
 	Config config.Config
 
@@ -46,6 +53,8 @@ type collator struct {
 	batcher   *batcher.Batcher
 	p2p       *p2p.P2PHandler
 	dbpool    *pgxpool.Pool
+	submitter *Submitter
+	signals   signals
 }
 
 func Run(ctx context.Context, cfg config.Config) error {
@@ -87,6 +96,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		return err
 	}
+	submitter, err := NewSubmitter(ctx, cfg, dbpool)
+	if err != nil {
+		return err
+	}
 
 	c := collator{
 		Config: cfg,
@@ -99,9 +112,11 @@ func Run(ctx context.Context, cfg config.Config) error {
 			PeerMultiaddrs: cfg.PeerMultiaddrs,
 			PrivKey:        cfg.P2PKey,
 		}),
-		batcher: btchr,
-		dbpool:  dbpool,
+		batcher:   btchr,
+		dbpool:    dbpool,
+		submitter: submitter,
 	}
+	c.submitter.collator = &c
 	c.setupP2PHandler()
 
 	return c.run(ctx)
@@ -165,13 +180,69 @@ func (c *collator) setupRouter() *chi.Mux {
 	return router
 }
 
+func (c *collator) listenDatabaseNotifications(ctx context.Context) <-chan *pgconn.Notification {
+	chann := make(chan *pgconn.Notification, 1)
+	go func() {
+		defer close(chann)
+		defer log.Debug().Msg("stop listening database notifications")
+
+		conn, err := c.dbpool.Acquire(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("error acquiring connection")
+			return
+		}
+		defer conn.Release()
+
+		err = shdb.ExecListenChannels(ctx, conn.Conn(), dbListenChannels)
+		if err != nil {
+			return
+		}
+		shdb.SlurpNotifications(ctx, conn.Conn(), chann)
+	}()
+	return chann
+}
+
+func (c *collator) handleDatabaseNotifications(ctx context.Context) error {
+	notifications := c.listenDatabaseNotifications(ctx)
+	log.Info().Msg("listening for notifications")
+	for {
+		select {
+		case n := <-notifications:
+			switch n.Channel {
+			case newDecryptionTrigger:
+				c.signals.newDecryptionTrigger()
+			case newDecryptionKey:
+				c.signals.newDecryptionKey()
+			case newBatchtx:
+				c.signals.newBatchTx()
+			default:
+				log.Error().
+					Str("channel", n.Channel).
+					Msg("ignoring database notification for unknown channel")
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
 func (c *collator) run(ctx context.Context) error {
 	httpServer := &http.Server{
 		Addr:              c.Config.HTTPListenAddress,
 		Handler:           c.setupRouter(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+
 	errorgroup, errorctx := errgroup.WithContext(ctx)
+	newSignal := func(signalName string, handler shdb.SignalHandler) shdb.SignalFunc {
+		sig, loop := shdb.NewSignal(errorctx, signalName, handler)
+		errorgroup.Go(loop)
+		return sig
+	}
+	c.signals.newDecryptionTrigger = newSignal(newDecryptionTrigger, c.sendDecryptionTriggers)
+	c.signals.newDecryptionKey = newSignal(newDecryptionKey, c.submitter.submitBatch)
+	c.signals.newBatchTx = newSignal(newBatchtx, c.submitter.submitBatchTxToSequencer)
+
 	errorgroup.Go(httpServer.ListenAndServe)
 	errorgroup.Go(func() error {
 		<-errorctx.Done()
@@ -186,7 +257,7 @@ func (c *collator) run(ctx context.Context) error {
 		return c.p2p.Run(errorctx)
 	})
 	errorgroup.Go(func() error {
-		return c.handleNewDecryptionTrigger(errorctx)
+		return c.handleDatabaseNotifications(errorctx)
 	})
 	errorgroup.Go(func() error {
 		return c.closeBatchesTicker(errorctx, c.Config.EpochDuration)

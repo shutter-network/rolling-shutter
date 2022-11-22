@@ -58,6 +58,20 @@
   rows-not-empty?
   "decryption trigger should have been generated")
 
+(def-check-query :collator/have-batch-tx
+  ["select * from batchtx"]
+  (fn [sys {:collator/keys [num-batchtxs]} rows]
+    (>= (count rows) num-batchtxs))
+  (fn [sys {:collator/keys [num-batchtxs]}]
+    (format "at least %d batch txs should have been generated" num-batchtxs)))
+
+(defmethod runner/run ::add-collator
+  [sys m]
+  (let [addr (get-in sys [:sys/collator :subcommand/cfg :eth-address])
+        mock-port (get-in sys [:sys/mocksequencer :subcommand/listening-port])
+        mock-url (format "http://localhost:%d" mock-port)]
+    (play/add-collator mock-url addr 0)
+    sys))
 
 (defn test-collator-basic
   [{:keys [num-keypers] :as conf}]
@@ -75,6 +89,7 @@
                 (build/run-keypers conf)
                 (build/run-mocksequencer)
                 (build/run-collator)
+                {:run ::add-collator}
 
                 ;; the keypers are already running, but they won't have a key generated at this
                 ;; point. Hence the collator should not generate a decryption trigger.
@@ -109,6 +124,11 @@
                  :loop/description "decryption trigger should be generated"
                  :loop/timeout-ms (* 6 1000)
                  :loop/checks [{:check :collator/decryption-trigger}]}
+                {:check :loop/until
+                 :loop/description "batchtx generation should work"
+                 :loop/timeout-ms (* 20 1000)
+                 :loop/checks [{:check :collator/have-batch-tx
+                                :collator/num-batchtxs 5}]}
                 ;; {:check :loop/forever}
                 ]})
 

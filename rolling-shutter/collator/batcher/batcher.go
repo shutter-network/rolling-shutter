@@ -28,6 +28,7 @@ var (
 	ErrBatchIndexTooFarInFuture = errors.New("batch index is too far in the future")
 	ErrWaitForSequencer         = errors.New("waiting for sequencer to generate a new block")
 	ErrBatchAlreadyExists       = errors.New("batch already exists")
+	ErrNoEonPublicKey           = errors.New("no eon public key found")
 )
 
 type Batcher struct {
@@ -237,8 +238,10 @@ func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1
 
 	// Lookup the current eon public key for the given block.
 	_, err = db.FindEonPublicKeyForBlock(ctx, l1blockNumber)
-	if err != nil {
+	if err == pgx.ErrNoRows {
 		log.Info().Int64("l1BlockNumber", l1blockNumber).Msg("no eon public key found")
+		return ErrNoEonPublicKey
+	} else if err != nil {
 		return err
 	}
 

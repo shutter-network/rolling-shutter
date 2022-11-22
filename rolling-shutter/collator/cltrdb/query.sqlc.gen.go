@@ -292,6 +292,31 @@ func (q *Queries) GetUnsentTriggers(ctx context.Context) ([]DecryptionTrigger, e
 	return items, nil
 }
 
+const getUnsubmittedBatchTx = `-- name: GetUnsubmittedBatchTx :one
+SELECT epoch_id, marshaled, submitted FROM batchtx WHERE submitted=false
+`
+
+func (q *Queries) GetUnsubmittedBatchTx(ctx context.Context) (Batchtx, error) {
+	row := q.db.QueryRow(ctx, getUnsubmittedBatchTx)
+	var i Batchtx
+	err := row.Scan(&i.EpochID, &i.Marshaled, &i.Submitted)
+	return i, err
+}
+
+const insertBatchTx = `-- name: InsertBatchTx :exec
+INSERT INTO batchtx (epoch_id, marshaled) VALUES ($1, $2)
+`
+
+type InsertBatchTxParams struct {
+	EpochID   []byte
+	Marshaled []byte
+}
+
+func (q *Queries) InsertBatchTx(ctx context.Context, arg InsertBatchTxParams) error {
+	_, err := q.db.Exec(ctx, insertBatchTx, arg.EpochID, arg.Marshaled)
+	return err
+}
+
 const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
 INSERT INTO decryption_key (epoch_id, decryption_key)
 VALUES ($1, $2)
@@ -402,6 +427,15 @@ WHERE epoch_id=$1 AND status='new'
 
 func (q *Queries) RejectNewTransactions(ctx context.Context, epochID []byte) error {
 	_, err := q.db.Exec(ctx, rejectNewTransactions, epochID)
+	return err
+}
+
+const setBatchSubmitted = `-- name: SetBatchSubmitted :exec
+UPDATE batchtx SET submitted=true WHERE submitted=false
+`
+
+func (q *Queries) SetBatchSubmitted(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, setBatchSubmitted)
 	return err
 }
 

@@ -1,4 +1,4 @@
--- schema-version: collator-11 --
+-- schema-version: collator-12 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -33,6 +33,22 @@ CREATE TABLE decryption_key (
        epoch_id bytea PRIMARY KEY,
        decryption_key bytea
 );
+
+CREATE OR REPLACE FUNCTION notify_new_decryption_key()
+  RETURNS TRIGGER AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('new_decryption_key', 'payload');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_decryption_key
+        AFTER INSERT ON decryption_key
+    FOR EACH STATEMENT EXECUTE PROCEDURE notify_new_decryption_key();
+
+
+
 CREATE TYPE txstatus AS ENUM ('new', 'rejected', 'committed');
 
 CREATE TABLE transaction(
@@ -51,6 +67,28 @@ CREATE TABLE next_batch(
     epoch_id bytea NOT NULL,
     l1_block_number bigint NOT NULL
 );
+
+CREATE TABLE batchtx(
+       epoch_id bytea PRIMARY KEY,
+       marshaled bytea NOT NULL,
+       submitted BOOL DEFAULT FALSE NOT NULL
+);
+
+CREATE OR REPLACE FUNCTION notify_new_batchtx()
+  RETURNS TRIGGER AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('new_batchtx', 'payload');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_batchtx
+    AFTER INSERT ON batchtx
+    FOR EACH STATEMENT EXECUTE PROCEDURE notify_new_batchtx();
+
+-- ensure we only have at most one tx not submitted yet
+CREATE UNIQUE INDEX batchtx_at_most_one_not_yet_submitted ON batchtx (submitted) WHERE submitted = false;
 
 -- CREATE TABLE eon(
 --      activation_block_number bigint NOT NULL,

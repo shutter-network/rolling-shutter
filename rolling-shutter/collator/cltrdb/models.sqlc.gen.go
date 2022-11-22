@@ -53,6 +53,12 @@ func (ns NullTxstatus) Value() (driver.Value, error) {
 	return ns.Txstatus, nil
 }
 
+type Batchtx struct {
+	EpochID   []byte
+	Marshaled []byte
+	Submitted bool
+}
+
 type DecryptionKey struct {
 	EpochID       []byte
 	DecryptionKey []byte

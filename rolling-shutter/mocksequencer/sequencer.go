@@ -177,14 +177,14 @@ func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
 	)
 	a.mux.RLock()
 	defer a.mux.RUnlock()
+	if len(a.mp) == 0 {
+		return foundVal, errors.New("no value was set")
+	}
 
 	blocks := make([]uint64, len(a.mp))
 	for k := range a.mp {
 		blocks[i] = k
 		i++
-	}
-	if len(blocks) == 0 {
-		return foundVal, errors.New("no value was set")
 	}
 
 	// sort in descending order
@@ -479,6 +479,11 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		// the deviation between batch-tx's l1-block-number and sequencer's
 		// known l1-block-number is greater than allowed:
 		// |delta| > |maximum-delta|
+		log.Error().
+			Uint64("batchtx-l1-blocknum", batchTx.L1BlockNumber()).
+			Uint64("current-l1-blocknum", currentL1Block).
+			Uint64("max-block-deviation", proc.maxBlockDeviation).
+			Msg("rejecting batchtx (block number deviation)")
 		err := errors.Errorf(
 			"the 'L1BlockNumber' deviates more than the allowed %d blocks",
 			proc.maxBlockDeviation,

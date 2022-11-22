@@ -153,6 +153,7 @@ func mockSequencerMain(config *mocksequencer.Config) error {
 	if config.Admin {
 		services = append(services, &rpc.AdminService{})
 	}
+	log.Info().Str("listen-on", config.HTTPListenAddress).Msg("Serving JSON-RPC")
 	err := sequencer.ListenAndServe(
 		ctx,
 		services...,
