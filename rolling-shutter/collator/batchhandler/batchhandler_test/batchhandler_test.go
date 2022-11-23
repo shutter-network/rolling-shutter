@@ -26,10 +26,11 @@ import (
 // the test conducted in a registered hook-function in the MockEthServer,
 // that is called everytime the MockEthServer receives a BatchTx via the
 // `eth_sendRawTransaction` JSON-RPC endpoint.
-func TestBatchHandler(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
+//
+//nolint:funlen //don't fix this, BatchHandler is deprecated and will get removed
+func TestBatchHandlerIntegration(t *testing.T) {
+	t.Skip("BatchHandler is deprecated and will get removed")
+
 	ctx := context.Background()
 
 	epoch1, _ := epochid.BigToEpochID(common.Big1)

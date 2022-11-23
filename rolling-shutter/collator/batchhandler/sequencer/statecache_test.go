@@ -10,7 +10,7 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestCaching(t *testing.T) {
+func TestCachingIntegration(t *testing.T) {
 	eth := RunMockEthServer(t)
 	defer eth.Teardown()
 
