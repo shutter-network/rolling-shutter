@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
 
 type AccountInfo struct {
@@ -26,7 +25,7 @@ type BlockInfo interface {
 
 type L2ClientReader interface {
 	GetAccountInfo(ctx context.Context, account common.Address) (AccountInfo, error)
-	GetBatchIndex(ctx context.Context) (epochid.EpochID, error)
+	GetBatchIndex(ctx context.Context) (uint64, error)
 	ChainID(ctx context.Context) (*big.Int, error)
 	GetBlockInfo(ctx context.Context) (BlockInfo, error)
 }
@@ -51,7 +50,7 @@ func (rc *rpcClient) GetAccountInfo(ctx context.Context, account common.Address)
 	}, nil
 }
 
-func (rc *rpcClient) GetBatchIndex(ctx context.Context) (epochid.EpochID, error) {
+func (rc *rpcClient) GetBatchIndex(ctx context.Context) (uint64, error) {
 	return l2client.GetBatchIndex(ctx, rc.client)
 }
 
