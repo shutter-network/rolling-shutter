@@ -2,6 +2,7 @@ package mocknode
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"log"
 	"math/big"
 	"math/rand"
@@ -191,7 +192,7 @@ func (m *MockNode) sendMessages(ctx context.Context) error {
 }
 
 func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPublicKey, error) {
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec // we need the seed for testing and this is a mock function
 	p, err := shcrypto.RandomPolynomial(r, 0)
 	if err != nil {
 		return nil, nil, err
@@ -216,7 +217,7 @@ func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.
 
 func encryptRandomMessage(epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
-	_, err := rand.Read(message[3:])
+	_, err := cryptorand.Read(message[3:])
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to generate random batch data")
 	}
