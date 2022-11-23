@@ -18,8 +18,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-const dBPollTime = 500 * time.Millisecond
-
 func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
