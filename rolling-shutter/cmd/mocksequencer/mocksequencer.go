@@ -21,8 +21,8 @@ var (
 	l1RPCURL     string
 	sequencerURL string
 	chainID      uint64
-	debugPtr     *bool
-	adminPtr     *bool
+	debug        bool
+	admin        bool
 )
 
 type Config struct{}
@@ -36,8 +36,8 @@ func Cmd() *cobra.Command {
 			return mockSequencerMain()
 		},
 	}
-	debugPtr = cmd.PersistentFlags().Bool("debug", false, "debug mode (higher log verbosity)")
-	adminPtr = cmd.PersistentFlags().Bool("admin", true, "expose the 'admin_' RPC namespace methods")
+	cmd.PersistentFlags().BoolVarP(&debug, "debug", "", false, "debug mode (higher log verbosity)")
+	cmd.PersistentFlags().BoolVarP(&admin, "admin", "", true, "expose the 'admin_' RPC namespace methods")
 	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "http://localhost:8545", "layer-1 node JSON RPC endpoint")
 	cmd.PersistentFlags().StringVarP(&sequencerURL, "rpc", "r", ":8545", "url of the sequencer's JSON RPC endpoint")
 	cmd.PersistentFlags().Uint64VarP(&chainID, "chain-id", "c", 4242, "the chain-id")
@@ -47,11 +47,9 @@ func Cmd() *cobra.Command {
 func mockSequencerMain() error {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if debugPtr != nil {
-		if *debugPtr {
-			zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-			zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		}
+	if debug {
+		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	log.Info().Msgf("Starting mock sequencer version %s", shversion.Version())
@@ -72,10 +70,8 @@ func mockSequencerMain() error {
 		&rpc.EthService{},
 		&rpc.ShutterService{},
 	}
-	if adminPtr != nil {
-		if *adminPtr {
-			services = append(services, &rpc.AdminService{})
-		}
+	if admin {
+		services = append(services, &rpc.AdminService{})
 	}
 	err := sequencer.ListenAndServe(
 		ctx,
