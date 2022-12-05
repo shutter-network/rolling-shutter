@@ -32,7 +32,7 @@ func (tr *Stopping) Process(batch *Batch) *StateChangeResult {
 		FromState:             tr.previous.StateEnum(),
 		ToState:               tr.StateEnum(),
 		P2PMessages:           []shmsg.P2PMessage{},
-		SequencerTransactions: []txtypes.TxData{},
+		SequencerTransactions: []txtypes.TxInner{},
 		Errors:                []StateChangeError{},
 	}
 }
@@ -78,7 +78,7 @@ func (tr *Stopped) Process(batch *Batch) *StateChangeResult {
 		FromState:             tr.previous.StateEnum(),
 		ToState:               tr.StateEnum(),
 		P2PMessages:           []shmsg.P2PMessage{},
-		SequencerTransactions: []txtypes.TxData{},
+		SequencerTransactions: []txtypes.TxInner{},
 		Errors:                []StateChangeError{},
 	}
 }

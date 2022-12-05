@@ -28,7 +28,7 @@ func newTestConfig(t *testing.T) config.Config {
 	}
 }
 
-func TestMockEth(t *testing.T) {
+func TestMockEthIntegration(t *testing.T) {
 	cfg := newTestConfig(t)
 	eth := RunMockEthServer(t)
 	defer eth.Teardown()

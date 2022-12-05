@@ -2,6 +2,7 @@ package mocknode
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"log"
 	"math/big"
 	"math/rand"
@@ -10,6 +11,7 @@ import (
 
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
+	txtypes "github.com/shutter-network/txtypes/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -190,7 +192,7 @@ func (m *MockNode) sendMessages(ctx context.Context) error {
 }
 
 func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPublicKey, error) {
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec // we need the seed for testing and this is a mock function
 	p, err := shcrypto.RandomPolynomial(r, 0)
 	if err != nil {
 		return nil, nil, err
@@ -215,21 +217,12 @@ func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.
 
 func encryptRandomMessage(epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
-	_, err := rand.Read(message[3:])
+	_, err := cryptorand.Read(message[3:])
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to generate random batch data")
 	}
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	sigma, err := shcrypto.RandomSigma(r)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to generate random sigma")
-	}
-
-	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
-	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
-
-	return message, encryptedMessage.Marshal(), nil
+	encryptedMessage, err := EncryptMessage(message, epochID, eonPublicKey)
+	return message, encryptedMessage, err
 }
 
 func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID epochid.EpochID) error {
@@ -271,4 +264,24 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochI
 		Key:        keyBytes,
 	}
 	return m.p2p.SendMessage(ctx, msg)
+}
+
+func EncryptShutterPayload(payload *txtypes.ShutterPayload, epoch epochid.EpochID, eonPubKey *shcrypto.EonPublicKey) ([]byte, error) {
+	var encryptedMessage []byte
+	message, err := payload.Encode()
+	if err != nil {
+		return encryptedMessage, err
+	}
+	encryptedMessage, err = EncryptMessage(message, epoch, eonPubKey)
+	return encryptedMessage, err
+}
+
+func EncryptMessage(message []byte, epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, error) {
+	sigma, err := shcrypto.RandomSigma(cryptorand.Reader)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate random sigma")
+	}
+	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
+	encryptedMessage := shcrypto.Encrypt(message, eonPublicKey, epochIDG1, sigma)
+	return encryptedMessage.Marshal(), nil
 }

@@ -153,7 +153,7 @@ func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
 		me.Mux.RLock()
 		status, err = me.getReceipt(&mess)
 		me.Mux.RUnlock()
-	case "shutter_getBatchIndex":
+	case "shutter_batchIndex":
 		me.Mux.RLock()
 		status, err = me.getBatchIndex(&mess)
 		me.Mux.RUnlock()

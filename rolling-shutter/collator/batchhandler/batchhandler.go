@@ -496,7 +496,7 @@ func (bh *BatchHandler) OnOutgoingMessage(ctx context.Context, msg shmsg.P2PMess
 // Note: The send operation eventually retries sends if the sequencer is unresponsive
 // or an error is returned - the "OnSequencerTransaction" method-call is thus blocking during
 // the whole send operation.
-func (bh *BatchHandler) OnSequencerTransaction(ctx context.Context, tx txtypes.TxData) error {
+func (bh *BatchHandler) OnSequencerTransaction(ctx context.Context, tx txtypes.TxInner) error {
 	signedTx, err := txtypes.SignNewTx(bh.config.EthereumKey, bh.signer, tx)
 	if err != nil {
 		// that's a bug!

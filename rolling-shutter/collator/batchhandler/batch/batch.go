@@ -48,7 +48,7 @@ type StateChangeResult struct {
 	FromState             StateEnum
 	ToState               StateEnum
 	P2PMessages           []shmsg.P2PMessage
-	SequencerTransactions []txtypes.TxData
+	SequencerTransactions []txtypes.TxInner
 	Errors                []StateChangeError
 }
 

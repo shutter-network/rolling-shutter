@@ -9,11 +9,23 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/rpc"
 )
+
+var (
+	l1RPCURL     string
+	sequencerURL string
+	chainID      uint64
+	debug        bool
+	admin        bool
+)
+
+type Config struct{}
 
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -24,14 +36,23 @@ func Cmd() *cobra.Command {
 			return mockSequencerMain()
 		},
 	}
+	cmd.PersistentFlags().BoolVarP(&debug, "debug", "", false, "debug mode (higher log verbosity)")
+	cmd.PersistentFlags().BoolVarP(&admin, "admin", "", true, "expose the 'admin_' RPC namespace methods")
+	cmd.PersistentFlags().StringVarP(&l1RPCURL, "l1", "l", "http://localhost:8545", "layer-1 node JSON RPC endpoint")
+	cmd.PersistentFlags().StringVarP(&sequencerURL, "rpc", "r", ":8545", "url of the sequencer's JSON RPC endpoint")
+	cmd.PersistentFlags().Uint64VarP(&chainID, "chain-id", "c", 4242, "the chain-id")
 	return cmd
 }
 
 func mockSequencerMain() error {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if debug {
+		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
 
 	log.Info().Msgf("Starting mock sequencer version %s", shversion.Version())
-	logDummyTransaction()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -43,12 +64,18 @@ func mockSequencerMain() error {
 		cancel()
 	}()
 
-	sequencer := mocksequencer.New(big.NewInt(1), 8545)
+	sequencer := mocksequencer.New(new(big.Int).SetUint64(chainID), sequencerURL, l1RPCURL)
+
+	services := []mocksequencer.RPCService{
+		&rpc.EthService{},
+		&rpc.ShutterService{},
+	}
+	if admin {
+		services = append(services, &rpc.AdminService{})
+	}
 	err := sequencer.ListenAndServe(
 		ctx,
-		&mocksequencer.AdminService{},
-		&mocksequencer.EthService{},
-		&mocksequencer.ShutterService{},
+		services...,
 	)
 	if err == context.Canceled {
 		log.Info().Msg("Bye.")

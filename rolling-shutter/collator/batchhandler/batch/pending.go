@@ -30,7 +30,7 @@ func (tr *Pending) Process(batch *Batch) *StateChangeResult {
 		FromState:             tr.previous.StateEnum(),
 		ToState:               tr.StateEnum(),
 		P2PMessages:           []shmsg.P2PMessage{},
-		SequencerTransactions: []txtypes.TxData{},
+		SequencerTransactions: []txtypes.TxInner{},
 		Errors:                []StateChangeError{},
 	}
 }

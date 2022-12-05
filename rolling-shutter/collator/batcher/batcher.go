@@ -108,11 +108,10 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 	}
 	nextBatchIndex := nextBatchEpochID.Uint64()
 
-	l2epochID, err := btchr.l2Client.GetBatchIndex(ctx)
+	l2batchIndex, err := btchr.l2Client.GetBatchIndex(ctx)
 	if err != nil {
 		return err
 	}
-	l2batchIndex := l2epochID.Uint64()
 	if l2batchIndex >= nextBatchIndex {
 		// something is seriously wrong here, as the sequencer has already produced a block
 		return errBatchAlreadyExists
