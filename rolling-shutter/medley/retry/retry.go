@@ -8,10 +8,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func multDuration(a time.Duration, m float64) time.Duration {
+	return time.Duration(float64(a) * m)
+}
+
 type retrier struct {
 	numRetries       int
+	infiniteRetries  bool
 	interval         time.Duration
 	maxInterval      time.Duration
+	cancelingErrors  []error
 	multiplier       float64
 	executionContext string
 	identifier       string
@@ -23,6 +29,7 @@ func defaultOptions() Option {
 		r.interval = 2 * time.Second
 		r.maxInterval = 60 * time.Second
 		r.multiplier = 1.
+		r.cancelingErrors = []error{}
 	}
 }
 
@@ -79,7 +86,8 @@ type (
 	RetriableFunction[T any] func(ctx context.Context) (T, error)
 )
 
-// FunctionCall calls the given function multiple times until it doesn't return an error.
+// FunctionCall calls the given function multiple times until it doesn't return an error
+// or one of any optional, user-defined specific errors is returned.
 func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...Option) (T, error) {
 	retrier := &retrier{}
 	opts = append([]Option{defaultOptions()}, opts...)
@@ -115,11 +123,16 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			if err == nil {
 				return result, nil
 			}
-			// don't retry when the context was canceled during function execution
 			if ctx.Err() != nil {
 				return null, ctx.Err()
 			}
-			retrier.logError(err, "request errored, retrying")
+			for _, cErr := range retrier.cancelingErrors {
+				if err == cErr {
+					retrier.logError(err, "request errored")
+					return null, err
+				}
+			}
+			retrier.logError(err, "request errored")
 			next <- time.Now()
 		case <-ctx.Done():
 			return null, ctx.Err()
