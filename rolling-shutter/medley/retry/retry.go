@@ -63,7 +63,7 @@ func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
 	go func() {
 		defer close(iter)
 		interval := r.interval
-		// emit the time once, this is the initial event
+		// emit the time once, this is the initial action
 		// (e.g. the initial function call)
 		iter <- r.clock.Now()
 		i := 0
