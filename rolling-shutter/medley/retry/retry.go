@@ -49,28 +49,29 @@ func (r *retrier) logError(err error, msg string) {
 }
 
 func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
-	rc := make(chan time.Time, 1)
+	iter := make(chan time.Time, 1)
 	go func() {
-		i := 0
+		defer close(iter)
 		interval := r.interval
 		// emit the time once, this is the initial event
 		// (e.g. the initial function call)
-		rc <- time.Now()
+		iter <- time.Now()
+		i := 0
 		for range next {
-			if i >= r.numRetries {
+			if i >= r.numRetries && !r.infiniteRetries {
 				return
 			}
 			// emit the time, this is a consecutive retry event
-			rc <- <-time.After(interval)
+			iter <- <-time.After(interval)
 			i++
 			if float64(interval) >= float64(r.maxInterval)/r.multiplier {
 				interval = r.maxInterval
 			} else {
-				interval = time.Duration(float64(interval) * r.multiplier)
+				interval = multDuration(interval, r.multiplier)
 			}
 		}
 	}()
-	return rc
+	return iter
 }
 
 type (
@@ -92,19 +93,25 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 	var err error
 	var null T
 
+	callCount := 0
+
 	for {
 		select {
 		case _, ok := <-retry:
 			if !ok {
-				retrier.logError(err, "request errored, retry limit reached")
+				retrier.logWithContext(log.Info()).Msg("retry limit reached")
 				return null, err
 			}
 			var result T
+			if callCount > 0 {
+				retrier.logWithContext(log.Debug().Int("count", callCount)).Msg("retrying")
+			}
 			start := time.Now()
 			result, err = fn(ctx)
 			retrier.logWithContext(
 				log.Debug().TimeDiff("took", time.Now(), start),
 			).Msg("called retriable function")
+			callCount++
 			if err == nil {
 				return result, nil
 			}

@@ -14,9 +14,9 @@ func NumberOfRetries(n int) Option {
 	}
 }
 
-func MaxInterval(n int) Option {
+func MaxInterval(t time.Duration) Option {
 	return func(r *retrier) {
-		r.numRetries = n
+		r.maxInterval = t
 	}
 }
 
