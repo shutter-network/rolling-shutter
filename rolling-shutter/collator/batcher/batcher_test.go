@@ -38,17 +38,17 @@ func TestRejectBadTransactionsIntegration(t *testing.T) {
 	t.Run("Future", func(t *testing.T) {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex+batchIndexAcceptenceInterval, 0, 22000)
 		err := fixtures.Batcher.EnqueueTx(ctx, tx)
-		assert.Error(t, err, errBatchIndexTooFarInFuture.Error())
+		assert.Error(t, err, ErrBatchIndexTooFarInFuture.Error())
 	})
 	t.Run("Past", func(t *testing.T) {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex-1, 0, 22000)
 		err := fixtures.Batcher.EnqueueTx(ctx, tx)
-		assert.Error(t, err, errBatchIndexInPast.Error())
+		assert.Error(t, err, ErrBatchIndexInPast.Error())
 	})
 	t.Run("Nonce", func(t *testing.T) {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex, 1, 22000)
 		err := fixtures.Batcher.EnqueueTx(ctx, tx)
-		assert.Error(t, err, errNonceMismatch.Error())
+		assert.Error(t, err, ErrNonceMismatch.Error())
 	})
 	t.Run("Gas", func(t *testing.T) {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex, 0, 2)
@@ -62,7 +62,7 @@ func TestRejectBadTransactionsIntegration(t *testing.T) {
 		defer func() { fixtures.ChainID = chainID }()
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex+1, 0, 22000)
 		err := fixtures.Batcher.EnqueueTx(ctx, tx)
-		assert.Error(t, err, errWrongChainID.Error())
+		assert.Error(t, err, ErrWrongChainID.Error())
 	})
 }
 
@@ -76,7 +76,7 @@ func TestRejectTxNotEnoughFundsIntegration(t *testing.T) {
 	nextBatchIndex := int(fixtures.Params.InitialEpochID.Uint64())
 	tx, _ := fixtures.MakeTx(t, 1, nextBatchIndex, 0, 22000)
 	err := fixtures.Batcher.EnqueueTx(ctx, tx)
-	assert.Error(t, err, errCannotPayGasFee.Error())
+	assert.Error(t, err, ErrCannotPayGasFee.Error())
 }
 
 func TestConfirmTransactionsIntegration(t *testing.T) {
@@ -125,13 +125,13 @@ func TestCloseBatchIntegration(t *testing.T) {
 
 	t.Run("initChainStateWaitForSequencer", func(t *testing.T) {
 		err = fixtures.Batcher.initChainState(ctx)
-		assert.Error(t, err, errWaitForSequencer.Error())
+		assert.Error(t, err, ErrWaitForSequencer.Error())
 	})
 
 	t.Run("batchAlreadyExists", func(t *testing.T) {
 		fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialEpochID.Uint64() + 1)
 		err = fixtures.Batcher.initChainState(ctx)
-		assert.Error(t, err, errBatchAlreadyExists.Error())
+		assert.Error(t, err, ErrBatchAlreadyExists.Error())
 	})
 
 	t.Run("initChainStateSetsNextBatchChainState", func(t *testing.T) {
@@ -184,7 +184,7 @@ func TestOpenNextBatch(t *testing.T) {
 
 	tx3, _ := fixtures.MakeTx(t, 2, int(nextBatchIndex), 0, 22000)
 	err = fixtures.Batcher.EnqueueTx(ctx, tx3)
-	assert.Error(t, err, errCannotPayGasFee.Error())
+	assert.Error(t, err, ErrCannotPayGasFee.Error())
 
 	assert.Check(t, fixtures.Batcher.nextBatchChainState != nil, "nextBatchChainState field not initialized")
 

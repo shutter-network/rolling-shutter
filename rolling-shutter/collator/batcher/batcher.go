@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	errWrongChainID             = errors.New("transaction has wrong chainid")
-	errWongTxType               = errors.New("only encrypted shutter transactions allowed")
-	errBatchIndexInPast         = errors.New("batch index in the past")
-	errBatchIndexTooFarInFuture = errors.New("batch index is too far in the future")
-	errWaitForSequencer         = errors.New("waiting for sequencer to generate a new block")
-	errBatchAlreadyExists       = errors.New("batch already exists")
+	ErrWrongChainID             = errors.New("transaction has wrong chainid")
+	ErrWongTxType               = errors.New("only encrypted shutter transactions allowed")
+	ErrBatchIndexInPast         = errors.New("batch index in the past")
+	ErrBatchIndexTooFarInFuture = errors.New("batch index is too far in the future")
+	ErrWaitForSequencer         = errors.New("waiting for sequencer to generate a new block")
+	ErrBatchAlreadyExists       = errors.New("batch already exists")
 )
 
 type Batcher struct {
@@ -87,10 +87,10 @@ func NewBatcher(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*
 // earlyValidateTx validates a transaction for some basic properties.
 func (btchr *Batcher) earlyValidateTx(tx *txtypes.Transaction) error {
 	if tx.ChainId().Cmp(btchr.signer.ChainID()) != 0 {
-		return errWrongChainID
+		return ErrWrongChainID
 	}
 	if tx.Type() != txtypes.ShutterTxType {
-		return errWongTxType
+		return ErrWongTxType
 	}
 	return nil
 }
@@ -114,11 +114,11 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 	}
 	if l2batchIndex >= nextBatchIndex {
 		// something is seriously wrong here, as the sequencer has already produced a block
-		return errBatchAlreadyExists
+		return ErrBatchAlreadyExists
 	} else if l2batchIndex < nextBatchIndex-1 {
 		// need to wait for the sequencer to produce the block
 		log.Printf("must wait: l2batchinde=%d nextBatchIndex=%d", l2batchIndex, nextBatchIndex)
-		return errWaitForSequencer
+		return ErrWaitForSequencer
 	}
 	block, err := btchr.l2Client.GetBlockInfo(ctx)
 	if err != nil {
@@ -303,9 +303,9 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	nextBatchIndex := nextBatchEpochID.Uint64()
 
 	if tx.BatchIndex() < nextBatchIndex {
-		return errBatchIndexInPast
+		return ErrBatchIndexInPast
 	} else if tx.BatchIndex() >= nextBatchIndex+uint64(btchr.config.BatchIndexAcceptenceInterval) {
-		return errBatchIndexTooFarInFuture
+		return ErrBatchIndexTooFarInFuture
 	}
 
 	txInNextBatch := btchr.nextBatchChainState != nil && tx.BatchIndex() == nextBatchIndex
