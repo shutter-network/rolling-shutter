@@ -95,6 +95,15 @@ func (btchr *Batcher) earlyValidateTx(tx *txtypes.Transaction) error {
 	return nil
 }
 
+func (btchr *Batcher) EnsureChainState(ctx context.Context) error {
+	btchr.mux.Lock()
+	defer btchr.mux.Unlock()
+	if btchr.nextBatchChainState != nil {
+		return nil
+	}
+	return btchr.initChainState(ctx)
+}
+
 // initChainState initializes the nextBatchChainState field. It makes sure that the l2Client is up
 // to date, i.e. has applied the latest transactions. If the client is not up to date or another
 // error happens that prevents us from initializing the field, this method will set the field to
@@ -235,6 +244,14 @@ func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1
 func (btchr *Batcher) CloseBatch(ctx context.Context) error {
 	btchr.mux.Lock()
 	defer btchr.mux.Unlock()
+
+	if btchr.nextBatchChainState == nil {
+		err := btchr.initChainState(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	l1blockNumber, err := btchr.l1EthClient.BlockNumber(ctx)
 	if err != nil {
 		return err
@@ -243,6 +260,7 @@ func (btchr *Batcher) CloseBatch(ctx context.Context) error {
 	err = btchr.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		return btchr.closeBatchImpl(ctx, cltrdb.New(dbtx), int64(l1blockNumber))
 	})
+
 	if err != nil {
 		return err
 	}
