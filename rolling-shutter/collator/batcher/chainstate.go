@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	errNonceMismatch         = errors.New("nonce mismatch")
-	errAccountNotInitialized = errors.New("account not initialized")
-	errCannotPayGasFee       = errors.New("not enough funds to pay gas fee")
-	errGasLimitReached       = errors.New("gas limit reached")
-	errBatchSizeLimitReached = errors.New("batch size limit reached")
+	ErrNonceMismatch         = errors.New("nonce mismatch")
+	ErrAccountNotInitialized = errors.New("account not initialized")
+	ErrCannotPayGasFee       = errors.New("not enough funds to pay gas fee")
+	ErrGasLimitReached       = errors.New("gas limit reached")
+	ErrBatchSizeLimitReached = errors.New("batch size limit reached")
 )
 
 // ChainState is used by the collator to simulate applying transactions to a per block state and
@@ -67,11 +67,11 @@ func (chst *ChainState) CanApplyTx(tx *txtypes.Transaction, txSizeInBytes uint64
 		return err
 	}
 	if !chst.IsAccountInitialized(account) {
-		return errAccountNotInitialized
+		return ErrAccountNotInitialized
 	}
 
 	if tx.Nonce() != chst.nonces[account] {
-		return errNonceMismatch
+		return ErrNonceMismatch
 	}
 
 	err = batch.ValidateGasParams(tx, chst.baseFee)
@@ -81,15 +81,15 @@ func (chst *ChainState) CanApplyTx(tx *txtypes.Transaction, txSizeInBytes uint64
 
 	gasCost := batch.CalculateGasCost(tx, chst.baseFee)
 	if chst.balances[account].Cmp(gasCost) < 0 {
-		return errCannotPayGasFee
+		return ErrCannotPayGasFee
 	}
 
 	if chst.gasUsed+tx.Gas() > chst.blockGasLimit {
-		return errGasLimitReached
+		return ErrGasLimitReached
 	}
 
 	if chst.sizeInBytes+txSizeInBytes > batch.BatchSizeLimit {
-		return errBatchSizeLimitReached
+		return ErrBatchSizeLimitReached
 	}
 
 	return nil
