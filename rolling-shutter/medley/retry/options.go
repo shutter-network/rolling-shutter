@@ -8,9 +8,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// NumberOfRetries specifies the
+// number of retries are conducted
+// until the call finally returns.
+// `-1` is a special value that results in
+// infinite retries.
 func NumberOfRetries(n int) Option {
 	return func(r *retrier) {
 		r.numRetries = n
+		if n == -1 {
+			r.infiniteRetries = true
+		}
 	}
 }
 
@@ -23,6 +31,12 @@ func MaxInterval(t time.Duration) Option {
 func Interval(t time.Duration) Option {
 	return func(r *retrier) {
 		r.interval = t
+	}
+}
+
+func StopOnErrors(e ...error) Option {
+	return func(r *retrier) {
+		r.cancelingErrors = e
 	}
 }
 
