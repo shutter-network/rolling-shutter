@@ -12,11 +12,14 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
+
+const minRetryPollInterval time.Duration = 50 * time.Millisecond
 
 func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
@@ -158,6 +161,65 @@ func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
 					Str("commitment", hexutil.Encode(msg.TransactionsHash)).
 					Msg("sent decryption trigger")
 			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// closeBatchesTicker constantly tries to close the current batch after `interval` duration.
+// Every time the `interval` has passed, closeBatchesTicker will first try to close the batch
+// until successful.
+// Then it will wait some time and try to initialize the chain state for the next batch
+// in order to validate queued up transactions early on in the batch life-cycle.
+func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duration) error {
+	t := time.NewTicker(interval)
+	assumedBatchProcessingDuration := time.Second
+	retryPollInterval := interval / 5
+	if minRetryPollInterval > retryPollInterval {
+		retryPollInterval = minRetryPollInterval
+	}
+	for {
+		select {
+		case <-t.C:
+			fnCloseBatch := func(ctx context.Context) (bool, error) {
+				err := c.batcher.CloseBatch(ctx)
+				return err == nil, err
+			}
+			// retry indefinitely until successful or context canceled
+			_, err := retry.FunctionCall(ctx,
+				fnCloseBatch,
+				retry.Interval(retryPollInterval),
+				retry.NumberOfRetries(-1),
+			)
+			if err != nil {
+				if ctx.Err() != nil {
+					return err
+				}
+				continue
+			}
+
+			// give the keypers and sequencer some time, this is not strictly necessary
+			time.Sleep(assumedBatchProcessingDuration)
+
+			// try to validate already queued transactions as early as possible
+			fnEnsureChainState := func(ctx context.Context) (bool, error) {
+				err := c.batcher.EnsureChainState(ctx)
+				return err == nil, err
+			}
+
+			// retry indefinitely until successful, context canceled or
+			// a severe error occurs
+			_, err = retry.FunctionCall(ctx, fnEnsureChainState,
+				retry.Interval(retryPollInterval),
+				retry.NumberOfRetries(-1),
+				retry.StopOnErrors(batcher.ErrBatchAlreadyExists),
+			)
+			if err == batcher.ErrBatchAlreadyExists {
+				// something is seriously wrong
+				return err
+			}
+
 		case <-ctx.Done():
 			return ctx.Err()
 		}

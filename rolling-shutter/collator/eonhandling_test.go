@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"testing"
+	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"gotest.tools/assert"
@@ -30,6 +31,7 @@ func newTestConfig(t *testing.T) config.Config {
 		EthereumKey:         ethereumKey,
 		ExecutionBlockDelay: uint32(5),
 		InstanceID:          123,
+		EpochDuration:       1 * time.Second,
 	}
 }
 

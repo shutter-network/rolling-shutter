@@ -192,8 +192,9 @@ func (c *collator) setupRouter() *chi.Mux {
 
 func (c *collator) run(ctx context.Context) error {
 	httpServer := &http.Server{
-		Addr:    c.Config.HTTPListenAddress,
-		Handler: c.setupRouter(),
+		Addr:              c.Config.HTTPListenAddress,
+		Handler:           c.setupRouter(),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	errorgroup, errorctx := errgroup.WithContext(ctx)
@@ -212,6 +213,9 @@ func (c *collator) run(ctx context.Context) error {
 	})
 	errorgroup.Go(func() error {
 		return c.handleNewDecryptionTrigger(errorctx)
+	})
+	errorgroup.Go(func() error {
+		return c.closeBatchesTicker(errorctx, c.Config.EpochDuration)
 	})
 
 	return errorgroup.Wait()
