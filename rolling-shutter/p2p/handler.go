@@ -178,7 +178,7 @@ func (h *P2PHandler) hasHandler() bool {
 
 func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 	// This will consume incoming messages and dispatch them to the registered handler functions
-	// If the handler return messages, then they will be sent to the broadcast
+	// If the handler returns messages, then they will be sent to the broadcast
 	for {
 		select {
 		case msg, ok := <-h.P2P.GossipMessages:
