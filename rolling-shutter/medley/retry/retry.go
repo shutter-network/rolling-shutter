@@ -64,12 +64,15 @@ func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
 		// (e.g. the initial function call)
 		iter <- time.Now()
 		i := 0
-		for range next {
+		// next receives information when the last
+		// action (e.g. function call) was executed
+		for lastExecutionFinished := range next {
 			if i >= r.numRetries && !r.infiniteRetries {
 				return
 			}
+			nextTick := time.Until(lastExecutionFinished.Add(interval))
 			// emit the time, this is a consecutive retry event
-			iter <- <-time.After(interval)
+			iter <- <-time.After(nextTick)
 			i++
 			if float64(interval) >= float64(r.maxInterval)/r.multiplier {
 				interval = r.maxInterval
@@ -115,8 +118,10 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			}
 			start := time.Now()
 			result, err = fn(ctx)
+			stopped := time.Now()
+
 			retrier.logWithContext(
-				log.Debug().TimeDiff("took", time.Now(), start),
+				log.Debug().TimeDiff("took (ms)", time.Now(), start),
 			).Msg("called retriable function")
 			callCount++
 			if err == nil {
@@ -132,7 +137,7 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 				}
 			}
 			retrier.logError(err, "request errored")
-			next <- time.Now()
+			next <- stopped
 		case <-ctx.Done():
 			return null, ctx.Err()
 		}
