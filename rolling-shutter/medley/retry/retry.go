@@ -9,7 +9,7 @@ import (
 )
 
 func multDuration(a time.Duration, m float64) time.Duration {
-	return time.Duration(float64(a) * m)
+	return time.Duration(float64(a.Nanoseconds()) * m)
 }
 
 type retrier struct {
@@ -23,13 +23,13 @@ type retrier struct {
 	identifier       string
 }
 
-func defaultOptions() Option {
-	return func(r *retrier) {
-		r.numRetries = 3
-		r.interval = 2 * time.Second
-		r.maxInterval = 60 * time.Second
-		r.multiplier = 1.
-		r.cancelingErrors = []error{}
+func newRetrier() *retrier {
+	return &retrier{
+		numRetries:      3,
+		interval:        2 * time.Second,
+		maxInterval:     60 * time.Second,
+		multiplier:      1.,
+		cancelingErrors: []error{},
 	}
 }
 
@@ -89,8 +89,7 @@ type (
 // FunctionCall calls the given function multiple times until it doesn't return an error
 // or one of any optional, user-defined specific errors is returned.
 func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...Option) (T, error) {
-	retrier := &retrier{}
-	opts = append([]Option{defaultOptions()}, opts...)
+	retrier := newRetrier()
 	retrier.option(opts)
 
 	next := make(chan time.Time, 1)
