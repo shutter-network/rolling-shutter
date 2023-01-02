@@ -1,11 +1,11 @@
 executors:
   base:
     docker:
-      - image: cimg/base:2022.04
+      - image: cimg/base:2022.12
 
   openjdk:
     docker:
-      - image: cimg/openjdk:17.0.3-node
+      - image: cimg/openjdk:17.0.5-node
 
 jobs:
   prepare-contracts:
