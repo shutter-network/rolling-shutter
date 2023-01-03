@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
@@ -30,7 +31,19 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		mapstructure.ComposeDecodeHookFunc(
 			medley.StringToURL,
 		)))
-	return err
+	if err != nil {
+		return err
+	}
+	if config.CollatorURL == nil {
+		return errors.Errorf("configuration value CollatorURL is missing")
+	}
+	if config.SequencerURL == nil {
+		return errors.Errorf("configuration value SequencerURL is missing")
+	}
+	if config.HTTPListenAddress == "" {
+		return errors.Errorf("configuration value HTTPListenAddress is missing")
+	}
+	return nil
 }
 
 type JSONRPCProxy struct {
