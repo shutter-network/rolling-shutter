@@ -26,16 +26,11 @@ import (
 )
 
 const (
-	BaseFee            = 22000
-	GasLimit           = 2200000000
-	AllowedL1Deviation = 5
-	L1PollInterVal     = 1 * time.Second
+	BaseFee  = 22000
+	GasLimit = 2200000000
 )
 
-var (
-	coinbase              = common.HexToAddress("0x0000000000000000000000000000000000000000")
-	allowedL1DeviationBig = big.NewInt(AllowedL1Deviation)
-)
+var coinbase = common.HexToAddress("0x0000000000000000000000000000000000000000")
 
 type BlockData struct {
 	mux            sync.Mutex
@@ -223,9 +218,11 @@ type Sequencer struct {
 	BatchIndex  uint64
 	Signer      txtypes.Signer
 
-	Mux           sync.RWMutex
-	l1BlockNumber uint64
-	l1RPCURL      string
+	Mux               sync.RWMutex
+	l1BlockNumber     uint64
+	l1RPCURL          string
+	l1PollInterval    time.Duration
+	maxBlockDeviation uint64
 }
 
 type TransactionIdentifier struct {
@@ -233,7 +230,13 @@ type TransactionIdentifier struct {
 	Index     int
 }
 
-func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Sequencer {
+func New(
+	chainID *big.Int,
+	sequencerURL string,
+	l1RPCURL string,
+	l1PollInterval time.Duration,
+	maxBlockDeviation uint64,
+) *Sequencer {
 	sequencer := &Sequencer{
 		URL:       sequencerURL,
 		Collators: newActivationBlockMap[common.Address](),
@@ -242,14 +245,16 @@ func New(chainID *big.Int, sequencerURL, l1RPCURL string) *Sequencer {
 			ChainID:      chainID,
 			ShutterBlock: &big.Int{},
 		},
-		LatestBlock:   common.Hash{},
-		Blocks:        make(map[common.Hash]*BlockData),
-		Txs:           map[common.Hash]TransactionIdentifier{},
-		BatchIndex:    0,
-		Signer:        txtypes.NewLondonSigner(chainID),
-		Mux:           sync.RWMutex{},
-		l1BlockNumber: 0,
-		l1RPCURL:      l1RPCURL,
+		LatestBlock:       common.Hash{},
+		Blocks:            make(map[common.Hash]*BlockData),
+		Txs:               map[common.Hash]TransactionIdentifier{},
+		BatchIndex:        0,
+		Signer:            txtypes.NewLondonSigner(chainID),
+		Mux:               sync.RWMutex{},
+		l1BlockNumber:     0,
+		l1RPCURL:          l1RPCURL,
+		l1PollInterval:    l1PollInterval,
+		maxBlockDeviation: maxBlockDeviation,
 	}
 	blockData := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, coinbase, nil)
 	sequencer.setLatestBlock(blockData)
@@ -268,7 +273,7 @@ func (proc *Sequencer) RunBackgroundTasks(ctx context.Context) <-chan error {
 		return errChan
 	}
 
-	ticker := time.NewTicker(L1PollInterVal)
+	ticker := time.NewTicker(proc.l1PollInterval)
 	l1Client, err := ethclient.DialContext(ctx, proc.l1RPCURL)
 	if err != nil {
 		return setError(errors.Wrap(err, "error connecting to layer 1 JSON RPC endpoint"))
@@ -468,11 +473,16 @@ func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transac
 		new(big.Int).SetUint64(batchTx.L1BlockNumber()),
 		new(big.Int).SetUint64(currentL1Block),
 	)
+
+	allowedL1DeviationBig := new(big.Int).SetUint64(proc.maxBlockDeviation)
 	if l1BlockDeviation.CmpAbs(allowedL1DeviationBig) == 1 {
 		// the deviation between batch-tx's l1-block-number and sequencer's
 		// known l1-block-number is greater than allowed:
 		// |delta| > |maximum-delta|
-		err := errors.Errorf("the 'L1BlockNumber' deviates more than the allowed %d blocks", AllowedL1Deviation)
+		err := errors.Errorf(
+			"the 'L1BlockNumber' deviates more than the allowed %d blocks",
+			proc.maxBlockDeviation,
+		)
 		return "", rpcerrors.TransactionRejected(err)
 	}
 
