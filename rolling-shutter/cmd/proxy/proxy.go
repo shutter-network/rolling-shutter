@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -53,8 +52,6 @@ func readConfig() (proxy.Config, error) {
 }
 
 func proxyMain() error {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	config, err := readConfig()
 	if err != nil {
 		return err
