@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -13,6 +14,7 @@ func multDuration(a time.Duration, m float64) time.Duration {
 }
 
 type retrier struct {
+	clock            clock.Clock
 	numRetries       int
 	infiniteRetries  bool
 	interval         time.Duration
@@ -25,6 +27,7 @@ type retrier struct {
 
 func newRetrier() *retrier {
 	return &retrier{
+		clock:           clock.New(),
 		numRetries:      3,
 		interval:        2 * time.Second,
 		maxInterval:     60 * time.Second,
@@ -62,7 +65,7 @@ func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
 		interval := r.interval
 		// emit the time once, this is the initial event
 		// (e.g. the initial function call)
-		iter <- time.Now()
+		iter <- r.clock.Now()
 		i := 0
 		// next receives information when the last
 		// action (e.g. function call) was executed
@@ -70,9 +73,9 @@ func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
 			if i >= r.numRetries && !r.infiniteRetries {
 				return
 			}
-			nextTick := time.Until(lastExecutionFinished.Add(interval))
+			nextTick := r.clock.Until(lastExecutionFinished.Add(interval))
 			// emit the time, this is a consecutive retry event
-			iter <- <-time.After(nextTick)
+			iter <- <-r.clock.After(nextTick)
 			i++
 			if float64(interval) >= float64(r.maxInterval)/r.multiplier {
 				interval = r.maxInterval
@@ -116,9 +119,9 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			if callCount > 0 {
 				retrier.logWithContext(log.Debug().Int("count", callCount)).Msg("retrying")
 			}
-			start := time.Now()
+			start := retrier.clock.Now()
 			result, err = fn(ctx)
-			stopped := time.Now()
+			stopped := retrier.clock.Now()
 
 			retrier.logWithContext(
 				log.Debug().TimeDiff("took (ms)", time.Now(), start),

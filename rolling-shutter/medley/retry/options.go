@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/google/uuid"
 )
 
@@ -63,5 +64,14 @@ func LogIdentifier(s string) Option {
 	id := uuid.NewString()
 	return func(r *retrier) {
 		r.identifier = id + ":" + s
+	}
+}
+
+// UseClock injects a different `clock.Clock`
+// implementation than the default `time`
+// wrapper. Mainly used for mocking.
+func UseClock(c clock.Clock) Option {
+	return func(r *retrier) {
+		r.clock = c
 	}
 }

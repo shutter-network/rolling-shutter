@@ -3,6 +3,7 @@ module github.com/shutter-network/rolling-shutter/rolling-shutter
 go 1.18
 
 require (
+	github.com/benbjohnson/clock v1.3.0
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/getkin/kin-openapi v0.87.0
@@ -40,7 +41,6 @@ require (
 require (
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220626175859-9abda183db8e // indirect
-	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd v0.22.3 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.2 // indirect
