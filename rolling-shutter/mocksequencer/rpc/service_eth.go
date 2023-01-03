@@ -48,6 +48,7 @@ func (s *EthService) GetBalance(address common.Address, blockNrOrHash ethrpc.Blo
 	return balance, nil
 }
 
-func (s *EthService) ChainID() *hexutil.Big {
+//nolint:var-naming,revive,stylecheck
+func (s *EthService) ChainId() *hexutil.Big {
 	return (*hexutil.Big)(s.processor.ChainID())
 }
