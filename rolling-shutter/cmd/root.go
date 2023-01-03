@@ -4,7 +4,10 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
 
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
@@ -33,6 +36,13 @@ func Cmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			zerolog.TimeFieldFormat = "2006/01/02 15:04:05.000000"
+			zlog.Logger = zlog.Output(zerolog.ConsoleWriter{
+				NoColor:    true,
+				Out:        os.Stderr,
+				TimeFormat: zerolog.TimeFieldFormat,
+			}).With().Timestamp().Logger()
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			var flags int
 
 			switch logformat {
