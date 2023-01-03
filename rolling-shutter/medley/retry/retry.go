@@ -103,7 +103,7 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			start := time.Now()
 			result, err = fn(ctx)
 			retrier.logWithContext(
-				log.Info().TimeDiff("took", time.Now(), start),
+				log.Debug().TimeDiff("took", time.Now(), start),
 			).Msg("called retriable function")
 			if err == nil {
 				return result, nil
