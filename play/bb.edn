@@ -143,7 +143,6 @@
       [& args]
       (run-process (cons 'rolling-shutter args))))
 
-
   -godoc:idx
   {:depends [-install:godoc]
    :task (let [path (src-file "godoc.idx")]
@@ -343,10 +342,23 @@
    :depends [build -mocknode-subcommand]
    :task (play/generate-config -mocknode-subcommand)}
 
+  ;; --------------------------------------
+  ;; -- mock-sequencer
+
+  -mocksequencer-subcommand
+  {:depends []
+   :task (play/mocksequencer-subcommand)}
+
+  genconfig:mocksequencer
+  {:doc "Generate mocksequencer config"
+   :depends [build -mocksequencer-subcommand]
+   :task (play/generate-config -mocksequencer-subcommand)}
+
+  ;; --------------------------------------
   ;; -- general tasks
   genconfig
   {:doc "Generate configs"
-   :depends [genconfig:keypers genconfig:mock]}
+   :depends [genconfig:keypers genconfig:mock genconfig:mocksequencer]}
 
   peer
   {:doc "Add nodes as peers of each other"
@@ -411,7 +423,7 @@
   {:doc "Run godoc"
    :depends [-godoc:idx]
    :task (do
-           (print "===============> Starting godoc. Please wait a few seconds for the browser to open!\n" )
+           (print "===============> Starting godoc. Please wait a few seconds for the browser to open!\n")
            (future
              (Thread/sleep 4000)
              (browse/browse-url "http://localhost:6060/"))
@@ -445,6 +457,10 @@
    :depends [build genconfig:mock]
    :task (run-process (play/subcommand-run genconfig:mock))}
 
+  sequencer
+  {:doc "Run mocksequencer"
+   :depends [build genconfig:mocksequencer]
+   :task (run-process (play/subcommand-run genconfig:mocksequencer))}
 
   clean
   {:doc "Remove config files and chain related files"
@@ -453,6 +469,7 @@
            (fs/delete-tree "testchain")
            (doseq [{:subcommand/keys [cfgfile]} (concat -keyper-subcommands
                                                         [(play/mocknode-subcommand)
+                                                         (play/mocksequencer-subcommand)
                                                          -collator-subcommand])]
              (fs/delete-if-exists cfgfile)))}
   ci-gen sht.play/ci-gen}}

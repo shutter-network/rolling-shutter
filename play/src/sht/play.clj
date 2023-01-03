@@ -12,20 +12,24 @@
 
 (def ^:private base-port 23000)
 (def ^:private keyper-base-port (+ base-port 100))
+(def ^:private ethereum-rpc-port 8545)
+;; use the "layer 1" ethereum node for the contracts
+(def ^:private contracts-rpc-port ethereum-rpc-port)
+(def ^:private sequencer-rpc-port 8555)
 
 (def ^:dynamic *cwd* (str (fs/normalize (fs/absolutize "."))))
 
 (def repo-root
   (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
 
-(defn- split-path[]
+(defn- split-path []
   (str/split (System/getenv "PATH") (re-pattern java.io.File/pathSeparator)))
 
 (defn- join-path
   [ps]
   (str/join java.io.File/pathSeparator (distinct ps)))
 
-(defn shutter-env[]
+(defn shutter-env []
   {"ROLLING_SHUTTER_ROOT" repo-root
    "PATH" (->> (split-path)
                (cons (str (fs/path repo-root "rolling-shutter" "bin")))
@@ -160,7 +164,7 @@
                               "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
                               "HTTPEnabled" true
                               "HTTPListenAddress" (format ":%d" (+ 24000 n))
-                              "L2URL" "http://127.0.0.1:8545/"}}))
+                              "ContractsURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)}}))
 
 ;; -- mocknode-subcommand
 (defn mocknode-subcommand
@@ -181,7 +185,17 @@
                  :p2p-port p2p-port
                  :db "collator"
                  :toml-edits {"DatabaseURL" (format "postgres:///collator")
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)}}))
+                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
+                              "SequencerURL" (format "http://localhost:%d" sequencer-rpc-port)}}))
+
+;; -- mocksequencer
+(defn mocksequencer-subcommand
+  []
+  #:subcommand{:cmd 'mock-sequencer
+               :cfgfile "mocksequencer.toml"
+               :toml-edits {"EthereumURL" (format "http://localhost:%d" ethereum-rpc-port)
+                            "ContractsURL" (format "http://localhost:%d" contracts-rpc-port)
+                            "HTTPListenAddress" (format ":%d" sequencer-rpc-port)}})
 
 (defn ci-gen
   "Rewrite bb.edn with a simplified build for use on CI systems"
