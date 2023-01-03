@@ -74,6 +74,7 @@ func readKeyperConfig() (keyper.Config, error) {
 	viper.SetEnvPrefix("KEYPER")
 	viper.BindEnv("ShuttermintURL")
 	viper.BindEnv("EthereumURL")
+	viper.BindEnv("ContractsURL")
 	viper.BindEnv("DeploymentDir")
 	viper.BindEnv("SigningKey")
 	viper.BindEnv("ValidatorSeed")
@@ -179,7 +180,7 @@ func exampleConfig() (*keyper.Config, error) {
 	cfg := &keyper.Config{
 		ShuttermintURL:     "http://localhost:26657",
 		EthereumURL:        "http://127.0.0.1:8545/",
-		L2URL:              "http://127.0.0.1:8547/",
+		ContractsURL:       "http://127.0.0.1:8555/",
 		DeploymentDir:      "./deployments/localhost/",
 		DKGPhaseLength:     30,
 		DKGStartBlockDelta: 12000,

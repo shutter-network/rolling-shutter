@@ -86,7 +86,7 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	l2Client, err := ethclient.Dial(config.L2URL)
+	l2Client, err := ethclient.Dial(config.ContractsURL)
 	if err != nil {
 		return err
 	}

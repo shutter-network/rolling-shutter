@@ -67,11 +67,11 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		return err
 	}
-	l2Client, err := ethclient.Dial(cfg.SequencerURL)
+	contractsClient, err := ethclient.Dial(cfg.ContractsURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(l2Client, cfg.DeploymentDir)
+	contracts, err := deployment.NewContracts(contractsClient, cfg.DeploymentDir)
 	if err != nil {
 		return err
 	}

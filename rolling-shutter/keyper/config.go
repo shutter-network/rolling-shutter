@@ -23,7 +23,7 @@ import (
 type Config struct {
 	ShuttermintURL string
 	EthereumURL    string
-	L2URL          string
+	ContractsURL   string
 	DatabaseURL    string
 	DeploymentDir  string
 
@@ -47,8 +47,10 @@ const configTemplate = `# Shutter keyper config
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
+# The layer 1 JSON RPC endpoitn
 EthereumURL         = "{{ .EthereumURL }}"
-L2URL               = "{{ .L2URL }}"
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL               = "{{ .ContractsURL }}"
 DeploymentDir       = "{{ .DeploymentDir }}"
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name

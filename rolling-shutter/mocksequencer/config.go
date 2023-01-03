@@ -11,7 +11,7 @@ import (
 
 var configTemplate = `# Shutter mock sequencer config
 # JSON-RPC endpoint exposed to clients
-HTTPListenAddress = "{{ .ListenURL }}"
+HTTPListenAddress = "{{ .HTTPListenAddress }}"
 
 # Layer1 JSON-RPC endpoint
 EthereumURL = "{{ .EthereumURL }}"

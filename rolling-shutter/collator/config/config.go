@@ -23,6 +23,7 @@ type Config struct {
 
 	EthereumURL       string
 	SequencerURL      string
+	ContractsURL      string
 	DeploymentDir     string
 	DatabaseURL       string
 	HTTPListenAddress string
@@ -53,6 +54,9 @@ HTTPListenAddress = "{{ .HTTPListenAddress }}"
 
 # JSON RPC endpoint of the sequencer to which batches will be submitted
 SequencerURL = "{{ .SequencerURL }}"
+
+# JSON RPC endpoint of the node where the contracts are deployed
+ContractsURL = "{{ .ContractsURL }}"
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"
