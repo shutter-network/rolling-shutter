@@ -3,13 +3,11 @@ package collator
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"net/http"
 	"os"
 	"time"
 
 	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -110,29 +108,6 @@ func Run(ctx context.Context, cfg config.Config) error {
 	return c.run(ctx)
 }
 
-// initializeNextBatch populates the next_batch table with a valid value if it is empty.
-func initializeNextBatch(ctx context.Context, db *cltrdb.Queries, l1Client *ethclient.Client) error {
-	_, err := db.GetNextBatch(ctx)
-	if err == pgx.ErrNoRows {
-		blk, err := getBlockNumber(ctx, l1Client)
-		if err != nil {
-			return err
-		}
-		if blk > math.MaxInt64 {
-			return errors.Errorf("block number too big: %d", blk)
-		}
-
-		epochID, _ := epochid.BigToEpochID(common.Big0)
-		return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-			EpochID:       epochID.Bytes(),
-			L1BlockNumber: int64(blk),
-		})
-	} else if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *collator) setupP2PHandler() {
 	p2p.AddValidator(c.p2p, c.validateEonPublicKey)
 	p2p.AddHandlerFunc(c.p2p, c.handleEonPublicKey)
@@ -196,7 +171,6 @@ func (c *collator) run(ctx context.Context) error {
 		Handler:           c.setupRouter(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
 	errorgroup, errorctx := errgroup.WithContext(ctx)
 	errorgroup.Go(httpServer.ListenAndServe)
 	errorgroup.Go(func() error {
