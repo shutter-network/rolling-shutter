@@ -47,7 +47,7 @@ func (r *retrier) logWithContext(e *zerolog.Event) *zerolog.Event {
 		e = e.Str("id", r.identifier)
 	}
 
-	if r.identifier != "" {
+	if r.executionContext != "" {
 		e = e.Str("context", r.executionContext)
 	}
 	return e
