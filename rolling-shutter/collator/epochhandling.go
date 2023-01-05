@@ -191,6 +191,7 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 				fnCloseBatch,
 				retry.Interval(retryPollInterval),
 				retry.NumberOfRetries(-1),
+				retry.LogCaptureStackFrameContext(),
 			)
 			if err != nil {
 				if ctx.Err() != nil {
@@ -214,6 +215,7 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 				retry.Interval(retryPollInterval),
 				retry.NumberOfRetries(-1),
 				retry.StopOnErrors(batcher.ErrBatchAlreadyExists),
+				retry.LogCaptureStackFrameContext(),
 			)
 			if err == batcher.ErrBatchAlreadyExists {
 				// something is seriously wrong
