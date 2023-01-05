@@ -112,7 +112,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 	}
 
 	// create a new libp2p Host
-	p.host, err = libp2p.New(ctx, libp2p.ListenAddrs(p.Config.ListenAddr), libp2p.Identity(privKey))
+	p.host, err = libp2p.New(libp2p.ListenAddrs(p.Config.ListenAddr), libp2p.Identity(privKey))
 	if err != nil {
 		return err
 	}
