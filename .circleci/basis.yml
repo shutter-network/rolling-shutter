@@ -1,15 +1,6 @@
 version: 2.1
 
 commands:
-  install-go:
-    steps:
-      - run:
-          name: Install go
-          command: |
-            curl -sSL "https://go.dev/dl/go1.19.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
-            mkdir -p ~/go/bin
-            echo >${BASH_ENV} 'export PATH=/usr/local/go/bin:~/go/bin:${PATH}'
-
   install-asdf:
     steps:
       - run:
@@ -42,7 +33,7 @@ executors:
           POSTGRES_DB: testdb
   py:
     docker:
-      - image: cimg/python:3.9.7-node@sha256:f014580897eea0a92ef30b79aefd2fd58c09853e4d1bcd1e0578a9c67681d183
+      - image: cimg/python:3.11.1-node@sha256:fac71c651914675c788807a3024d3730d897d3c898c47fa207268082fcba41c8
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   node14:
@@ -75,26 +66,26 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Configure nodeenv
+          name: Prepare system
           command: |
             cp .circleci/.nodeenvrc ~
-      - install-go
+            cp .tool-versions ~
+      - install-asdf
+      - run:
+          name: Install pre-commit with asdf
+          command: |
+            asdf plugin add golang
+            asdf install golang
+            asdf plugin add pre-commit
+            asdf install pre-commit
       - restore_cache:
           keys:
             - go-mod-v5-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
-          key: pre-commit-cache-v9-{{ checksum ".pre-commit-config.yaml" }}
-      - run:
-          name: Install pre-commit
-          command: |
-            if [[ -e ~/.local/bin/pre-commit ]]; then
-              echo "pre-commit already installed"
-            else
-              pip install pre-commit==2.18.1
-            fi
+          key: pre-commit-cache-v10-{{ checksum ".pre-commit-config.yaml" }}
       - run: pre-commit install-hooks
       - save_cache:
-          key: pre-commit-cache-v9-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v10-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local
