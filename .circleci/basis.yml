@@ -28,11 +28,12 @@ orbs:
 executors:
   system-tests:
     docker:
-      - image: cimg/openjdk:17.0.3-node
+      - image: cimg/openjdk:17.0.5-node
         environment:
           PGHOST: localhost
           PGUSER: circleci
           PLAY_DB_PASSWORD: xxx
+          NODE_OPTIONS: "--openssl-legacy-provider"
 
       - image: cimg/postgres:13.9
         environment:
@@ -50,13 +51,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.19.0@sha256:a6adde8f9cef732fc576ae2c5970f4537861c5beadb8ca9234b351c7d71659ab
+      - image: cimg/go:1.19.4@sha256:cbe908718445950803fa6bb9653d5d3d2d8aeed5c11449247b9813d0fd494ebc
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.19.0@sha256:a6adde8f9cef732fc576ae2c5970f4537861c5beadb8ca9234b351c7d71659ab
+      - image: cimg/go:1.19.4@sha256:cbe908718445950803fa6bb9653d5d3d2d8aeed5c11449247b9813d0fd494ebc
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
