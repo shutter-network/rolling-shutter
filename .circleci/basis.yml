@@ -34,7 +34,7 @@ executors:
           PGUSER: circleci
           PLAY_DB_PASSWORD: xxx
 
-      - image: circleci/postgres:12
+      - image: cimg/postgres:13.9
         environment:
           POSTGRES_USER: circleci
           POSTGRES_PASSWORD: xxx
@@ -61,7 +61,7 @@ executors:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
           ROLLING_SHUTTER_TESTDB_URL: postgres://pguser:password@localhost:5432/testdb
-      - image: circleci/postgres:12
+      - image: cimg/postgres:13.9
         environment:
           POSTGRES_USER: pguser
           POSTGRES_PASSWORD: password
