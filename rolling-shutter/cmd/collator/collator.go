@@ -147,6 +147,7 @@ func exampleConfig() (*config.Config, error) {
 	}
 	return &config.Config{
 		EthereumURL:         "http://127.0.0.1:8545/",
+		ContractsURL:        "http://127.0.0.1:8545/",
 		DeploymentDir:       "./deployments/localhost/",
 		ListenAddress:       p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		PeerMultiaddrs:      []multiaddr.Multiaddr{},

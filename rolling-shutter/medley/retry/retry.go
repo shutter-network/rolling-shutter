@@ -47,14 +47,14 @@ func (r *retrier) logWithContext(e *zerolog.Event) *zerolog.Event {
 		e = e.Str("id", r.identifier)
 	}
 
-	if r.identifier != "" {
+	if r.executionContext != "" {
 		e = e.Str("context", r.executionContext)
 	}
 	return e
 }
 
 func (r *retrier) logError(err error, msg string) {
-	e := log.Error().Err(err)
+	e := log.Debug().Err(err)
 	r.logWithContext(e).Msg(msg)
 }
 
@@ -112,7 +112,7 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 		select {
 		case _, ok := <-retry:
 			if !ok {
-				retrier.logWithContext(log.Info()).Msg("retry limit reached")
+				retrier.logWithContext(log.Debug()).Msg("retry limit reached")
 				return null, err
 			}
 			var result T

@@ -11,7 +11,6 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 )
 
 func TestServerDecryption(t *testing.T) {
@@ -36,7 +35,7 @@ func TestServerDecryption(t *testing.T) {
 	l1BlockNumber := uint64(42)
 
 	fixtures.L1Service.setBlockNumber(l1BlockNumber)
-	time.Sleep(mocksequencer.L1PollInterVal + 200*time.Millisecond)
+	time.Sleep(sequencerL1PollInterval + 200*time.Millisecond)
 	// HACK this is not the best way to synchronize.
 	// Better would be to keep a last-time-polled counter in the sequencer
 	// and here just wait for the next one

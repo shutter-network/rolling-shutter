@@ -2,7 +2,7 @@ package batcher
 
 import (
 	"context"
-	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
@@ -84,6 +85,23 @@ func NewBatcher(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*
 	return newBatcherFromClients(ctx, cfg, dbpool, l1EthClient, l2Client)
 }
 
+// initializeNextBatch populates the next_batch table with a valid value.
+func (btchr *Batcher) initializeNextBatch(ctx context.Context, db *cltrdb.Queries) error {
+	l1BlockNumber, err := btchr.l1EthClient.BlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	if l1BlockNumber > math.MaxInt64 {
+		return errors.Errorf("block number too big: %d", l1BlockNumber)
+	}
+
+	epochID, _ := epochid.BigToEpochID(common.Big1)
+	return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+		EpochID:       epochID.Bytes(),
+		L1BlockNumber: int64(l1BlockNumber),
+	})
+}
+
 // earlyValidateTx validates a transaction for some basic properties.
 func (btchr *Batcher) earlyValidateTx(tx *txtypes.Transaction) error {
 	if tx.ChainId().Cmp(btchr.signer.ChainID()) != 0 {
@@ -112,7 +130,13 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 	btchr.nextBatchChainState = nil
 	db := cltrdb.New(btchr.dbpool)
 	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, db)
-	if err != nil {
+	if err == pgx.ErrNoRows {
+		// the DB does not have a NextBatch set yet.
+		// this happens for a first time initialisation
+		if err := btchr.initializeNextBatch(ctx, db); err != nil {
+			return errors.Wrap(err, "failed to initialize 'NextBatch' in DB")
+		}
+	} else if err != nil {
 		return err
 	}
 	nextBatchIndex := nextBatchEpochID.Uint64()

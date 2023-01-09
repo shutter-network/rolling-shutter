@@ -26,6 +26,17 @@ export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
 6. bb k 1
 7. bb k 2
 
+## full test setup
+
+1.  bb init; bb chain
+2.  bb node
+3.  bb peer collator.toml mock.toml keyper-0.toml keyper-1.toml keyper-2.toml;
+    bb boot; bb sequencer
+4.  bb k 0
+5.  bb k 1
+6.  bb k 2
+7.  bb collator
+
 ## Whole system tests
 
 Make sure you have java jdk 17 as well as clojure installed.

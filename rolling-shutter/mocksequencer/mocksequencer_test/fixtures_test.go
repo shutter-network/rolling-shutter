@@ -24,7 +24,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/rpc"
 )
 
-var ADDRESS1 common.Address = common.BigToAddress(big.NewInt(1))
+var (
+	ADDRESS1                   common.Address = common.BigToAddress(big.NewInt(1))
+	sequencerL1PollInterval                   = time.Second
+	sequencerMaxBlockDeviation uint64         = 5
+)
 
 var BigIntComparer gocmp.Option = gocmp.Comparer(func(x, y *big.Int) bool {
 	if x == nil || y == nil {
@@ -157,7 +161,13 @@ func NewFixtures(ctx context.Context, numSenders int, serveHTTP bool) (fx *Fixtu
 	// right now the tests will fail if any of those ports
 	// are already in use
 	l1ServerURL := "http://localhost:8555"
-	fx.Sequencer = mocksequencer.New(fx.ChainID, ":8545", l1ServerURL)
+	fx.Sequencer = mocksequencer.New(
+		fx.ChainID,
+		":8545",
+		l1ServerURL,
+		sequencerL1PollInterval,
+		sequencerMaxBlockDeviation,
+	)
 
 	// set the sequencer internal activation-block based values
 	fx.Sequencer.EonKeys.Set(eonPubKey, 0)
