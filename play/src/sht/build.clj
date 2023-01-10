@@ -20,10 +20,10 @@
 (defn sys-write-config-files
   "write config files of all subprocesses to disk.
   This needs to be called, when :toml-edits has been modified."
-  [{:sys/keys [keypers collator] :as sys}]
-  (doseq [sub (conj keypers collator)]
-      (play/toml-edit-file (:subcommand/cfgfile sub)
-                           (:subcommand/toml-edits sub))))
+  [{:sys/keys [keypers collator mocksequencer] :as sys}]
+  (doseq [sub (concat keypers [collator mocksequencer])]
+    (play/toml-edit-file (:subcommand/cfgfile sub)
+                         (:subcommand/toml-edits sub))))
 
 (defmethod runner/run :init/init
   [sys {:init/keys [conf] :as m}]
@@ -37,18 +37,19 @@
         collator (-> (play/collator-subcommand)
                      play/generate-config
                      play/initdb)
-
+        mocksequencer (play/generate-config (play/mocksequencer-subcommand))
         peers (->> (conj keypers collator)
                    (mapv (fn [sub]
-                          (str (get-in sub [:subcommand/toml-edits "ListenAddress"])
-                               "/p2p/"
-                               (get-in sub [:subcommand/cfg :peerid])))))
+                           (str (get-in sub [:subcommand/toml-edits "ListenAddress"])
+                                "/p2p/"
+                                (get-in sub [:subcommand/cfg :peerid])))))
         set-peers (fn [sub]
                     (assoc-in sub  [:subcommand/toml-edits "PeerMultiaddrs"] peers))
         keypers (map set-peers keypers)
         collator (set-peers collator)
         res {:sys/keypers keypers
-             :sys/collator collator}
+             :sys/collator collator
+             :sys/mocksequencer mocksequencer}
         sys (merge sys res)]
     (sys-write-config-files sys)
     (info "Initialized system successfully" res)
@@ -87,6 +88,24 @@
 (defn run-keypers
   [{:keys [num-keypers]}]
   (mapv run-keyper (range num-keypers)))
+
+(defn run-collator
+  []
+  (let [collator (play/collator-subcommand)]
+    {:run :process/run
+     :process/id :collator
+     :process/cmd (play/subcommand-run collator)
+     :process/port (:subcommand/p2p-port collator)
+     :process/port-timeout 3000}))
+
+(defn run-mocksequencer
+  []
+  (let [mock-sequencer (play/mocksequencer-subcommand)]
+    {:run :process/run
+     :process/id :mocksequencer
+     :process/cmd (play/subcommand-run mock-sequencer)
+     :process/port (:subcommand/listening-port mock-sequencer)
+     :process/port-timeout 3000}))
 
 (defn run-chain
   []

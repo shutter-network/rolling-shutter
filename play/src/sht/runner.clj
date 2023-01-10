@@ -245,6 +245,11 @@
             res))
         futures))
 
+(defmethod check :loop/forever check-loop-forever
+  [sys m]
+  (info "waiting forever")
+  (deref (promise)))
+
 (defmethod check :loop/until check-loop-until
   [sys {:loop/keys [checks timeout-ms description] :or {description "loop/until"} :as m}]
   (let [stime (System/currentTimeMillis)

@@ -193,6 +193,7 @@
   []
   #:subcommand{:cmd 'mock-sequencer
                :cfgfile "mocksequencer.toml"
+               :listening-port sequencer-rpc-port
                :toml-edits {"EthereumURL" (format "http://localhost:%d" ethereum-rpc-port)
                             "ContractsURL" (format "http://localhost:%d" contracts-rpc-port)
                             "HTTPListenAddress" (format ":%d" sequencer-rpc-port)}})

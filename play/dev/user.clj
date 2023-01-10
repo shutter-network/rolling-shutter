@@ -7,6 +7,7 @@
             [sht.runner :as runner]
             [sht.build :as build]
             [sht.dkg-test :as dkg-test]
+            [sht.collator-test :as collator-test]
             [sht.play :as play]
             [sht.core :as core]))
 
@@ -14,7 +15,7 @@
   (core/report-result [(runner/run-test (first @dkg-test/tests))]))
 
 (defn doit2 []
-  (core/report-result [(runner/run-test (dkg-test/test-change-keyper-set))]))
+  (core/report-result [(runner/run-test (collator-test/test-collator-basic {:num-keypers 3, :threshold 2}))]))
 
 (comment
   (do

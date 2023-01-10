@@ -4,6 +4,7 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [sht.runner :as runner]
+            [sht.collator-test :as collator-test]
             [sht.dkg-test :as dkg-test])
   (:gen-class))
 
@@ -59,16 +60,21 @@
       (exit 0 "OK")
       (exit 1 "FAIL"))))
 
+(defn ^:private all-test-cases
+  []
+  (sanity-check-cases (concat @dkg-test/tests
+                              @collator-test/tests)))
+
 (defn run-tests
   [{:keys [nr] :as opts}]
-  (let [test-cases (sanity-check-cases @dkg-test/tests)
+  (let [test-cases (all-test-cases)
         test-cases (if nr [(nth test-cases nr)] test-cases)]
     (run-test-cases test-cases)))
 
 (defn -main
   [& args]
   (let [selected (set args)
-        test-cases (sanity-check-cases @dkg-test/tests)
+        test-cases (all-test-cases)
         test-cases (if (empty? selected)
                      test-cases
                      (filter (comp selected name :test/id) test-cases))]
