@@ -2,6 +2,7 @@
 /k*.toml
 /mock.toml
 /collator.toml
+/mocksequencer.toml
 /play.json
 /testchain/
 /deployments
