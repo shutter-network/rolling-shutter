@@ -19,7 +19,7 @@
 
 (defn sys-write-config-files
   "write config files of all subprocesses to disk.
-  This needs to be called, when :tom-edits has been modified."
+  This needs to be called, when :toml-edits has been modified."
   [{:sys/keys [keypers collator] :as sys}]
   (doseq [sub (conj keypers collator)]
       (play/toml-edit-file (:subcommand/cfgfile sub)
