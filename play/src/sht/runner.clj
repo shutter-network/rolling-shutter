@@ -188,7 +188,7 @@
 
 (defmethod run :sleep/sleep run-sleep-sleep
   [sys {:sleep/keys [milliseconds]}]
-  (infof "waiting for %d milliseconds" milliseconds)
+  (info (format "waiting for %d milliseconds" milliseconds))
   (Thread/sleep milliseconds)
   sys)
 

@@ -211,3 +211,4 @@
     (println "Created simpified config in" dst)))
 
 (def keyper-db (comp :subcommand/db keyper-subcommand))
+(def collator-db (comp :subcommand/db collator-subcommand))

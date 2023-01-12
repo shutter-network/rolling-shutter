@@ -16,6 +16,44 @@
 
 (set! *warn-on-reflection* true)
 
+(defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
+(defn- check-query
+  [description sys opts query ok-rows?]
+  (let [db {:dbtype "postgresql"
+            :dbname (play/collator-db)
+            :password play-db-password}
+        ds (jdbc/get-datasource db)
+        query (if (vector? query)
+                query
+                (query sys opts))
+        description (if (string? description)
+                      description
+                      (description sys opts))
+        rows (jdbc/execute! ds query)]
+    {:chk/ok? (boolean (ok-rows? sys opts rows))
+     :chk/description description
+     :chk/info rows}))
+
+(defmacro def-check-query
+  [id query ok-rows? description]
+  `(defmethod runner/check ~id
+     [sys# opts#]
+     (check-query ~description sys# opts# ~query ~ok-rows?)))
+
+(defn rows-not-empty?
+  [sys opts rows]
+  (seq rows))
+
+(defn rows-empty?
+  [sys opts rows]
+  (empty? rows))
+
+(def-check-query :collator/no-decryption-trigger
+  ["select * from decryption_trigger"]
+  rows-empty?
+  "no decryption trigger should have been generated")
+
+
 (defn test-collator-basic
   [{:keys [num-keypers] :as conf}]
   {:test/id :collator-basic-works
@@ -32,6 +70,11 @@
                 (build/run-keypers conf)
                 (build/run-mocksequencer)
                 (build/run-collator)
+
+                ;; the keypers are already running, but they won't have a key generated at this
+                ;; point. Hence the collator should not generate a decryption trigger.
+                {:run :sleep/sleep :sleep/milliseconds 6000}
+                {:check :collator/no-decryption-trigger}
 
                 {:run :process/run
                  :process/id :boot
