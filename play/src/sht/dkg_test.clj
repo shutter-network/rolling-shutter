@@ -68,6 +68,15 @@
   rows-not-empty?
   "eon should exist")
 
+(def-check-query :keyper/ordered-eons-match
+  ["select * from eons order by eon asc"]
+  (fn [_ {:keyper/keys [ordered-eons]} rows]
+    (->> rows
+         (mapv :eons/eon)
+         (compare ordered-eons)
+         (== 0)))
+  "the sequencer of ordered eons should match exactly")
+
 (def-check-query :keyper/dkg-success
   ["select * from dkg_result"]
   (fn [_ {:keyper/keys [eon]} rows]
@@ -163,7 +172,6 @@
                        n))
     sys))
 
-
 (defn get-public-validator-key
   "get the public validator key from a priv_validator_key.json map"
   [m]
@@ -217,7 +225,7 @@
      (rewrite-genesis cwd num-keypers num-initial-keypers))))
 
 (defn- format-hex
- [^bytes bs]
+  [^bytes bs]
   (.formatHex (java.util.HexFormat/of) bs))
 ;; (format-hex (byte-array 5 [1 3 32 128 255]))
 
@@ -227,10 +235,10 @@
   [sys]
   (let [keypers (:sys/keypers sys)
         pubkeys (mapv (fn [n]
-                      (let [pubkey (read-public-validator-key
-                                    (sys-chain-config-path sys n "priv_validator_key.json"))]
-                        (format-hex pubkey)))
-                    (range (count keypers)))
+                        (let [pubkey (read-public-validator-key
+                                      (sys-chain-config-path sys n "priv_validator_key.json"))]
+                          (format-hex pubkey)))
+                      (range (count keypers)))
         keypers (mapv (fn [k pubkey n]
                         (-> k
                             (assoc-in [:subcommand/toml-edits "ValidatorPublicKey"] pubkey)
@@ -297,10 +305,11 @@
                                  :keyper/num keyper})}
 
                 (for [keyper (range num-keypers)]
-                  {:check :keyper/non-zero-activation-block
-                   :keyper/num keyper})
-
-                ]})
+                  [{:check :keyper/non-zero-activation-block
+                    :keyper/num keyper}
+                   {:check :keyper/ordered-eons-match
+                    :keyper/num keyper
+                    :keyper/ordered-eons [1]}])]})
 
 (defn test-change-keyper-set
   []
@@ -398,7 +407,14 @@
                   (for [keyper (range num-keypers)]
                     {:check :keyper/tendermint-batch-config-started
                      :keyper-num keyper})
-                  ]}))
+                  (for [keyper (range num-initial-keypers)]
+                    {:check :keyper/ordered-eons-match
+                     :keyper/num keyper
+                     :keyper/ordered-eons [1 2]})
+                  (for [keyper (range num-initial-keypers num-keypers)]
+                    {:check :keyper/ordered-eons-match
+                     :keyper/num keyper
+                     :keyper/ordered-eons [2]})]}))
 
 (defn test-dkg-keypers-join-late
   [{:keys [num-keypers threshold] :as conf}]
@@ -454,11 +470,11 @@
                                  :keyper/num keyper})}
 
                 (for [keyper (range num-keypers)]
-                  {:check :keyper/non-zero-activation-block
-                   :keyper/num keyper})
-
-                ]})
-
+                  [{:check :keyper/non-zero-activation-block
+                    :keyper/num keyper}
+                   {:check :keyper/ordered-eons-match
+                    :keyper/num keyper
+                    :keyper/ordered-eons [1 2]}])]})
 (defn generate-tests
   []
   (concat
