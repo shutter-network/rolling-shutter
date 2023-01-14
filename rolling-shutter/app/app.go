@@ -464,10 +464,11 @@ func (app *ShutterApp) maybeStartEon(eon uint64) (*DKGInstance, bool) {
 
 	threshold := int(dkg.Config.Threshold)
 	success, ok := dkg.SuccessVoting.Outcome(threshold)
-	if !ok || success {
+	// dismiss votes for Eon that was voted on successfully already
+	outdatedEon := app.EONCounter > eon
+	if !ok || success || outdatedEon {
 		return nil, false
 	}
-
 	return app.StartDKG(dkg.Config), true
 }
 
