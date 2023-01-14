@@ -71,11 +71,8 @@
 (def-check-query :keyper/ordered-eons-match
   ["select * from eons order by eon asc"]
   (fn [_ {:keyper/keys [ordered-eons]} rows]
-    (->> rows
-         (mapv :eons/eon)
-         (compare ordered-eons)
-         (== 0)))
-  "the sequencer of ordered eons should match exactly")
+    (= ordered-eons (mapv :eons/eon rows)))
+  "the sequence of ordered eons should match exactly")
 
 (def-check-query :keyper/dkg-success
   ["select * from dkg_result"]
