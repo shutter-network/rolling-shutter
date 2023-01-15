@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -26,6 +27,13 @@ import (
 
 var logformat string
 
+func initZerologCallerMarshal() {
+	pathsep := string(os.PathSeparator)
+	zerolog.CallerMarshalFunc = func(file string, line int) string {
+		return fmt.Sprintf("%s:%d", file[1+strings.LastIndex(file, pathsep):], line)
+	}
+}
+
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rolling-shutter",
@@ -36,12 +44,19 @@ func Cmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			initZerologCallerMarshal()
 			zerolog.TimeFieldFormat = "2006/01/02 15:04:05.000000"
 			zlog.Logger = zlog.Output(zerolog.ConsoleWriter{
 				NoColor:    true,
 				Out:        os.Stderr,
 				TimeFormat: zerolog.TimeFieldFormat,
-			}).With().Timestamp().Logger()
+				PartsOrder: []string{
+					zerolog.TimestampFieldName,
+					zerolog.LevelFieldName,
+					zerolog.CallerFieldName,
+					zerolog.MessageFieldName,
+				},
+			}).With().Timestamp().Caller().Logger()
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			var flags int
 
