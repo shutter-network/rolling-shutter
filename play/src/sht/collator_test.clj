@@ -53,6 +53,11 @@
   rows-empty?
   "no decryption trigger should have been generated")
 
+(def-check-query :collator/decryption-trigger
+  ["select * from decryption_trigger"]
+  rows-not-empty?
+  "decryption trigger should have been generated")
+
 
 (defn test-collator-basic
   [{:keys [num-keypers] :as conf}]
@@ -100,6 +105,10 @@
                 (for [keyper (range num-keypers)]
                   {:check :keyper/non-zero-activation-block
                    :keyper/num keyper})
+                {:check :loop/until
+                 :loop/description "decryption trigger should be generated"
+                 :loop/timeout-ms (* 6 1000)
+                 :loop/checks [{:check :collator/decryption-trigger}]}
                 ;; {:check :loop/forever}
                 ]})
 
