@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +11,7 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -143,13 +143,13 @@ func main() error {
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-termChan
-		log.Printf("Received %s signal, shutting down", sig)
+		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
 		cancel()
 	}()
 
 	err = mockNode.Run(ctx)
 	if err == context.Canceled {
-		log.Printf("Bye.")
+		log.Info().Msg("bye")
 		return nil
 	}
 	return err

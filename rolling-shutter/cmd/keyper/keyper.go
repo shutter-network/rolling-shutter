@@ -3,7 +3,6 @@ package keyper
 import (
 	"bytes"
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -91,7 +91,7 @@ func readKeyperConfig() (keyper.Config, error) {
 
 	defer func() {
 		if viper.ConfigFileUsed() != "" {
-			log.Printf("Read config from %s", viper.ConfigFileUsed())
+			log.Info().Str("config", viper.ConfigFileUsed()).Msg("read config")
 		}
 	}()
 	var err error
@@ -127,12 +127,11 @@ func keyperMain() error {
 		return errors.WithMessage(err, "Please check your configuration")
 	}
 
-	log.Printf(
-		"Starting keyper version %s with signing key %s, using %s for Shuttermint",
-		shversion.Version(),
-		config.Address().Hex(),
-		config.ShuttermintURL,
-	)
+	log.Info().
+		Str("version", shversion.Version()).
+		Str("address", config.Address().Hex()).
+		Str("shuttermint", config.ShuttermintURL).
+		Msg("starting keyper")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -140,13 +139,13 @@ func keyperMain() error {
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-termChan
-		log.Printf("Received %s signal, shutting down", sig)
+		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
 		cancel()
 	}()
 
 	err = keyper.Run(ctx, config)
 	if err == context.Canceled {
-		log.Printf("Bye.")
+		log.Info().Msg("bye")
 		return nil
 	}
 	return err
@@ -171,8 +170,8 @@ func initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Database initialized (%s)", shdb.ConnectionInfo(dbpool))
-
+	log.Info().Str("connection", shdb.ConnectionInfo(dbpool)).
+		Msg("database initialized")
 	return nil
 }
 

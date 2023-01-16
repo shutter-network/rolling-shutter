@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/kr/pretty"
+	"github.com/rs/zerolog/log"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
@@ -110,8 +110,7 @@ func subscribe(cl client.Client) {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
-	log.Printf("Starting testclient version %s", shversion.Version())
+	log.Info().Str("version", shversion.Version()).Msg("starting testclient")
 
 	var cl client.Client
 	cl, err := http.New("http://localhost:26657")

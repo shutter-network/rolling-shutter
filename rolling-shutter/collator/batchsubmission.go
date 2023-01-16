@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
@@ -46,7 +46,7 @@ func (c *collator) submitBatches(ctx context.Context) error {
 			// submit batch to collator
 			err := c.submitBatch(ctx, batch)
 			if err != nil {
-				log.Printf("error submitting batch to sequencer: %s", err)
+				log.Error().Err(err).Msg("error submitting batch to sequencer")
 				// we don't return and will just try next loop iteration
 			}
 		case <-ctx.Done():
@@ -72,7 +72,7 @@ func (c *collator) submitBatch(ctx context.Context, batch []byte) error {
 	}
 	req.Header.Add("Content-Type", "application/json")
 
-	log.Println("submitting batch to sequecer")
+	log.Info().Msg("submitting batch to sequencer")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

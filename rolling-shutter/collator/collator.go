@@ -49,9 +49,8 @@ type collator struct {
 }
 
 func Run(ctx context.Context, cfg config.Config) error {
-	log.Printf(
-		"starting collator with ethereum address %s",
-		cfg.EthereumAddress(),
+	log.Info().Str("ethereum-address", cfg.EthereumAddress().Hex()).Msg(
+		"starting collator",
 	)
 
 	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
@@ -59,7 +58,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
-	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+	log.Info().Str("connection-info", shdb.ConnectionInfo(dbpool)).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {
@@ -156,10 +155,11 @@ func (c *collator) setupRouter() *chi.Mux {
 	     export SWAGGER_UI=$(pwd)/package
 	*/
 	swaggerUI := os.Getenv("SWAGGER_UI")
+	UIPath := "/ui/"
 	if swaggerUI != "" {
-		log.Printf("Enabling the swagger ui at /ui/")
+		log.Info().Str("path", UIPath).Msg("enabling the Swagger UI")
 		fs := http.FileServer(http.Dir(os.Getenv("SWAGGER_UI")))
-		router.Mount("/ui/", http.StripPrefix("/ui/", fs))
+		router.Mount(UIPath, http.StripPrefix(UIPath, fs))
 	}
 
 	return router

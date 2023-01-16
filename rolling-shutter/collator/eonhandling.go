@@ -3,11 +3,11 @@ package collator
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
@@ -137,10 +137,10 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 			if err != nil {
 				return err
 			}
-			log.Printf("Confirmed eon public key for keyper config index=%d, eon=%d",
-				key.KeyperConfigIndex,
-				key.Eon,
-			)
+			log.Info().
+				Uint64("config-index", key.KeyperConfigIndex).
+				Uint64("eon", key.Eon).
+				Msg("Confirmed eon public key for keyper config index=%d, eon=%d")
 		}
 		return nil
 	})

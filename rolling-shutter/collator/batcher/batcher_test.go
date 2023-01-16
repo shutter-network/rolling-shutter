@@ -2,7 +2,6 @@ package batcher
 
 import (
 	"context"
-	"log"
 	"math/big"
 	"testing"
 
@@ -177,7 +176,6 @@ func TestOpenNextBatch(t *testing.T) {
 	txs, err := fixtures.DB.GetNonRejectedTransactionsByEpoch(ctx, epochid.Uint64ToEpochID(nextBatchIndex).Bytes())
 	assert.NilError(t, err)
 	assert.Equal(t, len(txs), 2)
-	log.Printf("NoneRejected, not verified: %+v", txs)
 
 	// so, now let's let the l2 chain build a new block
 	fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialEpochID.Uint64())

@@ -2,18 +2,18 @@ package chain
 
 import (
 	"fmt"
-	stdlog "log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	cfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/libs/log"
+	tenderlog "github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/node"
 
@@ -40,7 +40,7 @@ func Cmd() *cobra.Command {
 }
 
 func chainMain() {
-	stdlog.Printf("Starting shuttermint version %s", shversion.Version())
+	log.Info().Str("version", shversion.Version()).Msg("starting shuttermint")
 
 	node, err := newTendermint(cfgFile)
 	if err != nil {
@@ -62,7 +62,7 @@ func chainMain() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	sig := <-c
-	stdlog.Printf("Got signal '%s'. Exiting.", sig)
+	log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
 	// Previously we had an os.Exit(0) call here, but now we do wait until the defer function
 	// above is done
 }
@@ -86,8 +86,8 @@ func newTendermint(configFile string) (service.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	stdlog.Printf("Id: %s", nodeid)
-	logger, err := log.NewDefaultLogger(config.LogFormat, config.LogLevel, false)
+	log.Info().Str("node-id", string(nodeid)).Msg("loaded node-id")
+	logger, err := tenderlog.NewDefaultLogger(config.LogFormat, config.LogLevel, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create default logger")
 	}

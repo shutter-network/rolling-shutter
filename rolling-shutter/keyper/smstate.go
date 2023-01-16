@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
@@ -246,7 +246,8 @@ func scheduleShutterMessage(
 	if err != nil {
 		return err
 	}
-	log.Printf("Scheduled shuttermint message: id=%d %s", msgid, description)
+	log.Info().Int32("id", msgid).Str("description", description).
+		Msg("scheduled shuttermint message")
 	return nil
 }
 
@@ -340,7 +341,7 @@ func (st *ShuttermintState) handleEonStarted(
 
 	phase := st.phaseLength.getPhaseAtHeight(lastCommittedHeight+1, e.Height)
 	if phase > puredkg.Dealing {
-		log.Printf("Missed the dealing phase of eon %d", e.Eon)
+		log.Info().Uint64("eon", e.Eon).Msg("missed the dealing phase")
 	}
 	if phase == puredkg.Off {
 		panic("phase is off")
@@ -368,7 +369,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 	pure := dkg.pure
 	commitment, polyEvals, err := pure.StartPhase1Dealing()
 	if err != nil {
-		log.Fatalf("Aborting due to unexpected error: %+v", err)
+		log.Fatal().Err(err).Msg("aborting due to unexpected error")
 	}
 	dkg.markDirty()
 	err = scheduleShutterMessage(
@@ -414,7 +415,7 @@ func (st *ShuttermintState) startPhase2Accusing(
 			return err
 		}
 	} else {
-		log.Printf("No one to accuse in eon %d", eon)
+		log.Info().Uint64("eon", eon).Msg("no one to accuse")
 	}
 
 	return nil
@@ -443,7 +444,7 @@ func (st *ShuttermintState) startPhase3Apologizing(
 			return err
 		}
 	} else {
-		log.Printf("No apologies needed in eon %d", eon)
+		log.Info().Uint64("eon", eon).Msg("no apologies needed")
 	}
 
 	return nil
@@ -466,7 +467,7 @@ func (st *ShuttermintState) finalizeDKG(
 	if err != nil {
 		return err
 	}
-	log.Printf("Deleted %d poly evals", tag.RowsAffected())
+	log.Info().Int64("count", tag.RowsAffected()).Msg("deleted poly evals")
 
 	var dkgerror sql.NullString
 	var pureResult []byte
@@ -476,14 +477,15 @@ func (st *ShuttermintState) finalizeDKG(
 	dkgresultmsg := shmsg.NewDKGResult(eon, err == nil)
 
 	if err != nil {
-		log.Printf("Error: DKG process failed for eon %d: %s", eon, err)
+		log.Error().Err(err).Uint64("eon", eon).Bool("success", false).
+			Msg("DKG process failed")
 		dkgerror = sql.NullString{String: err.Error(), Valid: true}
 		_, err := queries.GetEon(ctx, int64(eon))
 		if err != nil {
 			return err
 		}
 	} else {
-		log.Printf("Success: DKG process succeeded for eon %d", eon)
+		log.Info().Uint64("eon", eon).Bool("success", true).Msg("DKG process succeeded")
 		pureResult, err = shdb.EncodePureDKGResult(&dkgresult)
 		if err != nil {
 			return err
@@ -517,10 +519,12 @@ func (st *ShuttermintState) shiftPhase(
 ) error {
 	phase := st.phaseLength.getPhaseAtHeight(height, dkg.startHeight)
 	for currentPhase := dkg.pure.Phase; currentPhase < phase; currentPhase = dkg.pure.Phase {
-		log.Printf(
-			"Phase transition eon=%d, height=%d %s->%s",
-			eon, height, currentPhase, currentPhase+1,
-		)
+		log.Info().
+			Uint64("eon", eon).
+			Int64("height", height).
+			Str("current-phase", currentPhase.String()).
+			Str("next-phase", (currentPhase + 1).String()).
+			Msg("phase transition")
 
 		var err error
 		switch currentPhase {
@@ -573,16 +577,14 @@ func (st *ShuttermintState) handlePolyCommitment(
 ) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
-		log.Printf("PolyCommitment for non existent eon received: eon=%d commitment=%#v",
-			e.Eon, e)
+		log.Info().Str("event", e.String()).
+			Msg("event for non existent eon received")
 		return nil
 	}
 	senderIndex, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
-		log.Printf("Received PolyCommitment from non keyper address: eon=%d sender=%s",
-			e.Eon,
-			e.Sender.Hex(),
-		)
+		log.Info().Str("event", e.String()).
+			Msg("Received PolyCommitment from non keyper address")
 		return nil
 	}
 
@@ -592,7 +594,8 @@ func (st *ShuttermintState) handlePolyCommitment(
 		Gammas: e.Gammas,
 	})
 	if err != nil {
-		log.Printf("Error handling PolyCommitment: %s", err)
+		log.Info().Str("event", e.String()).Err(err).
+			Msg("failed to handle PolyCommitment")
 		return nil
 	}
 	dkg.markDirty()
@@ -613,7 +616,8 @@ func (st *ShuttermintState) handlePolyEval(
 
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
-		log.Printf("PolyEval for non existent eon received: %s", e)
+		log.Info().Str("event", e.String()).
+			Msg("event for non existent eon received")
 		return nil
 	}
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
@@ -633,7 +637,8 @@ func (st *ShuttermintState) handlePolyEval(
 
 	evalBytes, err := st.decryptPolyEval(encrypted)
 	if err != nil {
-		log.Printf("Could not decrypt poly eval: %s", err)
+		log.Info().Str("event", e.String()).Err(err).
+			Msg("could not decrypt poly eval")
 		return nil
 	}
 
@@ -646,10 +651,11 @@ func (st *ShuttermintState) handlePolyEval(
 		},
 	)
 	if err != nil {
-		log.Printf("HandlePolyEvalMsg failed: %s", err)
+		log.Info().Err(err).Msg("failed to handle PolyEvalMsg")
 		return nil
 	}
-	log.Printf("Got poly eval message: eon=%d, keyper=#%d (%s)", e.Eon, sender, e.Sender)
+	log.Info().Str("event", e.String()).Int("keyper", sender).
+		Msg("got poly eval message")
 	dkg.markDirty()
 	return nil
 }
@@ -659,24 +665,28 @@ func (st *ShuttermintState) handleAccusation(
 ) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
-		log.Printf("Accusation for non existent eon received: %s", e)
+		log.Info().Str("event", e.String()).
+			Msg("event for non existent eon received")
 		return nil
 	}
 
 	if dkg.pure.Phase != puredkg.Accusing {
-		log.Printf("Warning: received accusation in wrong phase %s: %+v", dkg.pure.Phase, e)
+		log.Warn().Str("event", e.String()).Str("phase", dkg.pure.Phase.String()).
+			Msg("received accusation in wrong phase")
 		return nil
 	}
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
-		log.Printf("Error: cannot handle accusation. bad sender: %s", e.Sender)
+		log.Info().Str("event", e.String()).
+			Msg("cannot handle accusation. bad sender")
 		return nil
 	}
 
 	for _, accused := range e.Accused {
 		accusedIndex, err := medley.FindAddressIndex(dkg.keypers, accused)
 		if err != nil {
-			log.Printf("Error: accused address is not a keyper: %s", accused)
+			log.Info().Str("event", e.String()).Str("address", accused.Hex()).
+				Msg("accused address is not a keyper")
 			continue
 		}
 		err = dkg.pure.HandleAccusationMsg(
@@ -687,7 +697,8 @@ func (st *ShuttermintState) handleAccusation(
 			},
 		)
 		if err != nil {
-			log.Printf("Error: cannot handle accusation: %+v", err)
+			log.Info().Str("event", e.String()).Err(err).
+				Msg("cannot handle accusation")
 		}
 	}
 	dkg.markDirty()
@@ -699,23 +710,26 @@ func (st *ShuttermintState) handleApology(
 ) error {
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
-		log.Printf("Apology for non existent eon received: %s", e)
+		log.Info().Str("event", e.String()).
+			Msg("event for non existent eon received")
 		return nil
 	}
 	if dkg.pure.Phase != puredkg.Apologizing {
-		log.Printf("Warning: received apology in wrong phase %s: %+v", dkg.pure.Phase, e)
+		log.Warn().Str("phase", dkg.pure.Phase.String()).
+			Msg("Warning: received apology in wrong phase")
 		return nil
 	}
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
-		log.Printf("Error: cannot handle apology. bad sender: %s", e.Sender)
+		log.Info().Str("event", e.String()).Msg("failed to handle apology. bad sender")
 		return nil
 	}
 
 	for j, accuser := range e.Accusers {
 		accuserIndex, err := medley.FindAddressIndex(dkg.keypers, accuser)
 		if err != nil {
-			log.Printf("Error in syncApologies: %+v", err)
+			log.Info().Str("event", e.String()).Str("address", accuser.Hex()).
+				Msg("accuser address is not a keyper")
 			continue
 		}
 		err = dkg.pure.HandleApologyMsg(
@@ -726,7 +740,7 @@ func (st *ShuttermintState) handleApology(
 				Eval:    e.PolyEval[j],
 			})
 		if err != nil {
-			log.Printf("Error: cannot handle apology: %+v", err)
+			log.Info().Str("event", e.String()).Err(err).Msg("failed to handle apology")
 		}
 	}
 	dkg.markDirty()
@@ -755,8 +769,8 @@ func (st *ShuttermintState) HandleEvent(
 	case *shutterevents.Apology:
 		err = st.handleApology(ctx, queries, e)
 	default:
-		log.Printf("HandleEvent not yet implemented for %s: %+v",
-			reflect.TypeOf(event), event)
+		log.Warn().Str("type", reflect.TypeOf(event).String()).Interface("event", event).
+			Msg("HandleEvent not yet implemented for event type")
 	}
 
 	return err

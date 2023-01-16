@@ -2,14 +2,15 @@ package chainobserver
 
 import (
 	"context"
-	"log"
 	"math"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
@@ -57,7 +58,8 @@ func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*events
 	fromBlock := uint64(eventSyncProgress.NextBlockNumber)
 	fromLogIndex := uint64(eventSyncProgress.NextLogIndex)
 
-	log.Printf("starting event syncing from block %d log %d", fromBlock, fromLogIndex)
+	log.Info().Uint64("from-block", fromBlock).Uint64("from-log-index", fromLogIndex).
+		Msg("starting event syncing")
 	syncer := eventsyncer.New(chainobs.contracts.Client, finalityOffset, eventTypes, fromBlock, fromLogIndex)
 
 	errorgroup, errorctx := errgroup.WithContext(ctx)
@@ -156,7 +158,8 @@ func (chainobs *ChainObserver) handleEvent(
 	case newCollatorConfig:
 		err = chainobs.handleCollatorConfigsListNewConfigEvent(ctx, db, event)
 	default:
-		log.Printf("ignoring unknown event %+v %T", event, event)
+		log.Info().Str("event-type", reflect.TypeOf(event).String()).Interface("event", event).
+			Msg("ignoring unknown event")
 	}
 	return err
 }
@@ -164,10 +167,12 @@ func (chainobs *ChainObserver) handleEvent(
 func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 	ctx context.Context, db *commondb.Queries, event newKeyperConfig,
 ) error {
-	log.Printf(
-		"handling NewConfig event from keypers config contract in block %d (config index %d, activation block number %d)",
-		event.Raw.BlockNumber, event.KeyperConfigIndex, event.ActivationBlockNumber,
-	)
+	log.Info().
+		Uint64("block-number", event.Raw.BlockNumber).
+		Uint64("keyper-config-index", event.KeyperConfigIndex).
+		Uint64("activation-block-number", event.ActivationBlockNumber).
+		Msg("handling NewConfig event from keypers config contract")
+
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
 			"activation block number %d from config contract would overflow int64",
@@ -188,10 +193,11 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
 	ctx context.Context, db *commondb.Queries, event newCollatorConfig,
 ) error {
-	log.Printf(
-		"handling NewConfig event from collator config contract in block %d (collator config index %d, activation block number %d)",
-		event.Raw.BlockNumber, event.CollatorConfigIndex, event.ActivationBlockNumber,
-	)
+	log.Info().
+		Uint64("block-number", event.Raw.BlockNumber).
+		Uint64("collator-config-index", event.CollatorConfigIndex).
+		Uint64("activation-block-number", event.ActivationBlockNumber).
+		Msg("handling NewConfig event from collator config contract")
 	if event.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf(
 			"activation block number %d from config contract would overflow int64",

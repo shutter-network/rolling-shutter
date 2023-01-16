@@ -2,9 +2,9 @@ package keyper
 
 import (
 	"context"
-	"log"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
@@ -30,7 +30,8 @@ func SendShutterMessages(
 		if err != nil {
 			return err // XXX retry
 		}
-		log.Printf("Send shuttermint message: id=%d %s", outgoing.ID, outgoing.Description)
+		log.Info().Int32("id", outgoing.ID).Str("description", outgoing.Description).
+			Msg("send shuttermint message")
 		err = queries.DeleteShutterMessage(ctx, outgoing.ID)
 		if err != nil {
 			return err

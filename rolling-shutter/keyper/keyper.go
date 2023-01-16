@@ -4,7 +4,6 @@ package keyper
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
 	"github.com/tendermint/tendermint/rpc/client"
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/errgroup"
@@ -79,7 +79,7 @@ func Run(ctx context.Context, config Config) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
-	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+	log.Info().Str("connection", shdb.ConnectionInfo(dbpool)).Msg("connected to database")
 	db := kprdb.New(dbpool)
 
 	l1Client, err := ethclient.Dial(config.EthereumURL)
@@ -187,10 +187,11 @@ func (kpr *keyper) setupRouter() *chi.Mux {
 	     export SWAGGER_UI=$(pwd)/package
 	*/
 	swaggerUI := os.Getenv("SWAGGER_UI")
+	path := "/ui/"
 	if swaggerUI != "" {
-		log.Printf("Enabling the swagger ui at /ui/")
+		log.Info().Str("path", path).Msg("enabling the swagger ui")
 		fs := http.FileServer(http.Dir(os.Getenv("SWAGGER_UI")))
-		router.Mount("/ui/", http.StripPrefix("/ui/", fs))
+		router.Mount(path, http.StripPrefix(path, fs))
 	}
 
 	return router
@@ -280,7 +281,7 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 	if err != nil {
 		return err
 	}
-	log.Printf("block seen: %d", l1BlockNumber)
+	log.Info().Uint64("block-number", l1BlockNumber).Msg("block seen")
 	return nil
 }
 
@@ -319,7 +320,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	}
 
 	if keyperSet.ActivationBlockNumber-lastBlock > kpr.config.DKGStartBlockDelta {
-		log.Printf("not yet submitting config for %+v", keyperSet)
+		log.Info().Interface("keyper-set", keyperSet).Msg("not yet submitting config")
 		return nil
 	}
 
@@ -332,7 +333,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	if err != nil {
 		return err
 	}
-	log.Printf("have a new config to be scheduled: %v", keyperSet)
+	log.Info().Interface("keyper-set", keyperSet).Msg("have a new config to be scheduled")
 	batchConfigMsg := shmsg.NewBatchConfig(
 		uint64(keyperSet.ActivationBlockNumber),
 		keypers,

@@ -64,7 +64,7 @@ func newBatcherFromClients(
 	}
 	err = btchr.initChainState(ctx)
 	if err != nil {
-		log.Printf("Could not init the chain state: %s", err)
+		log.Error().Err(err).Msg("failed to init the chain state")
 		// It's fine to log and ignore this error. We'll be able to handle
 		// nextBatchChainState being nil.
 	}
@@ -150,7 +150,8 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 		return ErrBatchAlreadyExists
 	} else if l2batchIndex < nextBatchIndex-1 {
 		// need to wait for the sequencer to produce the block
-		log.Printf("must wait: l2batchinde=%d nextBatchIndex=%d", l2batchIndex, nextBatchIndex)
+		log.Info().Uint64("batch-index", l2batchIndex).Uint64("next-batch-index", nextBatchIndex).
+			Msg("wait for sequencer")
 		return ErrWaitForSequencer
 	}
 	block, err := btchr.l2Client.GetBlockInfo(ctx)
@@ -165,6 +166,8 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 		btchr.nextBatchChainState = nil
 		return err
 	}
+	log.Info().Uint64("batch-index", btchr.nextBatchChainState.epochID.Uint64()).
+		Msg("loaded chain state")
 	return nil
 }
 
@@ -330,10 +333,8 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 
 	if btchr.nextBatchChainState == nil {
 		err = btchr.initChainState(ctx)
-		if err == nil {
-			log.Printf("Loaded chain state for batch index %d", btchr.nextBatchChainState.epochID.Uint64())
-		} else {
-			log.Printf("Cannot load chain state: %s", err)
+		if err != nil {
+			log.Info().Err(err).Msg("cannot load chain state")
 		}
 	}
 

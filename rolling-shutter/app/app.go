@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 
@@ -103,8 +103,12 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 		if err != nil {
 			return shapp, err
 		}
-		log.Printf("Loaded shutter app from file %s, last saved %s, block height %d, devmode=%t",
-			gobpath, shapp.LastSaved, shapp.LastBlockHeight, shapp.DevMode)
+		log.Info().
+			Str("file", gobpath).
+			Time("last-saved", shapp.LastSaved).
+			Int64("last-block-height", shapp.LastBlockHeight).
+			Bool("devmode", shapp.DevMode).
+			Msg("Loaded shutter app from file")
 	}
 
 	shapp.Gobpath = gobpath
@@ -141,7 +145,8 @@ func (app *ShutterApp) addConfig(cfg BatchConfig) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("adding config %d", cfg.KeyperConfigIndex)
+	log.Info().Uint64("config-index", cfg.KeyperConfigIndex).
+		Msg("adding keyper config")
 	app.Configs = append(app.Configs, &cfg)
 	app.updateCheckTxMembers()
 	return nil
@@ -208,7 +213,7 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	genesisState := GenesisAppState{}
 	err := amino.NewCodec().UnmarshalJSON(req.AppStateBytes, &genesisState)
 	if err != nil {
-		log.Fatalf("Cannot unmarshal genesis app state: %s", err)
+		log.Fatal().Err(err).Msg("cannot unmarshal genesis app state")
 	}
 
 	bc := BatchConfig{
@@ -218,17 +223,17 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	}
 	err = bc.EnsureValid()
 	if err != nil {
-		log.Fatalf("Invalid genesis app state: %s", err)
+		log.Fatal().Err(err).Msg("invalid genesis app state")
 	}
 
 	if len(app.Configs) == 1 && len(app.Configs[0].Keypers) == 0 {
-		log.Print("Initializing new chain")
+		log.Info().Msg("initializing new chain")
 		for i, k := range genesisState.Keypers {
-			log.Printf("Initial keyper #%d: %s", i, k.String())
+			log.Info().Int("index", i).Str("keyper", k.String()).Msg("initial keyper")
 		}
 		validators, err := MakePowermap(req.Validators)
 		if err != nil {
-			log.Fatalf("InitChain: cannot handle validator keys: %s", err)
+			log.Fatal().Err(err).Msg("cannot handle validator keys")
 		}
 		app.Validators = validators
 		app.Configs = []*BatchConfig{&bc}
@@ -236,7 +241,10 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		app.CheckTxState = NewCheckTxState()
 		app.updateCheckTxMembers()
 	} else if !reflect.DeepEqual(bc, *app.Configs[0]) {
-		log.Fatalf("Mismatch between stored app state and initial app state, stored=%+v initial=%+v", app.Configs[0], bc)
+		log.Fatal().
+			Interface("initial-state", bc).
+			Interface("stored-state", app.Configs[0]).
+			Msg("mismatch between stored app state and initial app state")
 	}
 
 	app.ChainID = req.ChainId
@@ -319,7 +327,7 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 	if reflect.DeepEqual(*app.LastConfig(), bc) {
 		// The config has already been accepted. So, let's just return success
 		// XXX We do not check if we're allowed to vote on config changes here
-		log.Printf("config %d already accepted", bc.KeyperConfigIndex)
+		log.Info().Uint64("config-index", bc.KeyperConfigIndex).Msg("keyper config already accepted")
 		return abcitypes.ResponseDeliverTx{
 			Code: 0,
 		}
@@ -689,8 +697,7 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 				}
 			}
 			if numVotes >= numRequiredVotes {
-				log.Printf("starting config with keyper config index %d",
-					config.KeyperConfigIndex)
+				log.Info().Uint64("config-index", config.KeyperConfigIndex).Msg("starting keyper config")
 				config.Started = true
 				events = append(events, shutterevents.BatchConfigStarted{
 					KeyperConfigIndex: config.KeyperConfigIndex,
@@ -708,12 +715,13 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 	app.LastBlockHeight = req.Height
 	if app.DevMode {
 		if len(validatorUpdates) > 0 {
-			log.Printf("Ignoring %d validator updates in dev mode", len(validatorUpdates))
+			log.Info().Int("count", len(validatorUpdates)).Msg("ignoring validator updates in dev mode")
 		}
 		return abcitypes.ResponseEndBlock{Events: events}
 	}
 	if len(validatorUpdates) > 0 {
-		log.Printf("Applying %d validator updates: %v", len(validatorUpdates), validatorUpdates)
+		log.Info().Int("count", len(validatorUpdates)).Interface("validator-updates", validatorUpdates).
+			Msg("applying validator updates")
 	}
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: validatorUpdates,
@@ -742,7 +750,7 @@ func numRequiredTransitionValidators(config *BatchConfig) uint64 {
 // persistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and
 // renames the file later. Most probably this will not work on windows!
 func (app *ShutterApp) PersistToDisk() error {
-	log.Printf("Persisting state to disk, height=%d", app.LastBlockHeight)
+	log.Info().Int64("height", app.LastBlockHeight).Msg("persisting state to disk")
 	tmppath := app.Gobpath + ".tmp"
 	file, err := os.Create(tmppath)
 	if err != nil {
@@ -751,7 +759,7 @@ func (app *ShutterApp) PersistToDisk() error {
 	defer func() {
 		err = file.Close()
 		if err != nil {
-			log.Printf("Error: close file: %+v", err)
+			log.Error().Err(err).Str("path", tmppath).Msg("failed to close file")
 			return
 		}
 	}()
@@ -785,7 +793,7 @@ func (app *ShutterApp) Commit() abcitypes.ResponseCommit {
 
 	err := app.maybePersistToDisk()
 	if err != nil {
-		log.Printf("Error: cannot persist state to disk: %+v", err)
+		log.Error().Err(err).Msg("cannot persist state to disk")
 	}
 
 	return abcitypes.ResponseCommit{}
