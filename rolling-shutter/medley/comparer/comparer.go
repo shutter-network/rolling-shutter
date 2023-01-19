@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	gocmp "github.com/google/go-cmp/cmp"
-	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 )
 
 // P2PPrivKeyComparer is a gocmp comparer for use with gotest.tools/assert.DeepEqual.
