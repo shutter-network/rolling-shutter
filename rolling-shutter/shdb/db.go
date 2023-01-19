@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"math/big"
 	"regexp"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -35,7 +35,7 @@ func MustFindSchemaVersion(schema, path string) string {
 	rx := "-- schema-version: ([-a-z0-9]+) --"
 	matches := regexp.MustCompile(rx).FindStringSubmatch(schema)
 	if len(matches) != 2 {
-		log.Fatalf("malformed schema in %s, cannot find regular expression %s", path, rx)
+		log.Fatal().Str("path", path).Str("regex", rx).Msg("malformed schema, regex does not match")
 	}
 	return matches[1]
 }

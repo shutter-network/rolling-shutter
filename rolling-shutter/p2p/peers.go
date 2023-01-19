@@ -2,10 +2,10 @@ package p2p
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -22,7 +22,7 @@ func (p *P2P) managePeers(ctx context.Context) error {
 		select {
 		case <-time.After(peerCheckInterval):
 			n := len(p.host.Network().Peers())
-			log.Printf("connected to %d peers, want at least %d", n, minPeers)
+			log.Info().Int("want", minPeers).Int("have", n).Msg("insufficient number of peer connections")
 			if n < minPeers {
 				if err := p.connectToConfiguredPeers(ctx); err != nil {
 					return err
@@ -42,11 +42,12 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 	for _, m := range p.Config.PeerMultiaddrs {
 		addrInfo, err := peer.AddrInfoFromP2pAddr(m)
 		if err != nil {
-			log.Printf("ignoring invalid address from config %s: %s", m, err)
+			log.Info().Err(err).Str("address", m.String()).Str("origin", "config").Msg("ignoring invalid address")
 			continue
 		}
 		if len(addrInfo.Addrs) == 0 {
-			log.Println("ignoring address from config without transport", m)
+			log.Info().Str("address", m.String()).Str("origin", "config").
+				Msg("ignoring address without transport")
 			continue
 		}
 		// don't connect to yourself
@@ -62,7 +63,7 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 	}
 
 	if len(candidates) == 0 {
-		log.Println("no peers to connect to")
+		log.Info().Msg("no peers to connect to")
 	}
 
 	// try to connect to all remaining candidates
@@ -70,9 +71,11 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 		err := p.host.Connect(ctx, *addrInfo)
 		if err != nil {
 			if len(addrInfo.Addrs) > 0 {
-				log.Printf("error connecting to %s at %s: %s", addrInfo.ID, addrInfo.Addrs[0], err)
+				log.Info().Err(err).Str("peer-id", addrInfo.ID.String()).
+					Str("peer-address", addrInfo.Addrs[0].String()).Msg("connection error")
 			} else {
-				log.Printf("error connecting to %s without known multiaddr: %s", addrInfo.ID, err)
+				log.Info().Err(err).Str("peer-id", addrInfo.ID.String()).
+					Str("peer-address", "").Msg("connection error")
 			}
 		}
 	}

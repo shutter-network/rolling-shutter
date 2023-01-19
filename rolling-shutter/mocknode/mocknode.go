@@ -3,7 +3,6 @@ package mocknode
 import (
 	"context"
 	cryptorand "crypto/rand"
-	"log"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 	"golang.org/x/sync/errgroup"
 
@@ -99,8 +99,7 @@ func (m *MockNode) setupP2PHandler() {
 
 func (m *MockNode) logStartupInfo() error {
 	eonPublicKey := m.eonPublicKey.Marshal()
-	log.Println("starting mocknode")
-	log.Printf("eon public key: %X", eonPublicKey)
+	log.Info().Hex("eon-public-key", eonPublicKey).Msg("starting mocknode")
 	return nil
 }
 
@@ -108,9 +107,10 @@ func (m *MockNode) handleEonPublicKey(_ context.Context, key *shmsg.EonPublicKey
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
-		log.Printf("error while unmarshalling eon public key: %s", err)
+		log.Info().Err(err).Msg("failed to unmarshal eon public key")
 	}
-	log.Printf("updated eon public key from messages to %s", (*bn256.G2)(m.eonPublicKey))
+	log.Info().Str("eon-public-key", (*bn256.G2)(m.eonPublicKey).String()).
+		Msg("updated eon public key from messages to %s")
 	return make([]shmsg.P2PMessage, 0), nil
 }
 
@@ -121,27 +121,31 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 		case <-time.After(sleepDuration):
 			httpResponse, err := m.collatorClient.GetNextEpoch(ctx)
 			if err != nil {
-				log.Printf("Error while calling next-epoch: %s", err)
+				log.Error().Err(err).Msg("failed to get next epoch from collator")
 				continue
 			}
 			nextEpochResponse, err := client.ParseGetNextEpochResponse(httpResponse)
 			if err != nil {
-				log.Printf("111 Error while calling next-epoch: %s", err)
+				log.Error().Err(err).Msg("failed to parse response from collator")
 				continue
 			}
 			if nextEpochResponse.JSONDefault != nil {
-				log.Printf("222 Error while calling next-epoch: %v", nextEpochResponse.JSONDefault)
+
+				jsonDefault := nextEpochResponse.JSONDefault
+				log.Error().Str("message", jsonDefault.Message).Int32("status", jsonDefault.Code).
+					Msg("received error response from collator")
 				continue
 			}
 
 			if nextEpochResponse.JSON200 == nil {
-				log.Printf("333 Error getting next-epoch: %+v", nextEpochResponse)
+				log.Error().Interface("response", nextEpochResponse).
+					Msg("collator response did not contain epoch-id")
 				continue
 			}
 
 			epochID, err := epochid.BigToEpochID(new(big.Int).SetBytes(nextEpochResponse.JSON200.Id))
 			if err != nil {
-				log.Printf("444 Error converting epoch id")
+				log.Error().Msg("error converting epoch-id")
 			}
 			_, encryptedTx, err := encryptRandomMessage(epochID, m.eonPublicKey)
 			if err != nil {
@@ -161,11 +165,15 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				return err
 			}
 			if response.JSON200 != nil {
-				log.Printf("Submitted tx for epoch %d: %x", epochID, response.JSON200.Id)
+				log.Info().Str("epoch-id", epochID.Hex()).Hex("transaction-id", response.JSON200.Id).
+					Msg("submitted transaction")
 			} else if response.JSONDefault != nil {
-				log.Printf("Error submitting tx for epoch %d: %v", epochID, response.JSONDefault)
+				jsonDefault := response.JSONDefault
+				log.Error().Str("epoch-id", epochID.Hex()).Str("message", jsonDefault.Message).Int32("status", jsonDefault.Code).
+					Msg("failed to submit transaction")
 			} else {
-				log.Printf("Error submitting tx for epoch %d: %s", epochID, response.Status())
+				log.Info().Str("epoch-id", epochID.Hex()).Str("status", response.Status()).
+					Msg("failed to submit transcation")
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -240,7 +248,7 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID epochid.Epo
 }
 
 func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID epochid.EpochID) error {
-	log.Printf("sending decryption trigger for epoch %d", epochID)
+	log.Info().Str("epoch-id", epochID.Hex()).Msg("sending decryption trigger")
 	msg := &shmsg.DecryptionTrigger{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID.Bytes(),
@@ -249,7 +257,7 @@ func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID epochid.Ep
 }
 
 func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochID) error {
-	log.Printf("sending decryption key for epoch %d", epochID)
+	log.Info().Str("epoch-id", epochID.Hex()).Msg("sending decryption key")
 
 	epochSecretKey, err := computeEpochSecretKey(epochID, m.eonSecretKeyShare)
 	if err != nil {

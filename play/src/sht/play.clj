@@ -16,6 +16,7 @@
 ;; use the "layer 1" ethereum node for the contracts
 (def ^:private contracts-rpc-port ethereum-rpc-port)
 (def ^:private sequencer-rpc-port 8555)
+(def ^:private loglvl "info")
 
 (def ^:dynamic *cwd* (str (fs/normalize (fs/absolutize "."))))
 
@@ -126,8 +127,8 @@
     (spit filename (toml-edit-string (slurp filename) m))))
 
 (defn subcommand-run
-  [{:subcommand/keys [cmd cfgfile]}]
-  ['rolling-shutter (str cmd) "--config" cfgfile])
+  [{:subcommand/keys [cmd cfgfile loglvl]}]
+  ['rolling-shutter (format "--loglevel=%s" loglvl) (str cmd) "--config" cfgfile])
 
 (defn subcommand-genconfig
   [{:subcommand/keys [cmd cfgfile]}]
@@ -156,6 +157,7 @@
   (let [db (format "keyper-db-%d" n)
         p2p-port (+ keyper-base-port n)]
     #:subcommand{:cmd 'keyper
+                 :loglvl loglvl
                  :db db
                  :p2p-port p2p-port
                  :cfgfile (format "keyper-%s.toml" n)
@@ -171,6 +173,7 @@
   []
   (let [p2p-port (+ base-port 0)]
     #:subcommand{:cmd 'mocknode
+                 :loglvl loglvl
                  :cfgfile "mock.toml"
                  :p2p-port p2p-port
                  :db nil
@@ -181,6 +184,7 @@
   []
   (let [p2p-port (+ base-port 1)]
     #:subcommand{:cmd 'collator
+                 :loglvl loglvl
                  :cfgfile "collator.toml"
                  :p2p-port p2p-port
                  :db "collator"
@@ -192,6 +196,7 @@
 (defn mocksequencer-subcommand
   []
   #:subcommand{:cmd 'mock-sequencer
+               :loglvl loglvl
                :cfgfile "mocksequencer.toml"
                :listening-port sequencer-rpc-port
                :toml-edits {"EthereumURL" (format "http://localhost:%d" ethereum-rpc-port)

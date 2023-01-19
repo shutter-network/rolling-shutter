@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
@@ -56,7 +56,8 @@ func (txbatch *TXBatch) WaitMined(ctx context.Context) ([]*types.Receipt, error)
 		if receipt.Status != 1 {
 			err = medley.GetRevertReason(ctx, txbatch.Ethclient, crypto.PubkeyToAddress(txbatch.key.PublicKey), tx, receipt.BlockNumber)
 			fmt.Print("\n")
-			log.Printf("tx #%d %s reverted: %s", i, tx.Hash(), err)
+			log.Info().Err(err).Str("hash", tx.Hash().Hex()).Int("index", i).
+				Msg("transaction reverted")
 			numFailed++
 		} else {
 			fmt.Print(".")

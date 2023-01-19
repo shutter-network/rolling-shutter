@@ -38,7 +38,7 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.Decryptio
 	if err != nil {
 		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
 	}
-	log.Printf("inserted decryption key for epoch %s to database", epochID)
+	log.Info().Str("epoch-id", epochID.Hex()).Msg("inserted decryption key to database")
 	return []shmsg.P2PMessage{}, nil
 }
 

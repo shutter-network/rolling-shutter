@@ -2,12 +2,12 @@ package bootstrap
 
 import (
 	"context"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/rpc/client/http"
 
@@ -97,12 +97,12 @@ func bootstrap() error {
 
 	shmcl, err := http.New(bootstrapFlags.ShuttermintURL)
 	if err != nil {
-		log.Fatalf("Error connecting to Shuttermint node: %v", err)
+		log.Fatal().Err(err).Msg("failed to connect to Shuttermint node")
 	}
 
 	signingKey, err := crypto.HexToECDSA(bootstrapFlags.SigningKey)
 	if err != nil {
-		log.Fatalf("Invalid signing key: %v", err)
+		log.Fatal().Err(err).Msg("failed to parse signing key")
 	}
 
 	keyperConfigIndex := uint64(bootstrapFlags.KeyperConfigIndex)
@@ -123,7 +123,8 @@ func bootstrap() error {
 		return err
 	}
 
-	log.Printf("using config=%+v keypers=%+v", cfg, keypers)
+	log.Info().Interface("config", cfg).Interface("keypers", keypers).
+		Msg("using configuration")
 
 	threshold := cfg.Threshold
 
@@ -147,10 +148,11 @@ func bootstrap() error {
 		return errors.Errorf("Failed to send start message: %v", err)
 	}
 
-	log.Println("Submitted bootstrapping transaction")
-	log.Printf("Config index: %d", keyperConfigIndex)
-	log.Printf("Activation block number: %d", activationBlockNumber)
-	log.Printf("Threshold: %d", threshold)
-	log.Printf("Num Keypers: %d", len(keypers))
+	log.Info().
+		Uint64("keyper-config-index", keyperConfigIndex).
+		Uint64("activation-block-number", activationBlockNumber).
+		Uint64("threshold", threshold).
+		Int("num-keypers", len(keypers)).
+		Msg("submitted bootstrapping transaction")
 	return nil
 }

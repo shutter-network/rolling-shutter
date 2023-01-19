@@ -3,11 +3,11 @@ package keyper
 import (
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
@@ -84,7 +84,7 @@ func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
 			finished = false
 			successful = false
 		} else if err != nil {
-			log.Println("failed to get dkg result from db")
+			log.Info().Msg("failed to get dkg result from db")
 			sendError(w, http.StatusInternalServerError, err.Error())
 			return
 		} else {
@@ -146,7 +146,8 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 
 	for _, msg := range msgs {
 		if err := srv.kpr.p2p.SendMessage(ctx, msg); err != nil {
-			log.Printf("error sending message %+v: %s", msg, err)
+			log.Info().Err(err).Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
+				Msg("failed to send message")
 			continue
 		}
 	}

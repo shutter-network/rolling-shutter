@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog/log"
 	"gotest.tools/assert"
 )
 
@@ -82,7 +82,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 
 		select {
 		case message = <-p2ps[0].GossipMessages:
-			log.Println("got", message)
+			log.Info().Interface("message", message).Msg("got message")
 			if message == nil {
 				t.Fatalf("channel closed unexpectedly")
 			}

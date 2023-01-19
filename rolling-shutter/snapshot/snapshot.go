@@ -2,7 +2,8 @@ package snapshot
 
 import (
 	"context"
-	"log"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Snapshot struct {
@@ -16,8 +17,6 @@ func New(config Config) *Snapshot {
 }
 
 func (d *Snapshot) Run(ctx context.Context) error {
-	log.Printf(
-		"starting Snapshot Hub interface",
-	)
+	log.Info().Msg("starting Snapshot Hub interface")
 	return nil
 }

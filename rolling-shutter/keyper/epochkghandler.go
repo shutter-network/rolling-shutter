@@ -2,9 +2,9 @@ package keyper
 
 import (
 	"context"
-	"log"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
@@ -21,7 +21,7 @@ type epochKGHandler struct {
 }
 
 func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *shmsg.DecryptionTrigger) ([]shmsg.P2PMessage, error) {
-	log.Printf("received decryption trigger for epoch %d, sending decryption key share now.", msg.EpochID)
+	log.Info().Str("message", msg.String()).Msg("received decryption trigger")
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (h *epochKGHandler) sendDecryptionKeyShare(
 		}
 	}
 	if keyperIndex == -1 {
-		log.Printf("ignoring decryption trigger for epoch %s as we are not a keyper", epochID)
+		log.Info().Str("epoch-id", epochID.Hex()).Msg("ignoring decryption trigger: we are not a keyper")
 		return nil, nil
 	}
 
@@ -73,7 +73,7 @@ func (h *epochKGHandler) sendDecryptionKeyShare(
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon.Eon)
 	}
 	if !dkgResultDB.Success {
-		log.Printf("ignoring decryption trigger for eon %d as eon key generation failed", eon.Eon)
+		log.Info().Int64("eon", eon.Eon).Msg("ignoring decryption trigger: eon key generation failed")
 		return nil, nil
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -99,7 +99,8 @@ func (h *epochKGHandler) sendDecryptionKeyShare(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
-	log.Printf("sending decryption key share for epoch %s", epochID)
+	log.Info().Str("epoch-id", epochID.Hex()).Int64("block-number", blockNumber).
+		Msg("sending decryption key share")
 	return []shmsg.P2PMessage{
 		&shmsg.DecryptionKeyShare{
 			InstanceID:  h.config.InstanceID,
@@ -151,11 +152,8 @@ func (h *epochKGHandler) aggregateDecryptionKeySharesFromDB(
 		}
 		shareDecoded, err := shdb.DecodeEpochSecretKeyShare(share.DecryptionKeyShare)
 		if err != nil {
-			log.Printf(
-				"Warning: invalid decryption key share in db for epoch %s and keyper %d",
-				epochID,
-				share.KeyperIndex,
-			)
+			log.Warn().Str("epoch-id", epochID.Hex()).Int64("keyper-index", share.KeyperIndex).
+				Msg("invalid decryption key share in DB")
 			continue
 		}
 		err = epochKG.HandleEpochSecretKeyShare(&epochkg.EpochSecretKeyShare{
@@ -165,10 +163,8 @@ func (h *epochKGHandler) aggregateDecryptionKeySharesFromDB(
 			Share:  shareDecoded,
 		})
 		if err != nil {
-			log.Printf(
-				"error processing decryption key share for epoch %s of keyper %d: %s",
-				epochID, share.KeyperIndex, err,
-			)
+			log.Info().Str("epoch-id", epochID.Hex()).Int64("keyper-index", share.KeyperIndex).
+				Msg("failed to process decryption key share")
 			continue
 		}
 	}
@@ -205,7 +201,8 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", msg.Eon)
 	}
 	if !dkgResultDB.Success {
-		log.Printf("ignoring decryption trigger for eon %d as eon key generation failed", msg.Eon)
+		log.Info().Uint64("eon", msg.Eon).
+			Msg("ignoring decryption trigger: eon key generation failed")
 		return nil, nil
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -242,18 +239,19 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 		return nil, errors.Wrapf(err, "failed to store decryption key for epoch %s in db", epochID)
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to insert decryption key for epoch %s, but it already exists", epochID)
+		log.Info().Str("epoch-id", epochID.Hex()).
+			Msg("attempted to insert decryption key in db, but it already exists")
 		return nil, nil
 	}
-	log.Printf("broadcasting decryption key for epoch %s", epochID)
-	return []shmsg.P2PMessage{
-		&shmsg.DecryptionKey{
-			InstanceID: h.config.InstanceID,
-			Eon:        msg.Eon,
-			EpochID:    epochID.Bytes(),
-			Key:        decryptionKeyEncoded,
-		},
-	}, nil
+	message := &shmsg.DecryptionKey{
+		InstanceID: h.config.InstanceID,
+		Eon:        msg.Eon,
+		EpochID:    epochID.Bytes(),
+		Key:        decryptionKeyEncoded,
+	}
+	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.String()).
+		Msg("broadcasting decryption key")
+	return []shmsg.P2PMessage{message}, nil
 }
 
 func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
@@ -272,7 +270,8 @@ func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *shmsg.Dec
 		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochID)
 	}
 	if tag.RowsAffected() == 0 {
-		log.Printf("attempted to insert decryption key for epoch %s, but it already exists", epochID)
+		log.Info().Str("epoch-id", epochID.Hex()).
+			Msg("attempted to insert decryption key in db, but it already exists")
 	}
 	return nil, nil
 }

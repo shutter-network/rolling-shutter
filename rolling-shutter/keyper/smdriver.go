@@ -3,12 +3,12 @@ package keyper
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/coretypes"
@@ -61,7 +61,7 @@ func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
 
 	lastCommittedHeight, err := getLastCommittedHeight(ctx, smdrv.shmcl)
 	if errors.Is(err, errEmptyBlockchain) {
-		log.Printf("Shuttermint blockchain still empty")
+		log.Info().Msg("Shuttermint blockchain still empty")
 		return nil
 	}
 	if err != nil {
@@ -81,7 +81,7 @@ func makeEvents(height int64, events []abcitypes.Event) []shutterevents.IEvent {
 	for _, ev := range events {
 		x, err := shutterevents.MakeEvent(ev, height)
 		if err != nil {
-			log.Printf("Error: malformed event: %+v ev=%+v", err, ev)
+			log.Error().Err(err).Str("event", ev.String()).Msg("malformed event")
 		} else {
 			res = append(res, x)
 		}
@@ -118,10 +118,10 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 		}
 		query := fmt.Sprintf("tx.height >= %d and tx.height <= %d", currentBlock+1, height)
 		if logProgress {
-			log.Printf("Fetch events: query=%s targetHeight=%d", query, lastCommittedHeight)
+			log.Info().Str("query", query).Int64("target-height", lastCommittedHeight).Msg("fetch events")
 		}
 		// tendermint silently caps the perPage value at 100, make sure to stay below, otherwise
-		// our exit condition is wrong and the log.Fatalf will trigger a panic below; see
+		// our exit condition is wrong and the log.Fatal will trigger a panic below; see
 		// https://github.com/shutter-network/shutter/issues/50
 		perPage := 100
 		page := 1
@@ -137,11 +137,12 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 			txs = append(txs, res.Txs...)
 			if page*perPage >= res.TotalCount {
 				if total != res.TotalCount {
-					log.Fatalf("internal error. got %d transactions, expected %d transactions from shuttermint for height %d..%d",
-						total,
-						res.TotalCount,
-						currentBlock+1,
-						lastCommittedHeight)
+					log.Fatal().
+						Int("num-fetched-transactions", total).
+						Int("num-expected-transactions", res.TotalCount).
+						Int64("from-height", currentBlock+1).
+						Int64("to-height", lastCommittedHeight).
+						Msg("internal error. fetched fewer shuttermint transactions than expected")
 				}
 				break
 			}

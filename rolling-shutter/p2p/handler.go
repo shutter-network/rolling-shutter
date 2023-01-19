@@ -3,13 +3,13 @@ package p2p
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -53,7 +53,7 @@ func AddValidator[M shmsg.P2PMessage](handler *P2PHandler, valFunc ValidatorFunc
 	}
 
 	handleError := func(err error) {
-		log.Printf("received invalid message on topic %s, cause: %s)", topic, err)
+		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
 	}
 	validate := func(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
 		var (
@@ -186,7 +186,8 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 				return nil
 			}
 			if err := h.handle(ctx, msg); err != nil {
-				log.Printf("error handling message %+v: %s", msg, err)
+				log.Info().Err(err).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+					Msg("failed to handle message")
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -206,18 +207,21 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 	msgType := GetMessageType(m)
 	handlerFunc, exists := h.handlerRegistry[msgType]
 	if !exists {
-		log.Printf("ignoring message received on topic '%s' (sender=%s)", msg.Topic, msg.SenderID)
+		log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+			Msg("ignoring message, no handler registered for topic")
 		return nil
 	}
 
-	log.Printf("received message (msg: %s, topic=%s, sender=%s)", m.LogInfo(), msg.Topic, msg.SenderID)
+	log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+		Msg("received message")
 	msgsOut, err = handlerFunc(ctx, m)
 	if err != nil {
 		return err
 	}
 	for _, msgOut := range msgsOut {
 		if err := h.SendMessage(ctx, msgOut); err != nil {
-			log.Printf("error sending message %+v: %s", msgOut, err)
+			log.Info().Err(err).Str("message", msgOut.LogInfo()).Str("topic", msgOut.Topic()).
+				Msg("failed to send message")
 			continue
 		}
 	}
@@ -235,7 +239,8 @@ func (h *P2PHandler) SendMessage(ctx context.Context, msg shmsg.P2PMessage, retr
 		retryOpts = []retry.Option{retry.NumberOfRetries(0)}
 	}
 
-	log.Printf("sending %s", msg.LogInfo())
+	log.Info().Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
+		Msg("sending message")
 	_, callErr := retry.FunctionCall(
 		ctx,
 		func(ctx context.Context) (bool, error) {

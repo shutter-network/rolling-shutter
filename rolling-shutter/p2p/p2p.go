@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -14,6 +13,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -92,7 +92,7 @@ func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
 	p.mux.Unlock()
 
 	if !ok {
-		log.Printf("dropping message to not (yet) subscribed topic %s", topic)
+		log.Info().Str("topic", topic).Msg("dropping message, not subscribed to topic")
 		return nil
 	}
 	return room.Publish(ctx, message)
@@ -117,7 +117,7 @@ func (p *P2P) createHost(ctx context.Context) error {
 		return err
 	}
 	// print the node's PeerInfo in multiaddr format
-	log.Println("libp2p node address:", p.p2pAddress())
+	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
 
 	// create a new PubSub service using the GossipSub router
 	options := []pubsub.Option{
