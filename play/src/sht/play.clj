@@ -65,20 +65,28 @@
      (bb-log (seq cmd) opts)
      (p/process (replace-rolling-shutter-absolute-path cmd) opts))))
 
+(defn- run-process*
+  [cmd {:keys [dir] :as opts}]
+  (when dir
+    (println (format "Entering directory '%s'" dir)))
+  (try
+    (bb-log (seq cmd) opts)
+    (deref (p/process (replace-rolling-shutter-absolute-path cmd)
+                      (merge {:out :inherit :err :inherit}
+                             opts)))
+    (finally
+      (when dir
+        (println (format "Leaving directory '%s'" dir))))))
+
 (defn run-process
   ([cmd]
    (run-process cmd {}))
   ([cmd {:keys [dir] :as opts}]
-   (when dir
-     (println (format "Entering directory '%s'" dir)))
-   (try
-     (bb-log (seq cmd) opts)
-     (p/check (p/process (replace-rolling-shutter-absolute-path cmd)
-                         (merge {:out :inherit :err :inherit}
-                                opts)))
-     (finally
-       (when dir
-         (println (format "Leaving directory '%s'" dir)))))))
+   (let [proc (run-process* cmd opts)
+         exit-code (:exit proc)]
+     (when-not (zero? exit-code)
+       (println (format "Error: %s returned with non-zero exit code %d" (first cmd) exit-code))
+       (System/exit 1)))))
 
 (def dropdb-with-force?
   (delay
