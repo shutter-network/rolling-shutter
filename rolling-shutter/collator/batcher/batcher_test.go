@@ -108,6 +108,7 @@ func TestCloseBatchIntegration(t *testing.T) {
 	var err error
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
+	fixtures.AddEonPublicKey(ctx, t)
 	t.Run("Init", func(t *testing.T) {
 		assert.Check(t, fixtures.Batcher.nextBatchChainState != nil, "nextBatchChainState field not initialized")
 	})
@@ -150,7 +151,7 @@ func TestOpenNextBatch(t *testing.T) {
 	var err error
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
-
+	fixtures.AddEonPublicKey(ctx, t)
 	err = fixtures.Batcher.CloseBatch(ctx)
 	assert.NilError(t, err)
 	assert.Check(t, fixtures.Batcher.nextBatchChainState == nil, "nextBatchChainState field initialized")
@@ -204,7 +205,7 @@ func TestDecryptionTriggerGeneratedIntegration(t *testing.T) {
 	var err error
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
-
+	fixtures.AddEonPublicKey(ctx, t)
 	nextBatchEpoch, _, err := batchhandler.GetNextBatch(ctx, fixtures.DB)
 	assert.NilError(t, err)
 	nextBatchIndex := nextBatchEpoch.Uint64()

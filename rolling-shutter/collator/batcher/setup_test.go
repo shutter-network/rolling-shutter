@@ -183,6 +183,19 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	}
 }
 
+func (fix *Fixture) AddEonPublicKey(ctx context.Context, t *testing.T) {
+	t.Helper()
+	hash := []byte{1, 2, 3}
+	pubkey := []byte{4, 5, 6}
+	err := fix.DB.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+		Hash:         hash,
+		EonPublicKey: pubkey,
+	})
+	assert.NilError(t, err)
+	err = fix.DB.ConfirmEonPublicKey(ctx, hash)
+	assert.NilError(t, err)
+}
+
 func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas int) ([]byte, []byte) { //nolint:unparam
 	t.Helper()
 	assert.Check(t, accountIndex >= 0 && accountIndex < numAccounts)

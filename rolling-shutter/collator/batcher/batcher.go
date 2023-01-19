@@ -235,6 +235,13 @@ func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1
 		return err
 	}
 
+	// Lookup the current eon public key for the given block.
+	_, err = db.FindEonPublicKeyForBlock(ctx, l1blockNumber)
+	if err != nil {
+		log.Info().Int64("l1BlockNumber", l1blockNumber).Msg("no eon public key found")
+		return err
+	}
+
 	// Mark all new TXs as rejected
 	err = db.RejectNewTransactions(ctx, nextBatchEpochID.Bytes())
 	if err != nil {
