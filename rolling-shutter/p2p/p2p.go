@@ -23,11 +23,12 @@ const messagesBufSize = 128
 type P2P struct {
 	Config Config
 
-	mux            sync.Mutex
-	host           host.Host
-	pubSub         *pubsub.PubSub
-	gossipRooms    map[string]*gossipRoom
-	GossipMessages chan *Message
+	mux              sync.Mutex
+	host             host.Host
+	pubSub           *pubsub.PubSub
+	logNumberOfPeers int // number of peers when we last logged them
+	gossipRooms      map[string]*gossipRoom
+	GossipMessages   chan *Message
 }
 
 type Config struct {
@@ -38,11 +39,12 @@ type Config struct {
 
 func NewP2P(config Config) *P2P {
 	p := P2P{
-		Config:         config,
-		host:           nil,
-		pubSub:         nil,
-		gossipRooms:    make(map[string]*gossipRoom),
-		GossipMessages: make(chan *Message, messagesBufSize),
+		Config:           config,
+		host:             nil,
+		pubSub:           nil,
+		logNumberOfPeers: -1,
+		gossipRooms:      make(map[string]*gossipRoom),
+		GossipMessages:   make(chan *Message, messagesBufSize),
 	}
 	return &p
 }

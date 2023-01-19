@@ -22,7 +22,11 @@ func (p *P2P) managePeers(ctx context.Context) error {
 		select {
 		case <-time.After(peerCheckInterval):
 			n := len(p.host.Network().Peers())
-			log.Info().Int("want", minPeers).Int("have", n).Msg("insufficient number of peer connections")
+			if n != p.logNumberOfPeers {
+				log.Info().Int("want", minPeers).Int("have", n).Int("previous", p.logNumberOfPeers).Msg("number of peer connections")
+				p.logNumberOfPeers = n
+			}
+
 			if n < minPeers {
 				if err := p.connectToConfiguredPeers(ctx); err != nil {
 					return err
