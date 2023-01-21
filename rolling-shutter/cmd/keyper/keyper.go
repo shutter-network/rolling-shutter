@@ -170,8 +170,7 @@ func initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Info().Str("connection", shdb.ConnectionInfo(dbpool)).
-		Msg("database initialized")
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database initialized")
 	return nil
 }
 

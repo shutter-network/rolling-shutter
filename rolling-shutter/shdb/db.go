@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"fmt"
 	"math/big"
 	"regexp"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
@@ -21,10 +21,10 @@ import (
 
 const SchemaVersionKey = "schema-version"
 
-// ConnectionInfo returns a string describing the current database connection.
-func ConnectionInfo(dbpool *pgxpool.Pool) string {
+// Adds database connection parameters to the zerolog.Event's context.
+func AddConnectionInfo(ev *zerolog.Event, dbpool *pgxpool.Pool) *zerolog.Event {
 	cc := dbpool.Config().ConnConfig
-	return fmt.Sprintf("host=%s, user=%s, db=%s", cc.Host, cc.User, cc.Database)
+	return ev.Str("db-host", cc.Host).Str("db-user", cc.User).Str("database", cc.Database)
 }
 
 // MustFindSchemaVersion extracts the expected schema version from schema.sql files that should

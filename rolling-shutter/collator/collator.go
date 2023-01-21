@@ -58,7 +58,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
-	log.Info().Str("connection-info", shdb.ConnectionInfo(dbpool)).Msg("connected to database")
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {

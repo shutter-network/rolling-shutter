@@ -77,8 +77,7 @@ func initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Info().Str("connection", shdb.ConnectionInfo(dbpool)).
-		Msg("database initialized")
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database initialized")
 	return nil
 }
 
@@ -186,7 +185,7 @@ func main() error {
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-termChan
-		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
+		log.Info().Str("signal", sig.String()).Msg("received OS signal, shutting down")
 		cancel()
 	}()
 

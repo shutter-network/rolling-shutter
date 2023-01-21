@@ -79,7 +79,7 @@ func Run(ctx context.Context, config Config) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
-	log.Info().Str("connection", shdb.ConnectionInfo(dbpool)).Msg("connected to database")
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 	db := kprdb.New(dbpool)
 
 	l1Client, err := ethclient.Dial(config.EthereumURL)
