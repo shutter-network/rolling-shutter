@@ -14,15 +14,14 @@ func multDuration(a time.Duration, m float64) time.Duration {
 }
 
 type retrier struct {
-	clock            clock.Clock
-	numRetries       int
-	infiniteRetries  bool
-	interval         time.Duration
-	maxInterval      time.Duration
-	cancelingErrors  []error
-	multiplier       float64
-	executionContext string
-	identifier       string
+	clock           clock.Clock
+	numRetries      int
+	infiniteRetries bool
+	interval        time.Duration
+	maxInterval     time.Duration
+	cancelingErrors []error
+	multiplier      float64
+	zlogContext     zerolog.Context
 }
 
 func newRetrier() *retrier {
@@ -33,6 +32,7 @@ func newRetrier() *retrier {
 		maxInterval:     60 * time.Second,
 		multiplier:      1.,
 		cancelingErrors: []error{},
+		zlogContext:     log.With().CallerWithSkipFrameCount(3),
 	}
 }
 
@@ -40,22 +40,6 @@ func (r *retrier) option(opts []Option) {
 	for _, opt := range opts {
 		opt(r)
 	}
-}
-
-func (r *retrier) logWithContext(e *zerolog.Event) *zerolog.Event {
-	if r.identifier != "" {
-		e = e.Str("id", r.identifier)
-	}
-
-	if r.executionContext != "" {
-		e = e.Str("context", r.executionContext)
-	}
-	return e
-}
-
-func (r *retrier) logError(err error, msg string) {
-	e := log.Debug().Err(err)
-	r.logWithContext(e).Msg(msg)
 }
 
 func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
@@ -97,7 +81,8 @@ type (
 func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...Option) (T, error) {
 	retrier := newRetrier()
 	retrier.option(opts)
-
+	retrier.zlogContext = retrier.zlogContext.Str("funcName", getFuncName(3))
+	logger := retrier.zlogContext.Logger()
 	next := make(chan time.Time, 1)
 	defer close(next)
 
@@ -112,21 +97,22 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 		select {
 		case _, ok := <-retry:
 			if !ok {
-				retrier.logWithContext(log.Debug()).Msg("retry limit reached")
+				logger.Debug().
+					Err(err).
+					Int("count", callCount).
+					Msg("retry limit reached")
 				return null, err
 			}
 			var result T
-			if callCount > 0 {
-				retrier.logWithContext(log.Debug().Int("count", callCount)).Msg("retrying")
-			}
 			start := retrier.clock.Now()
 			result, err = fn(ctx)
 			stopped := retrier.clock.Now()
-
-			retrier.logWithContext(
-				log.Debug().TimeDiff("took (ms)", time.Now(), start),
-			).Msg("called retriable function")
 			callCount++
+			logger.Debug().
+				Err(err).
+				TimeDiff("duration", time.Now(), start).
+				Int("count", callCount).
+				Msg("called retriable function")
 			if err == nil {
 				return result, nil
 			}
@@ -135,11 +121,10 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			}
 			for _, cErr := range retrier.cancelingErrors {
 				if err == cErr {
-					retrier.logError(err, "request errored")
+					logger.Debug().Err(err).Msg("request errored")
 					return null, err
 				}
 			}
-			retrier.logError(err, "request errored")
 			next <- stopped
 		case <-ctx.Done():
 			return null, ctx.Err()

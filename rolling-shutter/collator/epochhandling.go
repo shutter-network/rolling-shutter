@@ -144,7 +144,6 @@ func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
 					retry.ExponentialBackoff(),
 					retry.NumberOfRetries(3),
 					retry.LogIdentifier(msg.LogInfo()),
-					retry.LogCaptureStackFrameContext(),
 				)
 				if err != nil {
 					continue // continue sending other messages
@@ -191,7 +190,6 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 				fnCloseBatch,
 				retry.Interval(retryPollInterval),
 				retry.NumberOfRetries(-1),
-				retry.LogCaptureStackFrameContext(),
 			)
 			if err != nil {
 				if ctx.Err() != nil {
@@ -215,7 +213,6 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 				retry.Interval(retryPollInterval),
 				retry.NumberOfRetries(-1),
 				retry.StopOnErrors(batcher.ErrBatchAlreadyExists),
-				retry.LogCaptureStackFrameContext(),
 			)
 			if err == batcher.ErrBatchAlreadyExists {
 				// something is seriously wrong

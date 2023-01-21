@@ -1,8 +1,8 @@
 package retry
 
 import (
-	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/benbjohnson/clock"
@@ -48,22 +48,20 @@ func ExponentialBackoff() Option {
 	}
 }
 
-func LogCaptureStackFrameContext() Option {
+func getFuncName(skip int) string {
 	pc := make([]uintptr, 10)
-	// capture the caller of the option function
-	runtime.Callers(2, pc)
+	runtime.Callers(skip, pc)
 	frms := runtime.CallersFrames(pc)
 	frm, _ := frms.Next()
-	frmCtx := fmt.Sprintf("%s:%d %s", frm.File, frm.Line, frm.Function)
-	return func(r *retrier) {
-		r.executionContext = frmCtx
-	}
+	name := frm.Func.Name()
+	name = name[1+strings.LastIndex(name, "."):]
+	return name
 }
 
 func LogIdentifier(s string) Option {
 	id := uuid.NewString()
 	return func(r *retrier) {
-		r.identifier = id + ":" + s
+		r.zlogContext = r.zlogContext.Str("id", id+":"+s)
 	}
 }
 

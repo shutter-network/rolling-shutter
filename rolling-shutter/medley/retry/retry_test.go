@@ -126,7 +126,6 @@ var testFlagTable = []testFlags{
 		// don't cause runtime errors
 		[]Option{
 			Interval(baseInterval),
-			LogCaptureStackFrameContext(),
 			LogIdentifier("test_retry"),
 			NumberOfRetries(2),
 		},
