@@ -132,15 +132,22 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 		if err != nil {
 			return err
 		}
+		logger := log.With().
+			Uint64("keyper-config-index", key.KeyperConfigIndex).
+			Uint64("eon", key.Eon).
+			Hex("hash", hash).
+			Int32("threshold", keyperSet.Threshold).
+			Int64("count", count).
+			Logger()
+
 		if count == int64(keyperSet.Threshold) {
 			err = db.ConfirmEonPublicKey(ctx, hash)
 			if err != nil {
 				return err
 			}
-			log.Info().
-				Uint64("config-index", key.KeyperConfigIndex).
-				Uint64("eon", key.Eon).
-				Msg("Confirmed eon public key for keyper config index=%d, eon=%d")
+			logger.Info().Msg("confirmed eon public key")
+		} else {
+			logger.Info().Msg("inserted eon public key")
 		}
 		return nil
 	})
