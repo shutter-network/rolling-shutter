@@ -44,7 +44,7 @@ func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
 	if short {
 		pathsep := string(os.PathSeparator)
 		// default is long filename
-		zerolog.CallerMarshalFunc = func(file string, line int) string {
+		zerolog.CallerMarshalFunc = func(_ uintptr, file string, line int) string {
 			return fmt.Sprintf("%s:%d", file[1+strings.LastIndex(file, pathsep):], line)
 		}
 	}
