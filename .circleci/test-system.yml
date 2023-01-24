@@ -105,7 +105,7 @@ jobs:
       - run:
           name: "Run whole system tests"
           command: |
-            java -jar sht-standalone.jar << parameters.nr >>
+            env NOCOLOR=1 java -jar sht-standalone.jar << parameters.nr >>
       - run:
           name: "Tar work folder"
           command: |

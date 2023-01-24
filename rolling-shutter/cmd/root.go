@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
@@ -27,10 +28,12 @@ import (
 )
 
 var (
-	logFormatArg  string
-	logFormatName string = "logformat"
-	logLevelArg   string
-	logLevelName  string = "loglevel"
+	logNoColorArg  bool
+	logNoColorName string = "no-color"
+	logFormatArg   string
+	logFormatName  string = "logformat"
+	logLevelArg    string
+	logLevelName   string = "loglevel"
 )
 
 func errorForFlag(flg *flag.Flag) error {
@@ -54,6 +57,14 @@ func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
 func configureTime(l zerolog.Logger) zerolog.Logger {
 	zerolog.TimeFieldFormat = "2006/01/02 15:04:05.000000"
 	return l.With().Timestamp().Logger()
+}
+
+// colorize returns the string s wrapped in ANSI code c, unless disabled is true.
+func colorize(s interface{}, c int, disabled bool) string {
+	if disabled {
+		return fmt.Sprintf("%s", s)
+	}
+	return fmt.Sprintf("\x1b[%dm%v\x1b[0m", c, s)
 }
 
 func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
@@ -113,7 +124,7 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 
 	// reset the writer
 	l = l.Output(zerolog.ConsoleWriter{
-		NoColor:    true,
+		NoColor:    logNoColorArg,
 		Out:        os.Stderr,
 		TimeFormat: zerolog.TimeFieldFormat,
 		PartsOrder: []string{
@@ -123,7 +134,11 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 			zerolog.MessageFieldName,
 		},
 		PartsExclude: exclude,
+		FormatCaller: func(i interface{}) string {
+			return colorize(fmt.Sprintf("[%20s]", i), 1, logNoColorArg)
+		},
 	})
+
 	return l, nil
 }
 
@@ -146,6 +161,13 @@ func Cmd() *cobra.Command {
 			return nil
 		},
 	}
+	viper.BindEnv("NOCOLOR")
+	cmd.PersistentFlags().BoolVar(
+		&logNoColorArg,
+		logNoColorName,
+		viper.GetBool("NOCOLOR"),
+		"do not write colored logs")
+
 	cmd.PersistentFlags().StringVar(
 		&logFormatArg,
 		logFormatName,
