@@ -108,7 +108,14 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 			result, err = fn(ctx)
 			stopped := retrier.clock.Now()
 			callCount++
-			logger.Debug().
+			var logev *zerolog.Event
+			if callCount == 1 && err == nil {
+				logev = logger.Trace()
+			} else {
+				logev = logger.Debug()
+			}
+
+			logev.
 				Err(err).
 				TimeDiff("duration", time.Now(), start).
 				Int("count", callCount).
