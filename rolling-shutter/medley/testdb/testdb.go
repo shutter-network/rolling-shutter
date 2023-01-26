@@ -2,11 +2,11 @@ package testdb
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
@@ -87,7 +87,7 @@ func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, *pgx
 	db := cltrdb.New(dbpool)
 	err := cltrdb.InitDB(ctx, dbpool)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("cltrdb.Initdb failed")
 		closedb()
 		t.Fatalf("failed to initialize collator db")
 	}
