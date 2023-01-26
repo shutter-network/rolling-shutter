@@ -94,11 +94,11 @@ func (c *collator) listenNewDecryptionTrigger(ctx context.Context) <-chan time.T
 		defer log.Debug().Msg("stop listening for new_decryption_trigger")
 
 		conn, err := c.dbpool.Acquire(ctx)
-		defer conn.Release()
 		if err != nil {
-			log.Error().Msg("error acquiring connection")
+			log.Error().Err(err).Msg("error acquiring connection")
 			return
 		}
+		defer conn.Release()
 
 		_, err = conn.Exec(ctx, "listen new_decryption_trigger")
 		if err != nil {
