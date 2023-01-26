@@ -8,7 +8,13 @@ import (
 	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/shutter-network/shutter/shlib/shtest"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 func TestNewShutterApp(t *testing.T) {
 	app := NewShutterApp()

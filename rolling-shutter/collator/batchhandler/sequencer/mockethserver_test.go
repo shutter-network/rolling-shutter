@@ -12,7 +12,12 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 func newTestConfig(t *testing.T) config.Config {
 	t.Helper()

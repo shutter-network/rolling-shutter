@@ -16,7 +16,12 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/transaction"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 // `TestBatchHandler` spawns a BatchHandler in conjunction with a
 // `p2pMessagingMock` and a mocked sequencer server (`MockEthServer`).

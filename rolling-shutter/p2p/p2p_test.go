@@ -15,7 +15,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog/log"
 	"gotest.tools/assert"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 // TestStartNetworkNode test that we can init two p2p nodes and make them send/receive messages.
 func TestStartNetworkNodeIntegration(t *testing.T) {

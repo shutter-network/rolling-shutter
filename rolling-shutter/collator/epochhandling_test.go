@@ -11,8 +11,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {

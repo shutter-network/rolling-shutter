@@ -10,7 +10,12 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
+
+func init() {
+	testlog.Setup()
+}
 
 const testDBURLVar = "ROLLING_SHUTTER_TESTDB_URL"
 
