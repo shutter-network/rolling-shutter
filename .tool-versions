@@ -7,7 +7,7 @@ golangci-lint 1.50.1
 java temurin-17.0.5+8
 nodejs 16.14.2
 postgres 14.2
-pre-commit 2.21.0
+pre-commit 3.0.1
 protoc 3.20.3
 solidity 0.8.9
 sqlc 1.16.0
