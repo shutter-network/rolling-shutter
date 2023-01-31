@@ -42,13 +42,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.19.4@sha256:cbe908718445950803fa6bb9653d5d3d2d8aeed5c11449247b9813d0fd494ebc
+      - image: cimg/go:1.19.5@sha256:a14b0d7a15641d99300a16b80a2bf1cae0792ffdfb4c2180941c4c0f429a9ba3
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.19.4@sha256:cbe908718445950803fa6bb9653d5d3d2d8aeed5c11449247b9813d0fd494ebc
+      - image: cimg/go:1.19.5@sha256:a14b0d7a15641d99300a16b80a2bf1cae0792ffdfb4c2180941c4c0f429a9ba3
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
