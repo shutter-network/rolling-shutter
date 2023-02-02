@@ -7,3 +7,5 @@
 *.json
 *.toml
 /godoc.idx
+/go.work
+/go.work.sum
