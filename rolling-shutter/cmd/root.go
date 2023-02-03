@@ -144,9 +144,10 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "rolling-shutter",
-		Short:   "A collection of commands to run and interact with Rolling Shutter nodes",
-		Version: shversion.Version(),
+		Use:          "rolling-shutter",
+		Short:        "A collection of commands to run and interact with Rolling Shutter nodes",
+		Version:      shversion.Version(),
+		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := medley.BindFlags(cmd, "ROLLING_SHUTTER")
 			if err != nil {
