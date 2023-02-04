@@ -54,8 +54,7 @@
     (def asdf-go?
       (inside-asdf? (fs/which "go")))
 
-    (def repo-root
-      (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
+    (def repo-root play/repo-root)
     (def src-dir
       (-> repo-root (fs/path "rolling-shutter") str))
     (def play-dir

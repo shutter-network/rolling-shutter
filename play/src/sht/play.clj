@@ -21,7 +21,20 @@
 (def ^:dynamic *cwd* (str (fs/normalize (fs/absolutize "."))))
 
 (def repo-root
-  (str (fs/canonicalize (or (System/getenv "ROLLING_SHUTTER_ROOT") ".."))))
+  (let [candidates [(System/getenv "ROLLING_SHUTTER_ROOT")
+                    (fs/path (System/getProperty "babashka.config") ".." "..")
+                    ".."]
+        candidates (->> candidates
+                        (remove nil?)
+                        (map fs/canonicalize)
+                        (map str)
+                        distinct)
+        root? (fn [p]
+                (fs/exists? (fs/path p "rolling-shutter" "keyper" "keyper.go")))
+        root (first (filter root? candidates))]
+    (if root
+      root
+      (throw (ex-info "could not determine root directory" {:candidates candidates})))))
 
 (defn- split-path []
   (str/split (System/getenv "PATH") (re-pattern java.io.File/pathSeparator)))
