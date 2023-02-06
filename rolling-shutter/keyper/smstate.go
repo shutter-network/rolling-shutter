@@ -574,7 +574,7 @@ func (st *ShuttermintState) handleCheckIn(
 
 func (st *ShuttermintState) handlePolyCommitment(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment,
-) error {
+) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Info().Str("event", e.String()).
@@ -662,7 +662,7 @@ func (st *ShuttermintState) handlePolyEval(
 
 func (st *ShuttermintState) handleAccusation(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.Accusation,
-) error {
+) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Info().Str("event", e.String()).
@@ -707,7 +707,7 @@ func (st *ShuttermintState) handleAccusation(
 
 func (st *ShuttermintState) handleApology(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.Apology,
-) error {
+) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
 		log.Info().Str("event", e.String()).

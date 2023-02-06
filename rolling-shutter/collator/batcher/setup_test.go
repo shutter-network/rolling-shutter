@@ -196,7 +196,7 @@ func (fix *Fixture) AddEonPublicKey(ctx context.Context, t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas int) ([]byte, []byte) { //nolint:unparam
+func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas int) ([]byte, []byte) {
 	t.Helper()
 	assert.Check(t, accountIndex >= 0 && accountIndex < numAccounts)
 	// construct a valid transaction

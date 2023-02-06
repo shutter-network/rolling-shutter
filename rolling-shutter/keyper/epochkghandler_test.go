@@ -31,7 +31,13 @@ func newTestConfig(t *testing.T) Config {
 	return c
 }
 
-func initializeEon(ctx context.Context, t *testing.T, db *kprdb.Queries, config Config, keyperIndex uint64) *testkeygen.TestKeyGenerator {
+func initializeEon(
+	ctx context.Context,
+	t *testing.T,
+	db *kprdb.Queries,
+	config Config,
+	keyperIndex uint64, //nolint:unparam
+) *testkeygen.TestKeyGenerator {
 	t.Helper()
 
 	eon := uint64(0)

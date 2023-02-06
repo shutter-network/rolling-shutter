@@ -42,7 +42,7 @@ func Cmd() *cobra.Command {
 func chainMain() {
 	log.Info().Str("version", shversion.Version()).Msg("starting shuttermint")
 
-	node, err := newTendermint(cfgFile)
+	node, err := newTendermint(cfgFile) //nolint:gocritic
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(2)

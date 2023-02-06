@@ -89,8 +89,9 @@ func Run(ctx context.Context, config Config) error {
 	router.Post("/*", p.HandleRequest)
 
 	httpServer := &http.Server{
-		Addr:    config.HTTPListenAddress,
-		Handler: router,
+		Addr:              config.HTTPListenAddress,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	errorgroup, errorctx := errgroup.WithContext(ctx)
 	errorgroup.Go(httpServer.ListenAndServe)

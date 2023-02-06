@@ -130,7 +130,6 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				continue
 			}
 			if nextEpochResponse.JSONDefault != nil {
-
 				jsonDefault := nextEpochResponse.JSONDefault
 				log.Error().Str("message", jsonDefault.Message).Int32("status", jsonDefault.Code).
 					Msg("received error response from collator")

@@ -11,7 +11,7 @@ import (
 // Encoding/decoding helpers
 //
 
-func newAddressPair(key string, value common.Address) abcitypes.EventAttribute {
+func newAddressPair(key string, value common.Address) abcitypes.EventAttribute { //nolint:unparam
 	return abcitypes.EventAttribute{
 		Key:   key,
 		Value: encodeAddress(value),

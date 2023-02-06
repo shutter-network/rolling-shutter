@@ -202,8 +202,9 @@ func (kpr *keyper) run(ctx context.Context) error {
 
 	if kpr.config.HTTPEnabled {
 		httpServer := &http.Server{
-			Addr:    kpr.config.HTTPListenAddress,
-			Handler: kpr.setupRouter(),
+			Addr:              kpr.config.HTTPListenAddress,
+			Handler:           kpr.setupRouter(),
+			ReadHeaderTimeout: 5 * time.Second,
 		}
 		group.Go(httpServer.ListenAndServe)
 		group.Go(func() error {
