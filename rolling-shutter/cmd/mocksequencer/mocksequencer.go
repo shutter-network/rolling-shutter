@@ -120,8 +120,6 @@ func readConfig() (mocksequencer.Config, error) {
 }
 
 func mockSequencerMain(config *mocksequencer.Config) error {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if config.Debug {
 		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
