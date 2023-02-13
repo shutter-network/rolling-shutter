@@ -15,6 +15,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type ShuttermintDriver struct {
@@ -26,7 +27,9 @@ type ShuttermintDriver struct {
 var errEmptyBlockchain = errors.New("empty shuttermint blockchain")
 
 func getLastCommittedHeight(ctx context.Context, shmcl client.Client) (int64, error) {
-	latestBlock, err := shmcl.Block(ctx, nil)
+	latestBlock, err := medley.Retry(ctx, func() (*coretypes.ResultBlock, error) {
+		return shmcl.Block(ctx, nil)
+	})
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get last committed height of shuttermint chain")
 	}
@@ -91,7 +94,9 @@ func makeEvents(height int64, events []abcitypes.Event) []shutterevents.IEvent {
 
 func (smdrv *ShuttermintDriver) fetchEvents2(ctx context.Context, heightFrom, lastCommittedHeight int64) error {
 	for currentBlock := heightFrom + 1; currentBlock < lastCommittedHeight; currentBlock++ {
-		results, err := smdrv.shmcl.BlockResults(ctx, &currentBlock)
+		results, err := medley.Retry(ctx, func() (*coretypes.ResultBlockResults, error) {
+			return smdrv.shmcl.BlockResults(ctx, &currentBlock)
+		})
 		if err != nil {
 			return err
 		}
@@ -128,7 +133,9 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 		total := 0
 		txs := []*coretypes.ResultTx{}
 		for {
-			res, err := smdrv.shmcl.TxSearch(ctx, query, false, &page, &perPage, "")
+			res, err := medley.Retry(ctx, func() (*coretypes.ResultTxSearch, error) {
+				return smdrv.shmcl.TxSearch(ctx, query, false, &page, &perPage, "")
+			})
 			if err != nil {
 				return errors.Wrap(err, "failed to fetch shuttermint txs")
 			}
@@ -148,7 +155,9 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 			}
 			page++
 		}
-		err := smdrv.handleTransactions(ctx, txs, currentBlock, height, lastCommittedHeight)
+		_, err := medley.Retry(ctx, func() (struct{}, error) {
+			return struct{}{}, smdrv.handleTransactions(ctx, txs, currentBlock, height, lastCommittedHeight)
+		})
 		if err != nil {
 			return err
 		}
