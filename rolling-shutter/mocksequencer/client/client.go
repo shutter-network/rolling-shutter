@@ -57,8 +57,21 @@ func (c *Client) SubmitBatch(ctx context.Context, tx *txtypes.Transaction) (*com
 	if err != nil {
 		return nil, err
 	}
+	return c.SubmitBatchData(ctx, data)
+}
+
+func (c *Client) AddCollator(ctx context.Context, address string, l1BlockNumber uint64) (int, error) {
+	var result int
+	err := c.client.CallContext(ctx, &result, "admin_addCollator", address, l1BlockNumber)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+func (c *Client) SubmitBatchData(ctx context.Context, data []byte) (*common.Hash, error) {
 	var result string
-	err = c.client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(data))
+	err := c.client.CallContext(ctx, &result, "shutter_submitBatch", hexutil.Encode(data))
 	// result is the TX hash if successful, otherwise the empty string
 	if err != nil || result == "" {
 		return nil, err

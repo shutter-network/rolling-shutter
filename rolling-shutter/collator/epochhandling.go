@@ -19,7 +19,18 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-const minRetryPollInterval time.Duration = 50 * time.Millisecond
+const (
+	minRetryPollInterval time.Duration = 50 * time.Millisecond
+	newDecryptionTrigger               = "new_decryption_trigger"
+	newDecryptionKey                   = "new_decryption_key"
+	newBatchtx                         = "new_batchtx"
+)
+
+var dbListenChannels []string = []string{
+	newDecryptionTrigger,
+	newDecryptionKey,
+	newBatchtx,
+}
 
 func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
@@ -86,84 +97,34 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	return true, nil
 }
 
-func (c *collator) listenNewDecryptionTrigger(ctx context.Context) <-chan time.Time {
-	chann := make(chan time.Time, 1)
-
-	go func() {
-		defer close(chann)
-		defer log.Debug().Msg("stop listening for new_decryption_trigger")
-
-		conn, err := c.dbpool.Acquire(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("error acquiring connection")
-			return
-		}
-		defer conn.Release()
-
-		_, err = conn.Exec(ctx, "listen new_decryption_trigger")
-		if err != nil {
-			log.Error().Msg("error listening to channel")
-			return
-		}
-
-		for {
-			notification, err := conn.Conn().WaitForNotification(ctx)
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if err != nil {
-					log.Error().Err(err).Msg("error waiting for notification")
-					continue
-				}
-				log.Info().Str("channel", notification.Channel).Msg("database notification received")
-				chann <- time.Now()
-			}
-		}
-	}()
-	return chann
-}
-
-func (c *collator) handleNewDecryptionTrigger(ctx context.Context) error {
-	newTrigger := c.listenNewDecryptionTrigger(ctx)
-	for {
-		select {
-		case <-newTrigger:
-			triggers, err := c.getUnsentDecryptionTriggers(ctx, c.Config)
-			if err != nil {
-				return err
-			}
-			if len(triggers) == 0 {
-				// no unsent triggers, continue and wait for next tick
-				continue
-			}
-			for _, msg := range triggers {
-				err := c.p2p.SendMessage(ctx,
-					msg,
-					retry.Interval(time.Second),
-					retry.ExponentialBackoff(),
-					retry.NumberOfRetries(3),
-					retry.LogIdentifier(msg.LogInfo()),
-				)
-				if err != nil {
-					continue // continue sending other messages
-				}
-				err = c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-					db := cltrdb.New(dbtx)
-					return db.UpdateDecryptionTriggerSent(ctx, msg.EpochID)
-				})
-				if err != nil {
-					return err
-				}
-				log.Info().
-					Str("msg", msg.LogInfo()).
-					Str("commitment", hexutil.Encode(msg.TransactionsHash)).
-					Msg("sent decryption trigger")
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+func (c *collator) sendDecryptionTriggers(ctx context.Context) error {
+	triggers, err := c.getUnsentDecryptionTriggers(ctx, c.Config)
+	if err != nil {
+		return err
 	}
+	for _, msg := range triggers {
+		err := c.p2p.SendMessage(ctx,
+			msg,
+			retry.Interval(time.Second),
+			retry.ExponentialBackoff(),
+			retry.NumberOfRetries(3),
+			retry.LogIdentifier(msg.LogInfo()),
+		)
+		if err != nil {
+			continue // continue sending other messages
+		}
+		err = c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
+			return cltrdb.New(dbtx).UpdateDecryptionTriggerSent(ctx, msg.EpochID)
+		})
+		if err != nil {
+			return err
+		}
+		log.Info().
+			Str("msg", msg.LogInfo()).
+			Str("commitment", hexutil.Encode(msg.TransactionsHash)).
+			Msg("sent decryption trigger")
+	}
+	return nil
 }
 
 // closeBatchesTicker constantly tries to close the current batch after `interval` duration.

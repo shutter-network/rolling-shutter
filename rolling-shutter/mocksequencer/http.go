@@ -26,7 +26,7 @@ func injectHTTPLogger(handler http.Handler) http.Handler {
 	c := alice.New()
 	c = c.Append(hlog.NewHandler(logger))
 	c = c.Append(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
-		hlog.FromRequest(r).Info().
+		hlog.FromRequest(r).Trace().
 			Str("method", r.Method).
 			Stringer("url", r.URL).
 			Int("status", status).

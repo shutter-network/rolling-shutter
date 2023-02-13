@@ -14,17 +14,14 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 const numAccounts = 5
@@ -216,57 +213,4 @@ func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas in
 	txBytes, err := tx.MarshalBinary()
 	assert.NilError(t, err)
 	return txBytes, tx.Hash().Bytes()
-}
-
-// `p2pMessagingMock` shortcuts the entire P2P messaging layer that would
-// normally handle the communication with the keyper-set.
-// If the `p2pMessagingMock` receives a DecryptionTrigger,
-// it will wait a fixed amount of time and then
-// call the BatchHandler's HandleDecryptionKey with a fixed decryption-key
-// for that epoch.
-// The data of the DecryptionTrigger is not fully validated.
-func p2pMessagingMock(
-	ctx context.Context,
-	t *testing.T,
-	failFunc func(error),
-	cfg config.Config,
-	batchHandler *batchhandler.BatchHandler,
-) error {
-	t.Helper()
-
-	messages := batchHandler.Messages()
-	for {
-		select {
-		case out, ok := <-messages:
-			if !ok {
-				log.Debug().Msg("P2P message mock: messages closed from outside")
-				return nil
-			}
-			// Emulate communication overhead etc.
-			time.Sleep(500 * time.Millisecond)
-			typ := out.ProtoReflect().Type().Descriptor().FullName()
-			if typ == "shmsg.DecryptionTrigger" {
-				trigger, _ := out.(*shmsg.DecryptionTrigger)
-				epoch, _ := epochid.BytesToEpochID(trigger.EpochID)
-
-				assertEqual(t, failFunc, trigger.InstanceID, cfg.InstanceID)
-				address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
-				signatureCorrect, err := shmsg.VerifySignature(trigger, address)
-				assertEqual(t, failFunc, err, nil)
-				assertEqual(t, failFunc, signatureCorrect, true)
-
-				// collator successfully received the decryption-key via P2P messaging,
-				// pass to the batch-handler
-				err = batchHandler.HandleDecryptionKey(ctx, epoch, []byte("decrkey"))
-				assertEqual(t, failFunc, err, nil)
-			}
-
-		case <-ctx.Done():
-			err := ctx.Err()
-			if err == context.Canceled {
-				return nil
-			}
-			return err
-		}
-	}
 }

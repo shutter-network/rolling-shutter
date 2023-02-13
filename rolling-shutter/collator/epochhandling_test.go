@@ -13,6 +13,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func init() {
@@ -23,8 +24,8 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
 	defer closedb()
 	config := newTestConfig(t)
@@ -36,6 +37,9 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	// is because the handler has no rooms subscribed and thus will actually
 	// skip to forward the messages sent to the transport
 	c := collator{dbpool: dbpool, Config: config, p2p: p2p.New(p2p.Config{})}
+	var newDecryptionTriggerLoop shdb.SignalLoopFunc
+	c.signals.newDecryptionTrigger, newDecryptionTriggerLoop = shdb.NewSignal(ctx, "newDecryptionTrigger", c.sendDecryptionTriggers)
+	go func() { _ = newDecryptionTriggerLoop() }()
 
 	trigger := cltrdb.InsertTriggerParams{
 		EpochID:       epochid.Uint64ToEpochID(3).Bytes(),
@@ -49,9 +53,9 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		assert.NilError(t, err)
 	}()
 
-	cctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	err := c.handleNewDecryptionTrigger(cctx)
+	cctx, cancelTimeout := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancelTimeout()
+	err := c.handleDatabaseNotifications(cctx)
 	assert.ErrorContains(t, err, "context deadline exceeded")
 
 	// HACK: The handleNewDecryptionTrigger should have

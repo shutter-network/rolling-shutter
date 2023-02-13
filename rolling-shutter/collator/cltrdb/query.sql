@@ -95,3 +95,12 @@ SET epoch_id = $1, l1_block_number = $2;
 
 -- name: GetNextBatch :one
 SELECT * FROM next_batch LIMIT 1;
+
+-- name: InsertBatchTx :exec
+INSERT INTO batchtx (epoch_id, marshaled) VALUES ($1, $2);
+
+-- name: GetUnsubmittedBatchTx :one
+SELECT * FROM batchtx WHERE submitted=false;
+
+-- name: SetBatchSubmitted :exec
+UPDATE batchtx SET submitted=true WHERE submitted=false;

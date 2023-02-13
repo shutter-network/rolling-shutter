@@ -7,6 +7,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [cheshire.core :as json]
+            [babashka.http-client :as http]
             [babashka.process :as p]
             [babashka.fs :as fs]))
 
@@ -238,3 +239,36 @@
 
 (def keyper-db (comp :subcommand/db keyper-subcommand))
 (def collator-db (comp :subcommand/db collator-subcommand))
+
+(defn jsonrpc-body
+  [method params]
+  (json/generate-string {:jsonrpc "2.0"
+                         :method method
+                         :params params
+                         :id 1}))
+
+(defn post-jsonrpc
+  [url body]
+  (http/post url
+             {:headers {"Content-Type" "application/json"}
+              :body body}))
+
+(defn get-jsonrpc-result
+  [resp]
+  (let [{:keys [result error]} (json/parse-string (:body resp) true)]
+    (when error
+      (throw (ex-info (:message error) {:code (:code error)})))
+    result))
+
+(defn add-collator
+  [mocksequencer-url addr l1-blocknumber]
+  (->> (jsonrpc-body "admin_addCollator" [addr l1-blocknumber])
+       (post-jsonrpc mocksequencer-url)
+       get-jsonrpc-result))
+
+(comment
+  (post-jsonrpc "http://localhost:9999"
+                (jsonrpc-body "admin_addCollator"
+                              ["0x96858D19fB1398a23fd3c5E9fb205B964d5BA46b" 55]))
+  (add-collator "http://localhost:8555" "0x96858D19fB1398a23fd3c5E9fb205B964d5BA46b" 55)
+  )

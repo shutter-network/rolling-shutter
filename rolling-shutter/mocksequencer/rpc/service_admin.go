@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/encoding"
@@ -26,6 +27,11 @@ func (s *AdminService) Name() string {
 }
 
 func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, error) {
+	var err error
+	defer func() {
+		log.Info().Err(err).Str("address", address).Uint64("l1-blocknumber", l1BlockNumber).Msg("admin method AddCollator called")
+	}()
+
 	collator, err := encoding.StringToAddress(address)
 	if err != nil {
 		return 0, err

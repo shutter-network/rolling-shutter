@@ -19,8 +19,8 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (uint64, error) {
 
 	f := func(ctx context.Context) (*string, error) {
 		var result string
-		log.Debug().Msg("polling batch-index from sequencer")
 		err := l2Client.CallContext(ctx, &result, "shutter_batchIndex")
+		log.Debug().Err(err).Str("result", result).Msg("polling batch-index from sequencer")
 		if err != nil {
 			return nil, err
 		}
