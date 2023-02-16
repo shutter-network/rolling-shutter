@@ -32,7 +32,7 @@ func GetMessageType(msg shmsg.P2PMessage) protoreflect.FullName {
 
 // AddValidator will add a validator-function to a P2PHandler instance:
 // The passed in ValidatorFunc function takes a specific message of type M complying to the
-// P2PMessage interface, processes it and returns wether it is valid or not (bool value).
+// P2PMessage interface, processes it and returns whether it is valid or not (bool value).
 // If the return value is false, the message is dropped and a potentially raised error is logged.
 // If the validator is registered on the P2Phandler via the AddValidator function,
 // the passed in validator will be called automatically when a message of type M is received
