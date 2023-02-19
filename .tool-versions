@@ -10,5 +10,5 @@ postgres 14.2
 pre-commit 3.0.4
 protoc 3.20.3
 solidity 0.8.9
-sqlc 1.16.0
+sqlc 1.17.0
 tinygo 0.27.0
