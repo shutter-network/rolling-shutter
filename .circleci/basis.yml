@@ -42,13 +42,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.19.5@sha256:a14b0d7a15641d99300a16b80a2bf1cae0792ffdfb4c2180941c4c0f429a9ba3
+      - image: cimg/go:1.20.1
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.19.5@sha256:a14b0d7a15641d99300a16b80a2bf1cae0792ffdfb4c2180941c4c0f429a9ba3
+      - image: cimg/go:1.20.1
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -80,7 +80,7 @@ jobs:
             asdf install pre-commit
       - restore_cache:
           keys:
-            - go-mod-v5-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
+            - go-mod-v6-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
           key: pre-commit-cache-v10-{{ checksum ".pre-commit-config.yaml" }}
       - run: pre-commit install-hooks
