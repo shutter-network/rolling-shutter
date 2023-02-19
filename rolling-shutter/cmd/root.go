@@ -16,7 +16,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/collator"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/completion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/cryptocmd"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocknode"
@@ -184,7 +183,6 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(bootstrap.Cmd())
 	cmd.AddCommand(chain.Cmd())
 	cmd.AddCommand(collator.Cmd())
-	cmd.AddCommand(completion.Cmd())
 	cmd.AddCommand(keyper.Cmd())
 	cmd.AddCommand(mocknode.Cmd())
 	cmd.AddCommand(snapshot.Cmd())
