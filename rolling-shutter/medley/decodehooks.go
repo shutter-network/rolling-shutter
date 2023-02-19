@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 )

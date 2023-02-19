@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
