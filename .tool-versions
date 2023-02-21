@@ -3,7 +3,7 @@ binaryen 108
 circleci 0.1.23391
 clojure 1.11.1.1224
 golang 1.20.1
-golangci-lint 1.51.1
+golangci-lint 1.51.2
 java temurin-17.0.5+8
 nodejs 16.14.2
 postgres 14.2
