@@ -16,7 +16,6 @@ require (
 	github.com/kr/pretty v0.3.0
 	github.com/kyleconroy/sqlc v1.17.0
 	github.com/libp2p/go-libp2p v0.25.1
-	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multiaddr v0.8.0
