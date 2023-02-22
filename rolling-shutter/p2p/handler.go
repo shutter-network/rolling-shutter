@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -66,7 +65,7 @@ func AddValidator[M shmsg.P2PMessage](handler *P2PHandler, valFunc ValidatorFunc
 			Message:  libp2pMessage.Data,
 			SenderID: libp2pMessage.GetFrom().Pretty(),
 		}
-		if strings.Compare(message.Topic, topic) != 0 {
+		if message.Topic != topic {
 			// This should not happen, if so then we registered the validator function on the wrong topic
 			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.Topic))
 			return false
