@@ -26,6 +26,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
@@ -54,10 +55,10 @@ type keyper struct {
 func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
 	cfgAddress := config.Address().Hex()
-	queries := kprdb.New(dbpool)
+	queries := metadb.New(dbpool)
 	dbAddr, err := queries.GetMeta(ctx, addressKey)
 	if err == pgx.ErrNoRows {
-		return queries.InsertMeta(ctx, kprdb.InsertMetaParams{
+		return queries.InsertMeta(ctx, metadb.InsertMetaParams{
 			Key:   addressKey,
 			Value: cfgAddress,
 		})

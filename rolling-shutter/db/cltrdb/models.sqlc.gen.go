@@ -89,11 +89,6 @@ type EonPublicKeyVote struct {
 	KeyperConfigIndex int64
 }
 
-type MetaInf struct {
-	Key   string
-	Value string
-}
-
 type NextBatch struct {
 	EnforceOneRow bool
 	EpochID       []byte

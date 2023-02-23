@@ -23,8 +23,3 @@ type KeyperSet struct {
 	Keypers               []string
 	Threshold             int32
 }
-
-type MetaInf struct {
-	Key   string
-	Value string
-}
