@@ -207,7 +207,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		InstanceID: 0,
 		Eon:        eon,
 		EpochID:    epochID.Bytes(),
-		Key:        tkg.EpochSecretKey(epochID).Marshal(),
+		Key:        encodedDecryptionKey,
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
