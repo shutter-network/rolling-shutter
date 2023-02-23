@@ -22,12 +22,12 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"

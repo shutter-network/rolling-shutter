@@ -7,8 +7,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 

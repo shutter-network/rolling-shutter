@@ -23,10 +23,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"

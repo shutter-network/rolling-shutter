@@ -10,8 +10,8 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 )
 
 type server struct {
