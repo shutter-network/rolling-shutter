@@ -1,4 +1,4 @@
-package commondb
+package chainobsdb
 
 import (
 	_ "embed"
@@ -6,5 +6,5 @@ import (
 
 // CreateObserveTables contains the SQL statements to create observe tables.
 //
-//go:embed observe-schema.sql
+//go:embed schema.sql
 var CreateObserveTables string

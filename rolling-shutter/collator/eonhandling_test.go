@@ -12,8 +12,8 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
@@ -66,7 +66,7 @@ type setupEonKeysParams struct {
 	keypers           []*ecdsa.PrivateKey
 }
 
-func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params setupEonKeysParams) []keyper {
+func setupEonKeys(ctx context.Context, t *testing.T, dbtx chainobsdb.DBTX, params setupEonKeysParams) []keyper {
 	t.Helper()
 
 	kprs := make([]keyper, 0)
@@ -98,8 +98,8 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx commondb.DBTX, params 
 		keyperSet = append(keyperSet, k.address)
 	}
 
-	db := commondb.New(dbtx)
-	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
+	db := chainobsdb.New(dbtx)
+	err := db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(params.keyperConfigIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),

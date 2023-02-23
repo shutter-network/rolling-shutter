@@ -24,7 +24,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
@@ -39,7 +39,6 @@ import (
 type keyper struct {
 	config            Config
 	dbpool            *pgxpool.Pool
-	db                *kprdb.Queries
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
 	l1Client          *ethclient.Client
@@ -81,7 +80,6 @@ func Run(ctx context.Context, config Config) error {
 	}
 	defer dbpool.Close()
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
-	db := kprdb.New(dbpool)
 
 	l1Client, err := ethclient.Dial(config.EthereumURL)
 	if err != nil {
@@ -119,7 +117,6 @@ func Run(ctx context.Context, config Config) error {
 	k := keyper{
 		config:            config,
 		dbpool:            dbpool,
-		db:                db,
 		shuttermintClient: shuttermintClient,
 		messageSender:     messageSender,
 		l1Client:          l1Client,
@@ -298,7 +295,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		return err
 	}
 
-	cq := commondb.New(tx)
+	cq := chainobsdb.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.KeyperConfigIndex)+1)
 	if err == pgx.ErrNoRows {
 		return nil
@@ -383,7 +380,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 
 func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 	for {
-		eonPublicKeys, err := kpr.db.GetAndDeleteEonPublicKeys(ctx)
+		eonPublicKeys, err := kprdb.New(kpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
 		if err != nil {
 			return err
 		}

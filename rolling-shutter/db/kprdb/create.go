@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -29,7 +29,7 @@ func initDB(ctx context.Context, tx pgx.Tx) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
 	}
-	_, err = tx.Exec(ctx, commondb.CreateObserveTables)
+	_, err = tx.Exec(ctx, chainobsdb.CreateObserveTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create observe tables")
 	}

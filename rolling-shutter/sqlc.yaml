@@ -20,10 +20,10 @@ packages:
     output_models_file_name: "models.sqlc.gen.go"
     output_files_suffix: "c.gen"
 
-  - path: "db/commondb"
-    name: "commondb"
-    schema: ["db/commondb/observe-schema.sql"]
-    queries: ["db/commondb/observe-query.sql"]
+  - path: "db/chainobsdb"
+    name: "chainobsdb"
+    schema: ["db/chainobsdb/schema.sql"]
+    queries: ["db/chainobsdb/query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"

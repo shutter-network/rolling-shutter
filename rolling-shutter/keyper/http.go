@@ -134,7 +134,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	handler := epochKGHandler{
 		config: srv.kpr.config,
-		db:     srv.kpr.db,
+		db:     kprdb.New(srv.kpr.dbpool),
 	}
 	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
