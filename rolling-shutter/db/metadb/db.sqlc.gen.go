@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.17.0
 
-package commondb
+package metadb
 
 import (
 	"context"

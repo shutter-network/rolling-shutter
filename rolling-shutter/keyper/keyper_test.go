@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -27,7 +27,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
@@ -40,7 +40,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
 
 	p2pHandler := p2p.New(p2p.Config{})
-	kpr := keyper{config: config, db: db, p2p: p2pHandler}
+	kpr := keyper{config: config, dbpool: dbpool, p2p: p2pHandler}
 	var peerID peer.ID
 
 	validateDecryptionKey := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKey)
@@ -153,12 +153,12 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
+	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	config := newTestConfig(t)
 	p2pHandler := p2p.New(p2p.Config{})
-	kpr := keyper{config: config, db: db, p2p: p2pHandler}
+	kpr := keyper{config: config, dbpool: dbpool, p2p: p2pHandler}
 
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
@@ -176,12 +176,12 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
-	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
+	err = chainobsdb.New(dbpool).InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 		ActivationBlockNumber: int64(activationBlk1),
 		Collator:              collator1,
 	})
 	assert.NilError(t, err)
-	err = db.InsertChainCollator(ctx, kprdb.InsertChainCollatorParams{
+	err = chainobsdb.New(dbpool).InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 		ActivationBlockNumber: int64(activationBlk2),
 		Collator:              collator2,
 	})

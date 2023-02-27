@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.17.0
 
-package commondb
+package chainobsdb
 
 import ()
 
@@ -22,9 +22,4 @@ type KeyperSet struct {
 	ActivationBlockNumber int64
 	Keypers               []string
 	Threshold             int32
-}
-
-type MetaInf struct {
-	Key   string
-	Value string
 }

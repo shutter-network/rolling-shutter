@@ -9,6 +9,8 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -25,7 +27,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
 
-	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(key.Eon))
+	dkgResultDB, err := kprdb.New(kpr.dbpool).GetDKGResult(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("no DKG result found for eon %d", key.Eon)
 	}
@@ -61,7 +63,7 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shm
 	if keyShare.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
-	dkgResultDB, err := kpr.db.GetDKGResult(ctx, int64(keyShare.Eon))
+	dkgResultDB, err := kprdb.New(kpr.dbpool).GetDKGResult(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
 	}
@@ -105,7 +107,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg
 	if blk > math.MaxInt64 {
 		return false, errors.Errorf("block number %d overflows int64", blk)
 	}
-	chainCollator, err := kpr.db.GetChainCollator(ctx, int64(blk))
+	chainCollator, err := chainobsdb.New(kpr.dbpool).GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("got decryption trigger with no collator for given block number: %d", blk)
 	}

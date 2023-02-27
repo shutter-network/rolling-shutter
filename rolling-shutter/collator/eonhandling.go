@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -30,9 +30,9 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 }
 
 // ensureEonPublicKeyMatchesKeyperSet checks that the information stored in the EonPublicKey
-// matches the commondb.KeyperSet stored in the database. It returns an error if there is a
+// matches the chainobsdb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
-func ensureEonPublicKeyMatchesKeyperSet(keyperSet commondb.KeyperSet, key *shmsg.EonPublicKey) error {
+func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *shmsg.EonPublicKey) error {
 	activationBlock := int64(key.ActivationBlock)
 
 	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
@@ -74,10 +74,10 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	// because of that.
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
-	var keyperSet commondb.KeyperSet
+	var keyperSet chainobsdb.KeyperSet
 	if err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
-		keyperSet, err = commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		keyperSet, err = chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		return err
@@ -100,7 +100,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 		var err error
 
 		db := cltrdb.New(tx)
-		keyperSet, err := commondb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		keyperSet, err := chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		if err != nil {

@@ -13,9 +13,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -50,7 +50,7 @@ func New(contracts *deployment.Contracts, dbpool *pgxpool.Pool) *ChainObserver {
 }
 
 func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*eventsyncer.EventType) error {
-	db := commondb.New(chainobs.dbpool)
+	db := chainobsdb.New(chainobs.dbpool)
 	eventSyncProgress, err := db.GetEventSyncProgress(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get last synced event from db")
@@ -121,7 +121,7 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 		return err
 	}
 	return chainobs.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := commondb.New(tx)
+		db := chainobsdb.New(tx)
 
 		if eventSyncUpdate.Event != nil {
 			if err := chainobs.handleEvent(ctx, db, eventSyncUpdate.Event); err != nil {
@@ -138,7 +138,7 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 			nextBlockNumber = eventSyncUpdate.BlockNumber
 			nextLogIndex = eventSyncUpdate.LogIndex + 1
 		}
-		if err := db.UpdateEventSyncProgress(ctx, commondb.UpdateEventSyncProgressParams{
+		if err := db.UpdateEventSyncProgress(ctx, chainobsdb.UpdateEventSyncProgressParams{
 			NextBlockNumber: int32(nextBlockNumber),
 			NextLogIndex:    int32(nextLogIndex),
 		}); err != nil {
@@ -149,7 +149,7 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 }
 
 func (chainobs *ChainObserver) handleEvent(
-	ctx context.Context, db *commondb.Queries, event interface{},
+	ctx context.Context, db *chainobsdb.Queries, event interface{},
 ) error {
 	var err error
 	switch event := event.(type) {
@@ -165,7 +165,7 @@ func (chainobs *ChainObserver) handleEvent(
 }
 
 func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
-	ctx context.Context, db *commondb.Queries, event newKeyperConfig,
+	ctx context.Context, db *chainobsdb.Queries, event newKeyperConfig,
 ) error {
 	log.Info().
 		Uint64("block-number", event.Raw.BlockNumber).
@@ -178,7 +178,7 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 			"activation block number %d from config contract would overflow int64",
 			event.ActivationBlockNumber)
 	}
-	err := db.InsertKeyperSet(ctx, commondb.InsertKeyperSetParams{
+	err := db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(event.KeyperConfigIndex),
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
 		Keypers:               shdb.EncodeAddresses(event.addrs),
@@ -191,7 +191,7 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 }
 
 func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
-	ctx context.Context, db *commondb.Queries, event newCollatorConfig,
+	ctx context.Context, db *chainobsdb.Queries, event newCollatorConfig,
 ) error {
 	log.Info().
 		Uint64("block-number", event.Raw.BlockNumber).
@@ -207,7 +207,7 @@ func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
 	if len(event.addrs) > 1 {
 		return errors.Errorf("got multiple collators from collator addrs set contract: %s", event.addrs)
 	} else if len(event.addrs) == 1 {
-		err := db.InsertChainCollator(ctx, commondb.InsertChainCollatorParams{
+		err := db.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
 			Collator:              shdb.EncodeAddress(event.addrs[0]),
 		})

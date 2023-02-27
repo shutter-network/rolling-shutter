@@ -8,8 +8,8 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -20,7 +20,9 @@ type epochKGHandler struct {
 	db     *kprdb.Queries
 }
 
-func (h *epochKGHandler) handleDecryptionTrigger(ctx context.Context, msg *shmsg.DecryptionTrigger) ([]shmsg.P2PMessage, error) {
+func (h *epochKGHandler) handleDecryptionTrigger(
+	ctx context.Context, msg *shmsg.DecryptionTrigger,
+) ([]shmsg.P2PMessage, error) {
 	log.Info().Str("message", msg.String()).Msg("received decryption trigger")
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
@@ -84,50 +86,21 @@ func (h *epochKGHandler) sendDecryptionKeyShare(
 	// compute the key share
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 	share := epochKG.ComputeEpochSecretKeyShare(epochID)
-	encodedShare := share.Marshal()
-	if err != nil {
-		return nil, err
-	}
 
-	// store share in db and sent it
-	err = h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
-		Eon:                eon.Eon,
-		EpochID:            epochID.Bytes(),
-		KeyperIndex:        keyperIndex,
-		DecryptionKeyShare: encodedShare,
-	})
+	msg := &shmsg.DecryptionKeyShare{
+		InstanceID:  h.config.InstanceID,
+		Eon:         uint64(eon.Eon),
+		EpochID:     epochID.Bytes(),
+		KeyperIndex: uint64(keyperIndex),
+		Share:       share.Marshal(),
+	}
+	err = h.db.InsertDecryptionKeyShareMsg(ctx, msg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
 	log.Info().Str("epoch-id", epochID.Hex()).Int64("block-number", blockNumber).
 		Msg("sending decryption key share")
-	return []shmsg.P2PMessage{
-		&shmsg.DecryptionKeyShare{
-			InstanceID:  h.config.InstanceID,
-			Eon:         uint64(eon.Eon),
-			EpochID:     epochID.Bytes(),
-			KeyperIndex: uint64(keyperIndex),
-			Share:       encodedShare,
-		},
-	}, nil
-}
-
-func (h *epochKGHandler) insertDecryptionKeyShare(ctx context.Context, msg *shmsg.DecryptionKeyShare) error {
-	err := h.db.InsertDecryptionKeyShare(ctx, kprdb.InsertDecryptionKeyShareParams{
-		Eon:                int64(msg.Eon),
-		EpochID:            msg.EpochID,
-		KeyperIndex:        int64(msg.KeyperIndex),
-		DecryptionKeyShare: msg.Share,
-	})
-	if err != nil {
-		return errors.Wrapf(
-			err,
-			"failed to insert decryption key share for epoch %d from keyper %d",
-			msg.EpochID,
-			msg.KeyperIndex,
-		)
-	}
-	return nil
+	return []shmsg.P2PMessage{msg}, nil
 }
 
 func (h *epochKGHandler) aggregateDecryptionKeySharesFromDB(
@@ -175,7 +148,7 @@ func (h *epochKGHandler) aggregateDecryptionKeySharesFromDB(
 func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shmsg.DecryptionKeyShare) ([]shmsg.P2PMessage, error) {
 	// Insert the share into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
-	if err := h.insertDecryptionKeyShare(ctx, msg); err != nil {
+	if err := h.db.InsertDecryptionKeyShareMsg(ctx, msg); err != nil {
 		return nil, err
 	}
 
@@ -227,27 +200,15 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 			epochID,
 		)
 	}
-	decryptionKeyEncoded := decryptionKey.Marshal()
-
-	// send decryption key
-	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
-		Eon:           int64(msg.Eon),
-		EpochID:       epochID.Bytes(),
-		DecryptionKey: decryptionKeyEncoded,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to store decryption key for epoch %s in db", epochID)
-	}
-	if tag.RowsAffected() == 0 {
-		log.Info().Str("epoch-id", epochID.Hex()).
-			Msg("attempted to insert decryption key in db, but it already exists")
-		return nil, nil
-	}
 	message := &shmsg.DecryptionKey{
 		InstanceID: h.config.InstanceID,
 		Eon:        msg.Eon,
 		EpochID:    epochID.Bytes(),
-		Key:        decryptionKeyEncoded,
+		Key:        decryptionKey.Marshal(),
+	}
+	err = h.db.InsertDecryptionKeyMsg(ctx, message)
+	if err != nil {
+		return nil, err
 	}
 	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.String()).
 		Msg("broadcasting decryption key")
@@ -257,21 +218,5 @@ func (h *epochKGHandler) handleDecryptionKeyShare(ctx context.Context, msg *shms
 func (h *epochKGHandler) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
-	if err != nil {
-		return nil, err
-	}
-	tag, err := h.db.InsertDecryptionKey(ctx, kprdb.InsertDecryptionKeyParams{
-		Eon:           int64(msg.Eon),
-		EpochID:       epochID.Bytes(),
-		DecryptionKey: msg.Key,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochID)
-	}
-	if tag.RowsAffected() == 0 {
-		log.Info().Str("epoch-id", epochID.Hex()).
-			Msg("attempted to insert decryption key in db, but it already exists")
-	}
-	return nil, nil
+	return nil, h.db.InsertDecryptionKeyMsg(ctx, msg)
 }

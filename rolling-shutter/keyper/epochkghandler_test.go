@@ -12,7 +12,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
@@ -207,7 +207,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		InstanceID: 0,
 		Eon:        eon,
 		EpochID:    epochID.Bytes(),
-		Key:        tkg.EpochSecretKey(epochID).Marshal(),
+		Key:        encodedDecryptionKey,
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)

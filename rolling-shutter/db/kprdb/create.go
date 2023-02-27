@@ -11,7 +11,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/commondb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -28,22 +29,23 @@ func initDB(ctx context.Context, tx pgx.Tx) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create keyper tables")
 	}
-	_, err = tx.Exec(ctx, commondb.CreateObserveTables)
+	_, err = tx.Exec(ctx, chainobsdb.CreateObserveTables)
 	if err != nil {
 		return errors.Wrap(err, "failed to create observe tables")
 	}
 
-	_, err = tx.Exec(ctx, commondb.CreateMetaInf)
+	_, err = tx.Exec(ctx, metadb.CreateMetaInf)
 	if err != nil {
 		return errors.Wrap(err, "failed to create meta_inf table")
 	}
 
-	queries := New(tx)
-	err = queries.InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+	err = metadb.New(tx).InsertMeta(ctx, metadb.InsertMetaParams{
+		Key: shdb.SchemaVersionKey, Value: schemaVersion,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
-	err = queries.TMSetSyncMeta(ctx, TMSetSyncMetaParams{
+	err = New(tx).TMSetSyncMeta(ctx, TMSetSyncMetaParams{
 		CurrentBlock:        0,
 		LastCommittedHeight: -1,
 		SyncTimestamp:       time.Now(),
@@ -62,13 +64,6 @@ func InitDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 }
 
 // ValidateKeyperDB checks that the database schema is compatible.
-func ValidateKeyperDB(ctx context.Context, dbpool *pgxpool.Pool) error {
-	val, err := New(dbpool).GetMeta(ctx, shdb.SchemaVersionKey)
-	if err != nil {
-		return errors.Wrap(err, "failed to get schema version from meta_inf table")
-	}
-	if val != schemaVersion {
-		return errors.Errorf("database has wrong schema version: expected %s, got %s", schemaVersion, val)
-	}
-	return nil
+func ValidateKeyperDB(ctx context.Context, dbpool DBTX) error {
+	return metadb.ValidateSchemaVersion(ctx, dbpool, schemaVersion)
 }

@@ -9,11 +9,6 @@ import (
 	"time"
 )
 
-type ChainCollator struct {
-	ActivationBlockNumber int64
-	Collator              string
-}
-
 type DecryptionKey struct {
 	Eon           int64
 	EpochID       []byte
@@ -45,19 +40,6 @@ type Eon struct {
 	KeyperConfigIndex     int64
 }
 
-type EventSyncProgress struct {
-	ID              bool
-	NextBlockNumber int32
-	NextLogIndex    int32
-}
-
-type KeyperSet struct {
-	KeyperConfigIndex     int64
-	ActivationBlockNumber int64
-	Keypers               []string
-	Threshold             int32
-}
-
 type LastBatchConfigSent struct {
 	EnforceOneRow     bool
 	KeyperConfigIndex int64
@@ -66,11 +48,6 @@ type LastBatchConfigSent struct {
 type LastBlockSeen struct {
 	EnforceOneRow bool
 	BlockNumber   int64
-}
-
-type MetaInf struct {
-	Key   string
-	Value string
 }
 
 type OutgoingEonKey struct {

@@ -9,7 +9,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
