@@ -3,39 +3,25 @@ package cltrdb
 
 import (
 	"context"
-	_ "embed"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// CreateCollatorTables contains the SQL statements to create the collator tables.
-//
-//go:embed schema.sql
-var CreateCollatorTables string
-
 // schemaVersion is used to check that we use the right schema.
-var schemaVersion = shdb.MustFindSchemaVersion(CreateCollatorTables, "cltrdb/schema.sql")
+var schemaVersion = db.MustFindSchemaVersion("cltrdb")
 
 func initDB(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, CreateCollatorTables)
+	err := db.Create(ctx, tx, []string{"cltrdb", "chainobsdb", "metadb"})
 	if err != nil {
-		return errors.Wrap(err, "failed to create collator tables")
+		return err
 	}
 
-	_, err = tx.Exec(ctx, chainobsdb.CreateObserveTables)
-	if err != nil {
-		return errors.Wrap(err, "failed to create observe tables")
-	}
-	_, err = tx.Exec(ctx, metadb.CreateMetaInf)
-	if err != nil {
-		return errors.Wrap(err, "failed to create meta_inf table")
-	}
 	err = metadb.New(tx).InsertMeta(ctx, metadb.InsertMetaParams{
 		Key:   shdb.SchemaVersionKey,
 		Value: schemaVersion,

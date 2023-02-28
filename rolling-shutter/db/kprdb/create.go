@@ -4,39 +4,24 @@ package kprdb
 
 import (
 	"context"
-	_ "embed"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// CreateKeyperTables contains the SQL statements to create the keyper tables.
-//
-//go:embed schema.sql
-var CreateKeyperTables string
-
 // schemaVersion is used to check that we use the right schema.
-var schemaVersion = shdb.MustFindSchemaVersion(CreateKeyperTables, "kprdb/schema.sql")
+var schemaVersion = db.MustFindSchemaVersion("kprdb")
 
 func initDB(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, CreateKeyperTables)
+	err := db.Create(ctx, tx, []string{"kprdb", "chainobsdb", "metadb"})
 	if err != nil {
-		return errors.Wrap(err, "failed to create keyper tables")
-	}
-	_, err = tx.Exec(ctx, chainobsdb.CreateObserveTables)
-	if err != nil {
-		return errors.Wrap(err, "failed to create observe tables")
-	}
-
-	_, err = tx.Exec(ctx, metadb.CreateMetaInf)
-	if err != nil {
-		return errors.Wrap(err, "failed to create meta_inf table")
+		return err
 	}
 
 	err = metadb.New(tx).InsertMeta(ctx, metadb.InsertMetaParams{

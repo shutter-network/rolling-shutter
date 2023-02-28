@@ -2,17 +2,11 @@ package metadb
 
 import (
 	"context"
-	_ "embed"
 
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
-
-// CreateMetaInf contains the SQL statements to create the meta_inf table.
-//
-//go:embed schema.sql
-var CreateMetaInf string
 
 // ValidateSchemaVersion checks that the database schema is compatible.
 func ValidateSchemaVersion(ctx context.Context, db DBTX, expectedSchemaVersion string) error {
