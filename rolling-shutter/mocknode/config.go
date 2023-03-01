@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/viper"
@@ -12,12 +13,14 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
 type Config struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
-	P2PKey         p2pcrypto.PrivKey
+	ListenAddresses          []multiaddr.Multiaddr
+	CustomBootstrapAddresses []peer.AddrInfo
+	Environment              p2p.Environment
+	P2PKey                   p2pcrypto.PrivKey
 
 	InstanceID             uint64
 	Rate                   float64
@@ -33,8 +36,8 @@ var configTemplate = `# Shutter mock node config
 # Eon Public Key: {{ .EonPublicKey | EonPublicKey }}
 
 # p2p configuration
-ListenAddress   = "{{ .ListenAddress }}"
-PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
+ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
+CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
 
 # Secret Keys
 P2PKey          = "{{ .P2PKey | P2PKey}}"
@@ -58,6 +61,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
+				medley.AddrInfoHook,
 				medley.P2PKeyHook,
 			),
 		),

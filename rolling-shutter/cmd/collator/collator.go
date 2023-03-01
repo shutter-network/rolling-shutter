@@ -12,6 +12,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -102,12 +103,12 @@ func readConfig() (config.Config, error) {
 	viper.BindEnv("SequencerURL")
 	viper.BindEnv("DeploymentDir")
 	viper.BindEnv("ListenAddress")
-	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("CustomBootstrapAddresses")
 	viper.BindEnv("EthereumKey")
 	viper.BindEnv("EpochDuration")
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
-	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 	viper.SetDefault("EpochDuration", "5s")
 
 	cfg := config.Config{}
@@ -145,18 +146,20 @@ func exampleConfig() (*config.Config, error) {
 		return nil, err
 	}
 	return &config.Config{
-		EthereumURL:         "http://127.0.0.1:8545/",
-		ContractsURL:        "http://127.0.0.1:8545/",
-		DeploymentDir:       "./deployments/localhost/",
-		ListenAddress:       p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
-		PeerMultiaddrs:      []multiaddr.Multiaddr{},
-		DatabaseURL:         "",
-		SequencerURL:        "http://127.0.0.1:9545/",
-		HTTPListenAddress:   ":3000",
-		EthereumKey:         ethereumKey,
-		P2PKey:              p2pkey,
-		EpochDuration:       5 * time.Second,
-		ExecutionBlockDelay: 5,
+		EthereumURL:   "http://127.0.0.1:8545/",
+		ContractsURL:  "http://127.0.0.1:8545/",
+		DeploymentDir: "./deployments/localhost/",
+		ListenAddresses: []multiaddr.Multiaddr{
+			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		},
+		CustomBootstrapAddresses: []peer.AddrInfo{},
+		DatabaseURL:              "",
+		SequencerURL:             "http://127.0.0.1:9545/",
+		HTTPListenAddress:        ":3000",
+		EthereumKey:              ethereumKey,
+		P2PKey:                   p2pkey,
+		EpochDuration:            5 * time.Second,
+		ExecutionBlockDelay:      5,
 	}, nil
 }
 

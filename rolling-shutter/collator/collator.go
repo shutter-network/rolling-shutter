@@ -108,8 +108,8 @@ func Run(ctx context.Context, cfg config.Config) error {
 		l2Client:  l2RPCClient,
 		contracts: contracts,
 		p2p: p2p.New(p2p.Config{
-			ListenAddr:     cfg.ListenAddress,
-			PeerMultiaddrs: cfg.PeerMultiaddrs,
+			ListenAddrs:    cfg.ListenAddresses,
+			BootstrapPeers: cfg.CustomBootstrapAddresses,
 			PrivKey:        cfg.P2PKey,
 		}),
 		batcher:   btchr,

@@ -11,6 +11,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -100,13 +101,13 @@ func initDB() error {
 func readConfig() (snapshot.Config, error) {
 	viper.SetEnvPrefix("SNAPSHOT")
 	viper.BindEnv("EthereumURL")
-	viper.BindEnv("ListenAddress")
-	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("ListenAddresses")
+	viper.BindEnv("CustomBootstrapAddresses")
 	viper.BindEnv("SnapshotHubURL")
 
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip6/::1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
-	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 
 	config := snapshot.Config{}
 
@@ -144,11 +145,13 @@ func exampleConfig() (*snapshot.Config, error) {
 	}
 
 	return &snapshot.Config{
-		EthereumURL:    "http://[::1]:8545/",
-		ListenAddress:  p2p.MustMultiaddr("/ip6/::1/tcp/2000"),
-		PeerMultiaddrs: []multiaddr.Multiaddr{},
-		DatabaseURL:    "",
-		SnapshotHubURL: "",
+		EthereumURL: "http://[::1]:8545/",
+		ListenAddresses: []multiaddr.Multiaddr{
+			p2p.MustMultiaddr("/ip6/::1/tcp/2000"),
+		},
+		CustomBootstrapAddresses: []peer.AddrInfo{},
+		DatabaseURL:              "",
+		SnapshotHubURL:           "",
 
 		EthereumKey: ethereumKey,
 		P2PKey:      p2pkey,

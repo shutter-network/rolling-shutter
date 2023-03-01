@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -82,12 +83,12 @@ func readKeyperConfig() (keyper.Config, error) {
 	viper.BindEnv("DKGPhaseLength")
 	viper.BindEnv("DatabaseURL")
 	viper.BindEnv("ListenAddress")
-	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("CustomBootstrapAddresses")
 
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
-	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 
 	defer func() {
 		if viper.ConfigFileUsed() != "" {
@@ -182,10 +183,12 @@ func exampleConfig() (*keyper.Config, error) {
 		DeploymentDir:      "./deployments/localhost/",
 		DKGPhaseLength:     30,
 		DKGStartBlockDelta: 12000,
-		ListenAddress:      p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
-		PeerMultiaddrs: []multiaddr.Multiaddr{
-			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
-			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+		ListenAddresses: []multiaddr.Multiaddr{
+			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		},
+		CustomBootstrapAddresses: []peer.AddrInfo{
+			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
+			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
 		},
 		InstanceID: 0,
 

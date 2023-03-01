@@ -29,6 +29,16 @@ func eonPublicKey(pubkey *shcrypto.EonPublicKey) string {
 	return hex.EncodeToString(b)
 }
 
+func toMultiaddrList(lst []peer.AddrInfo) []multiaddr.Multiaddr {
+	var maList []multiaddr.Multiaddr
+	for _, x := range lst {
+		x := x
+		d, _ := peer.AddrInfoToP2pAddrs(&x)
+		maList = append(maList, d...)
+	}
+	return maList
+}
+
 func quoteList(lst []multiaddr.Multiaddr) string {
 	var strlist []string
 	for _, x := range lst {
@@ -43,11 +53,12 @@ func quoteList(lst []multiaddr.Multiaddr) string {
 
 func MustBuildTemplate(name, content string) *template.Template {
 	t, err := template.New(name).Funcs(template.FuncMap{
-		"FromECDSA":    crypto.FromECDSA,
-		"QuoteList":    quoteList,
-		"P2PKey":       p2pKey,
-		"P2PKeyPublic": p2pKeyPublic,
-		"EonPublicKey": eonPublicKey,
+		"FromECDSA":       crypto.FromECDSA,
+		"QuoteList":       quoteList,
+		"ToMultiAddrList": toMultiaddrList,
+		"P2PKey":          p2pKey,
+		"P2PKeyPublic":    p2pKeyPublic,
+		"EonPublicKey":    eonPublicKey,
 	}).Parse(content)
 	if err != nil {
 		panic(err)

@@ -11,12 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
 // Config contains validated configuration parameters for the keyper client.
@@ -27,14 +29,15 @@ type Config struct {
 	DatabaseURL    string
 	DeploymentDir  string
 
-	ValidatorPublicKey ed25519.PublicKey
-	SigningKey         *ecdsa.PrivateKey
-	EncryptionKey      *ecies.PrivateKey
-	P2PKey             p2pcrypto.PrivKey
-	DKGPhaseLength     uint64 // in shuttermint blocks
-	DKGStartBlockDelta int64
-	ListenAddress      multiaddr.Multiaddr
-	PeerMultiaddrs     []multiaddr.Multiaddr
+	ValidatorPublicKey       ed25519.PublicKey
+	SigningKey               *ecdsa.PrivateKey
+	EncryptionKey            *ecies.PrivateKey
+	P2PKey                   p2pcrypto.PrivKey
+	DKGPhaseLength           uint64 // in shuttermint blocks
+	DKGStartBlockDelta       int64
+	ListenAddresses          []multiaddr.Multiaddr
+	CustomBootstrapAddresses []peer.AddrInfo
+	Environment              p2p.Environment
 
 	HTTPEnabled       bool
 	HTTPListenAddress string
@@ -63,8 +66,8 @@ DKGPhaseLength		= {{ .DKGPhaseLength }}
 DKGStartBlockDelta   = {{ .DKGStartBlockDelta }}
 
 # p2p configuration
-ListenAddress	= "{{ .ListenAddress }}"
-PeerMultiaddrs	= [{{ .PeerMultiaddrs | QuoteList}}]
+ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
+CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
 
 ValidatorPublicKey	= "{{ .ValidatorPublicKey | printf "%x" }}"
 
@@ -130,9 +133,11 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 				medley.StringToEciesPrivateKey,
 				medley.StringToAddress,
 				medley.P2PKeyHook,
+				medley.StringToEnvironment,
 				mapstructure.StringToTimeDurationHookFunc(),
 				mapstructure.StringToSliceHookFunc(","),
 				medley.MultiaddrHook,
+				medley.AddrInfoHook,
 			),
 		),
 	)

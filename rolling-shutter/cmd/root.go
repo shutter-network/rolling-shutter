@@ -32,6 +32,8 @@ var (
 	logFormatName  string = "logformat"
 	logLevelArg    string
 	logLevelName   string = "loglevel"
+	environmentArg  string
+	environmentName string = "environment"
 )
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
@@ -162,6 +164,12 @@ func Cmd() *cobra.Command {
 		logLevelName,
 		"info",
 		"set log level, possible values:  warn, info, debug",
+	)
+	cmd.PersistentFlags().StringVar(
+		&environmentArg,
+		environmentName,
+		"production",
+		"set the environment, possible values:  production, staging, local",
 	)
 	cmd.AddCommand(bootstrap.Cmd())
 	cmd.AddCommand(chain.Cmd())

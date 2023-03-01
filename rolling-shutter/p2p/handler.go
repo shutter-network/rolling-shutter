@@ -125,6 +125,19 @@ func AddHandlerFunc[M shmsg.P2PMessage](handler *P2PHandler, handlerFunc Handler
 }
 
 func New(config Config) *P2PHandler {
+	bootstrapPeers := config.BootstrapPeers
+	if len(bootstrapPeers) == 0 && config.Environment == Production {
+		bootstrapPeers = DefaultBootstrapPeers
+	}
+	// exclude one's one address from the bootstrap list,
+	// in case we are a bootstrap node
+	bstrpPeersWithoutSelf := []peer.AddrInfo{}
+	for _, bs := range bootstrapPeers {
+		if !bs.ID.MatchesPrivateKey(config.PrivKey) {
+			bstrpPeersWithoutSelf = append(bstrpPeersWithoutSelf, bs)
+		}
+	}
+	config.BootstrapPeers = bstrpPeersWithoutSelf
 	h := &P2PHandler{
 		P2P:               NewP2P(config),
 		gossipTopicNames:  make(map[string]bool),

@@ -109,9 +109,10 @@ func Run(ctx context.Context, config Config) error {
 	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.SigningKey)
 
 	p2pHandler := p2p.New(p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
+		ListenAddrs:    config.ListenAddresses,
+		BootstrapPeers: config.CustomBootstrapAddresses,
 		PrivKey:        config.P2PKey,
+		Environment:    p2p.Production,
 	})
 
 	k := keyper{
