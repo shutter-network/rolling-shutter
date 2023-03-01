@@ -18,6 +18,7 @@ import (
 	pkgErrors "github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const receiptPollInterval = 500 * time.Millisecond
@@ -135,41 +136,61 @@ func normName(s string) string {
 	return strings.ToUpper(strings.ReplaceAll(s, "-", "_"))
 }
 
-func argumentFromEnvironmentVariable(cmd *cobra.Command, prefix string, f *pflag.Flag) error {
-	if f.Changed {
-		return nil
-	}
+const depthToFoldChildPrefixes = 2
 
-	candidates := []string{}
-	if cmd.Parent() != nil {
-		candidates = append(candidates, normName(fmt.Sprintf("%s_%s_%s", prefix, cmd.Name(), f.Name)))
-	}
-	candidates = append(candidates, normName(fmt.Sprintf("%s_%s", prefix, f.Name)))
+func bindFlagsToRootCommand(cmd *cobra.Command) (string, int, error) {
+	var (
+		prefix string
+		depth  int
+		err    error
+	)
 
-	for _, envvar := range candidates {
-		val, ok := os.LookupEnv(envvar)
-		if !ok {
-			continue
-		}
-		err := cmd.Flags().Set(f.Name, val)
+	postfix := normName(cmd.Name())
+	if cmd.HasParent() {
+		prefix, depth, err = bindFlagsToRootCommand(cmd.Parent())
 		if err != nil {
-			return pkgErrors.Wrapf(err, "argument from environment variable %s", envvar)
+			return prefix, depth, err
 		}
-		return nil
+		depth++
+		// If the current depth is at or above the folding depth,
+		// all children flags will be "folded" under the same prefix.
+		// E.g. with depthToFoldChildPrefix = 1, all args will be
+		// settable with `ROLLING_SHUTTER_<ARG>` env vars,
+		// while a depth of 2 would result in
+		// `ROLLING_SHUTTER_<ARG>` and `ROLLING_SHUTTER_<SUBCMD>_<ARG>`
+		// vars and so on
+		if depth < depthToFoldChildPrefixes {
+			prefix = prefix + "_" + postfix
+		}
+	} else {
+		prefix = postfix
+		depth = 0
 	}
-	return nil
-}
 
-// BindFlags automatically sets options to command line flags from environment variables with the
-// given prefix.
-func BindFlags(cmd *cobra.Command, prefix string) error {
-	var err error
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if err != nil {
+	lflg := cmd.LocalFlags()
+	if lflg == nil {
+		return prefix, depth, nil
+	}
+	flgs := pflag.NewFlagSet(prefix, pflag.ContinueOnError)
+	lflg.VisitAll(func(f *pflag.Flag) {
+		if f.Name == "help" {
 			return
 		}
-		err = argumentFromEnvironmentVariable(cmd, prefix, f)
+		envName := prefix + "_" + normName(f.Name)
+		viper.BindEnv(f.Name, envName)
+		if f.DefValue != "" {
+			viper.SetDefault(f.Name, f.DefValue)
+		}
+		flgs.AddFlag(f)
 	})
+	// bind only the filtered flagset
+	// (e.g. without "help" flag) to viper
+	err = viper.BindPFlags(flgs)
+	return prefix, depth, err
+}
+
+func BindFlags(cmd *cobra.Command) error {
+	_, _, err := bindFlagsToRootCommand(cmd)
 	return err
 }
 

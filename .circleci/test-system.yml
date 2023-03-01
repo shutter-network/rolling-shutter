@@ -95,9 +95,9 @@ jobs:
           name: "Configure environment"
           command: |
             echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
-            echo >>${BASH_ENV} export ROLLING_SHUTTER_ROOT=${HOME}/src
-            echo >>${BASH_ENV} export ROLLING_SHUTTER_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
-            echo >>${BASH_ENV} export ROLLING_SHUTTER_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_CHAIN_ROOT=${HOME}/src
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_BOOTSTRAP_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
+            echo >>${BASH_ENV} export ROLLING_SHUTTER_CHAIN_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
       - run:
           name: Wait for PostgreSQL
           command: |
@@ -105,7 +105,7 @@ jobs:
       - run:
           name: "Run whole system tests"
           command: |
-            env NOCOLOR=1 java -jar sht-standalone.jar << parameters.nr >>
+            env ROLLING_SHUTTER_NOCOLOR=1 java -jar sht-standalone.jar << parameters.nr >>
       - run:
           name: "Tar work folder"
           command: |
