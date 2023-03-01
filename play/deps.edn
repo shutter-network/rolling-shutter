@@ -12,7 +12,6 @@
         babashka/process {:mvn/version "0.4.16"}
         org.clojars.lispyclouds/contajners {:mvn/version "0.0.6"}}
 
-
  :aliases {;; (deprecated) Run tests with clojure -X:run-tests
            :run-tests {:exec-fn sht.core/run-tests}
            ;; Run with clojure -M:test

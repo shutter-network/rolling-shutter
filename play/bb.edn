@@ -12,7 +12,6 @@
              [babashka.curl :as curl]
              [cheshire.core :as json]
              [sht.play :as play :refer [run-process]])
-
   :init
   (do
     (def volumes-docker (c/client {:engine   :docker
