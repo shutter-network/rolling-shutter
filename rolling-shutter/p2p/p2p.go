@@ -2,49 +2,81 @@ package p2p
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
+var DefaultBootstrapPeers []peer.AddrInfo
+
+func init() {
+	for _, s := range []string{} {
+		addrInfo, err := peer.AddrInfoFromString(s)
+		if err != nil {
+			log.Info().Str("address", s).Msg("failed to cast address info, ignoring bootstrap peer")
+		}
+		DefaultBootstrapPeers = append(DefaultBootstrapPeers, *addrInfo)
+	}
+}
+
+// Minimum number of peers in the routing table. If we drop below this and we
 // messagesBufSize is the number of incoming messages to buffer for all of the rooms.
-const messagesBufSize = 128
+const (
+	messagesBufSize = 128
+	protocolVersion = "/shutter/0.1.0"
+)
+
+type Environment int
+
+//go:generate stringer -type=Environment -output environment_string.gen.go
+const (
+	Staging Environment = iota
+	Production
+	Local
+)
 
 type P2P struct {
 	Config Config
 
+	connmngr         *connmgr.BasicConnMgr
 	mux              sync.Mutex
 	host             host.Host
 	pubSub           *pubsub.PubSub
-	logNumberOfPeers int // number of peers when we last logged them
 	gossipRooms      map[string]*gossipRoom
 	GossipMessages   chan *Message
+	logNumberOfPeers int // number of peers when we last logged them
 }
 
 type Config struct {
-	ListenAddr     multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
-	PrivKey        p2pcrypto.PrivKey
+	ListenAddrs     []multiaddr.Multiaddr
+	BootstrapPeers  []peer.AddrInfo
+	PrivKey         p2pcrypto.PrivKey
+	Environment     Environment
+	IsBootstrapNode bool
 }
 
 func NewP2P(config Config) *P2P {
 	p := P2P{
 		Config:           config,
+		connmngr:         nil,
 		host:             nil,
 		pubSub:           nil,
-		logNumberOfPeers: -1,
 		gossipRooms:      make(map[string]*gossipRoom),
 		GossipMessages:   make(chan *Message, messagesBufSize),
+		logNumberOfPeers: -1,
 	}
 	return &p
 }
@@ -58,7 +90,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators Vali
 	errorgroup.Go(func() error {
 		p.mux.Lock()
 		defer p.mux.Unlock()
-		if err := p.createHost(ctx); err != nil {
+		if err := p.init(ctx); err != nil {
 			return err
 		}
 
@@ -71,6 +103,19 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators Vali
 		if err := p.joinTopics(topicNames); err != nil {
 			return err
 		}
+		// TODO:
+		// should we somehow allow the bootstrap nodes
+		// to exchange the peers for topics?
+		// Right now, they are "dumb" bootstrappers who
+		// who will only stick to the peers that tried to
+		// connect with them.
+		// Maybe there are cases where this leads to network
+		// compartmentalisation?
+		if !p.Config.IsBootstrapNode {
+			if err := p.connectBootstrapNodes(ctx); err != nil {
+				return err
+			}
+		}
 
 		// listen to gossip on all topics
 		for _, room := range p.gossipRooms {
@@ -80,8 +125,11 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators Vali
 			})
 		}
 
+		// in case there were no subscribed topics (e.g. bootstrap nodes),
+		// just block the function until the context is canceled
 		errorgroup.Go(func() error {
-			return p.managePeers(errorgroupctx)
+			<-errorgroupctx.Done()
+			return ctx.Err()
 		})
 		return nil
 	})
@@ -100,38 +148,138 @@ func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
 	return room.Publish(ctx, message)
 }
 
-func (p *P2P) createHost(ctx context.Context) error {
-	var err error
+func (p *P2P) connectBootstrapNodes(ctx context.Context) error {
+	if p.host == nil {
+		return errors.New("Cannot connect to bootstrap nodes without existing host")
+	}
+	var (
+		connectedNodes atomic.Uint32
+		waitGroup      sync.WaitGroup
+	)
+
+	for _, addr := range p.Config.BootstrapPeers {
+		waitGroup.Add(1)
+		go func(ctx context.Context, a peer.AddrInfo) {
+			defer waitGroup.Done()
+			err := p.host.Connect(ctx, a)
+			if err != nil {
+				log.Error().Err(err).Str("peer", a.String()).Msg("couldn't connect to boostrap node")
+				return
+			}
+			connectedNodes.Add(1)
+		}(ctx, addr)
+	}
+
+	waitGroup.Wait()
+	if connectedNodes.Load() == 0 {
+		return errors.New("could not connect to any bootstrap node")
+	}
+	return nil
+}
+
+func (p *P2P) init(ctx context.Context) error {
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
-	privKey := p.Config.PrivKey
+	p2pHost, connectionManager, err := createHost(ctx, p.Config)
+	if err != nil {
+		return err
+	}
+
+	p2pPubSub, err := createPubSub(ctx, p2pHost, p.Config)
+	if err != nil {
+		return err
+	}
+	p.host = p2pHost
+	p.connmngr = connectionManager
+	p.pubSub = p2pPubSub
+	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
+	return nil
+}
+
+func createHost(ctx context.Context, config Config) (*basichost.BasicHost, *connmgr.BasicConnMgr, error) {
+	var err error
+
+	privKey := config.PrivKey
 	if privKey == nil {
-		privKey, _, err = p2pcrypto.GenerateEd25519Key(rand.Reader)
+		privKey, _, err = p2pcrypto.GenerateKeyPair(
+			p2pcrypto.Ed25519,
+			-1,
+		)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
-	// create a new libp2p Host
-	p.host, err = libp2p.New(libp2p.ListenAddrs(p.Config.ListenAddr), libp2p.Identity(privKey))
+	connectionManager, err := connmgr.NewConnManager(
+		10, // Lowwater
+		40, // HighWater,
+		connmgr.WithGracePeriod(time.Minute),
+	)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	// print the node's PeerInfo in multiaddr format
-	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
 
-	// create a new PubSub service using the GossipSub router
-	options := []pubsub.Option{
-		pubsub.WithPeerScore(peerScoreParams(), peerScoreThresholds()),
+	options := []libp2p.Option{
+		libp2p.Identity(privKey),
+		libp2p.ListenAddrs(config.ListenAddrs...),
+		libp2p.DefaultTransports,
+		libp2p.DefaultSecurity,
+		libp2p.ConnectionManager(connectionManager),
+		libp2p.ProtocolVersion(protocolVersion),
 	}
-	pubSub, err := pubsub.NewGossipSub(ctx, p.host, options...)
+
+	localNetworking := bool(config.Environment == Local)
+	if !localNetworking {
+		options = append(options,
+			// launch the server-side of AutoNAT too
+			// in order to help determine other peer's NATted
+			// peer-id (service is highly rate-limited)
+			libp2p.EnableNATService(),
+			// Attempt to open ports using uPNP for NATed hosts.
+			libp2p.NATPortMap(),
+		)
+	}
+
+	p2pHost, err := libp2p.New(options...)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	p.pubSub = pubSub
+	// we don't want to work with an interface type here,
+	// so explicitly cast it
+	bhost, ok := p2pHost.(*basichost.BasicHost)
+	if !ok {
+		// this will happen as soon as libp2p.New does not
+		// return a BasicHost ptr anymore
+		// this will be noticed early in the p2p-integration test
+		return nil, nil, errors.New("libp2p API did change")
+	}
+	return bhost, connectionManager, nil
+}
 
-	return nil
+func createPubSub(ctx context.Context, p2pHost host.Host, config Config) (*pubsub.PubSub, error) {
+	localNetworking := bool(config.Environment == Local)
+	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
+		isBootstrapNode:   config.IsBootstrapNode,
+		isLocalNetworking: localNetworking,
+		bootstrapPeers:    config.BootstrapPeers,
+	})
+	pubsubOptions := []pubsub.Option{
+		pubsub.WithGossipSubParams(*gossipSubParams),
+		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
+	}
+	if config.IsBootstrapNode {
+		// enables the pubsub v1.1 feature to handle discovery and
+		// connection management over the PubSub protocol
+		// This still needs an initial small set of connections,
+		// to bootstrap the network,
+		pubsubOptions = append(pubsubOptions, pubsub.WithPeerExchange(true))
+	}
+	pubSub, err := pubsub.NewGossipSub(ctx, p2pHost, pubsubOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return pubSub, nil
 }
 
 func (p *P2P) p2pAddress() string {
