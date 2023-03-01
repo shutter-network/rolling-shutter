@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
 // MultiaddrHook is a mapstructure decode hook for multiaddrs.
@@ -27,6 +31,23 @@ func MultiaddrHook(f reflect.Type, t reflect.Type, data interface{}) (interface{
 	}
 
 	return multiaddr.NewMultiaddr(data.(string))
+}
+
+func AddrInfoHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+
+	if t != reflect.TypeOf((*peer.AddrInfo)(nil)).Elem() {
+		return data, nil
+	}
+
+	addrInfo, err := peer.AddrInfoFromString(data.(string))
+	if err != nil {
+		return nil, err
+	}
+
+	return addrInfo, nil
 }
 
 func P2PKeyHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
@@ -80,6 +101,22 @@ func StringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{})
 		return nil, errors.Errorf("invalid seed length %d (must be %d)", len(seed), ed25519.SeedSize)
 	}
 	return ed25519.NewKeyFromSeed(seed), nil
+}
+
+func StringToEnvironment(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String || t != reflect.TypeOf(p2p.Staging) {
+		return data, nil
+	}
+	switch data.(string) {
+	case strings.ToLower(p2p.Staging.String()):
+		return p2p.Staging, nil
+	case strings.ToLower(p2p.Production.String()):
+		return p2p.Production, nil
+	case strings.ToLower(p2p.Local.String()):
+		return p2p.Local, nil
+	default:
+		return nil, errors.Errorf("unknown environment %s", data.(string))
+	}
 }
 
 func StringToEcdsaPrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {

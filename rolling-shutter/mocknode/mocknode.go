@@ -54,9 +54,10 @@ func New(config Config) (*MockNode, error) {
 
 		collatorClient: collatorClient,
 		p2p: p2p.New(p2p.Config{
-			ListenAddr:     config.ListenAddress,
-			PeerMultiaddrs: config.PeerMultiaddrs,
+			ListenAddrs:    config.ListenAddresses,
+			BootstrapPeers: config.CustomBootstrapAddresses,
 			PrivKey:        config.P2PKey,
+			Environment:    p2p.Production,
 		}),
 
 		eonSecretKeyShare: eonSecretKeyShare,

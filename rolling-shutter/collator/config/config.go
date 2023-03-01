@@ -9,24 +9,26 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
 type Config struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
-
-	EthereumURL       string
-	SequencerURL      string
-	ContractsURL      string
-	DeploymentDir     string
-	DatabaseURL       string
-	HTTPListenAddress string
+	ListenAddresses          []multiaddr.Multiaddr
+	CustomBootstrapAddresses []peer.AddrInfo
+	Environment              p2p.Environment
+	EthereumURL              string
+	SequencerURL             string
+	ContractsURL             string
+	DeploymentDir            string
+	DatabaseURL              string
+	HTTPListenAddress        string
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
@@ -59,8 +61,8 @@ SequencerURL = "{{ .SequencerURL }}"
 ContractsURL = "{{ .ContractsURL }}"
 
 # p2p configuration
-ListenAddress   = "{{ .ListenAddress }}"
-PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
+ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
+CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
 
 # Secret Keys
 EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
@@ -90,8 +92,10 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
+				medley.AddrInfoHook,
 				medley.P2PKeyHook,
 				medley.StringToEcdsaPrivateKey,
+				medley.StringToEnvironment,
 				mapstructure.StringToTimeDurationHookFunc(),
 			),
 		),

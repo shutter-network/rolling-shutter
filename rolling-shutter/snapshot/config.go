@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -17,8 +18,8 @@ import (
 )
 
 type Config struct {
-	ListenAddress  multiaddr.Multiaddr
-	PeerMultiaddrs []multiaddr.Multiaddr
+	ListenAddresses          []multiaddr.Multiaddr
+	CustomBootstrapAddresses []peer.AddrInfo
 
 	EthereumURL    string
 	DatabaseURL    string
@@ -42,8 +43,8 @@ DatabaseURL     = "{{ .DatabaseURL }}"
 SnapshotHubURL  = "{{ .SnapshotHubURL }}"
 
 # p2p configuration
-ListenAddress   = "{{ .ListenAddress }}"
-PeerMultiaddrs  = [{{ .PeerMultiaddrs | QuoteList}}]
+ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
+CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
 
 # Secret Keys
 EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
@@ -63,6 +64,7 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
+				medley.AddrInfoHook,
 				medley.P2PKeyHook,
 				medley.StringToEcdsaPrivateKey,
 			),

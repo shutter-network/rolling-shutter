@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -56,10 +57,10 @@ func generateConfigCmd() *cobra.Command {
 func readConfig() (mocknode.Config, error) {
 	viper.SetEnvPrefix("MOCKNODE")
 	viper.BindEnv("ListenAddress")
-	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("CustomBootstrapAddresses")
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
 	viper.SetDefault("ListenAddress", defaultListenAddress)
-	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 	viper.SetDefault("Rate", 1.0)
 
 	config := mocknode.Config{}
@@ -98,9 +99,9 @@ func exampleConfig() (*mocknode.Config, error) {
 	}
 
 	config := mocknode.Config{
-		ListenAddress:  listenAddress,
-		PeerMultiaddrs: []multiaddr.Multiaddr{},
-		P2PKey:         p2pkey,
+		ListenAddresses:          []multiaddr.Multiaddr{listenAddress},
+		CustomBootstrapAddresses: []peer.AddrInfo{},
+		P2PKey:                   p2pkey,
 
 		InstanceID:             0,
 		Rate:                   1.0,
