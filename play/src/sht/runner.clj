@@ -105,9 +105,7 @@
       (future-cancel fut))
     ret))
 
-
 (def ^:dynamic *process-map* nil)
-
 
 (defn start-proc!
   [sys proc-id cmd opts]
@@ -115,7 +113,7 @@
   (let [log-dir (:log-dir sys)
         opts (merge {:extra-env {"PLAY_NUM_KEYPERS" (-> sys :conf :num-keypers str)}
                      :out (-> log-dir (fs/path (format "%s-out.txt" (name proc-id))) str io/file),
-                     :err (-> log-dir (fs/path (format "%s-err.txt" (name proc-id))) str io/file),}
+                     :err (-> log-dir (fs/path (format "%s-err.txt" (name proc-id))) str io/file)}
                     {:dir (:cwd sys)}
                     opts)
         cmd (play/replace-rolling-shutter-absolute-path cmd)
@@ -144,9 +142,9 @@
 (defn wait-file
   [p timeout-ms]
   (when (= ::timed-out (timeout timeout-ms (partial wait-file-forever p)))
-     (throw (ex-info (format "Timeout waiting for file %s" p)
-                     {:path p
-                      :timeout-ms timeout-ms}))))
+    (throw (ex-info (format "Timeout waiting for file %s" p)
+                    {:path p
+                     :timeout-ms timeout-ms}))))
 
 (defn- wait-port-forever
   [host port]
@@ -255,7 +253,7 @@
   (let [stime (System/currentTimeMillis)
         end-time (+ stime timeout-ms)
         last-fails (atom {})
-        futures (mapv (fn [loop-check ]
+        futures (mapv (fn [loop-check]
                         (future (loop-single-check sys
                                                    loop-check
                                                    (fn [res] (swap! last-fails assoc loop-check res)))))
@@ -279,7 +277,7 @@
 (defmethod sanity-check-check :loop/until sanity-check-check-loop-until
   [{:loop/keys [checks timeout-ms] :as m}]
   (when (not (integer? timeout-ms))
-        (throw (ex-info ":loop/timeout-ms must be a number" {:m m})))
+    (throw (ex-info ":loop/timeout-ms must be a number" {:m m})))
   (sanity-check-step checks))
 
 (defn dispatch
@@ -287,13 +285,13 @@
   (if (map? d)
     (cond
       (:run d)
-        (update (run sys d) :report report-count-action)
+      (update (run sys d) :report report-count-action)
       (:check d)
-        (let [check-result (check sys d)]
-          (report-check check-result)
-          (update sys :report report-add-check-result check-result))
+      (let [check-result (check sys d)]
+        (report-check check-result)
+        (update sys :report report-add-check-result check-result))
       :else
-        (throw (ex-info "cannot dispatch" {:d d})))
+      (throw (ex-info "cannot dispatch" {:d d})))
     (reduce dispatch sys d)))
 
 (defn- cleanup-processes
@@ -312,18 +310,17 @@
   (if (map? d)
     (cond
       (:run d)
-        (sanity-check-run d)
+      (sanity-check-run d)
       (:check d)
-        (sanity-check-check d)
+      (sanity-check-check d)
       :else
-        (throw (ex-info "cannot dispatch" {:d d})))
+      (throw (ex-info "cannot dispatch" {:d d})))
     (doseq [x d]
       (sanity-check-step x))))
 
 (defn sanity-check-test
   [{:test/keys [id description steps conf]}]
   (sanity-check-step steps))
-
 
 (defn- sys-run-test
   [{:keys [description cwd] :as sys} {:test/keys [steps] :as tc}]
@@ -344,11 +341,11 @@
   [root]
   (when (fs/exists? root)
     (fs/walk-file-tree root
-                    {:visit-file (fn [path _]
-                                   (fs/delete path)
-                                   :continue)
-                     :post-visit-dir (fn [path _]
-                                       :continue)})))
+                       {:visit-file (fn [path _]
+                                      (fs/delete path)
+                                      :continue)
+                        :post-visit-dir (fn [path _]
+                                          :continue)})))
 
 (def ^:dynamic *current-test-id* nil)
 (defn run-test
@@ -392,9 +389,8 @@
                             (repeat prefix)
                             (str/split s #"\n"))))))
 
-
 (defn- timbre-output-fn
-  ([     data] (timbre-output-fn nil data))
+  ([data] (timbre-output-fn nil data))
   ([opts data] ; For partials
    (let [{:keys [no-stacktrace? stacktrace-fonts]} opts
          {:keys [level ?err vargs msg_ ?ns-str ?file hostname_
