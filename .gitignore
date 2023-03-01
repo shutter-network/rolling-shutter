@@ -1,2 +1,5 @@
 .vscode
+.direnv
+.lsp
+log
 node_modules
