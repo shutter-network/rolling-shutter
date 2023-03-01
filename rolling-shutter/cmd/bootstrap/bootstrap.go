@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/tendermint/tendermint/rpc/client/http"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
@@ -17,13 +18,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-var bootstrapFlags struct {
-	ShuttermintURL    string
-	EthereumURL       string
-	DeploymentDir     string
-	KeyperConfigIndex int
-	SigningKey        string
-	Keypers           []string
+type Config struct {
+	ShuttermintURL    string   `mapstructure:"shuttermint-url"`
+	EthereumURL       string   `mapstructure:"ethereum-url"`
+	DeploymentDir     string   `mapstructure:"deployment-dir"`
+	KeyperConfigIndex int      `mapstructure:"index"`
+	SigningKey        string   `mapstructure:"signing-key"`
+	Keypers           []string `mapstructure:"ethereum-url"`
 }
 
 func Cmd() *cobra.Command {
@@ -37,75 +38,73 @@ private key must correspond to the initial validator address as defined in the
 chain's genesis config.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return bootstrap()
+			config := &Config{}
+			if err := viper.Unmarshal(config); err != nil {
+				return err
+			}
+			return bootstrap(config)
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(
-		&bootstrapFlags.EthereumURL,
+	cmd.PersistentFlags().StringP(
 		"ethereum-url",
 		"",
 		"http://localhost:8545",
 		"Ethereum URL",
 	)
 
-	cmd.PersistentFlags().StringVarP(
-		&bootstrapFlags.DeploymentDir,
+	cmd.PersistentFlags().StringP(
 		"deployment-dir",
 		"",
 		"./deployments/localhost",
 		"Deployment directory",
 	)
 
-	cmd.PersistentFlags().StringVarP(
-		&bootstrapFlags.ShuttermintURL,
+	cmd.PersistentFlags().StringP(
 		"shuttermint-url",
 		"s",
 		"http://localhost:26657",
 		"Shuttermint RPC URL",
 	)
-	cmd.PersistentFlags().IntVarP(
-		&bootstrapFlags.KeyperConfigIndex,
+	cmd.PersistentFlags().IntP(
 		"index",
 		"i",
 		1,
 		"keyper config index to bootstrap with (use latest if negative)",
 	)
 
-	cmd.PersistentFlags().StringVarP(
-		&bootstrapFlags.SigningKey,
+	cmd.PersistentFlags().StringP(
 		"signing-key",
 		"k",
 		"",
 		"private key of the keyper to send the message with",
 	)
-	cmd.MarkPersistentFlagRequired("signing-key")
 
 	return cmd
 }
 
-func bootstrap() error {
+func bootstrap(config *Config) error {
 	ctx := context.Background()
-	ethereumClient, err := ethclient.DialContext(ctx, bootstrapFlags.EthereumURL)
+	ethereumClient, err := ethclient.DialContext(ctx, config.EthereumURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(ethereumClient, bootstrapFlags.DeploymentDir)
+	contracts, err := deployment.NewContracts(ethereumClient, config.DeploymentDir)
 	if err != nil {
 		return err
 	}
 
-	shmcl, err := http.New(bootstrapFlags.ShuttermintURL)
+	shmcl, err := http.New(config.ShuttermintURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to Shuttermint node")
 	}
 
-	signingKey, err := crypto.HexToECDSA(bootstrapFlags.SigningKey)
+	signingKey, err := crypto.HexToECDSA(config.SigningKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to parse signing key")
 	}
 
-	keyperConfigIndex := uint64(bootstrapFlags.KeyperConfigIndex)
+	keyperConfigIndex := uint64(config.KeyperConfigIndex)
 	cfg, err := contracts.KeypersConfigsList.KeypersConfigs(nil, big.NewInt(int64(keyperConfigIndex)))
 	if err != nil {
 		return err

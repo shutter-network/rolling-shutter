@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/log"
@@ -26,29 +27,40 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
 
-var (
-	logger                 = log.MustNewDefaultLogger(log.LogFormatPlain, log.LogLevelInfo, false)
-	rootDir                = ""
-	devMode                = false
-	index                  = 0
-	blockTime      float64 = 1.0
-	genesisKeypers         = []string{}
-)
+var logger = log.MustNewDefaultLogger(log.LogFormatPlain, log.LogLevelInfo, false)
+
+type Config struct {
+	RootDir       string   `mapstructure:"root"`
+	DevMode       bool     `mapstructure:"dev"`
+	Index         int      `mapstructure:"index"`
+	BlockTime     float64  `mapstructure:"blocktime"`
+	GenesisKeyper []string `mapstructure:"genesis-keyper"`
+}
 
 func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Create a config file for a Shuttermint node",
 		Args:  cobra.NoArgs,
-		RunE:  initFiles,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config := &Config{}
+			if err := viper.Unmarshal(config); err != nil {
+				return err
+			}
+			if len(config.GenesisKeyper) == 0 {
+				return errors.New("required argument `genesis-keyper` not specified")
+			}
+			if config.RootDir == "" {
+				return errors.New("required argument `root` not specified")
+			}
+			return initFiles(cmd, config, args)
+		},
 	}
-	cmd.PersistentFlags().StringVar(&rootDir, "root", "", "root directory")
-	cmd.PersistentFlags().BoolVar(&devMode, "dev", false, "turn on devmode (disables validator set changes)")
-	cmd.PersistentFlags().IntVar(&index, "index", 0, "keyper index")
-	cmd.PersistentFlags().Float64Var(&blockTime, "blocktime", 1.0, "block time in seconds")
-	cmd.PersistentFlags().StringSliceVar(&genesisKeypers, "genesis-keyper", nil, "genesis keyper address")
-	cmd.MarkPersistentFlagRequired("genesis-keyper")
-	cmd.MarkPersistentFlagRequired("root")
+	cmd.PersistentFlags().String("root", "", "root directory")
+	cmd.PersistentFlags().Bool("dev", false, "turn on devmode (disables validator set changes)")
+	cmd.PersistentFlags().Int("index", 0, "keyper index")
+	cmd.PersistentFlags().Float64("blocktime", 1.0, "block time in seconds")
+	cmd.PersistentFlags().StringSlice("genesis-keyper", nil, "genesis keyper address")
 	return cmd
 }
 
@@ -66,50 +78,59 @@ func scaleToBlockTime(config *cfg.Config, blockTime float64) {
 	scale(&config.RPC.TimeoutBroadcastTxCommit)
 }
 
-func initFiles(_ *cobra.Command, _ []string) error {
+func getArgFromViper[T any](getter func(string) T, name string, required bool) (T, error) {
+	if !viper.IsSet(name) && required {
+		var nullVal T
+		return nullVal, errors.Errorf("required argument `%s` not set", name)
+	}
+	return getter(name), nil
+}
+
+func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	keypers := []common.Address{}
 
-	for _, a := range genesisKeypers {
+	for _, a := range config.GenesisKeyper {
 		if !common.IsHexAddress(a) {
 			return errors.Errorf("--genesis-keyper argument '%s' is not an address", a)
 		}
 		keypers = append(keypers, common.HexToAddress(a))
 	}
 
-	config := cfg.DefaultConfig()
-	config.LogLevel = log.LogLevelError
-	scaleToBlockTime(config, blockTime)
-	keyper0RPCAddress := config.RPC.ListenAddress
-	rpcAddress, err := adjustPort(keyper0RPCAddress, index)
+	tendemintCfg := cfg.DefaultConfig()
+	tendemintCfg.LogLevel = log.LogLevelError
+	scaleToBlockTime(tendemintCfg, config.BlockTime)
+	keyper0RPCAddress := tendemintCfg.RPC.ListenAddress
+	rpcAddress, err := adjustPort(keyper0RPCAddress, config.Index)
 	if err != nil {
 		return err
 	}
-	config.RPC.ListenAddress = rpcAddress
+	tendemintCfg.RPC.ListenAddress = rpcAddress
 
-	keyper0P2PAddress := config.P2P.ListenAddress
-	p2pAddress, err := adjustPort(keyper0P2PAddress, index)
+	keyper0P2PAddress := tendemintCfg.P2P.ListenAddress
+	p2pAddress, err := adjustPort(keyper0P2PAddress, config.Index)
 	if err != nil {
 		return err
 	}
-	config.P2P.ListenAddress = p2pAddress
+	tendemintCfg.P2P.ListenAddress = p2pAddress
 
-	config.P2P.AllowDuplicateIP = true
-	config.Mode = cfg.ModeValidator
-	config.SetRoot(rootDir)
-	if err := config.ValidateBasic(); err != nil {
+	tendemintCfg.P2P.AllowDuplicateIP = true
+	tendemintCfg.Mode = cfg.ModeValidator
+
+	tendemintCfg.SetRoot(config.RootDir)
+	if err := tendemintCfg.ValidateBasic(); err != nil {
 		return errors.Wrap(err, "error in config file")
 	}
-	cfg.EnsureRoot(config.RootDir)
+	cfg.EnsureRoot(tendemintCfg.RootDir)
 
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
-	err = cfg.WriteConfigFile(rootDir, config)
+	err = cfg.WriteConfigFile(config.RootDir, tendemintCfg)
 	if err != nil {
 		return err
 	}
 	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3)
 
-	return initFilesWithConfig(config, appState)
+	return initFilesWithConfig(tendemintCfg, config, appState)
 }
 
 func adjustPort(address string, keyperIndex int) (string, error) {
@@ -127,10 +148,10 @@ func adjustPort(address string, keyperIndex int) (string, error) {
 	return strings.Join(substrings[:len(substrings)-1], ":") + ":" + portStrAdjusted, nil
 }
 
-func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error {
+func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState app.GenesisAppState) error {
 	// private validator
-	privValKeyFile := config.PrivValidator.KeyFile()
-	privValStateFile := config.PrivValidator.StateFile()
+	privValKeyFile := tendermintConfig.PrivValidator.KeyFile()
+	privValStateFile := tendermintConfig.PrivValidator.StateFile()
 	var pv *privval.FilePV
 	var err error
 	if tmos.FileExists(privValKeyFile) {
@@ -150,11 +171,11 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 			"stateFile", privValStateFile)
 	}
 
-	nodeKeyFile := config.NodeKeyFile()
+	nodeKeyFile := tendermintConfig.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
 		logger.Info("Found node key", "path", nodeKeyFile)
 	} else {
-		nodeid, err := config.LoadOrGenNodeKeyID()
+		nodeid, err := tendermintConfig.LoadOrGenNodeKeyID()
 		if err != nil {
 			return err
 		}
@@ -168,7 +189,7 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 	}
 
 	// genesis file
-	genFile := config.GenesisFile()
+	genFile := tendermintConfig.GenesisFile()
 	if tmos.FileExists(genFile) {
 		logger.Info("Found genesis file", "path", genFile)
 	} else {
@@ -198,8 +219,8 @@ func initFilesWithConfig(config *cfg.Config, appState app.GenesisAppState) error
 		logger.Info("Generated genesis file", "path", genFile)
 	}
 	a := app.NewShutterApp()
-	a.Gobpath = filepath.Join(config.DBDir(), "shutter.gob")
-	a.DevMode = devMode
+	a.Gobpath = filepath.Join(tendermintConfig.DBDir(), "shutter.gob")
+	a.DevMode = config.DevMode
 	err = a.PersistToDisk()
 	if err != nil {
 		return err

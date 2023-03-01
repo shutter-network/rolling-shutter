@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
@@ -34,13 +33,6 @@ var (
 	logLevelArg    string
 	logLevelName   string = "loglevel"
 )
-
-func errorForFlag(flg *flag.Flag) error {
-	if flg != nil {
-		return errors.Errorf("failed to parse '%s' option. usage: '%s'", flg.Name, flg.Usage)
-	}
-	return errors.Errorf("'%s' option not specified", logFormatName)
-}
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
 	if short {
@@ -77,13 +69,8 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 	// shutter "message"
 	zerolog.MessageFieldName = "log"
 
-	logFormatFlag := cmd.PersistentFlags().Lookup(logFormatName)
-	if logFormatFlag == nil {
-		// this should not happen due to user error,
-		// since the flag should have a default value attached
-		return l, errors.Errorf("flag '%s' not found", logFormatName)
-	}
-	switch logFormatFlag.Value.String() {
+	logFormat := viper.GetString(logFormatName)
+	switch logFormat {
 	case "max", "long":
 		l = configureTime(l)
 		l = configureCaller(l, true)
@@ -101,16 +88,12 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 			zerolog.CallerFieldName,
 		}
 	default:
-		return l, errorForFlag(logFormatFlag)
+		return l, errors.Errorf("flag '%s' value '%s' not recognized", logFormatName, logFormat)
 	}
 
-	logLevelFlag := cmd.PersistentFlags().Lookup(logLevelName)
-	if logFormatFlag == nil {
-		// this should not happen due to user error,
-		// since the flag should have a default value attached
-		return l, errors.Errorf("flag '%s' not found", logLevelName)
-	}
-	switch logLevelFlag.Value.String() {
+	logLevel := viper.GetString(logLevelName)
+	switch logLevel {
+	case "":
 	case "info":
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	case "warn":
@@ -118,7 +101,7 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	default:
-		return l, errorForFlag(logLevelFlag)
+		return l, errors.Errorf("flag '%s' value '%s' not recognized", logLevelName, logLevel)
 	}
 
 	// reset the writer
@@ -148,7 +131,7 @@ func Cmd() *cobra.Command {
 		Version:      shversion.Version(),
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			err := medley.BindFlags(cmd, "ROLLING_SHUTTER")
+			err := medley.BindFlags(cmd)
 			if err != nil {
 				return err
 			}
