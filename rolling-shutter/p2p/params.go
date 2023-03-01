@@ -7,15 +7,67 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func peerScoreParams() *pubsub.PeerScoreParams {
-	return &pubsub.PeerScoreParams{
+type pubSubParamsOptions struct {
+	isBootstrapNode   bool
+	isLocalNetworking bool
+	bootstrapPeers    []peer.AddrInfo
+}
+
+func makePubSubParams(options pubSubParamsOptions) (*pubsub.GossipSubParams, *pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
+	gsDefault := pubsub.DefaultGossipSubParams()
+	gossipSubParams := &gsDefault
+	// From the spec:
+	// to allow bootstrapping via PeerExchange (PX),
+	// the bootstrappers should not form a mesh, thus D=D_lo=D_hi=D_out=0
+	if options.isBootstrapNode {
+		gossipSubParams.D = 0
+		gossipSubParams.Dlo = 0
+		gossipSubParams.Dhi = 0
+		gossipSubParams.Dout = 0
+	}
+
+	peerScoreThresholds := &pubsub.PeerScoreThresholds{
+		GossipThreshold:             -4000,
+		PublishThreshold:            -8000,
+		GraylistThreshold:           -16000,
+		AcceptPXThreshold:           100,
+		OpportunisticGraftThreshold: 5,
+	}
+
+	bootstrapSet := make(map[peer.ID]bool, 0)
+	for _, bs := range options.bootstrapPeers {
+		bootstrapSet[bs.ID] = true
+	}
+
+	// NOTE: loosely from the gossipsub spec:
+	// Only the bootstrappers / highly trusted PX'ing nodes
+	// should reach the AcceptPXThreshold thus they need
+	// to be treated differently in the scoring function.
+	appSpecificScoringFn := func(p peer.ID) float64 {
+		_, ok := bootstrapSet[p]
+		if !ok {
+			return 0.
+		}
+		// In order to be able to participate in the gossipsub,
+		// a peer has to be PX'ed by a bootstrap node - this is only
+		// possible if the AcceptPXThreshold peer-score is reached.
+
+		// NOTE: we have yet to determine a value that is
+		// sufficient to reach the AcceptPXThreshold most of the times,
+		// but don't overshoot and trust the bootstrap peers
+		// unconditionally - they should still be punishable
+		// for malicous behavior
+		return 200.
+	}
+	peerScoreParams := &pubsub.PeerScoreParams{
+		// Topics score-map will be filled later while subscribing to topics.
 		Topics:        make(map[string]*pubsub.TopicScoreParams),
 		TopicScoreCap: 32.72,
 
-		AppSpecificScore:  func(p peer.ID) float64 { return 0 },
+		AppSpecificScore:  appSpecificScoringFn,
 		AppSpecificWeight: 1,
 
-		IPColocationFactorWeight:    0, // -35.11 for non-testing environments
+		IPColocationFactorWeight:    -35.11,
 		IPColocationFactorThreshold: 10,
 		IPColocationFactorWhitelist: nil,
 
@@ -28,16 +80,10 @@ func peerScoreParams() *pubsub.PeerScoreParams {
 
 		RetainScore: 12 * time.Hour,
 	}
-}
-
-func peerScoreThresholds() *pubsub.PeerScoreThresholds {
-	return &pubsub.PeerScoreThresholds{
-		GossipThreshold:             -4000,
-		PublishThreshold:            -8000,
-		GraylistThreshold:           -16000,
-		AcceptPXThreshold:           100,
-		OpportunisticGraftThreshold: 5,
+	if options.isLocalNetworking {
+		peerScoreParams.IPColocationFactorWeight = 0
 	}
+	return gossipSubParams, peerScoreParams, peerScoreThresholds
 }
 
 func topicScoreParams() *pubsub.TopicScoreParams {

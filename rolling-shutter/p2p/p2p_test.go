@@ -31,12 +31,16 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 	defer cancel()
 
+	numBootstrappers := 2
 	numPeers := 2
+	numNodes := numPeers + numBootstrappers
+
 	privKeys := []p2pcrypto.PrivKey{}
 	listenAddrs := []multiaddr.Multiaddr{}
-	nodeAddrs := []multiaddr.Multiaddr{}
+	bootStrapAddrs := []peer.AddrInfo{}
+	isBootstrappers := []bool{}
 	firstPort := 2000
-	for i := 0; i < numPeers; i++ {
+	for i := 0; i < numNodes; i++ {
 		privKey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 		assert.NilError(t, err)
 		privKeys = append(privKeys, privKey)
@@ -47,9 +51,14 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		listenAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
 		listenAddrs = append(listenAddrs, listenAddr)
 		assert.NilError(t, err)
-		nodeAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, pid.String()))
-		assert.NilError(t, err)
-		nodeAddrs = append(nodeAddrs, nodeAddr)
+		if i >= numNodes-numBootstrappers {
+			isBootstrappers = append(isBootstrappers, true)
+			nodeAddr, err := peer.AddrInfoFromString(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, pid.String()))
+			assert.NilError(t, err)
+			bootStrapAddrs = append(bootStrapAddrs, *nodeAddr)
+		} else {
+			isBootstrappers = append(isBootstrappers, false)
+		}
 	}
 
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
@@ -59,11 +68,13 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 
 	waitGroup := sync.WaitGroup{}
 	p2ps := []*P2P{}
-	for i := 0; i < numPeers; i++ {
+	for i := 0; i < numNodes; i++ {
 		p := New(Config{
-			ListenAddr:     listenAddrs[i],
-			PeerMultiaddrs: nodeAddrs,
-			PrivKey:        privKeys[i],
+			ListenAddrs:     []multiaddr.Multiaddr{listenAddrs[i]},
+			BootstrapPeers:  bootStrapAddrs,
+			PrivKey:         privKeys[i],
+			Environment:     Local,
+			IsBootstrapNode: isBootstrappers[i],
 		}).P2P
 		p2ps = append(p2ps, p)
 		waitGroup.Add(1)
