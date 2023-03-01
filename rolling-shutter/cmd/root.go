@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocknode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocksequencer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/p2pnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/snapshot"
@@ -180,5 +181,6 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(cryptocmd.Cmd())
 	cmd.AddCommand(proxy.Cmd())
 	cmd.AddCommand(mocksequencer.Cmd())
+	cmd.AddCommand(p2pnode.Cmd())
 	return cmd
 }
