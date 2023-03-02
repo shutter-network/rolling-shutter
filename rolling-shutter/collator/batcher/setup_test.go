@@ -156,14 +156,6 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	ethL2.SetChainID(chainID)
 	ethL2.SetBlock(params.BaseFee, gasLimit, "latest")
 
-	// set initial ("next") epoch id and block number manually,
-	// this is usually done in the collator and not in the handler
-
-	err := db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-		EpochID:       params.InitialEpochID.Bytes(),
-		L1BlockNumber: 42,
-	})
-	assert.NilError(t, err)
 	batcher, err := NewBatcher(ctx, cfg, dbpool)
 	assert.NilError(t, err)
 	return &Fixture{

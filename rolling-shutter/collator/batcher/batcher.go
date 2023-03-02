@@ -87,20 +87,30 @@ func NewBatcher(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*
 }
 
 // initializeNextBatch populates the next_batch table with a valid value.
-func (btchr *Batcher) initializeNextBatch(ctx context.Context, db *cltrdb.Queries) error {
-	l1BlockNumber, err := btchr.l1EthClient.BlockNumber(ctx)
+func (btchr *Batcher) initializeNextBatch(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uint64, error) {
+	var (
+		nextEpochID   epochid.EpochID
+		l1BlockNumber uint64
+		err           error
+	)
+	l1BlockNumber, err = btchr.l1EthClient.BlockNumber(ctx)
 	if err != nil {
-		return err
+		return nextEpochID, l1BlockNumber, err
 	}
 	if l1BlockNumber > math.MaxInt64 {
-		return errors.Errorf("block number too big: %d", l1BlockNumber)
+		return nextEpochID, l1BlockNumber, errors.Errorf("block number too big: %d", l1BlockNumber)
 	}
 
-	epochID, _ := epochid.BigToEpochID(common.Big1)
-	return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-		EpochID:       epochID.Bytes(),
+	l2batchIndex, err := btchr.l2Client.GetBatchIndex(ctx)
+	if err != nil {
+		return nextEpochID, l1BlockNumber, err
+	}
+	nextEpochID = epochid.Uint64ToEpochID(l2batchIndex + 1)
+	err = db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+		EpochID:       nextEpochID.Bytes(),
 		L1BlockNumber: int64(l1BlockNumber),
 	})
+	return nextEpochID, l1BlockNumber, err
 }
 
 // earlyValidateTx validates a transaction for some basic properties.
@@ -134,7 +144,8 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 	if err == pgx.ErrNoRows {
 		// the DB does not have a NextBatch set yet.
 		// this happens for a first time initialisation
-		if err := btchr.initializeNextBatch(ctx, db); err != nil {
+		nextBatchEpochID, _, err = btchr.initializeNextBatch(ctx, db)
+		if err != nil {
 			return errors.Wrap(err, "failed to initialize 'NextBatch' in DB")
 		}
 	} else if err != nil {
