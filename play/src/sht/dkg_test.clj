@@ -278,6 +278,7 @@
 
                 (build/run-chain)
                 (build/run-node conf)
+                (build/run-p2pnodes conf)
                 (build/run-keypers conf)
 
                 {:run :process/run
@@ -314,7 +315,8 @@
         num-initial-keypers (dec num-keypers)
         devmode? false
         conf {:num-keypers num-keypers
-              :num-initial-keypers num-initial-keypers}]
+              :num-initial-keypers num-initial-keypers
+              :num-bootstrappers 2}]
     {:test/id :change-keyper-set
      :test/conf conf
      :test/description "changing the keyper set should work"
@@ -333,13 +335,14 @@
                     :process/cmd '[bb node]
                     :process/opts {:extra-env {"PLAY_NUM_KEYPERS" num-initial-keypers}}
                     :process/port 8545
-                    :process/port-timeout (+ 5000 (* num-keypers 2000))}
+                    :process/port-timeout (+ 15000 (* num-keypers 2000))}
 
                    {:run :process/run
                     :process/wait true
                     :process/id :symlink-deployments
                     :process/cmd '[bb -deployments]}]
 
+                  (build/run-p2pnodes conf)
                   (build/run-keypers conf)
                   (when devmode?
                     {:run :process/run
@@ -425,6 +428,7 @@
                    :keyper-num keyper})
                 (build/run-chain)
                 (build/run-node conf)
+                (build/run-p2pnodes conf)
 
                 (mapv build/run-keyper (range (dec threshold)))
 
@@ -476,7 +480,7 @@
   []
   (concat
    [(test-change-keyper-set)]
-   (for [conf [{:num-keypers 3, :threshold 2}]
+   (for [conf [{:num-keypers 3, :num-bootstrappers 2, :threshold 2}]
          f [test-keypers-dkg-generation
             test-dkg-keypers-join-late]]
      (f conf))))
