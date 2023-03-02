@@ -36,6 +36,7 @@
       (Long/valueOf (or (System/getenv s) default)))
 
     (def num-keypers (long-from-env "PLAY_NUM_KEYPERS" "3"))
+    (def num-bootstrappers 1)
 
     (def windows? (babashka.core/windows?))
     (def no-color? windows?)
@@ -80,22 +81,6 @@
       (io/copy
        (:body (curl/get url {:as :stream}))
        (io/file path)))
-
-    (defn extract-address [cfgfile]
-      (re-find (re-pattern "0x[0-9a-fA-F]{40}") (slurp cfgfile)))
-
-    (defn extract-peerid [cfgfile]
-      (second (re-find (re-pattern "(?m)(?i)^# Peer identity: /p2p/([0-9a-zA-Z]*)") (slurp cfgfile))))
-
-    (defn extract-eon-key [cfgfile]
-      (second (re-find (re-pattern "(?m)(?i)^# Eon Public Key: ([0-9a-zA-Z]*)") (slurp cfgfile))))
-
-    (defn extract-toml-value [cfgfile key]
-      (second (re-find (re-pattern (format "(?m)^\\s*%s\\s*=\\s*(.*)" key)) (slurp cfgfile))))
-
-    (defn extract-toml-value-str [cfgfile key]
-      (let [v-with-quotes (extract-toml-value cfgfile key)]
-        (subs v-with-quotes 1 (dec (count v-with-quotes)))))
 
     (defn toml-replace
       [toml-str key value]
@@ -285,6 +270,17 @@
    :depends [build contracts:install]}
 
   ;; --------------------------------------
+  ;; -- p2pnode
+
+  -p2pnode-subcommand (play/p2pnode-subcommand)
+  -p2pnode-subcommands (mapv play/p2pnode-subcommand (range num-bootstrappers))
+
+  genconfig:p2pnodes
+  {:doc "Generate p2pnode config"
+   :depends [build -p2pnode-subcommands]
+   :task (mapv play/generate-config -p2pnode-subcommands)}
+
+;; --------------------------------------
   ;; -- collator
 
   -collator-subcommand (play/collator-subcommand)
@@ -356,18 +352,23 @@
   ;; -- general tasks
   genconfig
   {:doc "Generate configs"
-   :depends [genconfig:keypers genconfig:mock genconfig:mocksequencer]}
+   :depends [genconfig:keypers genconfig:mock genconfig:mocksequencer genconfig:p2pnodes]}
 
   peer
-  {:doc "Add nodes as peers of each other"
-   :task (let [cfgs *command-line-args*
-               peers (map (fn [cfg]
-                            (str  (extract-toml-value-str cfg "ListenAddress")
-                                  "/p2p/"
-                                  (extract-peerid cfg)))
-                          cfgs)]
-           (doseq [cfg cfgs]
-             (toml-edit-file cfg {"PeerMultiaddrs" peers})))}
+  {:doc "Add the boostrap-nodes adresses to the nodes config"
+   :task (let [cfg-files *command-line-args*
+               cfgs (map (fn [cfg-file]
+                           (let [cfg (play/extract-cfg cfg-file)]
+                             (assoc cfg :cfg-file cfg-file :ext-addrs (play/construct-boostrap-addresses cfg))))
+                         cfg-files)
+               cfgs-by-is-btsrp (group-by (fn [cfg] (= (get cfg :peer-role) "bootstrap")) cfgs)
+               bootstr-cfgs (get cfgs-by-is-btsrp true)
+               non-bootstr-cfgs (get cfgs-by-is-btsrp false)
+               peers (flatten (map (fn [cfg] (get cfg :ext-addrs)) bootstr-cfgs))]
+           (doseq [cfg bootstr-cfgs]
+             (toml-edit-file (get cfg :cfg-file) {"CustomBootstrapAddresses" []}))
+           (doseq [cfg non-bootstr-cfgs]
+             (toml-edit-file (get cfg :cfg-file) {"CustomBootstrapAddresses" peers})))}
 
   init:testchain
   {:doc "Initialize the shuttermint testchain directory"
@@ -449,6 +450,13 @@
                subcommand (nth genconfig:keypers n)
                cmd (play/subcommand-run subcommand)]
            (run-process cmd))}
+  p2p
+  {:doc "Run p2p bootstrap node"
+   :depends [build genconfig:p2pnodes -deployments]
+   :task (let [n (Integer/parseInt (or (first *command-line-args*) "0"))
+               subcommand (nth genconfig:p2pnodes n)
+               cmd (play/subcommand-run subcommand)]
+           (run-process cmd))}
 
   m
   {:doc "Run mocknode"
@@ -462,10 +470,11 @@
 
   clean
   {:doc "Remove config files and chain related files"
-   :depends [-keyper-subcommands -collator-subcommand]
+   :depends [-keyper-subcommands -collator-subcommand -p2pnode-subcommands]
    :task (do
            (fs/delete-tree "testchain")
            (doseq [{:subcommand/keys [cfgfile]} (concat -keyper-subcommands
+                                                        -p2pnode-subcommands
                                                         [(play/mocknode-subcommand)
                                                          (play/mocksequencer-subcommand)
                                                          -collator-subcommand])]

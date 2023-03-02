@@ -50,7 +50,6 @@
   (println msg)
   (System/exit code))
 
-
 (defn run-test-cases
   [test-cases]
   (let [sysv (mapv runner/run-test test-cases)]
@@ -81,5 +80,4 @@
     (run-test-cases test-cases)))
 
 (comment
-  (def sys (runner/run-test (dkg-test/test-keypers-dkg-generation {:num-keypers 3})))
-  )
+  (def sys (runner/run-test (dkg-test/test-keypers-dkg-generation {:num-keypers 3 :num-bootstrappers 2}))))

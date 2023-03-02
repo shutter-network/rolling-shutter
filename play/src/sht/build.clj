@@ -20,8 +20,8 @@
 (defn sys-write-config-files
   "write config files of all subprocesses to disk.
   This needs to be called, when :toml-edits has been modified."
-  [{:sys/keys [keypers collator mocksequencer] :as sys}]
-  (doseq [sub (concat keypers [collator mocksequencer])]
+  [{:sys/keys [keypers collator mocksequencer p2pnodes] :as sys}]
+  (doseq [sub (concat keypers [collator mocksequencer] p2pnodes)]
     (play/toml-edit-file (:subcommand/cfgfile sub)
                          (:subcommand/toml-edits sub))))
 
@@ -29,7 +29,7 @@
   [sys {:init/keys [conf] :as m}]
   (info "Initializing system" m)
   (let [sys (bb-build-all sys)
-        {:keys [num-keypers]} conf
+        {:keys [num-keypers num-bootstrappers]} conf
         keypers (->> (range num-keypers)
                      (map play/keyper-subcommand)
                      (map play/generate-config)
@@ -37,20 +37,29 @@
         collator (-> (play/collator-subcommand)
                      play/generate-config
                      play/initdb)
+        p2pnodes (->> (range num-bootstrappers)
+                      (map play/p2pnode-subcommand)
+                      (mapv play/generate-config))
+
         mocksequencer (play/generate-config (play/mocksequencer-subcommand))
-        peers (->> (conj keypers collator)
-                   (mapv (fn [sub]
-                           (str (get-in sub [:subcommand/toml-edits "ListenAddress"])
-                                "/p2p/"
-                                (get-in sub [:subcommand/cfg :peerid])))))
+
+        get-bootstrap-addrs (fn [p2pnode]
+                              (play/construct-boostrap-addresses
+                               (merge
+                                (get-in p2pnode [:subcommand/cfg])
+                                {:listen-addrs (get-in p2pnode [:subcommand/toml-edits "ListenAddresses"])})))
         set-peers (fn [sub]
-                    (assoc-in sub  [:subcommand/toml-edits "PeerMultiaddrs"] peers))
+                    (assoc-in sub  [:subcommand/toml-edits "CustomBootstrapAddresses"]
+                              (flatten (map get-bootstrap-addrs p2pnodes))))
         keypers (map set-peers keypers)
         collator (set-peers collator)
+        p2pnodes (map set-peers p2pnodes)
         res {:sys/keypers keypers
              :sys/collator collator
-             :sys/mocksequencer mocksequencer}
+             :sys/mocksequencer mocksequencer
+             :sys/p2pnodes p2pnodes}
         sys (merge sys res)]
+    (println p2pnodes)
     (sys-write-config-files sys)
     (info "Initialized system successfully" res)
     sys))
@@ -69,7 +78,7 @@
     :process/id :node
     :process/cmd '[bb node]
     :process/port 8545
-    :process/port-timeout (+ 5000 (* num-keypers 2000))}
+    :process/port-timeout (+ 15000 (* num-keypers 2000))}
 
    {:run :process/run
     :process/wait true
@@ -88,6 +97,19 @@
 (defn run-keypers
   [{:keys [num-keypers]}]
   (mapv run-keyper (range num-keypers)))
+
+(defn run-p2pnode
+  [n]
+  (let [p2pnode (play/p2pnode-subcommand n)]
+    {:run :process/run
+     :process/id (keyword (format "p2pnode-%d" n))
+     :process/cmd (play/subcommand-run p2pnode)
+     :process/port (:subcommand/p2p-port p2pnode)
+     :process/port-timeout 3000}))
+
+(defn run-p2pnodes
+  [{:keys [num-bootstrappers]}]
+  (mapv run-p2pnode (range num-bootstrappers)))
 
 (defn run-collator
   []

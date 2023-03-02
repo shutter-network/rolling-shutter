@@ -303,7 +303,7 @@
       (p/destroy-tree p))
     (swap! *process-map* assoc proc-id (deref p))))
 
-(def default-conf {:num-keypers 3, :threshold 2})
+(def default-conf {:num-keypers 3,:num-bootstrappers 2, :threshold 2})
 
 (defn- sanity-check-step
   [d]

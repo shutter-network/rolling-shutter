@@ -75,6 +75,7 @@
 
 (defn test-collator-basic
   [{:keys [num-keypers] :as conf}]
+  (println conf)
   {:test/id :collator-basic-works
    :test/conf conf
    :test/description "collator basic functionality should work"
@@ -86,6 +87,7 @@
 
                 (build/run-chain)
                 (build/run-node conf)
+                (build/run-p2pnodes conf)
                 (build/run-keypers conf)
                 (build/run-mocksequencer)
                 (build/run-collator)
@@ -131,7 +133,4 @@
                                 :collator/num-batchtxs 5}]}
                 ;; {:check :loop/forever}
                 ]})
-
-
-
-(def tests (delay [(test-collator-basic {:num-keypers 3, :threshold 2})]))
+(def tests (delay [(test-collator-basic {:num-keypers 3, :num-bootstrappers 2, :threshold 2})]))

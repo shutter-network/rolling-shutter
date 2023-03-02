@@ -1,5 +1,6 @@
 /chain/
 /k*.toml
+/p2p*.toml
 /mock.toml
 /collator.toml
 /mocksequencer.toml

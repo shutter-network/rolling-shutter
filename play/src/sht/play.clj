@@ -13,6 +13,7 @@
 
 (def ^:private base-port 23000)
 (def ^:private keyper-base-port (+ base-port 100))
+(def ^:private bootstrap-base-port (+ base-port 200))
 (def ^:private ethereum-rpc-port 8545)
 ;; use the "layer 1" ethereum node for the contracts
 (def ^:private contracts-rpc-port ethereum-rpc-port)
@@ -114,20 +115,41 @@
                                ["--force" db]
                                [db])))))
 
-(defn- extract-address [toml]
+(defn extract-address [toml]
   (re-find (re-pattern "0x[0-9a-fA-F]{40}") toml))
 
-(defn- extract-peerid [toml]
+(defn extract-peerid [toml]
   (second (re-find (re-pattern "(?m)(?i)^# Peer identity: /p2p/([0-9a-zA-Z]*)") toml)))
 
-(defn- extract-eon-key [toml]
+(defn extract-peer-role [toml]
+  (second (re-find (re-pattern "(?m)(?i)^# Peer role: ([a-zA-Z]*)") toml)))
+
+(defn extract-eon-key [toml]
   (second (re-find (re-pattern "(?m)(?i)^# Eon Public Key: ([0-9a-zA-Z]*)") toml)))
 
-(defn- extract-cfg [cfgfile]
-  (let [toml (slurp (str (fs/path *cwd* cfgfile)))]
+(defn extract-toml-value [toml key]
+  (second (re-find (re-pattern (format "(?m)^\\s*%s\\s*=\\s*(.*)" key)) toml)))
+
+(defn remove-outer-characters [string]
+  (subs string 1 (dec (count string))))
+
+(defn extract-listen-addresses [toml]
+  (json/decode (extract-toml-value toml "ListenAddresses")))
+
+(defn extract-cfg [path]
+  (let [toml (slurp (str path))]
     {:eth-address (extract-address toml)
      :peerid (extract-peerid toml)
+     :listen-addrs (extract-listen-addresses toml)
+     :peer-role (extract-peer-role toml)
      :eon-key (extract-eon-key toml)}))
+
+(defn construct-boostrap-addresses [cfg]
+  (map (fn [listen-addr]
+         (str listen-addr
+              "/p2p/"
+              (get cfg :peerid)))
+       (get cfg :listen-addrs)))
 
 (defn toml-replace
   [toml-str key value]
@@ -145,12 +167,18 @@
 
 (defn toml-edit-file
   [filename m]
-  (let [filename (str (fs/path *cwd* filename))]
-    (spit filename (toml-edit-string (slurp filename) m))))
+  (let [path (str (fs/path *cwd* filename))]
+    (spit path (toml-edit-string (slurp path) m))))
 
 (defn subcommand-run
   [{:subcommand/keys [cmd cfgfile loglevel]}]
-  ['rolling-shutter (format "--loglevel=%s" (or loglevel default-loglevel)) (str cmd) "--config" cfgfile])
+  ['rolling-shutter
+   (str "--environment")
+   (str "local")
+   (str "--loglevel")
+   (str (or loglevel default-loglevel))
+   (str cmd)
+   "--config" cfgfile])
 
 (defn subcommand-genconfig
   [{:subcommand/keys [cmd cfgfile]}]
@@ -164,7 +192,7 @@
       (toml-edit-file cfgfile toml-edits)))
   (assoc subcommand
          ::cwd *cwd*
-         :subcommand/cfg (extract-cfg cfgfile)))
+         :subcommand/cfg (extract-cfg (fs/path *cwd* cfgfile))))
 
 (defn initdb
   [{:subcommand/keys [cmd cfgfile db] :as subcommand}]
@@ -185,7 +213,7 @@
                  :cfgfile (format "keyper-%s.toml" n)
                  :toml-edits {"DatabaseURL" (format "postgres:///%s" db)
                               "DKGPhaseLength" 8
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
+                              "ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
                               "HTTPEnabled" true
                               "HTTPListenAddress" (format ":%d" (+ 24000 n))
                               "ContractsURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)}}))
@@ -199,7 +227,18 @@
                  :cfgfile "mock.toml"
                  :p2p-port p2p-port
                  :db nil
-                 :toml-edits {"ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)}}))
+                 :toml-edits {"ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]}}))
+
+;; -- p2pnode
+(defn p2pnode-subcommand
+  [n]
+  (let [p2p-port (+ bootstrap-base-port n)]
+    #:subcommand{:cmd 'p2pnode
+                 :loglvl nil
+                 :cfgfile (format "p2p-%s.toml" n)
+                 :p2p-port p2p-port
+                 :db nil
+                 :toml-edits {"ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]}}))
 
 ;; -- collator
 (defn collator-subcommand
@@ -211,7 +250,7 @@
                  :p2p-port p2p-port
                  :db "collator"
                  :toml-edits {"DatabaseURL" (format "postgres:///collator")
-                              "ListenAddress" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
+                              "ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
                               "SequencerURL" (format "http://localhost:%d" sequencer-rpc-port)}}))
 
 ;; -- mocksequencer
@@ -270,5 +309,4 @@
   (post-jsonrpc "http://localhost:9999"
                 (jsonrpc-body "admin_addCollator"
                               ["0x96858D19fB1398a23fd3c5E9fb205B964d5BA46b" 55]))
-  (add-collator "http://localhost:8555" "0x96858D19fB1398a23fd3c5E9fb205B964d5BA46b" 55)
-  )
+  (add-collator "http://localhost:8555" "0x96858D19fB1398a23fd3c5E9fb205B964d5BA46b" 55))
