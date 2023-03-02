@@ -79,6 +79,5 @@ func (p *P2PNode) Run(ctx context.Context) error {
 
 	p2p.AddValidator(p.p2p, p.validateEonPublicKey)
 	p2p.AddHandlerFunc(p.p2p, p.handleEonPublicKey)
-
 	return p.p2p.Run(ctx)
 }
