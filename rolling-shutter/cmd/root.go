@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	golog "github.com/ipfs/go-log/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -27,12 +28,12 @@ import (
 )
 
 var (
-	logNoColorArg  bool
-	logNoColorName string = "no-color"
-	logFormatArg   string
-	logFormatName  string = "logformat"
-	logLevelArg    string
-	logLevelName   string = "loglevel"
+	logNoColorArg   bool
+	logNoColorName  string = "no-color"
+	logFormatArg    string
+	logFormatName   string = "logformat"
+	logLevelArg     string
+	logLevelName    string = "loglevel"
 	environmentArg  string
 	environmentName string = "environment"
 )
@@ -99,10 +100,13 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 	case "":
 	case "info":
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		golog.SetAllLoggers(golog.LevelInfo)
 	case "warn":
 		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		golog.SetAllLoggers(golog.LevelWarn)
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		golog.SetAllLoggers(golog.LevelDebug)
 	default:
 		return l, errors.Errorf("flag '%s' value '%s' not recognized", logLevelName, logLevel)
 	}
