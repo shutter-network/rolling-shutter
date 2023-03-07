@@ -153,7 +153,7 @@ func testRetryFunctionCall(t *testing.T, flags testFlags) { //nolint:thelper
 	mockClock := clock.NewMock()
 	callCount := 0
 	calledRelativeTimes := make([]time.Duration, 0)
-	fn := func(ctx context.Context) (bool, error) {
+	fn := func(ctx context.Context) (struct{}, error) {
 		called := mockClock.Now()
 		callCount++
 
@@ -170,9 +170,9 @@ func testRetryFunctionCall(t *testing.T, flags testFlags) { //nolint:thelper
 			// only call this at the second call,
 			// this is useful to test
 			// StopOnErrors() option
-			return false, errAtSecondCall
+			return struct{}{}, errAtSecondCall
 		}
-		return false, errDefault
+		return struct{}{}, errDefault
 	}
 	// This uses the mock clock virtual timeout
 	ctx, cancel := mockClock.WithTimeout(context.Background(), flags.deadline)

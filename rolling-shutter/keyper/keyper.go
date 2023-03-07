@@ -348,9 +348,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 
 func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	for {
-		l1BlockNumber, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
-			return kpr.l1Client.BlockNumber(ctx)
-		})
+		l1BlockNumber, err := retry.FunctionCall(ctx, kpr.l1Client.BlockNumber)
 		if err != nil {
 			return err
 		}

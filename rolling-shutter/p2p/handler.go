@@ -242,12 +242,8 @@ func (h *P2PHandler) SendMessage(ctx context.Context, msg shmsg.P2PMessage, retr
 		Msg("sending message")
 	_, callErr := retry.FunctionCall(
 		ctx,
-		func(ctx context.Context) (bool, error) {
-			err := h.P2P.Publish(ctx, msg.Topic(), msgBytes)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, h.P2P.Publish(ctx, msg.Topic(), msgBytes)
 		},
 		retryOpts...,
 	)

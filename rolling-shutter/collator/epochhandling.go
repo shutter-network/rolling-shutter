@@ -142,9 +142,8 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 	for {
 		select {
 		case <-t.C:
-			fnCloseBatch := func(ctx context.Context) (bool, error) {
-				err := c.batcher.CloseBatch(ctx)
-				return err == nil, err
+			fnCloseBatch := func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, c.batcher.CloseBatch(ctx)
 			}
 			// retry indefinitely until successful or context canceled
 			_, err := retry.FunctionCall(ctx,
@@ -163,9 +162,8 @@ func (c *collator) closeBatchesTicker(ctx context.Context, interval time.Duratio
 			time.Sleep(assumedBatchProcessingDuration)
 
 			// try to validate already queued transactions as early as possible
-			fnEnsureChainState := func(ctx context.Context) (bool, error) {
-				err := c.batcher.EnsureChainState(ctx)
-				return err == nil, err
+			fnEnsureChainState := func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, c.batcher.EnsureChainState(ctx)
 			}
 
 			// retry indefinitely until successful, context canceled or

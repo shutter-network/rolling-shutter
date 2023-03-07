@@ -325,9 +325,7 @@ func (c *collator) getBatchConfirmation(ctx context.Context) (uint64, error) {
 }
 
 func getBlockNumber(ctx context.Context, client *ethclient.Client) (uint64, error) {
-	blk, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
-		return client.BlockNumber(ctx)
-	})
+	blk, err := retry.FunctionCall(ctx, client.BlockNumber)
 	if err != nil {
 		return 0, err
 	}

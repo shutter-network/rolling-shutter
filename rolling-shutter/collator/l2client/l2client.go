@@ -17,14 +17,11 @@ import (
 func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (uint64, error) {
 	var blockNumber uint64
 
-	f := func(ctx context.Context) (*string, error) {
+	f := func(ctx context.Context) (string, error) {
 		var result string
 		err := l2Client.CallContext(ctx, &result, "shutter_batchIndex")
 		log.Debug().Err(err).Str("result", result).Msg("polling batch-index from sequencer")
-		if err != nil {
-			return nil, err
-		}
-		return &result, nil
+		return result, err
 	}
 
 	result, err := retry.FunctionCall(ctx, f)
@@ -32,7 +29,7 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (uint64, error) {
 		return blockNumber, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
 	}
 
-	blockNumber, err = hexutil.DecodeUint64(*result)
+	blockNumber, err = hexutil.DecodeUint64(result)
 	if err != nil {
 		return blockNumber, errors.Wrap(err, "can't decode batch-index")
 	}

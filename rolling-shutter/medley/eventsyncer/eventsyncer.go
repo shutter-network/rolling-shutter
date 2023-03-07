@@ -137,9 +137,7 @@ func (s *EventSyncer) Run(ctx context.Context) error {
 func (s *EventSyncer) sync(ctx context.Context) error {
 	fromBlock := s.FromBlock
 	for {
-		currentBlock, err := retry.FunctionCall(ctx, func(ctx context.Context) (uint64, error) {
-			return s.Client.BlockNumber(ctx)
-		})
+		currentBlock, err := retry.FunctionCall(ctx, s.Client.BlockNumber)
 		if err != nil {
 			return errors.Wrap(err, "failed to query current block number")
 		}
