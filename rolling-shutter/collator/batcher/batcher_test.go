@@ -11,7 +11,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 func DefaultTestParams() TestParams {
@@ -227,7 +227,7 @@ func TestDecryptionTriggerGeneratedIntegration(t *testing.T) {
 	assert.Equal(t, len(triggers), 1)
 	trigger := triggers[0]
 
-	expectedHash := shmsg.HashByteList([][]byte{txHash, tx2Hash})
+	expectedHash := p2pmsg.HashByteList([][]byte{txHash, tx2Hash})
 	assert.DeepEqual(t, expectedHash, trigger.BatchHash)
 
 	err = fixtures.DB.UpdateDecryptionTriggerSent(ctx, trigger.EpochID)

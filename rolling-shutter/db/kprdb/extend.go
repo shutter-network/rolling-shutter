@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func GetKeyperIndex(addr common.Address, keypers []string) (uint64, bool) {
@@ -26,7 +26,7 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 	return GetKeyperIndex(addr, bc.Keypers)
 }
 
-func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *shmsg.DecryptionKey) error {
+func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.DecryptionKey) error {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *shmsg.Decrypt
 	return nil
 }
 
-func (q *Queries) InsertDecryptionKeyShareMsg(ctx context.Context, msg *shmsg.DecryptionKeyShare) error {
+func (q *Queries) InsertDecryptionKeyShareMsg(ctx context.Context, msg *p2pmsg.DecryptionKeyShare) error {
 	err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
 		Eon:                int64(msg.Eon),
 		EpochID:            msg.EpochID,

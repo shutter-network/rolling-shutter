@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 type P2PNode struct {
@@ -27,42 +27,42 @@ func New(config Config) *P2PNode {
 	}
 }
 
-func (p *P2PNode) validateDecryptionTrigger(_ context.Context, _ *shmsg.DecryptionTrigger) (bool, error) {
+func (p *P2PNode) validateDecryptionTrigger(_ context.Context, _ *p2pmsg.DecryptionTrigger) (bool, error) {
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionTrigger(_ context.Context, msg *shmsg.DecryptionTrigger) ([]shmsg.P2PMessage, error) {
-	msgs := []shmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionTrigger(_ context.Context, msg *p2pmsg.DecryptionTrigger) ([]p2pmsg.P2PMessage, error) {
+	msgs := []p2pmsg.P2PMessage{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
 
-func (p *P2PNode) validateDecryptionKeyShare(_ context.Context, _ *shmsg.DecryptionKeyShare) (bool, error) {
+func (p *P2PNode) validateDecryptionKeyShare(_ context.Context, _ *p2pmsg.DecryptionKeyShare) (bool, error) {
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionKeyShare(_ context.Context, msg *shmsg.DecryptionKeyShare) ([]shmsg.P2PMessage, error) {
-	msgs := []shmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionKeyShare(_ context.Context, msg *p2pmsg.DecryptionKeyShare) ([]p2pmsg.P2PMessage, error) {
+	msgs := []p2pmsg.P2PMessage{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
 
-func (p *P2PNode) validateEonPublicKey(_ context.Context, _ *shmsg.EonPublicKey) (bool, error) {
+func (p *P2PNode) validateEonPublicKey(_ context.Context, _ *p2pmsg.EonPublicKey) (bool, error) {
 	return true, nil
 }
 
-func (p *P2PNode) handleEonPublicKey(_ context.Context, msg *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	msgs := []shmsg.P2PMessage{}
+func (p *P2PNode) handleEonPublicKey(_ context.Context, msg *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
+	msgs := []p2pmsg.P2PMessage{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
 
-func (p *P2PNode) validateDecryptionKey(_ context.Context, _ *shmsg.DecryptionKey) (bool, error) {
+func (p *P2PNode) validateDecryptionKey(_ context.Context, _ *p2pmsg.DecryptionKey) (bool, error) {
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionKey(_ context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
-	msgs := []shmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionKey(_ context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.P2PMessage, error) {
+	msgs := []p2pmsg.P2PMessage{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }

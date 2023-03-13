@@ -17,8 +17,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func TestDecryptionKeyValidatorIntegration(t *testing.T) {
@@ -50,13 +50,13 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		name      string
 		validator pubsub.Validator
 		valid     bool
-		msg       shmsg.P2PMessage
+		msg       p2pmsg.P2PMessage
 	}{
 		{
 			name:      "valid decryption key",
 			valid:     true,
 			validator: validateDecryptionKey,
-			msg: &shmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
 				EpochID:    epochID.Bytes(),
@@ -67,7 +67,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "invalid decryption key wrong epoch",
 			valid:     false,
 			validator: validateDecryptionKey,
-			msg: &shmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
 				EpochID:    wrongEpochID.Bytes(),
@@ -78,7 +78,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "invalid decryption key wrong instance ID",
 			valid:     false,
 			validator: validateDecryptionKey,
-			msg: &shmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
 				Eon:        eon,
 				EpochID:    epochID.Bytes(),
@@ -89,7 +89,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "valid decryption key share",
 			valid:     true,
 			validator: validateDecryptionKeyShare,
-			msg: &shmsg.DecryptionKeyShare{
+			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
@@ -101,7 +101,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "invalid decryption key share wrong epoch",
 			valid:     false,
 			validator: validateDecryptionKeyShare,
-			msg: &shmsg.DecryptionKeyShare{
+			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
 				EpochID:     wrongEpochID.Bytes(),
@@ -113,7 +113,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "invalid decryption key share wrong instance ID",
 			valid:     false,
 			validator: validateDecryptionKeyShare,
-			msg: &shmsg.DecryptionKeyShare{
+			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID + 1,
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
@@ -125,7 +125,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:      "invalid decryption key share wrong keyper index",
 			valid:     false,
 			validator: validateDecryptionKeyShare,
-			msg: &shmsg.DecryptionKeyShare{
+			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.InstanceID,
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
@@ -242,7 +242,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			msg, err := shmsg.NewSignedDecryptionTrigger(
+			msg, err := p2pmsg.NewSignedDecryptionTrigger(
 				tc.instanceID,
 				tc.epochID,
 				tc.blockNumber,
@@ -262,7 +262,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 }
 
 // makePubSubMessage makes a pubsub.Message corresponding to the type received by gossip validators.
-func makePubSubMessage(message shmsg.P2PMessage, topic string) (*pubsub.Message, error) {
+func makePubSubMessage(message p2pmsg.P2PMessage, topic string) (*pubsub.Message, error) {
 	messageBytes, err := proto.Marshal(message)
 	if err != nil {
 		return nil, err

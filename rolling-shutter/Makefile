@@ -22,7 +22,7 @@ wasm-js: wasm
 	$(MAKE) -C ../js/shutter-crypto build
 
 protoc:
-	${GO} generate ./shmsg/
+	${GO} generate ./shmsg/ ./p2pmsg
 
 test-unit:
 	@echo "====================> Running unit tests"

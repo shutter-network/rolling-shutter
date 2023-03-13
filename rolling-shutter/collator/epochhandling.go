@@ -16,7 +16,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 const (
@@ -32,7 +32,7 @@ var dbListenChannels []string = []string{
 	newBatchtx,
 }
 
-func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.DecryptionKey) ([]shmsg.P2PMessage, error) {
+func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.P2PMessage, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err
@@ -50,10 +50,10 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *shmsg.Decryptio
 		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
 	}
 	log.Info().Str("epoch-id", epochID.Hex()).Msg("inserted decryption key to database")
-	return []shmsg.P2PMessage{}, nil
+	return []p2pmsg.P2PMessage{}, nil
 }
 
-func (c *collator) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) (bool, error) {
+func (c *collator) validateDecryptionKey(ctx context.Context, key *p2pmsg.DecryptionKey) (bool, error) {
 	var eonPublicKey shcrypto.EonPublicKey
 	if key.GetInstanceID() != c.Config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", c.Config.InstanceID, key.GetInstanceID())

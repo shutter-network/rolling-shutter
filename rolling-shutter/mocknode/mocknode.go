@@ -20,7 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 type MockNode struct {
@@ -104,7 +104,7 @@ func (m *MockNode) logStartupInfo() error {
 	return nil
 }
 
-func (m *MockNode) handleEonPublicKey(_ context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
+func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
@@ -112,7 +112,7 @@ func (m *MockNode) handleEonPublicKey(_ context.Context, key *shmsg.EonPublicKey
 	}
 	log.Info().Str("eon-public-key", (*bn256.G2)(m.eonPublicKey).String()).
 		Msg("updated eon public key from messages to %s")
-	return make([]shmsg.P2PMessage, 0), nil
+	return make([]p2pmsg.P2PMessage, 0), nil
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {
@@ -249,7 +249,7 @@ func (m *MockNode) sendMessagesForEpoch(ctx context.Context, epochID epochid.Epo
 
 func (m *MockNode) sendDecryptionTrigger(ctx context.Context, epochID epochid.EpochID) error {
 	log.Info().Str("epoch-id", epochID.Hex()).Msg("sending decryption trigger")
-	msg := &shmsg.DecryptionTrigger{
+	msg := &p2pmsg.DecryptionTrigger{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID.Bytes(),
 	}
@@ -266,7 +266,7 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochI
 
 	keyBytes := epochSecretKey.Marshal()
 
-	msg := &shmsg.DecryptionKey{
+	msg := &p2pmsg.DecryptionKey{
 		InstanceID: m.Config.InstanceID,
 		EpochID:    epochID.Bytes(),
 		Key:        keyBytes,

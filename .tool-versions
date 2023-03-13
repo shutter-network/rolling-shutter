@@ -8,7 +8,7 @@ java temurin-17.0.5+8
 nodejs 16.14.2
 postgres 14.2
 pre-commit 3.0.4
-protoc 3.20.3
+protoc 22.2
 solidity 0.8.9
 sqlc 1.17.0
 tinygo 0.27.0

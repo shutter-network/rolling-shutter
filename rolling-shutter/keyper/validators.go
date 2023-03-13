@@ -12,11 +12,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.DecryptionKey) (bool, error) {
+func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *p2pmsg.DecryptionKey) (bool, error) {
 	if key.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, key.GetInstanceID())
 	}
@@ -53,7 +53,7 @@ func (kpr *keyper) validateDecryptionKey(ctx context.Context, key *shmsg.Decrypt
 	return ok, nil
 }
 
-func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shmsg.DecryptionKeyShare) (bool, error) {
+func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *p2pmsg.DecryptionKeyShare) (bool, error) {
 	if keyShare.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, keyShare.GetInstanceID())
 	}
@@ -88,14 +88,14 @@ func (kpr *keyper) validateDecryptionKeyShare(ctx context.Context, keyShare *shm
 	), nil
 }
 
-func (kpr *keyper) validateEonPublicKey(_ context.Context, key *shmsg.EonPublicKey) (bool, error) {
+func (kpr *keyper) validateEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) (bool, error) {
 	if key.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, key.GetInstanceID())
 	}
 	return true, nil
 }
 
-func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg.DecryptionTrigger) (bool, error) {
+func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *p2pmsg.DecryptionTrigger) (bool, error) {
 	if trigger.GetInstanceID() != kpr.config.InstanceID {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", kpr.config.InstanceID, trigger.GetInstanceID())
 	}
@@ -120,7 +120,7 @@ func (kpr *keyper) validateDecryptionTrigger(ctx context.Context, trigger *shmsg
 		return false, errors.Wrapf(err, "error while converting collator from string to address: %s", chainCollator.Collator)
 	}
 
-	signatureValid, err := shmsg.VerifySignature(trigger, collator)
+	signatureValid, err := p2pmsg.VerifySignature(trigger, collator)
 	if err != nil {
 		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %d", trigger.EpochID)
 	}

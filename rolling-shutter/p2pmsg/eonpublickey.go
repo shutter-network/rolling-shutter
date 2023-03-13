@@ -1,4 +1,4 @@
-package shmsg
+package p2pmsg
 
 import (
 	"crypto/ecdsa"

@@ -18,7 +18,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 var (
@@ -447,5 +447,5 @@ func hashTransactions(txs []cltrdb.Transaction) []byte {
 		txHashes[i] = t.TxHash
 	}
 	// Hash the list of transaction hashes
-	return shmsg.HashByteList(txHashes)
+	return p2pmsg.HashByteList(txHashes)
 }

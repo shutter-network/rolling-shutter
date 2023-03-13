@@ -16,8 +16,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func newTestConfig(t *testing.T) Config {
@@ -111,7 +111,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	// send decryption key share when first trigger is received
-	trigger := &shmsg.DecryptionTrigger{
+	trigger := &p2pmsg.DecryptionTrigger{
 		EpochID:    epochID.Bytes(),
 		InstanceID: 0,
 	}
@@ -123,7 +123,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 1)
-	msg, ok := msgs[0].(*shmsg.DecryptionKeyShare)
+	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShare)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == 0)
 	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
@@ -156,7 +156,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// threshold is two, so no outgoing message after first input
-	msgs, err := handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
+	msgs, err := handler.handleDecryptionKeyShare(ctx, &p2pmsg.DecryptionKeyShare{
 		InstanceID:  0,
 		EpochID:     epochID.Bytes(),
 		KeyperIndex: 0,
@@ -167,7 +167,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 
 	// second message pushes us over the threshold (note that we didn't send a trigger, so the
 	// share of the handler itself doesn't count)
-	msgs, err = handler.handleDecryptionKeyShare(ctx, &shmsg.DecryptionKeyShare{
+	msgs, err = handler.handleDecryptionKeyShare(ctx, &p2pmsg.DecryptionKeyShare{
 		InstanceID:  0,
 		EpochID:     epochID.Bytes(),
 		KeyperIndex: 2,
@@ -175,7 +175,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 1)
-	msg, ok := msgs[0].(*shmsg.DecryptionKey)
+	msg, ok := msgs[0].(*p2pmsg.DecryptionKey)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == 0)
 	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
@@ -203,7 +203,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// send a decryption key and check that it gets inserted
-	msgs, err := handler.handleDecryptionKey(ctx, &shmsg.DecryptionKey{
+	msgs, err := handler.handleDecryptionKey(ctx, &p2pmsg.DecryptionKey{
 		InstanceID: 0,
 		Eon:        eon,
 		EpochID:    epochID.Bytes(),

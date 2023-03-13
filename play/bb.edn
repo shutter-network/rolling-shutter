@@ -254,7 +254,7 @@
    :depends [-protoc-files]
    :task (when (seq (fs/modified-since exe -protoc-files))
            (run '-install:protoc-gen-go)
-           (run-process ["go" "generate" "./shmsg"] {:dir src-dir}))}
+           (run-process ["go" "generate" "./shmsg" "./p2pmsg"] {:dir src-dir}))}
 
   build
   {:doc "Build rolling-shutter executable"

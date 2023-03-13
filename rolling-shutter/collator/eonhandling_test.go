@@ -17,7 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 func newTestConfig(t *testing.T) config.Config {
@@ -38,7 +38,7 @@ func newTestConfig(t *testing.T) config.Config {
 type keyper struct {
 	address string
 	index   uint64
-	msg     *shmsg.EonPublicKey
+	msg     *p2pmsg.EonPublicKey
 }
 
 func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
@@ -75,10 +75,10 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx chainobsdb.DBTX, param
 		var (
 			err error
 			ok  bool
-			msg *shmsg.EonPublicKey
+			msg *p2pmsg.EonPublicKey
 		)
 
-		msg, err = shmsg.NewSignedEonPublicKey(
+		msg, err = p2pmsg.NewSignedEonPublicKey(
 			params.instanceID,
 			params.eonPubKey,
 			params.activationBlock,
@@ -89,7 +89,7 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx chainobsdb.DBTX, param
 		assert.NilError(t, err)
 		addr := ethcrypto.PubkeyToAddress(ethKey.PublicKey)
 		kprs = append(kprs, keyper{address: addr.Hex(), index: uint64(i), msg: msg})
-		ok, err = shmsg.VerifySignature(msg, addr)
+		ok, err = p2pmsg.VerifySignature(msg, addr)
 		assert.Check(t, ok)
 		assert.NilError(t, err)
 	}

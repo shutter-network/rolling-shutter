@@ -32,6 +32,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -388,7 +389,7 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}
-			msg, err := shmsg.NewSignedEonPublicKey(
+			msg, err := p2pmsg.NewSignedEonPublicKey(
 				kpr.config.InstanceID,
 				eonPublicKey.EonPublicKey,
 				uint64(eonPublicKey.ActivationBlockNumber),

@@ -32,8 +32,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 var errTriggerAlreadySent error = errors.New("decryption-trigger already sent")
@@ -286,7 +286,7 @@ func (c *collator) getUnsentDecryptionTriggers(
 	ctx context.Context,
 	cfg config.Config,
 ) (
-	[]*shmsg.DecryptionTrigger,
+	[]*p2pmsg.DecryptionTrigger,
 	error,
 ) {
 	var triggers []cltrdb.DecryptionTrigger
@@ -299,13 +299,13 @@ func (c *collator) getUnsentDecryptionTriggers(
 	if err != nil {
 		return nil, err
 	}
-	trigMsgs := make([]*shmsg.DecryptionTrigger, len(triggers))
+	trigMsgs := make([]*p2pmsg.DecryptionTrigger, len(triggers))
 	for i, trig := range triggers {
 		epochID, err := epochid.BytesToEpochID(trig.EpochID)
 		if err != nil {
 			return nil, err
 		}
-		trigMsg, err := shmsg.NewSignedDecryptionTrigger(
+		trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(
 			cfg.InstanceID,
 			epochID,
 			uint64(trig.L1BlockNumber),

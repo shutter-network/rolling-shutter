@@ -12,14 +12,14 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 // ensureNoIntegerOverflowsInEonPublicKey checks that the uint64 fields declared in the
 // EonPublicKey do not overflow when converted to an int64. It returns an error if there is an
 // overflow.
-func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
+func ensureNoIntegerOverflowsInEonPublicKey(key *p2pmsg.EonPublicKey) error {
 	if key.KeyperConfigIndex > math.MaxInt64 {
 		return errors.New("int64 overflow for msg.KeyperConfigIndex")
 	}
@@ -32,7 +32,7 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *shmsg.EonPublicKey) error {
 // ensureEonPublicKeyMatchesKeyperSet checks that the information stored in the EonPublicKey
 // matches the chainobsdb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
-func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *shmsg.EonPublicKey) error {
+func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *p2pmsg.EonPublicKey) error {
 	activationBlock := int64(key.ActivationBlock)
 
 	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
@@ -42,7 +42,7 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *shm
 			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
 	}
 
-	recoveredAddress, err := shmsg.RecoverAddress(key)
+	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
 			"(activation-block=%d)", activationBlock))
@@ -59,7 +59,7 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *shm
 }
 
 // validateEonPublicKey is a libp2p validator for incoming EonPublicKey messages.
-func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) (bool, error) {
+func (c *collator) validateEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) (bool, error) {
 	if err := ensureNoIntegerOverflowsInEonPublicKey(key); err != nil {
 		return false, err
 	}
@@ -91,10 +91,10 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *shmsg.EonPubli
 	return true, nil
 }
 
-func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicKey) ([]shmsg.P2PMessage, error) {
-	recoveredAddress, err := shmsg.RecoverAddress(key)
+func (c *collator) handleEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
+	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {
-		return make([]shmsg.P2PMessage, 0), err
+		return make([]p2pmsg.P2PMessage, 0), err
 	}
 	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
@@ -152,7 +152,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *shmsg.EonPublicK
 		return nil
 	})
 	if err != nil {
-		return make([]shmsg.P2PMessage, 0), err
+		return make([]p2pmsg.P2PMessage, 0), err
 	}
-	return make([]shmsg.P2PMessage, 0), nil
+	return make([]p2pmsg.P2PMessage, 0), nil
 }

@@ -2,4 +2,4 @@
 // some utility code to work with those 'shutter messages'.
 package shmsg
 
-//go:generate protoc gossip.proto shmsg.proto --go_out=./
+//go:generate protoc shmsg.proto --go_out=./
