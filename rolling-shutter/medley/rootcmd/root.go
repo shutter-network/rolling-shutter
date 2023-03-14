@@ -1,5 +1,5 @@
-// Package cmd implements the shuttermint subcommands
-package cmd
+// Package rootcmd implements a cobra command with logging command line switches
+package rootcmd
 
 import (
 	"fmt"
@@ -13,17 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/collator"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/cryptocmd"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocknode"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocksequencer"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/p2pnode"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/snapshot"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
@@ -62,7 +52,7 @@ func colorize(s interface{}, c int, disabled bool) string {
 	return fmt.Sprintf("\x1b[%dm%v\x1b[0m", c, s)
 }
 
-func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
+func setupLogging() (zerolog.Logger, error) {
 	// create a basic logger with stdout writer
 	// we will change the writer later
 
@@ -133,8 +123,6 @@ func setupLogging(cmd *cobra.Command) (zerolog.Logger, error) {
 
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "rolling-shutter",
-		Short:        "A collection of commands to run and interact with Rolling Shutter nodes",
 		Version:      shversion.Version(),
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -143,7 +131,7 @@ func Cmd() *cobra.Command {
 				return err
 			}
 
-			logger, err := setupLogging(cmd.Root())
+			logger, err := setupLogging()
 			if err != nil {
 				return errors.Wrap(err, "failed to setup logging")
 			}
@@ -176,15 +164,15 @@ func Cmd() *cobra.Command {
 		"production",
 		"set the environment, possible values:  production, staging, local",
 	)
-	cmd.AddCommand(bootstrap.Cmd())
-	cmd.AddCommand(chain.Cmd())
-	cmd.AddCommand(collator.Cmd())
-	cmd.AddCommand(keyper.Cmd())
-	cmd.AddCommand(mocknode.Cmd())
-	cmd.AddCommand(snapshot.Cmd())
-	cmd.AddCommand(cryptocmd.Cmd())
-	cmd.AddCommand(proxy.Cmd())
-	cmd.AddCommand(mocksequencer.Cmd())
-	cmd.AddCommand(p2pnode.Cmd())
 	return cmd
+}
+
+func Main(c *cobra.Command) {
+	status := 0
+
+	if err := c.Execute(); err != nil {
+		status = 1
+	}
+
+	os.Exit(status)
 }
