@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/viper"
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	cfg "github.com/tendermint/tendermint/config"
-	tenderlog "github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/node"
 
@@ -87,9 +86,9 @@ func newTendermint(configFile string) (service.Service, error) {
 		return nil, err
 	}
 	log.Info().Str("node-id", string(nodeid)).Msg("loaded node-id")
-	logger, err := tenderlog.NewDefaultLogger(config.LogFormat, config.LogLevel, false)
+	logger, err := newLogger(config.LogLevel)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create default logger")
+		return nil, errors.Wrap(err, "failed to create tendermint logger")
 	}
 
 	shapp, err := app.LoadShutterAppFromFile(

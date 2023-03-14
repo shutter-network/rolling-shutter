@@ -13,11 +13,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/libs/log"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 	tmtime "github.com/tendermint/tendermint/libs/time"
@@ -26,8 +27,6 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
-
-var logger = log.MustNewDefaultLogger(log.LogFormatPlain, log.LogLevelInfo, false)
 
 type Config struct {
 	RootDir       string   `mapstructure:"root"`
@@ -97,7 +96,7 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	}
 
 	tendemintCfg := cfg.DefaultConfig()
-	tendemintCfg.LogLevel = log.LogLevelError
+	tendemintCfg.LogLevel = tmlog.LogLevelError
 	scaleToBlockTime(tendemintCfg, config.BlockTime)
 	keyper0RPCAddress := tendemintCfg.RPC.ListenAddress
 	rpcAddress, err := adjustPort(keyper0RPCAddress, config.Index)
@@ -159,21 +158,25 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		if err != nil {
 			return err
 		}
-		logger.Info("Found private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
+		log.Info().
+			Str("privValKeyFile", privValKeyFile).
+			Str("stateFile", privValStateFile).
+			Msg("Found private validator")
 	} else {
 		pv, err = privval.GenFilePV(privValKeyFile, privValStateFile, types.ABCIPubKeyTypeEd25519)
 		if err != nil {
 			return err
 		}
 		pv.Save()
-		logger.Info("Generated private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
+		log.Info().
+			Str("privValKeyFile", privValKeyFile).
+			Str("stateFile", privValStateFile).
+			Msg("Generated private validator")
 	}
 
 	nodeKeyFile := tendermintConfig.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
-		logger.Info("Found node key", "path", nodeKeyFile)
+		log.Info().Str("path", nodeKeyFile).Msg("Found node key")
 	} else {
 		nodeid, err := tendermintConfig.LoadOrGenNodeKeyID()
 		if err != nil {
@@ -184,14 +187,13 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		if err != nil {
 			return errors.Wrapf(err, "Could not write to %s", idpath)
 		}
-
-		logger.Info("Generated node key", "path", nodeKeyFile, "id", nodeid)
+		log.Info().Str("path", nodeKeyFile).Str("id", string(nodeid)).Msg("Generated node key")
 	}
 
 	// genesis file
 	genFile := tendermintConfig.GenesisFile()
 	if tmos.FileExists(genFile) {
-		logger.Info("Found genesis file", "path", genFile)
+		log.Info().Str("path", genFile).Msg("Found genesis file")
 	} else {
 		appStateBytes, err := amino.NewCodec().MarshalJSONIndent(appState, "", "    ")
 		if err != nil {
@@ -216,7 +218,7 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err
 		}
-		logger.Info("Generated genesis file", "path", genFile)
+		log.Info().Str("path", genFile).Msg("Generated genesis file")
 	}
 	a := app.NewShutterApp()
 	a.Gobpath = filepath.Join(tendermintConfig.DBDir(), "shutter.gob")
