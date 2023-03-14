@@ -1,39 +1,39 @@
 version: 1
 packages:
-  - path: "db/kprdb"
+  - path: "kprdb"
     name: "kprdb"
-    schema: ["db/kprdb/schema.sql"]
-    queries: ["db/kprdb/query.sql"]
+    schema: ["kprdb/schema.sql"]
+    queries: ["kprdb/query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
     output_models_file_name: "models.sqlc.gen.go"
     output_files_suffix: "c.gen"
 
-  - path: "db/cltrdb"
+  - path: "cltrdb"
     name: "cltrdb"
-    schema: ["db/cltrdb/schema.sql"]
-    queries: ["db/cltrdb/query.sql"]
+    schema: ["cltrdb/schema.sql"]
+    queries: ["cltrdb/query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
     output_models_file_name: "models.sqlc.gen.go"
     output_files_suffix: "c.gen"
 
-  - path: "db/chainobsdb"
+  - path: "chainobsdb"
     name: "chainobsdb"
-    schema: ["db/chainobsdb/schema.sql"]
-    queries: ["db/chainobsdb/query.sql"]
+    schema: ["chainobsdb/schema.sql"]
+    queries: ["chainobsdb/query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"
     output_models_file_name: "models.sqlc.gen.go"
     output_files_suffix: "c.gen"
 
-  - path: "db/metadb"
+  - path: "metadb"
     name: "metadb"
-    schema: ["db/metadb/schema.sql"]
-    queries: ["db/metadb/query.sql"]
+    schema: ["metadb/schema.sql"]
+    queries: ["metadb/query.sql"]
     engine: "postgresql"
     sql_package: "pgx/v4"
     output_db_file_name: "db.sqlc.gen.go"

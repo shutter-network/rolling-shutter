@@ -1,5 +1,7 @@
 package db
 
+//go:generate sqlc generate
+
 import (
 	"context"
 	"embed"

@@ -1,7 +1,5 @@
 package main
 
-//go:generate sqlc generate
-
 import (
 	"github.com/spf13/cobra"
 
