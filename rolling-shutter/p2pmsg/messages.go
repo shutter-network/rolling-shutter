@@ -17,7 +17,7 @@ import (
 
 // All messages to be used in the P2P Gossip have to be included in this slice,
 // otherwise they won't be known to the marshaling layer.
-var messageTypes = []P2PMessage{
+var messageTypes = []Message{
 	// Keyper messages
 	new(DecryptionKey),
 	new(DecryptionTrigger),
@@ -29,13 +29,13 @@ var topicToProtoName = make(map[string]protoreflect.FullName)
 
 func init() {
 	for _, mess := range messageTypes {
-		registerP2PMessage(mess)
+		registerMessage(mess)
 	}
 }
 
 // Instead of using an envelope for the unmarshalling,
 // we simply map one protobuf message type 1 to 1 to a Gossip topic.
-func registerP2PMessage(mess P2PMessage) {
+func registerMessage(mess Message) {
 	messageTypeName := mess.ProtoReflect().Type().Descriptor().FullName()
 	topic := mess.Topic()
 
@@ -48,8 +48,8 @@ func registerP2PMessage(mess P2PMessage) {
 	topicToProtoName[topic] = messageTypeName
 }
 
-// P2PMessage can be send via the p2p protocol.
-type P2PMessage interface {
+// Message can be send via the p2p protocol.
+type Message interface {
 	protoreflect.ProtoMessage
 	ImplementsP2PMessage()
 	GetInstanceID() uint64
@@ -58,7 +58,7 @@ type P2PMessage interface {
 	Validate() error
 }
 
-func NewP2PMessageFromTopic(topic string) (P2PMessage, error) {
+func NewMessageFromTopic(topic string) (Message, error) {
 	name, ok := topicToProtoName[topic]
 	if !ok {
 		return nil, errors.Errorf("No message type found for topic <%s>", topic)
@@ -67,17 +67,17 @@ func NewP2PMessageFromTopic(topic string) (P2PMessage, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error while retrieving message type for topic <%s>", topic)
 	}
-	protomess, ok := t.New().Interface().(P2PMessage)
+	protomess, ok := t.New().Interface().(Message)
 	if !ok {
 		return nil, errors.Errorf("Error while instantiating message type for topic <%s>", topic)
 	}
 	return protomess, nil
 }
 
-func Unmarshal(topic string, data []byte) (P2PMessage, error) {
+func Unmarshal(topic string, data []byte) (Message, error) {
 	var err error
 
-	unmshl, err := NewP2PMessageFromTopic(topic)
+	unmshl, err := NewMessageFromTopic(topic)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to retrieve deserialisation type")
 	}

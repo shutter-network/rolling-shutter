@@ -13,7 +13,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 )
 
-func marshalUnmarshalMessage[M P2PMessage](t *testing.T, message M) M {
+func marshalUnmarshalMessage[M Message](t *testing.T, message M) M {
 	t.Helper()
 
 	var (

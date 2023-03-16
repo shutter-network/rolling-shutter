@@ -32,7 +32,7 @@ var dbListenChannels []string = []string{
 	newBatchtx,
 }
 
-func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.P2PMessage, error) {
+func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.Message, error) {
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.Decrypti
 		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
 	}
 	log.Info().Str("epoch-id", epochID.Hex()).Msg("inserted decryption key to database")
-	return []p2pmsg.P2PMessage{}, nil
+	return []p2pmsg.Message{}, nil
 }
 
 func (c *collator) validateDecryptionKey(ctx context.Context, key *p2pmsg.DecryptionKey) (bool, error) {

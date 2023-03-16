@@ -18,14 +18,14 @@ import (
 )
 
 type (
-	HandlerFuncStatic[M p2pmsg.P2PMessage] func(context.Context, M) ([]p2pmsg.P2PMessage, error)
-	HandlerFunc                            func(context.Context, p2pmsg.P2PMessage) ([]p2pmsg.P2PMessage, error)
-	HandlerRegistry                        map[protoreflect.FullName]HandlerFunc
-	ValidatorFunc[M p2pmsg.P2PMessage]     func(context.Context, M) (bool, error)
-	ValidatorRegistry                      map[string]pubsub.Validator
+	HandlerFuncStatic[M p2pmsg.Message] func(context.Context, M) ([]p2pmsg.Message, error)
+	HandlerFunc                         func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
+	HandlerRegistry                     map[protoreflect.FullName]HandlerFunc
+	ValidatorFunc[M p2pmsg.Message]     func(context.Context, M) (bool, error)
+	ValidatorRegistry                   map[string]pubsub.Validator
 )
 
-func GetMessageType(msg p2pmsg.P2PMessage) protoreflect.FullName {
+func GetMessageType(msg p2pmsg.Message) protoreflect.FullName {
 	return msg.ProtoReflect().Type().Descriptor().FullName()
 }
 
@@ -37,7 +37,7 @@ func GetMessageType(msg p2pmsg.P2PMessage) protoreflect.FullName {
 // the passed in validator will be called automatically when a message of type M is received
 //
 // For each message type M, there can only be one validator registered per P2PHandler.
-func AddValidator[M p2pmsg.P2PMessage](handler *P2PHandler, valFunc ValidatorFunc[M]) pubsub.Validator {
+func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M]) pubsub.Validator {
 	var messProto M
 	topic := messProto.Topic()
 
@@ -101,7 +101,7 @@ func AddValidator[M p2pmsg.P2PMessage](handler *P2PHandler, valFunc ValidatorFun
 // AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler
 //
 // For each message type M, there can only be one handler registered per P2PHandler.
-func AddHandlerFunc[M p2pmsg.P2PMessage](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) HandlerFunc {
+func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) HandlerFunc {
 	var messProto M
 	messageType := GetMessageType(messProto)
 
@@ -110,12 +110,12 @@ func AddHandlerFunc[M p2pmsg.P2PMessage](handler *P2PHandler, handlerFunc Handle
 		panic(fmt.Sprintf("Can't register more than one handler per message-type (message-type: '%s')", messageType))
 	}
 
-	f := func(ctx context.Context, msg p2pmsg.P2PMessage) ([]p2pmsg.P2PMessage, error) {
+	f := func(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
 		typedMsg, ok := msg.(M)
 		if !ok {
 			// this is programming error, when unmarshaling of the message did not
 			// result in the expected schema struct / concrete implementation
-			return []p2pmsg.P2PMessage{}, errors.New("Message type assertion mismatch")
+			return []p2pmsg.Message{}, errors.New("Message type assertion mismatch")
 		}
 		return handlerFunc(ctx, typedMsg)
 	}
@@ -208,7 +208,7 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 }
 
 func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
-	var msgsOut []p2pmsg.P2PMessage
+	var msgsOut []p2pmsg.Message
 	var err error
 
 	m, err := msg.Unmarshal()
@@ -240,7 +240,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 	return nil
 }
 
-func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.P2PMessage, retryOpts ...retry.Option) error {
+func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")

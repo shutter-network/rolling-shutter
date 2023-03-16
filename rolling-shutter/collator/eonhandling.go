@@ -91,10 +91,10 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *p2pmsg.EonPubl
 	return true, nil
 }
 
-func (c *collator) handleEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
+func (c *collator) handleEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
 	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {
-		return make([]p2pmsg.P2PMessage, 0), err
+		return make([]p2pmsg.Message, 0), err
 	}
 	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
@@ -152,7 +152,7 @@ func (c *collator) handleEonPublicKey(ctx context.Context, key *p2pmsg.EonPublic
 		return nil
 	})
 	if err != nil {
-		return make([]p2pmsg.P2PMessage, 0), err
+		return make([]p2pmsg.Message, 0), err
 	}
-	return make([]p2pmsg.P2PMessage, 0), nil
+	return make([]p2pmsg.Message, 0), nil
 }

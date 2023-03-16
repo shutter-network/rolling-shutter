@@ -17,10 +17,10 @@ type Message struct {
 	SenderID string
 }
 
-func (msg Message) Unmarshal() (p2pmsg.P2PMessage, error) {
+func (msg Message) Unmarshal() (p2pmsg.Message, error) {
 	var err error
 
-	unmshl, err := p2pmsg.NewP2PMessageFromTopic(msg.Topic)
+	unmshl, err := p2pmsg.NewMessageFromTopic(msg.Topic)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to retrieve deserialisation type")
 	}

@@ -104,7 +104,7 @@ func (m *MockNode) logStartupInfo() error {
 	return nil
 }
 
-func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
+func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
@@ -112,7 +112,7 @@ func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKe
 	}
 	log.Info().Str("eon-public-key", (*bn256.G2)(m.eonPublicKey).String()).
 		Msg("updated eon public key from messages to %s")
-	return make([]p2pmsg.P2PMessage, 0), nil
+	return make([]p2pmsg.Message, 0), nil
 }
 
 func (m *MockNode) sendTransactions(ctx context.Context) error {

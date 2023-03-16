@@ -50,7 +50,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 		name      string
 		validator pubsub.Validator
 		valid     bool
-		msg       p2pmsg.P2PMessage
+		msg       p2pmsg.Message
 	}{
 		{
 			name:      "valid decryption key",
@@ -262,7 +262,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 }
 
 // makePubSubMessage makes a pubsub.Message corresponding to the type received by gossip validators.
-func makePubSubMessage(message p2pmsg.P2PMessage, topic string) (*pubsub.Message, error) {
+func makePubSubMessage(message p2pmsg.Message, topic string) (*pubsub.Message, error) {
 	messageBytes, err := proto.Marshal(message)
 	if err != nil {
 		return nil, err

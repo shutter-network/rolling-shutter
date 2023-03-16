@@ -31,8 +31,8 @@ func (p *P2PNode) validateDecryptionTrigger(_ context.Context, _ *p2pmsg.Decrypt
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionTrigger(_ context.Context, msg *p2pmsg.DecryptionTrigger) ([]p2pmsg.P2PMessage, error) {
-	msgs := []p2pmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionTrigger(_ context.Context, msg *p2pmsg.DecryptionTrigger) ([]p2pmsg.Message, error) {
+	msgs := []p2pmsg.Message{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
@@ -41,8 +41,8 @@ func (p *P2PNode) validateDecryptionKeyShare(_ context.Context, _ *p2pmsg.Decryp
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionKeyShare(_ context.Context, msg *p2pmsg.DecryptionKeyShare) ([]p2pmsg.P2PMessage, error) {
-	msgs := []p2pmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionKeyShare(_ context.Context, msg *p2pmsg.DecryptionKeyShare) ([]p2pmsg.Message, error) {
+	msgs := []p2pmsg.Message{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
@@ -51,8 +51,8 @@ func (p *P2PNode) validateEonPublicKey(_ context.Context, _ *p2pmsg.EonPublicKey
 	return true, nil
 }
 
-func (p *P2PNode) handleEonPublicKey(_ context.Context, msg *p2pmsg.EonPublicKey) ([]p2pmsg.P2PMessage, error) {
-	msgs := []p2pmsg.P2PMessage{}
+func (p *P2PNode) handleEonPublicKey(_ context.Context, msg *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
+	msgs := []p2pmsg.Message{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
@@ -61,8 +61,8 @@ func (p *P2PNode) validateDecryptionKey(_ context.Context, _ *p2pmsg.DecryptionK
 	return true, nil
 }
 
-func (p *P2PNode) handleDecryptionKey(_ context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.P2PMessage, error) {
-	msgs := []p2pmsg.P2PMessage{}
+func (p *P2PNode) handleDecryptionKey(_ context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.Message, error) {
+	msgs := []p2pmsg.Message{}
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return msgs, nil
 }
