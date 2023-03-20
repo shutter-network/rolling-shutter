@@ -7,6 +7,8 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/introspection"
 )
 
 func multDuration(a time.Duration, m float64) time.Duration {
@@ -81,7 +83,8 @@ type (
 func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...Option) (T, error) {
 	retrier := newRetrier()
 	retrier.option(opts)
-	retrier.zlogContext = retrier.zlogContext.Str("funcName", getFuncName(3))
+	funcName := introspection.GetFuncName(4)
+	retrier.zlogContext = retrier.zlogContext.Str("funcName", funcName)
 	logger := retrier.zlogContext.Logger()
 	next := make(chan time.Time, 1)
 	defer close(next)

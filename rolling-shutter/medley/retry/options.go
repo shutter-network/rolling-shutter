@@ -1,8 +1,6 @@
 package retry
 
 import (
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/benbjohnson/clock"
@@ -46,16 +44,6 @@ func ExponentialBackoff() Option {
 		// for now just use a fixed value
 		r.multiplier = 1.5
 	}
-}
-
-func getFuncName(skip int) string {
-	pc := make([]uintptr, 10)
-	runtime.Callers(skip, pc)
-	frms := runtime.CallersFrames(pc)
-	frm, _ := frms.Next()
-	name := frm.Func.Name()
-	name = name[1+strings.LastIndex(name, "."):]
-	return name
 }
 
 func LogIdentifier(s string) Option {
