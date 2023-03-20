@@ -138,7 +138,7 @@ func New(config Config) *P2PHandler {
 	}
 	config.BootstrapPeers = bstrpPeersWithoutSelf
 	h := &P2PHandler{
-		P2P:               NewP2P(config),
+		P2P:               NewP2PNode(config),
 		gossipTopicNames:  make(map[string]bool),
 		handlerRegistry:   make(HandlerRegistry),
 		validatorRegistry: make(ValidatorRegistry),
@@ -147,7 +147,7 @@ func New(config Config) *P2PHandler {
 }
 
 type P2PHandler struct {
-	P2P              *P2P
+	P2P              *P2PNode
 	gossipTopicNames map[string]bool
 
 	handlerRegistry   HandlerRegistry

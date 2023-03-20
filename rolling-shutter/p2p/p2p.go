@@ -12,7 +12,6 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
@@ -58,7 +57,7 @@ type Notifee interface {
 	NewPeer()
 }
 
-type P2P struct {
+type P2PNode struct {
 	Config Config
 
 	connmngr       *connmgr.BasicConnMgr
@@ -80,8 +79,8 @@ type Config struct {
 	DisableRoutingDHT bool
 }
 
-func NewP2P(config Config) *P2P {
-	p := P2P{
+func NewP2PNode(config Config) *P2PNode {
+	p := P2PNode{
 		Config:         config,
 		connmngr:       nil,
 		host:           nil,
@@ -92,14 +91,7 @@ func NewP2P(config Config) *P2P {
 	return &p
 }
 
-func (p *P2P) Peerstore() peerstore.Peerstore {
-	if p.host == nil {
-		return nil
-	}
-	return p.host.Peerstore()
-}
-
-func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators ValidatorRegistry) error {
+func (p *P2PNode) Run(ctx context.Context, topicNames []string, topicValidators ValidatorRegistry) error {
 	defer func() {
 		close(p.GossipMessages)
 	}()
@@ -145,7 +137,7 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators Vali
 	return errorgroup.Wait()
 }
 
-func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
+func (p *P2PNode) Publish(ctx context.Context, topic string, message []byte) error {
 	p.mux.Lock()
 	room, ok := p.gossipRooms[topic]
 	p.mux.Unlock()
@@ -157,7 +149,7 @@ func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
 	return room.Publish(ctx, message)
 }
 
-func (p *P2P) init(ctx context.Context) error {
+func (p *P2PNode) init(ctx context.Context) error {
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
@@ -273,7 +265,7 @@ func createPubSub(ctx context.Context, p2pHost host.Host, config Config, hashTab
 	return pubSub, nil
 }
 
-func (p *P2P) p2pAddress() string {
+func (p *P2PNode) p2pAddress() string {
 	if p.host == nil {
 		return "<not connected yet>"
 	}
@@ -289,13 +281,13 @@ func (p *P2P) p2pAddress() string {
 }
 
 // P2PAddress returns the node's PeerInfo in multiaddr format.
-func (p *P2P) P2PAddress() string {
+func (p *P2PNode) P2PAddress() string {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	return p.p2pAddress()
 }
 
-func (p *P2P) joinTopics(topicNames []string) error {
+func (p *P2PNode) joinTopics(topicNames []string) error {
 	for _, topicName := range topicNames {
 		if err := p.joinTopic(topicName); err != nil {
 			return err
@@ -305,7 +297,7 @@ func (p *P2P) joinTopics(topicNames []string) error {
 }
 
 // JoinTopic tries to subscribe to the PubSub topic.
-func (p *P2P) joinTopic(topicName string) error {
+func (p *P2PNode) joinTopic(topicName string) error {
 	if _, ok := p.gossipRooms[topicName]; ok {
 		return errors.New("Cannot join new topic if already joined")
 	}
@@ -337,7 +329,7 @@ func (p *P2P) joinTopic(topicName string) error {
 	return nil
 }
 
-func (p *P2P) GetMultiaddr() (multiaddr.Multiaddr, error) {
+func (p *P2PNode) GetMultiaddr() (multiaddr.Multiaddr, error) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	peerInfo := peer.AddrInfo{
@@ -351,8 +343,8 @@ func (p *P2P) GetMultiaddr() (multiaddr.Multiaddr, error) {
 	return nil, err
 }
 
-func (p *P2P) HostID() string {
+func (p *P2PNode) HostID() string {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	return p.host.ID().Pretty()
+	return p.host.ID().String()
 }

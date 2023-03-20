@@ -67,7 +67,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	runctx, stopRun := context.WithCancel(ctx)
 
 	waitGroup := sync.WaitGroup{}
-	p2ps := []*P2P{}
+	p2ps := []*P2PNode{}
 	for i := 0; i < numNodes; i++ {
 		p := New(Config{
 			ListenAddrs:     []multiaddr.Multiaddr{listenAddrs[i]},
