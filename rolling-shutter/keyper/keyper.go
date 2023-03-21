@@ -32,6 +32,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -190,37 +191,43 @@ func (kpr *keyper) setupRouter() *chi.Mux {
 	return router
 }
 
-func (kpr *keyper) run(ctx context.Context) error {
-	group, ctx := errgroup.WithContext(ctx)
+type HTTPService struct {
+	kpr *keyper
+}
 
-	if kpr.config.HTTPEnabled {
-		httpServer := &http.Server{
-			Addr:              kpr.config.HTTPListenAddress,
-			Handler:           kpr.setupRouter(),
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		group.Go(httpServer.ListenAndServe)
-		group.Go(func() error {
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			return httpServer.Shutdown(shutdownCtx)
-		})
+func (httpService *HTTPService) Start(ctx context.Context, group *errgroup.Group) error {
+	kpr := httpService.kpr
+	httpServer := &http.Server{
+		Addr:              kpr.config.HTTPListenAddress,
+		Handler:           kpr.setupRouter(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	group.Go(httpServer.ListenAndServe)
+	group.Go(func() error {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return httpServer.Shutdown(shutdownCtx)
+	})
+	return nil
+}
+
+func (kpr *keyper) getServices() []service.Service {
+	services := []service.Service{
+		service.ServiceFn{Fn: kpr.p2p.Run},
+		service.ServiceFn{Fn: kpr.operateShuttermint},
+		service.ServiceFn{Fn: kpr.broadcastEonPublicKeys},
+		service.ServiceFn{Fn: kpr.handleContractEvents},
 	}
 
-	group.Go(func() error {
-		return kpr.p2p.Run(ctx)
-	})
-	group.Go(func() error {
-		return kpr.operateShuttermint(ctx)
-	})
-	group.Go(func() error {
-		return kpr.broadcastEonPublicKeys(ctx)
-	})
-	group.Go(func() error {
-		return kpr.handleContractEvents(ctx)
-	})
-	return group.Wait()
+	if kpr.config.HTTPEnabled {
+		services = append(services, &HTTPService{kpr: kpr})
+	}
+	return services
+}
+
+func (kpr *keyper) run(ctx context.Context) error {
+	return service.Run(ctx, kpr.getServices())
 }
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
