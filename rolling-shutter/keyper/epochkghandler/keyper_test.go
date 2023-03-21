@@ -1,4 +1,4 @@
-package keyper
+package epochkghandler
 
 import (
 	"context"
@@ -30,21 +30,22 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	config := newTestConfig(t)
 	keyperIndex := uint64(1)
 	eon := uint64(0)
 	epochID, _ := epochid.BigToEpochID(common.Big0)
 	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
-	tkg := initializeEon(ctx, t, db, config, keyperIndex)
+	tkg := initializeEon(ctx, t, db, keyperIndex)
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
 
 	p2pHandler := p2p.New(p2p.Config{})
-	kpr := keyper{config: config, dbpool: dbpool, p2p: p2pHandler}
+
+	kpr := New(config.Address, config.InstanceID, dbpool)
+
 	var peerID peer.ID
 
-	validateDecryptionKey := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKey)
-	validateDecryptionKeyShare := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKeyShare)
+	validateDecryptionKey := p2p.AddValidator(p2pHandler, kpr.validateDecryptionKey)
+	validateDecryptionKeyShare := p2p.AddValidator(p2pHandler, kpr.validateDecryptionKeyShare)
 
 	tests := []struct {
 		name      string
@@ -156,9 +157,8 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	config := newTestConfig(t)
 	p2pHandler := p2p.New(p2p.Config{})
-	kpr := keyper{config: config, dbpool: dbpool, p2p: p2pHandler}
+	kpr := New(config.Address, config.InstanceID, dbpool)
 
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
@@ -189,7 +189,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 	var peerID peer.ID
 
-	validateDecryptionTrigger := p2p.AddValidator(kpr.p2p, kpr.validateDecryptionTrigger)
+	validateDecryptionTrigger := p2p.AddValidator(p2pHandler, kpr.validateDecryptionTrigger)
 
 	tests := []struct {
 		name        string

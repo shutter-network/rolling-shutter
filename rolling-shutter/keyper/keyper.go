@@ -27,6 +27,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
@@ -134,19 +135,11 @@ func Run(ctx context.Context, config Config) error {
 }
 
 func (kpr *keyper) setupP2PHandler() {
-	epochHandler := epochKGHandler{
-		config: kpr.config,
-		db:     kprdb.New(kpr.dbpool),
-	}
-
-	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKey)
-	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionKeyShare)
-	p2p.AddValidator(kpr.p2p, kpr.validateEonPublicKey)
-	p2p.AddValidator(kpr.p2p, kpr.validateDecryptionTrigger)
-
-	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionTrigger)
-	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionKeyShare)
-	p2p.AddHandlerFunc(kpr.p2p, epochHandler.handleDecryptionKey)
+	epochkghandler.New(
+		kpr.config.Address(),
+		kpr.config.InstanceID,
+		kpr.dbpool,
+	).SetupP2p(kpr.p2p)
 }
 
 func (kpr *keyper) setupAPIRouter(swagger *openapi3.T) http.Handler {

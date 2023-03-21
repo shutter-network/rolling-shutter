@@ -1,4 +1,4 @@
-package keyper
+package epochkghandler
 
 import (
 	"bytes"
@@ -20,30 +20,22 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-func newTestConfig(t *testing.T) Config {
-	t.Helper()
-
-	c := Config{
-		InstanceID: 0,
-	}
-	err := c.GenerateNewKeys()
-	assert.NilError(t, err)
-	return c
-}
+var config = struct {
+	Address    common.Address
+	InstanceID uint64
+}{common.HexToAddress("0x2222222222222222222222222222222222222222"), 0}
 
 func initializeEon(
 	ctx context.Context,
 	t *testing.T,
 	db *kprdb.Queries,
-	config Config,
 	keyperIndex uint64, //nolint:unparam
 ) *testkeygen.TestKeyGenerator {
 	t.Helper()
-
 	eon := uint64(0)
 	keypers := []string{
 		"0x0000000000000000000000000000000000000000",
-		config.Address().Hex(),
+		config.Address.Hex(),
 		"0x1111111111111111111111111111111111111111",
 	}
 
@@ -97,18 +89,14 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
-	config := newTestConfig(t)
-	initializeEon(ctx, t, db, config, keyperIndex)
-	handler := epochKGHandler{
-		config: config,
-		db:     db,
-	}
+	initializeEon(ctx, t, db, keyperIndex)
+	handler := New(config.Address, config.InstanceID, dbpool)
 
 	// send decryption key share when first trigger is received
 	trigger := &p2pmsg.DecryptionTrigger{
@@ -141,18 +129,14 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
-	config := newTestConfig(t)
-	tkg := initializeEon(ctx, t, db, config, keyperIndex)
-	handler := epochKGHandler{
-		config: config,
-		db:     db,
-	}
+	tkg := initializeEon(ctx, t, db, keyperIndex)
+	handler := New(config.Address, config.InstanceID, dbpool)
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// threshold is two, so no outgoing message after first input
@@ -187,19 +171,15 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, _, closedb := testdb.NewKeyperTestDB(ctx, t)
+	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
 	eon := uint64(2)
 	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
-	config := newTestConfig(t)
-	tkg := initializeEon(ctx, t, db, config, keyperIndex)
-	handler := epochKGHandler{
-		config: config,
-		db:     db,
-	}
+	tkg := initializeEon(ctx, t, db, keyperIndex)
+	handler := New(config.Address, config.InstanceID, dbpool)
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// send a decryption key and check that it gets inserted

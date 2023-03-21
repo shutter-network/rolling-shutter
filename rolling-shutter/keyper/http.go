@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -132,11 +133,8 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	ctx := r.Context()
-	handler := epochKGHandler{
-		config: srv.kpr.config,
-		db:     kprdb.New(srv.kpr.dbpool),
-	}
-	msgs, err := handler.sendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
+	handler := epochkghandler.New(srv.kpr.config.Address(), srv.kpr.config.InstanceID, srv.kpr.dbpool)
+	msgs, err := handler.SendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())
