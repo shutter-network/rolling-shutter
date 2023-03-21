@@ -1,4 +1,4 @@
-package keyper
+package fx
 
 import (
 	"context"
@@ -8,12 +8,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
+// SendShutterMessages fetches shuttermint messages from the database and sends them to shuttermint
+// via the given MesssageSender.
 func SendShutterMessages(
-	ctx context.Context, queries *kprdb.Queries, messageSender fx.MessageSender,
+	ctx context.Context, queries *kprdb.Queries, messageSender MessageSender,
 ) error {
 	for {
 		outgoing, err := queries.GetNextShutterMessage(ctx)

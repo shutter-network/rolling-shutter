@@ -366,7 +366,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 
-		err = SendShutterMessages(ctx, kprdb.New(kpr.dbpool), &kpr.messageSender)
+		err = fx.SendShutterMessages(ctx, kprdb.New(kpr.dbpool), &kpr.messageSender)
 		if err != nil {
 			return err
 		}
