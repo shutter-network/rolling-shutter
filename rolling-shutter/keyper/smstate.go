@@ -18,6 +18,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -33,6 +34,10 @@ type ActiveDKG struct {
 
 func (dkg *ActiveDKG) markDirty() {
 	dkg.dirty = true
+}
+
+type PhaseLength interface {
+	GetPhaseAtHeight(height int64, eonStartHeight int64) puredkg.Phase
 }
 
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
@@ -51,7 +56,7 @@ func NewShuttermintState(config Config) *ShuttermintState {
 		config:         config,
 		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
 		dkg:            make(map[uint64]*ActiveDKG),
-		phaseLength:    NewConstantPhaseLength(int64(config.DKGPhaseLength)),
+		phaseLength:    dkgphase.NewConstantPhaseLength(int64(config.DKGPhaseLength)),
 	}
 }
 
@@ -339,7 +344,7 @@ func (st *ShuttermintState) handleEonStarted(
 		return err
 	}
 
-	phase := st.phaseLength.getPhaseAtHeight(lastCommittedHeight+1, e.Height)
+	phase := st.phaseLength.GetPhaseAtHeight(lastCommittedHeight+1, e.Height)
 	if phase > puredkg.Dealing {
 		log.Info().Uint64("eon", e.Eon).Msg("missed the dealing phase")
 	}
@@ -517,7 +522,7 @@ func (st *ShuttermintState) finalizeDKG(
 func (st *ShuttermintState) shiftPhase(
 	ctx context.Context, queries *kprdb.Queries, height int64, eon uint64, dkg *ActiveDKG,
 ) error {
-	phase := st.phaseLength.getPhaseAtHeight(height, dkg.startHeight)
+	phase := st.phaseLength.GetPhaseAtHeight(height, dkg.startHeight)
 	for currentPhase := dkg.pure.Phase; currentPhase < phase; currentPhase = dkg.pure.Phase {
 		log.Info().
 			Uint64("eon", eon).
