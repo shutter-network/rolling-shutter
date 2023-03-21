@@ -46,7 +46,7 @@ type Config struct {
 }
 
 const configTemplate = `# Shutter keyper config
-# Ethereum address: {{ .Address }}
+# Ethereum address: {{ .GetAddress }}
 # Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
 
 ShuttermintURL		= "{{ .ShuttermintURL }}"
@@ -153,9 +153,17 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 	return nil
 }
 
-// Address returns the keyper's Ethereum address.
-func (config *Config) Address() common.Address {
+// GetAddress returns the keyper's Ethereum address.
+func (config *Config) GetAddress() common.Address {
 	return crypto.PubkeyToAddress(config.SigningKey.PublicKey)
+}
+
+func (config *Config) GetHTTPListenAddress() string {
+	return config.HTTPListenAddress
+}
+
+func (config *Config) GetInstanceID() uint64 {
+	return config.InstanceID
 }
 
 // WriteTOML writes a toml configuration file with the given config.

@@ -3,24 +3,15 @@ package keyper
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"os"
 	"time"
 
-	chimiddleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"github.com/tendermint/tendermint/rpc/client"
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
@@ -29,7 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -56,7 +47,7 @@ type keyper struct {
 // stored value and raises an error if it doesn't match.
 func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
-	cfgAddress := config.Address().Hex()
+	cfgAddress := config.GetAddress().Hex()
 	queries := metadb.New(dbpool)
 	dbAddr, err := queries.GetMeta(ctx, addressKey)
 	if err == pgx.ErrNoRows {
@@ -137,79 +128,10 @@ func Run(ctx context.Context, config Config) error {
 
 func (kpr *keyper) setupP2PHandler() {
 	epochkghandler.New(
-		kpr.config.Address(),
+		kpr.config.GetAddress(),
 		kpr.config.InstanceID,
 		kpr.dbpool,
 	).SetupP2p(kpr.p2p)
-}
-
-func (kpr *keyper) setupAPIRouter(swagger *openapi3.T) http.Handler {
-	router := chi.NewRouter()
-
-	router.Use(chimiddleware.OapiRequestValidator(swagger))
-
-	_ = kproapi.HandlerFromMux(&server{kpr: kpr}, router)
-
-	return router
-}
-
-func (kpr *keyper) setupRouter() *chi.Mux {
-	swagger, err := kproapi.GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swagger.Servers = nil
-
-	router := chi.NewRouter()
-	router.Use(middleware.Logger)
-	router.Use(middleware.Recoverer)
-	router.Mount("/v1", http.StripPrefix("/v1", kpr.setupAPIRouter(swagger)))
-	apiJSON, _ := json.Marshal(swagger)
-	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(apiJSON)
-	})
-	router.Mount("/metrics", promhttp.Handler())
-	/*
-	   The following enables the swagger ui. Run the following to use it:
-
-	     npm pack swagger-ui-dist@4.1.2
-	     tar -xf swagger-ui-dist-4.1.2.tgz
-	     export SWAGGER_UI=$(pwd)/package
-	*/
-	swaggerUI := os.Getenv("SWAGGER_UI")
-	path := "/ui/"
-	if swaggerUI != "" {
-		log.Info().Str("path", path).Msg("enabling the swagger ui")
-		fs := http.FileServer(http.Dir(os.Getenv("SWAGGER_UI")))
-		router.Mount(path, http.StripPrefix(path, fs))
-	}
-
-	return router
-}
-
-type HTTPService struct {
-	kpr *keyper
-}
-
-func (httpService *HTTPService) Start(ctx context.Context, group *errgroup.Group) error {
-	kpr := httpService.kpr
-	httpServer := &http.Server{
-		Addr:              kpr.config.HTTPListenAddress,
-		Handler:           kpr.setupRouter(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	group.Go(httpServer.ListenAndServe)
-	group.Go(func() error {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return httpServer.Shutdown(shutdownCtx)
-	})
-	return nil
 }
 
 func (kpr *keyper) getServices() []service.Service {
@@ -221,7 +143,7 @@ func (kpr *keyper) getServices() []service.Service {
 	}
 
 	if kpr.config.HTTPEnabled {
-		services = append(services, &HTTPService{kpr: kpr})
+		services = append(services, kprapi.NewHTTPService(kpr.dbpool, &kpr.config, kpr.p2p))
 	}
 	return services
 }
@@ -385,7 +307,7 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			_, exists := kprdb.GetKeyperIndex(kpr.config.Address(), eonPublicKey.Keypers)
+			_, exists := kprdb.GetKeyperIndex(kpr.config.GetAddress(), eonPublicKey.Keypers)
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}

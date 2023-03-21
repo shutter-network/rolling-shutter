@@ -260,7 +260,7 @@ func (st *ShuttermintState) handleBatchConfig(
 	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig,
 ) error {
 	if !st.isKeyper {
-		if !e.IsKeyper(st.config.Address()) {
+		if !e.IsKeyper(st.config.GetAddress()) {
 			return nil
 		}
 		st.isKeyper = true
@@ -334,7 +334,7 @@ func (st *ShuttermintState) handleEonStarted(
 		keypers = append(keypers, a)
 	}
 
-	keyperIndex, err := medley.FindAddressIndex(keypers, st.config.Address())
+	keyperIndex, err := medley.FindAddressIndex(keypers, st.config.GetAddress())
 	if err != nil {
 		return nil
 	}
@@ -614,7 +614,7 @@ func (st *ShuttermintState) decryptPolyEval(encrypted []byte) ([]byte, error) {
 func (st *ShuttermintState) handlePolyEval(
 	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyEval,
 ) error {
-	myAddress := st.config.Address()
+	myAddress := st.config.GetAddress()
 	if e.Sender == myAddress {
 		return nil
 	}

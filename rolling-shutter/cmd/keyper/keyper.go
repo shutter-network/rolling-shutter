@@ -130,7 +130,7 @@ func keyperMain() error {
 
 	log.Info().
 		Str("version", shversion.Version()).
-		Str("address", config.Address().Hex()).
+		Str("address", config.GetAddress().Hex()).
 		Str("shuttermint", config.ShuttermintURL).
 		Msg("starting keyper")
 

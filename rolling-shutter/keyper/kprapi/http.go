@@ -1,4 +1,4 @@
-package keyper
+package kprapi
 
 import (
 	"encoding/hex"
@@ -15,10 +15,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
-
-type server struct {
-	kpr *keyper
-}
 
 func sendError(w http.ResponseWriter, code int, message string) {
 	e := kproapi.Error{
@@ -37,7 +33,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
-	db := kprdb.New(srv.kpr.dbpool)
+	db := kprdb.New(srv.dbpool)
 
 	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(epochID), "0x"))
 	if err != nil {
@@ -65,7 +61,7 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon 
 
 func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	db := kprdb.New(srv.kpr.dbpool)
+	db := kprdb.New(srv.dbpool)
 
 	res := kproapi.Eons{}
 
@@ -133,7 +129,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	ctx := r.Context()
-	handler := epochkghandler.New(srv.kpr.config.Address(), srv.kpr.config.InstanceID, srv.kpr.dbpool)
+	handler := epochkghandler.New(srv.config.GetAddress(), srv.config.GetInstanceID(), srv.dbpool)
 	msgs, err := handler.SendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
 		if err != nil {
@@ -143,7 +139,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	for _, msg := range msgs {
-		if err := srv.kpr.p2p.SendMessage(ctx, msg); err != nil {
+		if err := srv.p2p.SendMessage(ctx, msg); err != nil {
 			log.Info().Err(err).Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
 				Msg("failed to send message")
 			continue
