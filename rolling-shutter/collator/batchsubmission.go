@@ -125,6 +125,8 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	if err == pgx.ErrNoRows {
 		return nil
+	} else if err != nil {
+		return err
 	}
 	epoch, err := epochid.BytesToEpochID(unsubmitted.EpochID)
 	if err != nil {
