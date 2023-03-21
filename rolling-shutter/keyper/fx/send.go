@@ -20,6 +20,8 @@ func SendShutterMessages(
 		outgoing, err := queries.GetNextShutterMessage(ctx)
 		if err == pgx.ErrNoRows {
 			return nil
+		} else if err != nil {
+			return err
 		}
 
 		msg := &shmsg.Message{}
