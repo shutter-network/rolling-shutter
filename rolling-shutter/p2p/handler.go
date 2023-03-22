@@ -131,7 +131,7 @@ func New(config Config) *P2PHandler {
 	if len(bootstrapPeers) == 0 && config.Environment == Production {
 		bootstrapPeers = DefaultBootstrapPeers
 	}
-	// exclude one's one address from the bootstrap list,
+	// exclude one's own address from the bootstrap list,
 	// in case we are a bootstrap node
 	bstrpPeersWithoutSelf := []peer.AddrInfo{}
 	for _, bs := range bootstrapPeers {

@@ -10,11 +10,10 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
-func marshalUnmarshalMessage[M Message](t *testing.T, message M) M {
-	t.Helper()
-
+func marshalUnmarshalMessage[M Message](t *testing.T, message M, traceContext *TraceContext) (M, *TraceContext) { //nolint:thelper
 	var (
 		err        error
 		ok         bool
@@ -23,14 +22,17 @@ func marshalUnmarshalMessage[M Message](t *testing.T, message M) M {
 		unmshl     any
 	)
 
-	msgBytes, err = Marshal(message, nil)
+	msgBytes, err = Marshal(message, traceContext)
 	assert.NilError(t, err)
 
-	unmshl, _, err = Unmarshal(msgBytes)
+	unmshl, unmshlTc, err := Unmarshal(msgBytes)
 	assert.NilError(t, err)
+	if !trace.IsEnabled() {
+		assert.Assert(t, unmshlTc == nil)
+	}
 	newMessage, ok = unmshl.(M)
 	assert.Assert(t, ok)
-	return newMessage
+	return newMessage, unmshlTc
 }
 
 type testConfig struct {
@@ -61,7 +63,8 @@ func TestDecryptionKey(t *testing.T) {
 		InstanceID: cfg.instanceID,
 		Key:        validSecretKey,
 	}
-	m := marshalUnmarshalMessage(t, orig)
+	m, tc := marshalUnmarshalMessage(t, orig, nil)
+	assert.Assert(t, tc == nil)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKey{}))
 }
 
@@ -78,7 +81,8 @@ func TestDecryptionTrigger(t *testing.T) {
 
 	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, cfg.blockNumber, HashByteList(txs), privKey)
 	assert.NilError(t, err)
-	m := marshalUnmarshalMessage(t, orig)
+	m, tc := marshalUnmarshalMessage(t, orig, nil)
+	assert.Assert(t, tc == nil)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionTrigger{}))
 }
 
@@ -93,7 +97,8 @@ func TestDecryptionKeyShare(t *testing.T) {
 		Share:       keyshare,
 		KeyperIndex: keyperIndex,
 	}
-	m := marshalUnmarshalMessage(t, orig)
+	m, tc := marshalUnmarshalMessage(t, orig, nil)
+	assert.Assert(t, tc == nil)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKeyShare{}))
 }
 
@@ -111,6 +116,28 @@ func TestEonPublicKey(t *testing.T) {
 	)
 	assert.NilError(t, err)
 
-	m := marshalUnmarshalMessage(t, orig)
+	m, tc := marshalUnmarshalMessage(t, orig, nil)
+	assert.Assert(t, tc == nil)
 	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(EonPublicKey{}))
+}
+
+func TestTraceContext(t *testing.T) {
+	trace.SetEnabled()
+	defer trace.SetDisabled()
+
+	tc := &TraceContext{
+		TraceID:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		SpanID:     []byte{1, 1, 1, 1, 1, 1, 1, 1},
+		TraceFlags: []byte{1},
+		TraceState: "tracestate",
+	}
+	cfg := defaultTestConfig(t)
+	validSecretKey := cfg.tkg.EpochSecretKey(cfg.epochID).Marshal()
+	msg := &DecryptionKey{
+		EpochID:    cfg.epochID.Bytes(),
+		InstanceID: cfg.instanceID,
+		Key:        validSecretKey,
+	}
+	_, newTc := marshalUnmarshalMessage(t, msg, tc)
+	assert.DeepEqual(t, tc, newTc, cmpopts.IgnoreUnexported(TraceContext{}))
 }
