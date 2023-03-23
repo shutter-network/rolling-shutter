@@ -688,19 +688,19 @@ func (q *Queries) PolyEvalsWithEncryptionKeys(ctx context.Context) ([]PolyEvalsW
 	return items, nil
 }
 
-const scheduleShutterMessage = `-- name: ScheduleShutterMessage :one
+const scheduleSerializedShutterMessage = `-- name: ScheduleSerializedShutterMessage :one
 INSERT INTO tendermint_outgoing_messages (description, msg)
 VALUES ($1, $2)
 RETURNING id
 `
 
-type ScheduleShutterMessageParams struct {
+type ScheduleSerializedShutterMessageParams struct {
 	Description string
 	Msg         []byte
 }
 
-func (q *Queries) ScheduleShutterMessage(ctx context.Context, arg ScheduleShutterMessageParams) (int32, error) {
-	row := q.db.QueryRow(ctx, scheduleShutterMessage, arg.Description, arg.Msg)
+func (q *Queries) ScheduleSerializedShutterMessage(ctx context.Context, arg ScheduleSerializedShutterMessageParams) (int32, error) {
+	row := q.db.QueryRow(ctx, scheduleSerializedShutterMessage, arg.Description, arg.Msg)
 	var id int32
 	err := row.Scan(&id)
 	return id, err

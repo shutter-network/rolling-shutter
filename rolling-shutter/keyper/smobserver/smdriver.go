@@ -1,4 +1,4 @@
-package keyper
+package smobserver
 
 import (
 	"context"

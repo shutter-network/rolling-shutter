@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
@@ -164,6 +165,18 @@ func (config *Config) GetHTTPListenAddress() string {
 
 func (config *Config) GetInstanceID() uint64 {
 	return config.InstanceID
+}
+
+func (config *Config) GetDKGPhaseLength() *dkgphase.PhaseLength {
+	return dkgphase.NewConstantPhaseLength(int64(config.DKGPhaseLength))
+}
+
+func (config *Config) GetValidatorPublicKey() ed25519.PublicKey {
+	return config.ValidatorPublicKey
+}
+
+func (config *Config) GetEncryptionKey() *ecies.PrivateKey {
+	return config.EncryptionKey
 }
 
 // WriteTOML writes a toml configuration file with the given config.

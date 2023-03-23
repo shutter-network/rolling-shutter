@@ -21,6 +21,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -38,7 +39,7 @@ type keyper struct {
 	l1Client          *ethclient.Client
 	contracts         *deployment.Contracts
 
-	shuttermintState *ShuttermintState
+	shuttermintState *smobserver.ShuttermintState
 	p2p              *p2p.P2PHandler
 }
 
@@ -117,7 +118,7 @@ func Run(ctx context.Context, config Config) error {
 		l1Client:          l1Client,
 		contracts:         contracts,
 
-		shuttermintState: NewShuttermintState(config),
+		shuttermintState: smobserver.NewShuttermintState(&config),
 		p2p:              p2pHandler,
 	}
 
@@ -196,7 +197,7 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 	}
 
 	blockSeenMsg := shmsg.NewBlockSeen(l1BlockNumber)
-	err = scheduleShutterMessage(ctx, q, "block seen", blockSeenMsg)
+	err = q.ScheduleShutterMessage(ctx, "block seen", blockSeenMsg)
 	if err != nil {
 		return err
 	}
@@ -263,7 +264,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		uint64(keyperSet.Threshold),
 		uint64(keyperSet.KeyperConfigIndex),
 	)
-	err = scheduleShutterMessage(ctx, q, "new batch config", batchConfigMsg)
+	err = q.ScheduleShutterMessage(ctx, "new batch config", batchConfigMsg)
 	if err != nil {
 		return err
 	}
@@ -277,7 +278,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 
-		err = SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
+		err = smobserver.SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
 		if err != nil {
 			return err
 		}

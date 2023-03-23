@@ -101,7 +101,7 @@ INSERT INTO tendermint_encryption_key (address, encryption_public_key) VALUES ($
 -- name: GetEncryptionKeys :many
 SELECT * FROM tendermint_encryption_key;
 
--- name: ScheduleShutterMessage :one
+-- name: ScheduleSerializedShutterMessage :one
 INSERT INTO tendermint_outgoing_messages (description, msg)
 VALUES ($1, $2)
 RETURNING id;

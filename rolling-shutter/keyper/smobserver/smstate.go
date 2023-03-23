@@ -1,7 +1,8 @@
-package keyper
+package smobserver
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
@@ -24,6 +24,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
+
+type Config interface {
+	GetAddress() common.Address
+	GetDKGPhaseLength() *dkgphase.PhaseLength
+	GetValidatorPublicKey() ed25519.PublicKey
+	GetEncryptionKey() *ecies.PrivateKey
+}
 
 type ActiveDKG struct {
 	pure        *puredkg.PureDKG
@@ -56,7 +63,7 @@ func NewShuttermintState(config Config) *ShuttermintState {
 		config:         config,
 		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
 		dkg:            make(map[uint64]*ActiveDKG),
-		phaseLength:    dkgphase.NewConstantPhaseLength(int64(config.DKGPhaseLength)),
+		phaseLength:    config.GetDKGPhaseLength(),
 	}
 }
 
@@ -190,9 +197,8 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 			receivers = nil
 			encryptedEvals = nil
 		}()
-		return scheduleShutterMessage(
+		return queries.ScheduleShutterMessage(
 			ctx,
-			queries,
 			fmt.Sprintf("poly eval eon=%d", currentEon),
 			shmsg.NewPolyEval(uint64(currentEon), receivers, encryptedEvals),
 		)
@@ -234,28 +240,6 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 	return send()
 }
 
-func scheduleShutterMessage(
-	ctx context.Context,
-	queries *kprdb.Queries,
-	description string,
-	msg *shmsg.Message,
-) error {
-	data, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	msgid, err := queries.ScheduleShutterMessage(ctx, kprdb.ScheduleShutterMessageParams{
-		Description: description,
-		Msg:         data,
-	})
-	if err != nil {
-		return err
-	}
-	log.Info().Int32("id", msgid).Str("description", description).
-		Msg("scheduled shuttermint message")
-	return nil
-}
-
 func (st *ShuttermintState) handleBatchConfig(
 	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig,
 ) error {
@@ -264,13 +248,12 @@ func (st *ShuttermintState) handleBatchConfig(
 			return nil
 		}
 		st.isKeyper = true
-		err := scheduleShutterMessage(
+		err := queries.ScheduleShutterMessage(
 			ctx,
-			queries,
 			"check-in",
 			shmsg.NewCheckIn(
-				st.config.ValidatorPublicKey,
-				&st.config.EncryptionKey.PublicKey,
+				st.config.GetValidatorPublicKey(),
+				&st.config.GetEncryptionKey().PublicKey,
 			),
 		)
 		if err != nil {
@@ -377,9 +360,8 @@ func (st *ShuttermintState) startPhase1Dealing(
 		log.Fatal().Err(err).Msg("aborting due to unexpected error")
 	}
 	dkg.markDirty()
-	err = scheduleShutterMessage(
+	err = queries.ScheduleShutterMessage(
 		ctx,
-		queries,
 		fmt.Sprintf("poly commitment, eon=%d", eon),
 		shmsg.NewPolyCommitment(eon, commitment.Gammas),
 	)
@@ -410,9 +392,8 @@ func (st *ShuttermintState) startPhase2Accusing(
 		for _, a := range accusations {
 			accused = append(accused, dkg.keypers[a.Accused])
 		}
-		err := scheduleShutterMessage(
+		err := queries.ScheduleShutterMessage(
 			ctx,
-			queries,
 			fmt.Sprintf("accusations, eon=%d, count=%d", eon, len(accusations)),
 			shmsg.NewAccusation(eon, accused),
 		)
@@ -440,8 +421,8 @@ func (st *ShuttermintState) startPhase3Apologizing(
 			polyEvals = append(polyEvals, a.Eval)
 		}
 
-		err := scheduleShutterMessage(
-			ctx, queries,
+		err := queries.ScheduleShutterMessage(
+			ctx,
 			fmt.Sprintf("apologies, eon=%d, count=%d", eon, len(apologies)),
 			shmsg.NewApology(eon, accusers, polyEvals),
 		)
@@ -502,8 +483,8 @@ func (st *ShuttermintState) finalizeDKG(
 		}
 	}
 
-	err = scheduleShutterMessage(
-		ctx, queries,
+	err = queries.ScheduleShutterMessage(
+		ctx,
 		"reporting DKG result",
 		dkgresultmsg,
 	)
@@ -608,7 +589,7 @@ func (st *ShuttermintState) handlePolyCommitment(
 }
 
 func (st *ShuttermintState) decryptPolyEval(encrypted []byte) ([]byte, error) {
-	return st.config.EncryptionKey.Decrypt(encrypted, []byte(""), []byte(""))
+	return st.config.GetEncryptionKey().Decrypt(encrypted, []byte(""), []byte(""))
 }
 
 func (st *ShuttermintState) handlePolyEval(

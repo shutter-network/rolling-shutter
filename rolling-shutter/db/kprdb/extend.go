@@ -6,10 +6,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
 func GetKeyperIndex(addr common.Address, keypers []string) (uint64, bool) {
@@ -61,5 +63,26 @@ func (q *Queries) InsertDecryptionKeyShareMsg(ctx context.Context, msg *p2pmsg.D
 			msg.KeyperIndex,
 		)
 	}
+	return nil
+}
+
+func (q *Queries) ScheduleShutterMessage(
+	ctx context.Context,
+	description string,
+	msg *shmsg.Message,
+) error {
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	msgid, err := q.ScheduleSerializedShutterMessage(ctx, ScheduleSerializedShutterMessageParams{
+		Description: description,
+		Msg:         data,
+	})
+	if err != nil {
+		return err
+	}
+	log.Info().Int32("id", msgid).Str("description", description).
+		Msg("scheduled shuttermint message")
 	return nil
 }
