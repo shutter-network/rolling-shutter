@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -85,14 +84,14 @@ func (srv *server) setupRouter() *chi.Mux {
 	return router
 }
 
-func (srv *server) Start(ctx context.Context, group *errgroup.Group) error {
+func (srv *server) Start(ctx context.Context, runner service.Runner) error {
 	httpServer := &http.Server{
 		Addr:              srv.config.GetHTTPListenAddress(),
 		Handler:           srv.setupRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	group.Go(httpServer.ListenAndServe)
-	group.Go(func() error {
+	runner.Go(httpServer.ListenAndServe)
+	runner.Go(func() error {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()

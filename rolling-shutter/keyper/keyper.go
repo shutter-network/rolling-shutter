@@ -149,7 +149,7 @@ func (kpr *keyper) getServices() []service.Service {
 }
 
 func (kpr *keyper) run(ctx context.Context) error {
-	return service.Run(ctx, kpr.getServices())
+	return service.Run(ctx, kpr.getServices()...)
 }
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
