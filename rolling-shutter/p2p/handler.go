@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -70,7 +69,7 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.Topic))
 			return false
 		}
-		unmshl, err := message.Unmarshal()
+		unmshl, _, err := message.Unmarshal()
 		if err != nil {
 			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
 			return false
@@ -211,7 +210,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 	var msgsOut []p2pmsg.Message
 	var err error
 
-	m, err := msg.Unmarshal()
+	m, _, err := msg.Unmarshal()
 	if err != nil {
 		return err
 	}
@@ -241,7 +240,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 }
 
 func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
-	msgBytes, err := proto.Marshal(msg)
+	msgBytes, err := p2pmsg.Marshal(msg, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal p2p message")
 	}

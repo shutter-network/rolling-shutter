@@ -10,7 +10,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/protobuf/proto"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
@@ -263,7 +262,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 // makePubSubMessage makes a pubsub.Message corresponding to the type received by gossip validators.
 func makePubSubMessage(message p2pmsg.Message, topic string) (*pubsub.Message, error) {
-	messageBytes, err := proto.Marshal(message)
+	messageBytes, err := p2pmsg.Marshal(message, nil)
 	if err != nil {
 		return nil, err
 	}

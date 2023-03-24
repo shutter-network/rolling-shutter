@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
@@ -23,10 +22,11 @@ func marshalUnmarshalMessage[M Message](t *testing.T, message M) M {
 		newMessage M
 		unmshl     any
 	)
-	msgBytes, err = proto.Marshal(message)
+
+	msgBytes, err = Marshal(message, nil)
 	assert.NilError(t, err)
 
-	unmshl, err = Unmarshal(message.Topic(), msgBytes)
+	unmshl, _, err = Unmarshal(msgBytes)
 	assert.NilError(t, err)
 	newMessage, ok = unmshl.(M)
 	assert.Assert(t, ok)

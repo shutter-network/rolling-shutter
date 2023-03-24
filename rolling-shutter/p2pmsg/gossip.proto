@@ -1,7 +1,10 @@
 syntax = "proto3";
 package p2pmsg;
 
+import "google/protobuf/any.proto";
+
 option go_package = "./;p2pmsg";
+
 
 message DecryptionTrigger {
     uint64 instanceID = 1;
@@ -37,4 +40,18 @@ message EonPublicKey {
     uint64 keyperConfigIndex = 6;
     uint64 eon = 7;
     bytes signature = 5;
+}
+
+
+message TraceContext {
+    bytes traceID = 1;
+    bytes spanID = 2;
+    bytes traceFlags = 3;
+    string traceState = 4;
+}
+
+message Envelope {
+    string version = 1 ;
+    google.protobuf.Any message = 2;
+    optional TraceContext trace = 3;
 }

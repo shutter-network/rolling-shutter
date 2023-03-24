@@ -2,18 +2,20 @@ package p2pmsg
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 )
+
+const EnvelopeVersion = "0.0.1"
 
 // All messages to be used in the P2P Gossip have to be included in this slice,
 // otherwise they won't be known to the marshaling layer.
@@ -25,7 +27,10 @@ var messageTypes = []Message{
 	new(EonPublicKey),
 }
 
-var topicToProtoName = make(map[string]protoreflect.FullName)
+var (
+	topicToProtoName = make(map[string]protoreflect.FullName)
+	protoNames       = make(map[protoreflect.FullName]bool)
+)
 
 func init() {
 	for _, mess := range messageTypes {
@@ -46,6 +51,7 @@ func registerMessage(mess Message) {
 		}
 	}
 	topicToProtoName[topic] = messageTypeName
+	protoNames[messageTypeName] = true
 }
 
 // Message can be send via the p2p protocol.
@@ -74,23 +80,52 @@ func NewMessageFromTopic(topic string) (Message, error) {
 	return protomess, nil
 }
 
-func Unmarshal(topic string, data []byte) (Message, error) {
-	var err error
-
-	unmshl, err := NewMessageFromTopic(topic)
+func Marshal(msg Message, traceContext *TraceContext) ([]byte, error) {
+	var msgBytes []byte
+	wrappedMsg, err := anypb.New(msg)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve deserialisation type")
+		return msgBytes, errors.Wrap(err, "failed to wrap protobuf msg in 'any' type")
 	}
 
-	if err = proto.Unmarshal(data, unmshl); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal protobuf <%s>", reflect.TypeOf(unmshl).String()))
+	envelopedMsg := Envelope{
+		Version: EnvelopeVersion,
+		Message: wrappedMsg,
+		Trace:   traceContext,
 	}
 
-	err = unmshl.Validate()
+	msgBytes, err = proto.Marshal(&envelopedMsg)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()))
+		return msgBytes, errors.Wrap(err, "failed to marshal p2p message")
 	}
-	return unmshl, nil
+	return msgBytes, nil
+}
+
+func Unmarshal(data []byte) (Message, *TraceContext, error) {
+	envelope := &Envelope{}
+	if err := proto.Unmarshal(data, envelope); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to unmarshal protobuf <Envelope>")
+	}
+
+	// Fix the required version for now with an exact version match
+	if envelope.GetVersion() != EnvelopeVersion {
+		return nil, nil, errors.New("version mismatch")
+	}
+	traceContext := envelope.GetTrace()
+	msg, err := envelope.GetMessage().UnmarshalNew()
+	if err != nil {
+		return nil, traceContext, err
+	}
+	msgFullName := proto.MessageName(msg)
+	if _, ok := protoNames[msgFullName]; !ok {
+		return nil, traceContext, errors.Errorf("unknown message type <%s>", msgFullName.Name())
+	}
+
+	p2pmess, ok := msg.(Message)
+	if !ok {
+		return nil, traceContext, errors.Errorf(
+			"message of type <%s> does not comply with message interface", msgFullName.Name())
+	}
+	return p2pmess, traceContext, nil
 }
 
 func (*DecryptionTrigger) ImplementsP2PMessage() {

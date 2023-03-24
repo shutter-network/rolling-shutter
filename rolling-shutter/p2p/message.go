@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -17,21 +16,17 @@ type Message struct {
 	SenderID string
 }
 
-func (msg Message) Unmarshal() (p2pmsg.Message, error) {
+func (msg Message) Unmarshal() (p2pmsg.Message, *p2pmsg.TraceContext, error) { //nolint: unparam
 	var err error
 
-	unmshl, err := p2pmsg.NewMessageFromTopic(msg.Topic)
+	unmshl, traceContext, err := p2pmsg.Unmarshal(msg.Message)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve deserialisation type")
-	}
-
-	if err = proto.Unmarshal(msg.Message, unmshl); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal protobuf <%s>", reflect.TypeOf(unmshl).String()))
+		return nil, traceContext, errors.Wrap(err, "failed to unmarshal message")
 	}
 
 	err = unmshl.Validate()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()))
+		return nil, traceContext, errors.Wrap(err, fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()))
 	}
-	return unmshl, nil
+	return unmshl, traceContext, nil
 }
