@@ -13,6 +13,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
 const EnvelopeVersion = "0.0.1"
@@ -111,6 +112,10 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 		return nil, nil, errors.New("version mismatch")
 	}
 	traceContext := envelope.GetTrace()
+
+	if !trace.IsEnabled() && traceContext != nil {
+		traceContext = nil
+	}
 	msg, err := envelope.GetMessage().UnmarshalNew()
 	if err != nil {
 		return nil, traceContext, err

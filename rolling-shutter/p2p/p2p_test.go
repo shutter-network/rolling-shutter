@@ -110,5 +110,5 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	}
 	assert.Equal(t, topicName, message.Topic, "received message with wrong topic")
 	assert.Check(t, bytes.Equal(testMessage, message.Message), "received wrong message")
-	assert.Equal(t, p2ps[1].HostID(), message.SenderID, "received message with wrong sender")
+	assert.Equal(t, p2ps[1].HostID(), message.Sender.String(), "received message with wrong sender")
 }

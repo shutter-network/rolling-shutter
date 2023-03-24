@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -11,12 +12,14 @@ import (
 
 // Message envelopes the serialized protobuf bytes with additional topic and sender info.
 type Message struct {
-	Topic    string
-	Message  []byte
-	SenderID string
+	Topic        string
+	Message      []byte
+	Sender       peer.ID
+	ReceivedFrom peer.ID
+	ID           string
 }
 
-func (msg Message) Unmarshal() (p2pmsg.Message, *p2pmsg.TraceContext, error) { //nolint: unparam
+func (msg Message) Unmarshal() (p2pmsg.Message, *p2pmsg.TraceContext, error) {
 	var err error
 
 	unmshl, traceContext, err := p2pmsg.Unmarshal(msg.Message)

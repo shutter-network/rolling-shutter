@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -24,7 +25,7 @@ type (
 	ValidatorRegistry                   map[string]pubsub.Validator
 )
 
-func GetMessageType(msg p2pmsg.Message) protoreflect.FullName {
+func GetMessageType(msg protoreflect.ProtoMessage) protoreflect.FullName {
 	return msg.ProtoReflect().Type().Descriptor().FullName()
 }
 
@@ -60,9 +61,11 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 		)
 
 		message := Message{
-			Topic:    *libp2pMessage.Topic,
-			Message:  libp2pMessage.Data,
-			SenderID: libp2pMessage.GetFrom().Pretty(),
+			Topic:        *libp2pMessage.Topic,
+			Message:      libp2pMessage.Data,
+			Sender:       libp2pMessage.GetFrom(),
+			ReceivedFrom: libp2pMessage.ReceivedFrom,
+			ID:           libp2pMessage.ID,
 		}
 		if message.Topic != topic {
 			// This should not happen, if so then we registered the validator function on the wrong topic
@@ -197,7 +200,7 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 				return nil
 			}
 			if err := h.handle(ctx, msg); err != nil {
-				log.Info().Err(err).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+				log.Info().Err(err).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
 					Msg("failed to handle message")
 			}
 		case <-ctx.Done():
@@ -210,24 +213,26 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 	var msgsOut []p2pmsg.Message
 	var err error
 
-	m, _, err := msg.Unmarshal()
+	m, traceContext, err := msg.Unmarshal()
 	if err != nil {
 		return err
 	}
 
-	msgType := GetMessageType(m)
-	handlerFunc, exists := h.handlerRegistry[msgType]
+	ctx, span, reportError := newSpanForReceive(ctx, h.P2P, traceContext, msg, m)
+	defer span.End()
+
+	handlerFunc, exists := h.handlerRegistry[proto.MessageName(m)]
 	if !exists {
-		log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+		log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
 			Msg("ignoring message, no handler registered for topic")
 		return nil
 	}
 
-	log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.SenderID).
+	log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
 		Msg("received message")
 	msgsOut, err = handlerFunc(ctx, m)
 	if err != nil {
-		return err
+		return reportError(err)
 	}
 	for _, msgOut := range msgsOut {
 		if err := h.SendMessage(ctx, msgOut); err != nil {
@@ -240,9 +245,13 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 }
 
 func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
-	msgBytes, err := p2pmsg.Marshal(msg, nil)
+	var traceContext *p2pmsg.TraceContext
+	ctx, span, reportError := newSpanForPublish(ctx, h.P2P, traceContext, msg)
+	defer span.End()
+
+	msgBytes, err := p2pmsg.Marshal(msg, traceContext)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal p2p message")
+		return reportError(errors.Wrap(err, "failed to marshal p2p message"))
 	}
 
 	// if no retry options are passed, don't do any retries!
@@ -259,5 +268,5 @@ func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryO
 		},
 		retryOpts...,
 	)
-	return callErr
+	return reportError(callErr)
 }
