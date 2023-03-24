@@ -80,7 +80,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			err := p.Run(runctx, gossipTopicNames, make(map[string]pubsub.Validator))
+			err := p.Run(runctx, gossipTopicNames, map[string]pubsub.ValidatorEx{})
 			assert.Assert(t, err == context.Canceled)
 		}()
 	}

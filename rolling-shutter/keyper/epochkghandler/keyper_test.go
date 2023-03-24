@@ -7,18 +7,93 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
+
+func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
+	defer closedb()
+
+	keyperIndex := uint64(1)
+	eon := uint64(0)
+	epochID, _ := epochid.BigToEpochID(common.Big0)
+	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
+	tkg := initializeEon(ctx, t, db, keyperIndex)
+	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
+	kpr := New(config.Address, config.InstanceID, dbpool)
+
+	tests := []struct {
+		name  string
+		valid bool
+		msg   *p2pmsg.DecryptionKeyShare
+	}{
+		{
+			name:  "valid decryption key share",
+			valid: true,
+			msg: &p2pmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				Eon:         eon,
+				EpochID:     epochID.Bytes(),
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:  "invalid decryption key share wrong epoch",
+			valid: false,
+			msg: &p2pmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				Eon:         eon,
+				EpochID:     wrongEpochID.Bytes(),
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:  "invalid decryption key share wrong instance ID",
+			valid: false,
+			msg: &p2pmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID + 1,
+				Eon:         eon,
+				EpochID:     epochID.Bytes(),
+				KeyperIndex: keyperIndex,
+				Share:       keyshare,
+			},
+		},
+		{
+			name:  "invalid decryption key share wrong keyper index",
+			valid: false,
+			msg: &p2pmsg.DecryptionKeyShare{
+				InstanceID:  config.InstanceID,
+				Eon:         eon,
+				EpochID:     epochID.Bytes(),
+				KeyperIndex: keyperIndex + 1,
+				Share:       keyshare,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			validationResult, err := kpr.validateDecryptionKeyShare(ctx, tc.msg)
+			if tc.valid {
+				assert.NilError(t, err)
+			}
+			assert.Equal(t, validationResult, tc.valid,
+				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
+		})
+	}
+}
 
 func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	if testing.Short() {
@@ -35,27 +110,17 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
 	tkg := initializeEon(ctx, t, db, keyperIndex)
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
-	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
-
-	p2pHandler := p2p.New(p2p.Config{})
 
 	kpr := New(config.Address, config.InstanceID, dbpool)
 
-	var peerID peer.ID
-
-	validateDecryptionKey := p2p.AddValidator(p2pHandler, kpr.validateDecryptionKey)
-	validateDecryptionKeyShare := p2p.AddValidator(p2pHandler, kpr.validateDecryptionKeyShare)
-
 	tests := []struct {
-		name      string
-		validator pubsub.Validator
-		valid     bool
-		msg       p2pmsg.Message
+		name  string
+		valid bool
+		msg   *p2pmsg.DecryptionKey
 	}{
 		{
-			name:      "valid decryption key",
-			valid:     true,
-			validator: validateDecryptionKey,
+			name:  "valid decryption key",
+			valid: true,
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
@@ -64,9 +129,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:      "invalid decryption key wrong epoch",
-			valid:     false,
-			validator: validateDecryptionKey,
+			name:  "invalid decryption key wrong epoch",
+			valid: false,
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID,
 				Eon:        eon,
@@ -75,9 +139,8 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:      "invalid decryption key wrong instance ID",
-			valid:     false,
-			validator: validateDecryptionKey,
+			name:  "invalid decryption key wrong instance ID",
+			valid: false,
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.InstanceID + 1,
 				Eon:        eon,
@@ -85,63 +148,14 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 				Key:        secretKey,
 			},
 		},
-		{
-			name:      "valid decryption key share",
-			valid:     true,
-			validator: validateDecryptionKeyShare,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:      "invalid decryption key share wrong epoch",
-			valid:     false,
-			validator: validateDecryptionKeyShare,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
-				Eon:         eon,
-				EpochID:     wrongEpochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:      "invalid decryption key share wrong instance ID",
-			valid:     false,
-			validator: validateDecryptionKeyShare,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID + 1,
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:      "invalid decryption key share wrong keyper index",
-			valid:     false,
-			validator: validateDecryptionKeyShare,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex + 1,
-				Share:       keyshare,
-			},
-		},
 	}
 	for _, tc := range tests {
-		topic := tc.msg.Topic()
 		t.Run(tc.name, func(t *testing.T) {
-			pubsubMessage, err := makePubSubMessage(tc.msg, topic)
-			if err != nil {
-				t.Fatalf("Error in makePubSubMessage: %s", err)
+			validationResult, err := kpr.validateDecryptionKey(ctx, tc.msg)
+			if tc.valid {
+				assert.NilError(t, err)
 			}
-			assert.Equal(t, tc.validator(ctx, peerID, pubsubMessage), tc.valid,
+			assert.Equal(t, validationResult, tc.valid,
 				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
 		})
 	}
@@ -156,7 +170,6 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	p2pHandler := p2p.New(p2p.Config{})
 	kpr := New(config.Address, config.InstanceID, dbpool)
 
 	collatorKey1, err := ethcrypto.GenerateKey()
@@ -185,10 +198,6 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		Collator:              collator2,
 	})
 	assert.NilError(t, err)
-
-	var peerID peer.ID
-
-	validateDecryptionTrigger := p2p.AddValidator(p2pHandler, kpr.validateDecryptionTrigger)
 
 	tests := []struct {
 		name        string
@@ -249,32 +258,12 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 				tc.privKey,
 			)
 			assert.NilError(t, err)
-			topic := msg.Topic()
-			pubsubMsg, err := makePubSubMessage(msg, topic)
-			if err != nil {
-				t.Fatalf("Error in makePubSubMessage: %s", err)
+			validationResult, err := kpr.validateDecryptionTrigger(ctx, msg)
+			if tc.valid {
+				assert.NilError(t, err)
 			}
-			assert.Equal(t, validateDecryptionTrigger(ctx, peerID, pubsubMsg), tc.valid,
+			assert.Equal(t, validationResult, tc.valid,
 				"validate failed valid=%t", tc.valid)
 		})
 	}
-}
-
-// makePubSubMessage makes a pubsub.Message corresponding to the type received by gossip validators.
-func makePubSubMessage(message p2pmsg.Message, topic string) (*pubsub.Message, error) {
-	messageBytes, err := p2pmsg.Marshal(message, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	pubsubMessage := pubsub.Message{
-		Message: &pb.Message{
-			Data:  messageBytes,
-			Topic: &topic,
-		},
-		ReceivedFrom:  "",
-		ValidatorData: nil,
-	}
-
-	return &pubsubMessage, nil
 }

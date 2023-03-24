@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -22,8 +21,45 @@ type (
 	HandlerFunc                         func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
 	HandlerRegistry                     map[protoreflect.FullName]HandlerFunc
 	ValidatorFunc[M p2pmsg.Message]     func(context.Context, M) (bool, error)
-	ValidatorRegistry                   map[string]pubsub.Validator
+	ValidatorRegistry                   map[string]pubsub.ValidatorEx
+
+	ValidatorOption func(*validator) error
+	validator       struct {
+		allowTraceContext bool
+		invalidResultType pubsub.ValidationResult
+	}
 )
+
+func defaults() ValidatorOption {
+	return func(v *validator) error {
+		v.allowTraceContext = false
+		v.invalidResultType = pubsub.ValidationReject
+		return nil
+	}
+}
+
+// WithTraceContextPropagation option allows for
+// cross-cutting trace-context to be propagated and accepted.
+// If this is not set, if a peer sends a trace-context within the
+// message envelope, the message will be rejected and the
+// sender will be punished (as per local peer score).
+func WithTraceContextPropagation() ValidatorOption {
+	return func(v *validator) error {
+		v.allowTraceContext = true
+		return nil
+	}
+}
+
+// WithGracefulIgnore option allows to "upgrade" all messages
+// that would have been rejected to a ignore only.
+// This means that the peer will not get punished (as per local
+// peer score and can continue to send messages.
+func WithGracefulIgnore() ValidatorOption {
+	return func(v *validator) error {
+		v.invalidResultType = pubsub.ValidationIgnore
+		return nil
+	}
+}
 
 func GetMessageType(msg protoreflect.ProtoMessage) protoreflect.FullName {
 	return msg.ProtoReflect().Type().Descriptor().FullName()
@@ -37,7 +73,7 @@ func GetMessageType(msg protoreflect.ProtoMessage) protoreflect.FullName {
 // the passed in validator will be called automatically when a message of type M is received
 //
 // For each message type M, there can only be one validator registered per P2PHandler.
-func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M]) pubsub.Validator {
+func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M], opts ...ValidatorOption) error {
 	var messProto M
 	topic := messProto.Topic()
 
@@ -45,16 +81,26 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 	if exists {
 		// This is likely not intended and happens when different messages return the same P2PMessage.Topic().
 		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
-
-		// Instead of silently overwriting the old validator, rather panic.
 		// (If feature needed, allow for chaining of successively registered validator functions per topic)
-		panic(fmt.Sprintf("Can't register more than one validator per topic (topic: '%s', message-type: '%s')", topic, reflect.TypeOf(messProto)))
+		return errors.Errorf(
+			"can't register more than one validator per topic (topic: '%s', message-type: '%s')",
+			topic,
+			reflect.TypeOf(messProto))
 	}
 
 	handleError := func(err error) {
 		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
 	}
-	validate := func(ctx context.Context, _ peer.ID, libp2pMessage *pubsub.Message) bool {
+	val := &validator{
+		allowTraceContext: false,
+	}
+	opts = append([]ValidatorOption{defaults()}, opts...)
+	for _, opt := range opts {
+		if err := opt(val); err != nil {
+			return errors.Wrap(err, "invalid validator option")
+		}
+	}
+	validate := func(ctx context.Context, sender peer.ID, libp2pMessage *pubsub.Message) pubsub.ValidationResult {
 		var (
 			key M
 			ok  bool
@@ -68,31 +114,38 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 			ID:           libp2pMessage.ID,
 		}
 		if message.Topic != topic {
-			// This should not happen, if so then we registered the validator function on the wrong topic
 			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.Topic))
-			return false
+			return val.invalidResultType
 		}
-		unmshl, _, err := message.Unmarshal()
+		unmshl, traceContext, err := message.Unmarshal()
 		if err != nil {
 			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
-			return false
+			return val.invalidResultType
+		}
+
+		if traceContext != nil && !val.allowTraceContext {
+			handleError(errors.New("received non-empty trace-context"))
+			return val.invalidResultType
 		}
 
 		key, ok = unmshl.(M)
 		if !ok {
 			handleError(errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)))
-			return false
+			return val.invalidResultType
 		}
 
 		valid, err := valFunc(ctx, key)
 		if err != nil {
 			handleError(err)
 		}
-		return valid
+		if !valid {
+			return val.invalidResultType
+		}
+		return pubsub.ValidationAccept
 	}
 	handler.validatorRegistry[topic] = validate
 	handler.AddGossipTopic(topic)
-	return validate
+	return nil
 }
 
 // AddHandlerFunc will add a handler-function to a P2PHandler instance:
@@ -103,13 +156,13 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 // AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler
 //
 // For each message type M, there can only be one handler registered per P2PHandler.
-func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) HandlerFunc {
+func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) error {
 	var messProto M
 	messageType := GetMessageType(messProto)
 
 	_, exists := handler.handlerRegistry[messageType]
 	if exists {
-		panic(fmt.Sprintf("Can't register more than one handler per message-type (message-type: '%s')", messageType))
+		return errors.Errorf("Can't register more than one handler per message-type (message-type: '%s')", messageType)
 	}
 
 	f := func(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
@@ -123,7 +176,7 @@ func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFu
 	}
 	handler.handlerRegistry[messageType] = f
 	handler.AddGossipTopic(messProto.Topic())
-	return f
+	return nil
 }
 
 func New(config Config) *P2PHandler {
