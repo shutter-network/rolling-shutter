@@ -18,7 +18,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
@@ -31,6 +30,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -57,7 +57,12 @@ type collator struct {
 	signals   signals
 }
 
-func Run(ctx context.Context, cfg config.Config) error {
+func New(cfg config.Config) service.Service {
+	return &collator{Config: cfg}
+}
+
+func (c *collator) Start(ctx context.Context, runner service.Runner) error {
+	cfg := c.Config
 	log.Info().Str("ethereum-address", cfg.EthereumAddress().Hex()).Msg(
 		"starting collator",
 	)
@@ -66,7 +71,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	defer dbpool.Close()
+	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(cfg.EthereumURL)
@@ -101,25 +106,55 @@ func Run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 
-	c := collator{
-		Config: cfg,
-
-		l1Client:  l1Client,
-		l2Client:  l2RPCClient,
-		contracts: contracts,
-		p2p: p2p.New(p2p.Config{
-			ListenAddrs:    cfg.ListenAddresses,
-			BootstrapPeers: cfg.CustomBootstrapAddresses,
-			PrivKey:        cfg.P2PKey,
-		}),
-		batcher:   btchr,
-		dbpool:    dbpool,
-		submitter: submitter,
-	}
-	c.submitter.collator = &c
+	c.l1Client = l1Client
+	c.l2Client = l2RPCClient
+	c.contracts = contracts
+	c.p2p = p2p.New(p2p.Config{
+		ListenAddrs:    cfg.ListenAddresses,
+		BootstrapPeers: cfg.CustomBootstrapAddresses,
+		PrivKey:        cfg.P2PKey,
+	})
+	c.batcher = btchr
+	c.dbpool = dbpool
+	c.submitter = submitter
+	c.submitter.collator = c
 	c.setupP2PHandler()
 
-	return c.run(ctx)
+	httpServer := &http.Server{
+		Addr:              c.Config.HTTPListenAddress,
+		Handler:           c.setupRouter(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	newSignal := func(signalName string, handler shdb.SignalHandler) shdb.SignalFunc {
+		sig, loop := shdb.NewSignal(ctx, signalName, handler)
+		runner.Go(loop)
+		return sig
+	}
+	c.signals.newDecryptionTrigger = newSignal(newDecryptionTrigger, c.sendDecryptionTriggers)
+	c.signals.newDecryptionKey = newSignal(newDecryptionKey, c.submitter.submitBatch)
+	c.signals.newBatchTx = newSignal(newBatchtx, c.submitter.submitBatchTxToSequencer)
+
+	runner.Go(httpServer.ListenAndServe)
+	runner.Go(func() error {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return httpServer.Shutdown(shutdownCtx)
+	})
+	runner.Go(func() error {
+		return c.handleContractEvents(ctx)
+	})
+	runner.Go(func() error {
+		return c.p2p.Run(ctx)
+	})
+	runner.Go(func() error {
+		return c.handleDatabaseNotifications(ctx)
+	})
+	runner.Go(func() error {
+		return c.closeBatchesTicker(ctx, c.Config.EpochDuration)
+	})
+	return nil
 }
 
 func (c *collator) setupP2PHandler() {
@@ -224,46 +259,6 @@ func (c *collator) handleDatabaseNotifications(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-}
-
-func (c *collator) run(ctx context.Context) error {
-	httpServer := &http.Server{
-		Addr:              c.Config.HTTPListenAddress,
-		Handler:           c.setupRouter(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-
-	errorgroup, errorctx := errgroup.WithContext(ctx)
-	newSignal := func(signalName string, handler shdb.SignalHandler) shdb.SignalFunc {
-		sig, loop := shdb.NewSignal(errorctx, signalName, handler)
-		errorgroup.Go(loop)
-		return sig
-	}
-	c.signals.newDecryptionTrigger = newSignal(newDecryptionTrigger, c.sendDecryptionTriggers)
-	c.signals.newDecryptionKey = newSignal(newDecryptionKey, c.submitter.submitBatch)
-	c.signals.newBatchTx = newSignal(newBatchtx, c.submitter.submitBatchTxToSequencer)
-
-	errorgroup.Go(httpServer.ListenAndServe)
-	errorgroup.Go(func() error {
-		<-errorctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return httpServer.Shutdown(shutdownCtx)
-	})
-	errorgroup.Go(func() error {
-		return c.handleContractEvents(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return c.p2p.Run(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return c.handleDatabaseNotifications(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return c.closeBatchesTicker(errorctx, c.Config.EpochDuration)
-	})
-
-	return errorgroup.Wait()
 }
 
 func (c *collator) handleContractEvents(ctx context.Context) error {
