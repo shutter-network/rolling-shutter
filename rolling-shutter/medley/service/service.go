@@ -3,8 +3,12 @@ package service
 
 import (
 	"context"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -65,6 +69,39 @@ func Run(ctx context.Context, services ...Service) error {
 	})
 	defer r.runShutdownFuncs()
 	return group.Wait()
+}
+
+// notifyTermination creates a context that is canceled, when the process receives SIGINT or
+// SIGTERM. Similar to signal.NotifyContext, but with additional log output.
+func notifyTermination(ctx context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	if ctx.Err() == nil {
+		go func() {
+			select {
+			case sig := <-termChan:
+				log.Info().Str("signal", sig.String()).Msg("received OS signal, shutting down")
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+	return ctx, cancel
+}
+
+// RunWithSighandler runs the given services until they fail or the process receives a
+// SIGINT/SIGTERM signal.
+func RunWithSighandler(ctx context.Context, services ...Service) error {
+	ctx, cancel := notifyTermination(ctx)
+	defer cancel()
+	err := Run(ctx, services...)
+	if err == context.Canceled {
+		log.Info().Msg("bye")
+		return nil
+	}
+
+	return err
 }
 
 type ServiceFn struct {

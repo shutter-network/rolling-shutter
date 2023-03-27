@@ -3,9 +3,6 @@ package keyper
 import (
 	"bytes"
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -135,22 +132,7 @@ func keyperMain() error {
 		Str("shuttermint", config.ShuttermintURL).
 		Msg("starting keyper")
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
-		cancel()
-	}()
-
-	err = service.Run(ctx, keyper.New(config))
-	if err == context.Canceled {
-		log.Info().Msg("bye")
-		return nil
-	}
-	return err
+	return service.RunWithSighandler(context.Background(), keyper.New(config))
 }
 
 func initDB() error {
