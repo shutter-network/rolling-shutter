@@ -4,19 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"os"
-	"os/signal"
-	"syscall"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocknode"
 )
 
@@ -137,21 +134,5 @@ func main() error {
 	if err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
-		cancel()
-	}()
-
-	err = mockNode.Run(ctx)
-	if err == context.Canceled {
-		log.Info().Msg("bye")
-		return nil
-	}
-	return err
+	return service.RunWithSighandler(context.Background(), mockNode)
 }

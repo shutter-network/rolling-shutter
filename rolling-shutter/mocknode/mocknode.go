@@ -12,13 +12,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -70,25 +70,24 @@ func New(config Config) (*MockNode, error) {
 	return node, nil
 }
 
-func (m *MockNode) Run(ctx context.Context) error {
+func (m *MockNode) Start(ctx context.Context, runner service.Runner) error {
 	if err := m.logStartupInfo(); err != nil {
 		return err
 	}
 
-	g, errctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		return m.p2p.Run(errctx)
+	runner.Go(func() error {
+		return m.p2p.Run(ctx)
 	})
-	g.Go(func() error {
-		return m.sendMessages(errctx)
+	runner.Go(func() error {
+		return m.sendMessages(ctx)
 	})
 
 	if m.Config.SendTransactions {
-		g.Go(func() error {
-			return m.sendTransactions(errctx)
+		runner.Go(func() error {
+			return m.sendTransactions(ctx)
 		})
 	}
-	return g.Wait()
+	return nil
 }
 
 func (m *MockNode) setupP2PHandler() {
