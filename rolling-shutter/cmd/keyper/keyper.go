@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -144,7 +145,7 @@ func keyperMain() error {
 		cancel()
 	}()
 
-	err = keyper.Run(ctx, config)
+	err = service.Run(ctx, keyper.New(config))
 	if err == context.Canceled {
 		log.Info().Msg("bye")
 		return nil

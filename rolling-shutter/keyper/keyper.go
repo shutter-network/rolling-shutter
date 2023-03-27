@@ -43,6 +43,10 @@ type keyper struct {
 	p2p              *p2p.P2PHandler
 }
 
+func New(config Config) service.Service {
+	return &keyper{config: config}
+}
+
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
 // it stores the config's ethereum address into the database. On subsequent uses it compares the
 // stored value and raises an error if it doesn't match.
@@ -68,12 +72,13 @@ func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) er
 	return nil
 }
 
-func Run(ctx context.Context, config Config) error {
+func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
+	config := kpr.config
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	defer dbpool.Close()
+	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(config.EthereumURL)
@@ -110,21 +115,16 @@ func Run(ctx context.Context, config Config) error {
 		Environment:    p2p.Production,
 	})
 
-	k := keyper{
-		config:            config,
-		dbpool:            dbpool,
-		shuttermintClient: shuttermintClient,
-		messageSender:     messageSender,
-		l1Client:          l1Client,
-		contracts:         contracts,
+	kpr.dbpool = dbpool
+	kpr.shuttermintClient = shuttermintClient
+	kpr.messageSender = messageSender
+	kpr.l1Client = l1Client
+	kpr.contracts = contracts
+	kpr.shuttermintState = smobserver.NewShuttermintState(&config)
+	kpr.p2p = p2pHandler
 
-		shuttermintState: smobserver.NewShuttermintState(&config),
-		p2p:              p2pHandler,
-	}
-
-	k.setupP2PHandler()
-
-	return k.run(ctx)
+	kpr.setupP2PHandler()
+	return runner.StartService(kpr.getServices()...)
 }
 
 func (kpr *keyper) setupP2PHandler() {
@@ -147,10 +147,6 @@ func (kpr *keyper) getServices() []service.Service {
 		services = append(services, kprapi.NewHTTPService(kpr.dbpool, &kpr.config, kpr.p2p))
 	}
 	return services
-}
-
-func (kpr *keyper) run(ctx context.Context) error {
-	return service.Run(ctx, kpr.getServices()...)
 }
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
