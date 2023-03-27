@@ -1,11 +1,9 @@
 package chain
 
 import (
-	"fmt"
+	"context"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -13,11 +11,11 @@ import (
 	"github.com/spf13/viper"
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	cfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/node"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 var cfgFile string
@@ -40,34 +38,73 @@ func Cmd() *cobra.Command {
 
 func chainMain() {
 	log.Info().Str("version", shversion.Version()).Msg("starting shuttermint")
-
-	node, err := newTendermint(cfgFile) //nolint:gocritic
+	config, err := readConfig(cfgFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		log.Error().Err(err).Msg("could not read config file")
 		os.Exit(2)
 	}
-	err = node.Start()
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		err = node.Stop()
-		if err != nil {
-			panic(err)
-		}
-		node.Wait()
-	}()
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	sig := <-c
-	log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
-	// Previously we had an os.Exit(0) call here, but now we do wait until the defer function
-	// above is done
+	err = service.RunWithSighandler(context.Background(), &appService{config: config})
+	if err != nil {
+		log.Error().Err(err).Msg("service failed")
+		os.Exit(1)
+	}
 }
 
-func newTendermint(configFile string) (service.Service, error) {
-	// read config
+type appService struct {
+	config *cfg.Config
+}
+
+func (as *appService) Start(ctx context.Context, runner service.Runner) error {
+	logger, err := newLogger(as.config.LogLevel)
+	if err != nil {
+		return errors.Wrap(err, "failed to create tendermint logger")
+	}
+
+	nodeid, err := as.config.LoadNodeKeyID()
+	if err != nil {
+		return err
+	}
+	log.Info().Str("node-id", string(nodeid)).Msg("loaded node-id")
+
+	shapp, err := app.LoadShutterAppFromFile(
+		filepath.Join(as.config.DBDir(), "shutter.gob"),
+	)
+	if err != nil {
+		return err
+	}
+
+	tmNode, err := node.New(
+		as.config,
+		logger,
+		abciclient.NewLocalCreator(&shapp),
+		nil,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create new Tendermint node")
+	}
+	err = tmNode.Start()
+	if err != nil {
+		return errors.Wrap(err, "failed to start Tendermint node")
+	}
+	runner.Go(func() error {
+		tmNode.Wait()
+		log.Debug().Msg("Node stopped")
+		return nil
+	})
+	runner.Go(func() error {
+		<-ctx.Done()
+		log.Debug().Msg("Stopping node")
+		err := tmNode.Stop()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to stop Tendermint node")
+		}
+		return nil
+	})
+	return nil
+}
+
+func readConfig(configFile string) (*cfg.Config, error) {
 	config := cfg.DefaultConfig()
 	config.RootDir = filepath.Dir(filepath.Dir(configFile))
 	config.SetRoot(config.RootDir)
@@ -81,29 +118,5 @@ func newTendermint(configFile string) (service.Service, error) {
 	if err := config.ValidateBasic(); err != nil {
 		return nil, errors.Wrap(err, "config is invalid")
 	}
-	nodeid, err := config.LoadNodeKeyID()
-	if err != nil {
-		return nil, err
-	}
-	log.Info().Str("node-id", string(nodeid)).Msg("loaded node-id")
-	logger, err := newLogger(config.LogLevel)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create tendermint logger")
-	}
-
-	shapp, err := app.LoadShutterAppFromFile(
-		filepath.Join(config.DBDir(), "shutter.gob"))
-	if err != nil {
-		return nil, err
-	}
-
-	srvc, err := node.New(
-		config,
-		logger,
-		abciclient.NewLocalCreator(&shapp),
-		nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create new Tendermint node")
-	}
-	return srvc, nil
+	return config, nil
 }
