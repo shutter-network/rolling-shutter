@@ -24,6 +24,7 @@ func makePubSubParams(options pubSubParamsOptions) (*pubsub.GossipSubParams, *pu
 		gossipSubParams.Dlo = 0
 		gossipSubParams.Dhi = 0
 		gossipSubParams.Dout = 0
+		gossipSubParams.Dscore = 0
 	}
 
 	peerScoreThresholds := &pubsub.PeerScoreThresholds{
