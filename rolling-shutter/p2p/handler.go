@@ -195,7 +195,7 @@ func New(config Config) *P2PHandler {
 	config.BootstrapPeers = bstrpPeersWithoutSelf
 	h := &P2PHandler{
 		P2P:               NewP2PNode(config),
-		gossipTopicNames:  make(map[string]bool),
+		gossipTopicNames:  make(map[string]struct{}),
 		handlerRegistry:   make(HandlerRegistry),
 		validatorRegistry: make(ValidatorRegistry),
 	}
@@ -204,7 +204,7 @@ func New(config Config) *P2PHandler {
 
 type P2PHandler struct {
 	P2P              *P2PNode
-	gossipTopicNames map[string]bool
+	gossipTopicNames map[string]struct{}
 
 	handlerRegistry   HandlerRegistry
 	validatorRegistry ValidatorRegistry
@@ -217,7 +217,7 @@ type P2PHandler struct {
 // with the AddHandlerFunc() and AddValidator() functions
 // (e.g. for a publish only scenario for the topic).
 func (h *P2PHandler) AddGossipTopic(topic string) {
-	h.gossipTopicNames[topic] = true
+	h.gossipTopicNames[topic] = struct{}{}
 }
 
 func (h *P2PHandler) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
