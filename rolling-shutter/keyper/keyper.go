@@ -137,7 +137,7 @@ func (kpr *keyper) setupP2PHandler() {
 
 func (kpr *keyper) getServices() []service.Service {
 	services := []service.Service{
-		service.ServiceFn{Fn: kpr.p2p.Run},
+		kpr.p2p,
 		service.ServiceFn{Fn: kpr.operateShuttermint},
 		service.ServiceFn{Fn: kpr.broadcastEonPublicKeys},
 		service.ServiceFn{Fn: kpr.handleContractEvents},

@@ -74,10 +74,9 @@ func (m *MockNode) Start(ctx context.Context, runner service.Runner) error {
 	if err := m.logStartupInfo(); err != nil {
 		return err
 	}
-
-	runner.Go(func() error {
-		return m.p2p.Run(ctx)
-	})
+	if err := runner.StartService(m.p2p); err != nil {
+		return err
+	}
 	runner.Go(func() error {
 		return m.sendMessages(ctx)
 	})

@@ -3,9 +3,6 @@ package p2pnode
 import (
 	"bytes"
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -17,6 +14,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pnode"
 )
@@ -111,24 +109,7 @@ func main(config p2pnode.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Msg("starting p2pnode")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Info().Str("signal", sig.String()).Msg("received  OS signal, shutting down")
-		cancel()
-	}()
-
-	node := p2pnode.New(config)
-	err := node.Run(ctx)
-	if err == context.Canceled {
-		log.Info().Msg("bye")
-		return nil
-	}
-	return err
+	return service.RunWithSighandler(context.Background(), p2pnode.New(config))
 }
 
 func exampleConfig() (*p2pnode.Config, error) {

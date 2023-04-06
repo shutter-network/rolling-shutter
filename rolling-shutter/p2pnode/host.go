@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -67,7 +68,7 @@ func (p *P2PNode) handleDecryptionKey(_ context.Context, msg *p2pmsg.DecryptionK
 	return msgs, nil
 }
 
-func (p *P2PNode) Run(ctx context.Context) error {
+func (p *P2PNode) Start(ctx context.Context, runner service.Runner) error {
 	p2p.AddValidator(p.p2p, p.validateDecryptionKey)
 	p2p.AddHandlerFunc(p.p2p, p.handleDecryptionKey)
 
@@ -79,5 +80,5 @@ func (p *P2PNode) Run(ctx context.Context) error {
 
 	p2p.AddValidator(p.p2p, p.validateEonPublicKey)
 	p2p.AddHandlerFunc(p.p2p, p.handleEonPublicKey)
-	return p.p2p.Run(ctx)
+	return p.p2p.Start(ctx, runner)
 }

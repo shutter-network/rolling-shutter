@@ -145,9 +145,10 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	runner.Go(func() error {
 		return c.handleContractEvents(ctx)
 	})
-	runner.Go(func() error {
-		return c.p2p.Run(ctx)
-	})
+	err = runner.StartService(c.p2p)
+	if err != nil {
+		return err
+	}
 	runner.Go(func() error {
 		return c.handleDatabaseNotifications(ctx)
 	})

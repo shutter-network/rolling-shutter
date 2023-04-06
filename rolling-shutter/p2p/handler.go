@@ -8,11 +8,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
@@ -220,23 +220,25 @@ func (h *P2PHandler) AddGossipTopic(topic string) {
 	h.gossipTopicNames[topic] = true
 }
 
-func (h *P2PHandler) Run(ctx context.Context) error {
-	group, ctx := errgroup.WithContext(ctx)
+func (h *P2PHandler) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
+	runner.Go(func() error {
+		return h.P2P.Run(ctx, h.topics(), h.validatorRegistry)
+	})
+	if h.hasHandler() {
+		runner.Go(func() error {
+			return h.runHandleMessages(ctx)
+		})
+	}
 
+	return nil
+}
+
+func (h *P2PHandler) topics() []string {
 	topics := make([]string, 0, len(h.gossipTopicNames))
 	for topicName := range h.gossipTopicNames {
 		topics = append(topics, topicName)
 	}
-
-	group.Go(func() error {
-		return h.P2P.Run(ctx, topics, h.validatorRegistry)
-	})
-	if h.hasHandler() {
-		group.Go(func() error {
-			return h.runHandleMessages(ctx)
-		})
-	}
-	return group.Wait()
+	return topics
 }
 
 func (h *P2PHandler) hasHandler() bool {
