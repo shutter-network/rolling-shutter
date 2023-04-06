@@ -71,9 +71,7 @@ func New(config Config) (*MockNode, error) {
 }
 
 func (m *MockNode) Start(ctx context.Context, runner service.Runner) error {
-	if err := m.logStartupInfo(); err != nil {
-		return err
-	}
+	m.logStartupInfo()
 	if err := runner.StartService(m.p2p); err != nil {
 		return err
 	}
@@ -96,10 +94,8 @@ func (m *MockNode) setupP2PHandler() {
 	m.p2p.AddGossipTopic(kprtopics.DecryptionKey)
 }
 
-func (m *MockNode) logStartupInfo() error {
-	eonPublicKey := m.eonPublicKey.Marshal()
-	log.Info().Hex("eon-public-key", eonPublicKey).Msg("starting mocknode")
-	return nil
+func (m *MockNode) logStartupInfo() {
+	log.Info().Hex("eon-public-key", m.eonPublicKey.Marshal()).Msg("starting mocknode")
 }
 
 func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
