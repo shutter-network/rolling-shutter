@@ -129,8 +129,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 
 func (kpr *keyper) setupP2PHandler() {
 	epochkghandler.New(
-		kpr.config.GetAddress(),
-		kpr.config.InstanceID,
+		&kpr.config,
 		kpr.dbpool,
 	).SetupP2p(kpr.p2p)
 }

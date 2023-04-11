@@ -20,10 +20,17 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-var config = struct {
-	Address    common.Address
-	InstanceID uint64
-}{common.HexToAddress("0x2222222222222222222222222222222222222222"), 0}
+type TestConfig struct{}
+
+var config = &TestConfig{}
+
+func (c *TestConfig) GetAddress() common.Address {
+	return common.HexToAddress("0x2222222222222222222222222222222222222222")
+}
+
+func (c *TestConfig) GetInstanceID() uint64 {
+	return 55
+}
 
 func initializeEon(
 	ctx context.Context,
@@ -35,7 +42,7 @@ func initializeEon(
 	eon := uint64(0)
 	keypers := []string{
 		"0x0000000000000000000000000000000000000000",
-		config.Address.Hex(),
+		config.GetAddress().Hex(),
 		"0x1111111111111111111111111111111111111111",
 	}
 
@@ -96,7 +103,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 
 	initializeEon(ctx, t, db, keyperIndex)
-	handler := New(config.Address, config.InstanceID, dbpool)
+	handler := New(config, dbpool)
 
 	// send decryption key share when first trigger is received
 	trigger := &p2pmsg.DecryptionTrigger{
@@ -113,7 +120,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShare)
 	assert.Check(t, ok)
-	assert.Check(t, msg.InstanceID == 0)
+	assert.Check(t, msg.InstanceID == config.GetInstanceID())
 	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
 	assert.Check(t, msg.KeyperIndex == keyperIndex)
 	assert.Check(t, bytes.Equal(msg.Share, share.DecryptionKeyShare))
@@ -136,7 +143,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 
 	tkg := initializeEon(ctx, t, db, keyperIndex)
-	handler := New(config.Address, config.InstanceID, dbpool)
+	handler := New(config, dbpool)
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// threshold is two, so no outgoing message after first input
@@ -161,7 +168,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	assert.Check(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKey)
 	assert.Check(t, ok)
-	assert.Check(t, msg.InstanceID == 0)
+	assert.Check(t, msg.InstanceID == config.GetInstanceID())
 	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
 	assert.Check(t, bytes.Equal(msg.Key, encodedDecryptionKey))
 }
@@ -179,7 +186,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 
 	tkg := initializeEon(ctx, t, db, keyperIndex)
-	handler := New(config.Address, config.InstanceID, dbpool)
+	handler := New(config, dbpool)
 	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
 
 	// send a decryption key and check that it gets inserted

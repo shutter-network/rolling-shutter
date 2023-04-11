@@ -129,7 +129,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	ctx := r.Context()
-	handler := epochkghandler.New(srv.config.GetAddress(), srv.config.GetInstanceID(), srv.dbpool)
+	handler := epochkghandler.New(srv.config, srv.dbpool)
 	msgs, err := handler.SendDecryptionKeyShare(ctx, epochID, int64(requestBody.BlockNumber))
 	if err != nil {
 		if err != nil {

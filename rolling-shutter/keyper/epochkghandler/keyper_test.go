@@ -31,7 +31,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
 	tkg := initializeEon(ctx, t, db, keyperIndex)
 	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
-	kpr := New(config.Address, config.InstanceID, dbpool)
+	kpr := New(config, dbpool)
 
 	tests := []struct {
 		name  string
@@ -42,7 +42,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:  "valid decryption key share",
 			valid: true,
 			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
+				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
@@ -53,7 +53,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:  "invalid decryption key share wrong epoch",
 			valid: false,
 			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
+				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
 				EpochID:     wrongEpochID.Bytes(),
 				KeyperIndex: keyperIndex,
@@ -64,7 +64,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:  "invalid decryption key share wrong instance ID",
 			valid: false,
 			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID + 1,
+				InstanceID:  config.GetInstanceID() + 1,
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
@@ -75,7 +75,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:  "invalid decryption key share wrong keyper index",
 			valid: false,
 			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.InstanceID,
+				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
 				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex + 1,
@@ -111,7 +111,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	tkg := initializeEon(ctx, t, db, keyperIndex)
 	secretKey := tkg.EpochSecretKey(epochID).Marshal()
 
-	kpr := New(config.Address, config.InstanceID, dbpool)
+	kpr := New(config, dbpool)
 
 	tests := []struct {
 		name  string
@@ -122,7 +122,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:  "valid decryption key",
 			valid: true,
 			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.InstanceID,
+				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
 				EpochID:    epochID.Bytes(),
 				Key:        secretKey,
@@ -132,7 +132,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:  "invalid decryption key wrong epoch",
 			valid: false,
 			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.InstanceID,
+				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
 				EpochID:    wrongEpochID.Bytes(),
 				Key:        secretKey,
@@ -142,7 +142,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:  "invalid decryption key wrong instance ID",
 			valid: false,
 			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.InstanceID + 1,
+				InstanceID: config.GetInstanceID() + 1,
 				Eon:        eon,
 				EpochID:    epochID.Bytes(),
 				Key:        secretKey,
@@ -170,7 +170,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	kpr := New(config.Address, config.InstanceID, dbpool)
+	kpr := New(config, dbpool)
 
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
@@ -210,7 +210,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		{
 			name:        "valid trigger collator 1",
 			valid:       true,
-			instanceID:  config.InstanceID,
+			instanceID:  config.GetInstanceID(),
 			epochID:     epochID1,
 			blockNumber: activationBlk1,
 			privKey:     collatorKey1,
@@ -218,7 +218,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		{
 			name:        "valid trigger collator 2",
 			valid:       true,
-			instanceID:  config.InstanceID,
+			instanceID:  config.GetInstanceID(),
 			epochID:     epochID2,
 			blockNumber: activationBlk2,
 			privKey:     collatorKey2,
@@ -226,7 +226,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		{
 			name:        "invalid trigger wrong collator 1",
 			valid:       false,
-			instanceID:  config.InstanceID,
+			instanceID:  config.GetInstanceID(),
 			epochID:     epochID2,
 			blockNumber: activationBlk2,
 			privKey:     collatorKey1,
@@ -234,7 +234,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		{
 			name:        "invalid trigger wrong collator 2",
 			valid:       false,
-			instanceID:  config.InstanceID,
+			instanceID:  config.GetInstanceID(),
 			epochID:     epochID1,
 			blockNumber: activationBlk1,
 			privKey:     collatorKey2,
@@ -242,7 +242,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 		{
 			name:        "invalid trigger wrong instanceID",
 			valid:       false,
-			instanceID:  config.InstanceID + 1,
+			instanceID:  config.GetInstanceID() + 1,
 			epochID:     epochID1,
 			blockNumber: activationBlk1,
 			privKey:     collatorKey1,
