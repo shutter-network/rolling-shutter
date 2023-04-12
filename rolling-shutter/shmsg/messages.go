@@ -29,7 +29,7 @@ func (*DecryptionTrigger) ImplementsP2PMessage() {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", trigger.EpochID)
+	return fmt.Sprintf("DecryptionTrigger{epochid=%X}", trigger.EpochID)
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -49,7 +49,7 @@ func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecret
 
 func (share *DecryptionKeyShare) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionKeyShare{epochid=%s, keyperIndex=%d}",
+		"DecryptionKeyShare{epochid=%X, keyperIndex=%d}",
 		share.EpochID,
 		share.KeyperIndex,
 	)
@@ -63,7 +63,7 @@ func (*DecryptionKey) ImplementsP2PMessage() {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
+	return fmt.Sprintf("DecryptionKey{epochid=%X}", key.EpochID)
 }
 
 func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
@@ -83,7 +83,7 @@ func (*CipherBatch) ImplementsP2PMessage() {
 
 func (batch *CipherBatch) LogInfo() string {
 	return fmt.Sprintf(
-		"CipherBatch{epochid=%s, num tx=%d}",
+		"CipherBatch{epochid=%X, num tx=%d}",
 		batch.DecryptionTrigger.EpochID,
 		len(batch.Transactions),
 	)
@@ -102,7 +102,7 @@ func (*DecryptionSignature) ImplementsP2PMessage() {
 
 func (sig *DecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionSignature{epochid=%s}",
+		"DecryptionSignature{epochid=%X}",
 		sig.EpochID,
 	)
 }
@@ -116,7 +116,7 @@ func (*AggregatedDecryptionSignature) ImplementsP2PMessage() {
 
 func (ads *AggregatedDecryptionSignature) LogInfo() string {
 	return fmt.Sprintf(
-		"AggregatedDecryptionSignature{epochid=%s}",
+		"AggregatedDecryptionSignature{epochid=%X}",
 		ads.EpochID,
 	)
 }
@@ -142,7 +142,7 @@ func (*EonPublicKey) Topic() string {
 func (*TimedEpoch) ImplementsP2PMessage() {}
 
 func (te *TimedEpoch) LogInfo() string {
-	return fmt.Sprintf("TimedEpoch{EpochID=%s, NotBefore=%d}", te.EpochID, te.NotBefore)
+	return fmt.Sprintf("TimedEpoch{EpochID=%X, NotBefore=%d}", te.EpochID, te.NotBefore)
 }
 
 func (*TimedEpoch) Topic() string {
