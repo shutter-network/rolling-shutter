@@ -184,3 +184,11 @@ services:
       CADDY_INGRESS_NETWORKS: snapshutter_default
     labels:
       caddy.email: devops@brainbot.com
+
+  dummyserver:
+    build:
+      dockerfile: docker/build-src/dummyserver/Dockerfile
+      context: ..
+    restart: always
+    profiles:
+      - dev
