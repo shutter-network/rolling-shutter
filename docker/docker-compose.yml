@@ -180,6 +180,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data/caddy:/data
+    profiles:
+      - live
     environment:
       CADDY_INGRESS_NETWORKS: snapshutter_default
     labels:

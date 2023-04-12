@@ -8,6 +8,6 @@ else
 fi
 
 echo "Starting entire system"
-$DC up -d keyper-0 keyper-1 keyper-2 collator snapshot caddy
+$DC up -d --profile dev
 sleep 5
 $DC ps
