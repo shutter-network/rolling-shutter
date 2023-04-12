@@ -15,7 +15,8 @@ FROM scratch as runner
 
 COPY --from=builder /rolling-shutter/bin/rolling-shutter /rolling-shutter
 
-RUN --mount=from=busybox:latest,src=/bin/,dst=/bin/ mkdir -p /etc/ssl
+# Use 'uclibc' flavor to avoid https://github.com/docker-library/busybox/issues/155#issuecomment-1344375664
+RUN --mount=from=busybox:uclibc,src=/bin,dst=/bin mkdir -p /etc/ssl
 COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 
 ENTRYPOINT ["/rolling-shutter"]
