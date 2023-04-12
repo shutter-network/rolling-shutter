@@ -61,6 +61,8 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *Message) er
 			continue
 		}
 
+		metricMessagesReceived.WithLabelValues(m.Topic).Inc()
+
 		// send valid messages onto the Messages channel
 		select {
 		case messages <- m:

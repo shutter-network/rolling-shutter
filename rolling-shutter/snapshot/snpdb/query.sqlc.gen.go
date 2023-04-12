@@ -5,8 +5,6 @@ package snpdb
 
 import (
 	"context"
-
-	"github.com/jackc/pgconn"
 )
 
 const getDecryptionKey = `-- name: GetDecryptionKey :one
@@ -20,6 +18,30 @@ func (q *Queries) GetDecryptionKey(ctx context.Context, epochID []byte) (Decrypt
 	var i DecryptionKey
 	err := row.Scan(&i.EpochID, &i.Key)
 	return i, err
+}
+
+const getDecryptionKeyCount = `-- name: GetDecryptionKeyCount :one
+SELECT COUNT(DISTINCT epoch_id)
+FROM decryption_key
+`
+
+func (q *Queries) GetDecryptionKeyCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getDecryptionKeyCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getEonCount = `-- name: GetEonCount :one
+SELECT COUNT(DISTINCT eon_id)
+FROM eon_public_key
+`
+
+func (q *Queries) GetEonCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getEonCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getEonPublicKey = `-- name: GetEonPublicKey :one
@@ -49,7 +71,7 @@ func (q *Queries) GetEonPublicKeyLatest(ctx context.Context) (EonPublicKey, erro
 	return i, err
 }
 
-const insertDecryptionKey = `-- name: InsertDecryptionKey :execresult
+const insertDecryptionKey = `-- name: InsertDecryptionKey :execrows
 INSERT INTO decryption_key (
         epoch_id,
         key
@@ -64,8 +86,12 @@ type InsertDecryptionKeyParams struct {
 	Key     []byte
 }
 
-func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.Key)
+func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionKeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertDecryptionKey, arg.EpochID, arg.Key)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const insertEonPublicKey = `-- name: InsertEonPublicKey :exec

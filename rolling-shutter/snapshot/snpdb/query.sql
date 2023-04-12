@@ -3,7 +3,11 @@ SELECT *
 FROM decryption_key
 WHERE epoch_id = $1;
 
--- name: InsertDecryptionKey :execresult
+-- name: GetDecryptionKeyCount :one
+SELECT COUNT(DISTINCT epoch_id)
+FROM decryption_key;
+
+-- name: InsertDecryptionKey :execrows
 INSERT INTO decryption_key (
         epoch_id,
         key
@@ -33,3 +37,8 @@ SELECT eon_id, eon_public_key
 FROM eon_public_key
 ORDER BY eon_id DESC
 LIMIT 1;
+
+
+-- name: GetEonCount :one
+SELECT COUNT(DISTINCT eon_id)
+FROM eon_public_key;

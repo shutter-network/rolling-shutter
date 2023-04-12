@@ -46,11 +46,15 @@ DatabaseURL     = "{{ .DatabaseURL }}"
 
 # Snapshot integration
 SnapshotHubURL       = "{{ .SnapshotHubURL }}"
-SnapshotPollInterval = {{ .SnapshotPollInterval }}
 
 # JSONRPC configuration
 JSONRPCHost     = "{{ .JSONRPCHost }}"
 JSONRPCPort     = {{ .JSONRPCPort }}
+
+# Metrics configuration
+MetricsEnabled  = {{ .MetricsEnabled }}
+MetricsHost     = "{{ .MetricsHost }}"
+MetricsPort     = {{ .MetricsPort }}
 
 # p2p configuration
 ListenAddress   = "{{ .ListenAddress }}"

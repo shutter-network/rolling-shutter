@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"github.com/libp2p/go-libp2p-core/event"
 	"log"
 	"time"
 
@@ -18,10 +19,19 @@ func (p *P2P) managePeers(ctx context.Context) error {
 		return err
 	}
 
+	subscription, err := p.host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
+	if err != nil {
+		return err
+	}
+	defer subscription.Close()
+
 	for {
 		select {
+		case <-subscription.Out():
+			metricPeersTotal.Set(float64(len(p.host.Network().Peers())))
 		case <-time.After(peerCheckInterval):
 			n := len(p.host.Network().Peers())
+			metricPeersTotal.Set(float64(n))
 			if n < minPeers {
 				log.Printf("connected to %d peers, want at least %d", n, minPeers)
 				if err := p.connectToConfiguredPeers(ctx); err != nil {
@@ -55,6 +65,8 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 		}
 		candidates[addrInfo.ID] = addrInfo
 	}
+
+	metricPeersMin.Set(float64(len(candidates)))
 
 	// remove candidates that we're already connected to
 	for _, pid := range p.host.Network().Peers() {

@@ -56,6 +56,7 @@ func New(config Config) (*MockNode, error) {
 		ListenAddr:     config.ListenAddress,
 		PeerMultiaddrs: config.PeerMultiaddrs,
 		PrivKey:        config.P2PKey,
+		MetricsEnabled: false,
 	}
 	p := p2p.New(p2pConfig)
 

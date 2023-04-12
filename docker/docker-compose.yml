@@ -78,6 +78,7 @@ services:
       - ./config:/config
     ports:
       - "8754:8754"
+      - "9100:9100"
     depends_on:
       db:
         condition: service_healthy

@@ -148,8 +148,11 @@ func exampleConfig() (*snapshot.Config, error) {
 		PeerMultiaddrs: []multiaddr.Multiaddr{},
 		DatabaseURL:    "postgres://localhost:5432/shutter_snapshot",
 
-		SnapshotHubURL:       "",
-		SnapshotPollInterval: 10 * time.Second,
+		SnapshotHubURL: "",
+
+		MetricsEnabled: false,
+		MetricsHost:    "127.0.0.1",
+		MetricsPort:    9191,
 
 		EthereumKey: ethereumKey,
 		P2PKey:      p2pkey,

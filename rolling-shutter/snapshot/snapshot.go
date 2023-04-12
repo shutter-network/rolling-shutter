@@ -44,6 +44,7 @@ func New(config Config) *Snapshot {
 		ListenAddr:     config.ListenAddress,
 		PeerMultiaddrs: config.PeerMultiaddrs,
 		PrivKey:        config.P2PKey,
+		MetricsEnabled: config.MetricsEnabled,
 	}
 	p2p_instance := p2p.New(p2pConfig)
 
@@ -72,6 +73,13 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 	}
 	db := snpdb.New(dbpool)
 	snp.db = db
+
+	if snp.Config.MetricsEnabled {
+		err = snp.initMetrics(ctx)
+		if err != nil {
+			return err
+		}
+	}
 
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
 	snp.hubapi = hub
@@ -103,6 +111,13 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 			return nil
 		},
 	)
+	if snp.Config.MetricsEnabled {
+		errorgroup.Go(
+			func() error {
+				return snp.runMetricsServer(errorctx)
+			},
+		)
+	}
 	return errorgroup.Wait()
 }
 
@@ -167,6 +182,9 @@ func (snp *Snapshot) handleDecryptionKeyInput(
 		return nil
 	}
 	log.Printf("Sending key %X for proposal %X to hub", key.Key, key.EpochID)
+
+	metricKeysGenerated.Inc()
+
 	err := snp.hubapi.SubmitProposalKey(key.EpochID, key.Key)
 	if err != nil {
 		return err
@@ -206,6 +224,9 @@ func (snp *Snapshot) handleEonPublicKeyInput(
 	if seen {
 		return nil
 	}
+
+	metricEons.Inc()
+
 	log.Printf("Sending Eon %d public key to hub", eonId)
 	err = snp.hubapi.SubmitEonKey(eonId, key)
 	if err != nil {

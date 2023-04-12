@@ -34,6 +34,7 @@ type Config struct {
 	ListenAddr     multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 	PrivKey        p2pcrypto.PrivKey
+	MetricsEnabled bool
 }
 
 func New(config Config) *P2P {
@@ -43,6 +44,9 @@ func New(config Config) *P2P {
 		pubSub:         nil,
 		gossipRooms:    make(map[string]*gossipRoom),
 		GossipMessages: make(chan *Message, messagesBufSize),
+	}
+	if config.MetricsEnabled {
+		p.initMetrics()
 	}
 	return &p
 }
@@ -102,6 +106,7 @@ func (p *P2P) Publish(ctx context.Context, topic string, message []byte) error {
 		log.Printf("dropping message to not (yet) subscribed topic %s", topic)
 		return nil
 	}
+	metricMessagesSent.WithLabelValues(topic).Inc()
 	return room.Publish(ctx, message)
 }
 
