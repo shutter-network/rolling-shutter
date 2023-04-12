@@ -63,10 +63,12 @@ func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) er
 	queries := kprdb.New(dbpool)
 	dbAddr, err := queries.GetMeta(ctx, addressKey)
 	if err == pgx.ErrNoRows {
-		return queries.InsertMeta(ctx, kprdb.InsertMetaParams{
-			Key:   addressKey,
-			Value: cfgAddress,
-		})
+		return queries.InsertMeta(
+			ctx, kprdb.InsertMetaParams{
+				Key:   addressKey,
+				Value: cfgAddress,
+			},
+		)
 	} else if err != nil {
 		return err
 	}
@@ -74,7 +76,8 @@ func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) er
 	if dbAddr != cfgAddress {
 		return errors.Errorf(
 			"database linked to wrong address %s, config address is %s",
-			dbAddr, cfgAddress)
+			dbAddr, cfgAddress,
+		)
 	}
 	return nil
 }
@@ -120,11 +123,14 @@ func Run(ctx context.Context, config Config) error {
 		contracts:         contracts,
 
 		shuttermintState: NewShuttermintState(config),
-		p2p: p2p.New(p2p.Config{
-			ListenAddr:     config.ListenAddress,
-			PeerMultiaddrs: config.PeerMultiaddrs,
-			PrivKey:        config.P2PKey,
-		}),
+		p2p: p2p.New(
+			p2p.Config{
+				ListenAddr:     config.ListenAddress,
+				PeerMultiaddrs: config.PeerMultiaddrs,
+				PrivKey:        config.P2PKey,
+				MetricsEnabled: false,
+			},
+		),
 	}
 	return k.run(ctx)
 }
@@ -151,13 +157,15 @@ func (kpr *keyper) setupRouter() *chi.Mux {
 	router.Use(middleware.Recoverer)
 	router.Mount("/v1", http.StripPrefix("/v1", kpr.setupAPIRouter(swagger)))
 	apiJSON, _ := json.Marshal(swagger)
-	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(apiJSON)
-	})
+	router.Get(
+		"/api.json", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(apiJSON)
+		},
+	)
 
 	/*
 	   The following enables the swagger ui. Run the following to use it:
@@ -187,29 +195,41 @@ func (kpr *keyper) run(ctx context.Context) error {
 			Handler: kpr.setupRouter(),
 		}
 		group.Go(httpServer.ListenAndServe)
-		group.Go(func() error {
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			return httpServer.Shutdown(shutdownCtx)
-		})
+		group.Go(
+			func() error {
+				<-ctx.Done()
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				return httpServer.Shutdown(shutdownCtx)
+			},
+		)
 	}
 
-	group.Go(func() error {
-		return kpr.p2p.Run(ctx, GossipTopicNames, topicValidators)
-	})
-	group.Go(func() error {
-		return kpr.operateShuttermint(ctx)
-	})
-	group.Go(func() error {
-		return kpr.operateP2P(ctx)
-	})
-	group.Go(func() error {
-		return kpr.broadcastEonPublicKeys(ctx)
-	})
-	group.Go(func() error {
-		return kpr.handleContractEvents(ctx)
-	})
+	group.Go(
+		func() error {
+			return kpr.p2p.Run(ctx, GossipTopicNames, topicValidators)
+		},
+	)
+	group.Go(
+		func() error {
+			return kpr.operateShuttermint(ctx)
+		},
+	)
+	group.Go(
+		func() error {
+			return kpr.operateP2P(ctx)
+		},
+	)
+	group.Go(
+		func() error {
+			return kpr.broadcastEonPublicKeys(ctx)
+		},
+	)
+	group.Go(
+		func() error {
+			return kpr.handleContractEvents(ctx)
+		},
+	)
 	return group.Wait()
 }
 
@@ -245,11 +265,13 @@ func (kpr *keyper) sendBatchConfigStarted(ctx context.Context, tx pgx.Tx) error 
 		return err
 	}
 
-	count, err := q.CountBatchConfigsInBlockRange(ctx,
+	count, err := q.CountBatchConfigsInBlockRange(
+		ctx,
 		kprdb.CountBatchConfigsInBlockRangeParams{
 			StartBlock: lastBlock,
 			EndBlock:   int64(nextBlock),
-		})
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -329,9 +351,11 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			return kpr.handleOnChainChanges(ctx, tx)
-		})
+		err = kpr.dbpool.BeginFunc(
+			ctx, func(tx pgx.Tx) error {
+				return kpr.handleOnChainChanges(ctx, tx)
+			},
+		)
 		if err != nil {
 			return err
 		}
@@ -370,11 +394,13 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			err := kpr.sendMessage(ctx, &shmsg.EonPublicKey{
-				PublicKey:  eonPublicKey.EonPublicKey,
-				Eon:        uint64(eonPublicKey.Eon),
-				InstanceID: kpr.config.InstanceID,
-			})
+			err := kpr.sendMessage(
+				ctx, &shmsg.EonPublicKey{
+					PublicKey:  eonPublicKey.EonPublicKey,
+					Eon:        uint64(eonPublicKey.Eon),
+					InstanceID: kpr.config.InstanceID,
+				},
+			)
 			if err != nil {
 				return err
 			}

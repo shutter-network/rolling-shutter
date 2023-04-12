@@ -73,14 +73,18 @@ func (p *P2P) Run(ctx context.Context, topicNames []string, topicValidators map[
 		// listen to gossip on all topics
 		for _, room := range p.gossipRooms {
 			room := room
-			errorgroup.Go(func() error {
-				return room.readLoop(errorgroupctx, p.GossipMessages)
-			})
+			errorgroup.Go(
+				func() error {
+					return room.readLoop(errorgroupctx, p.GossipMessages)
+				},
+			)
 		}
 
-		errorgroup.Go(func() error {
-			return p.managePeers(errorgroupctx)
-		})
+		errorgroup.Go(
+			func() error {
+				return p.managePeers(errorgroupctx)
+			},
+		)
 		return nil
 	}()
 	if err != nil {

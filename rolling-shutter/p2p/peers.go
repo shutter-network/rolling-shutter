@@ -79,3 +79,4 @@ func (p *P2P) connectToConfiguredPeers(ctx context.Context) error {
 
 	return nil
 }
+

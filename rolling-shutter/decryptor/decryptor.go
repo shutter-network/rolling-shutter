@@ -89,18 +89,24 @@ func (d *Decryptor) Run(ctx context.Context) error {
 	d.db = db
 
 	errorgroup, errorctx := errgroup.WithContext(ctx)
-	errorgroup.Go(func() error {
-		return d.handleMessages(errorctx)
-	})
-	errorgroup.Go(func() error {
-		return d.handleContractEvents(errorctx)
-	})
+	errorgroup.Go(
+		func() error {
+			return d.handleMessages(errorctx)
+		},
+	)
+	errorgroup.Go(
+		func() error {
+			return d.handleContractEvents(errorctx)
+		},
+	)
 
 	topicValidators := d.makeMessagesValidators()
 
-	errorgroup.Go(func() error {
-		return d.p2p.Run(errorctx, gossipTopicNames[:], topicValidators)
-	})
+	errorgroup.Go(
+		func() error {
+			return d.p2p.Run(errorctx, gossipTopicNames[:], topicValidators)
+		},
+	)
 	return errorgroup.Wait()
 }
 

@@ -89,20 +89,28 @@ func (m *MockNode) Run(ctx context.Context) error {
 	}
 
 	g, errctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
-	})
-	g.Go(func() error {
-		return m.listen(errctx)
-	})
-	g.Go(func() error {
-		return m.sendMessages(errctx)
-	})
+	g.Go(
+		func() error {
+			return m.p2p.Run(errctx, gossipTopicNames[:], make(map[string]pubsub.Validator))
+		},
+	)
+	g.Go(
+		func() error {
+			return m.listen(errctx)
+		},
+	)
+	g.Go(
+		func() error {
+			return m.sendMessages(errctx)
+		},
+	)
 
 	if m.Config.SendTransactions {
-		g.Go(func() error {
-			return m.sendTransactions(errctx)
-		})
+		g.Go(
+			func() error {
+				return m.sendTransactions(errctx)
+			},
+		)
 	}
 	return g.Wait()
 }
@@ -254,7 +262,8 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				client.SubmitTransactionJSONRequestBody{
 					EncryptedTx: encryptedTx,
 					Epoch:       epochID,
-				})
+				},
+			)
 			if err != nil {
 				return err
 			}
@@ -306,7 +315,10 @@ func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPubli
 	return eonSecretKeyShare, eonPublicKey, nil
 }
 
-func computeEpochSecretKey(epochID []byte, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
+func computeEpochSecretKey(epochID []byte, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (
+	*shcrypto.EpochSecretKey,
+	error,
+) {
 	epochIDG1 := shcrypto.ComputeEpochID(epochID)
 	epochSecretKeyShare := shcrypto.ComputeEpochSecretKeyShare(eonSecretKeyShare, epochIDG1)
 	return shcrypto.ComputeEpochSecretKey(

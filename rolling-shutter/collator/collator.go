@@ -85,11 +85,14 @@ func Run(ctx context.Context, config Config) error {
 
 		contracts: contracts,
 
-		p2p: p2p.New(p2p.Config{
-			ListenAddr:     config.ListenAddress,
-			PeerMultiaddrs: config.PeerMultiaddrs,
-			PrivKey:        config.P2PKey,
-		}),
+		p2p: p2p.New(
+			p2p.Config{
+				ListenAddr:     config.ListenAddress,
+				PeerMultiaddrs: config.PeerMultiaddrs,
+				PrivKey:        config.P2PKey,
+				MetricsEnabled: false,
+			},
+		),
 
 		dbpool: dbpool,
 	}
@@ -100,9 +103,11 @@ func Run(ctx context.Context, config Config) error {
 func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deployment.Contracts) error {
 	_, err := db.GetNextEpochID(ctx)
 	if err == pgx.ErrNoRows {
-		blkUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-			return contracts.Client.BlockNumber(ctx)
-		})
+		blkUntyped, err := medley.Retry(
+			ctx, func() (interface{}, error) {
+				return contracts.Client.BlockNumber(ctx)
+			},
+		)
 		if err != nil {
 			return err
 		}
@@ -116,10 +121,12 @@ func initializeEpochID(ctx context.Context, db *cltrdb.Queries, contracts *deplo
 			return err
 		}
 
-		return db.SetNextEpochID(ctx, cltrdb.SetNextEpochIDParams{
-			EpochID:     epochID.Bytes(),
-			BlockNumber: int64(blk),
-		})
+		return db.SetNextEpochID(
+			ctx, cltrdb.SetNextEpochIDParams{
+				EpochID:     epochID.Bytes(),
+				BlockNumber: int64(blk),
+			},
+		)
 	} else if err != nil {
 		return err
 	}
@@ -148,13 +155,15 @@ func (c *collator) setupRouter() *chi.Mux {
 	router.Use(middleware.Recoverer)
 	router.Mount("/v1", http.StripPrefix("/v1", c.setupAPIRouter(swagger)))
 	apiJSON, _ := json.Marshal(swagger)
-	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(apiJSON)
-	})
+	router.Get(
+		"/api.json", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(apiJSON)
+		},
+	)
 
 	/*
 	   The following enables the swagger ui. Run the following to use it:
@@ -181,21 +190,27 @@ func (c *collator) run(ctx context.Context) error {
 
 	errorgroup, errorctx := errgroup.WithContext(ctx)
 	errorgroup.Go(httpServer.ListenAndServe)
-	errorgroup.Go(func() error {
-		<-errorctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return httpServer.Shutdown(shutdownCtx)
-	})
-	errorgroup.Go(func() error {
-		return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
-	})
+	errorgroup.Go(
+		func() error {
+			<-errorctx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return httpServer.Shutdown(shutdownCtx)
+		},
+	)
+	errorgroup.Go(
+		func() error {
+			return c.p2p.Run(errorctx, gossipTopicNames[:], map[string]pubsub.Validator{})
+		},
+	)
 	//errorgroup.Go(func() error {
 	//	return c.processEpochLoop(errorctx)
 	//})
-	errorgroup.Go(func() error {
-		return c.handleMessages(errorctx)
-	})
+	errorgroup.Go(
+		func() error {
+			return c.handleMessages(errorctx)
+		},
+	)
 
 	return errorgroup.Wait()
 }
@@ -219,9 +234,11 @@ func (c *collator) processEpochLoop(ctx context.Context) error {
 func (c *collator) newEpoch(ctx context.Context, forcedEpochID []byte) error {
 	var outMessages []shmsg.P2PMessage
 
-	blockNumberUntyped, err := medley.Retry(ctx, func() (interface{}, error) {
-		return c.contracts.Client.BlockNumber(ctx)
-	})
+	blockNumberUntyped, err := medley.Retry(
+		ctx, func() (interface{}, error) {
+			return c.contracts.Client.BlockNumber(ctx)
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -230,28 +247,32 @@ func (c *collator) newEpoch(ctx context.Context, forcedEpochID []byte) error {
 		return errors.Errorf("block number too big: %d", blockNumber)
 	}
 
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		// Disallow submitting transactions at the same time.
-		_, err = tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
-		if err != nil {
-			return err
-		}
-
-		db := cltrdb.New(tx)
-
-		if len(forcedEpochID) != 0 {
-			err = db.SetNextEpochID(ctx, cltrdb.SetNextEpochIDParams{
-				EpochID:     forcedEpochID,
-				BlockNumber: int64(blockNumber),
-			})
+	err = c.dbpool.BeginFunc(
+		ctx, func(tx pgx.Tx) error {
+			// Disallow submitting transactions at the same time.
+			_, err = tx.Exec(ctx, "LOCK TABLE decryption_trigger IN SHARE ROW EXCLUSIVE MODE")
 			if err != nil {
 				return err
 			}
-		}
 
-		outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
-		return err
-	})
+			db := cltrdb.New(tx)
+
+			if len(forcedEpochID) != 0 {
+				err = db.SetNextEpochID(
+					ctx, cltrdb.SetNextEpochIDParams{
+						EpochID:     forcedEpochID,
+						BlockNumber: int64(blockNumber),
+					},
+				)
+				if err != nil {
+					return err
+				}
+			}
+
+			outMessages, err = startNextEpoch(ctx, c.Config, db, uint32(blockNumber))
+			return err
+		},
+	)
 	if err != nil {
 		return err
 	}

@@ -2,10 +2,6 @@ package snapshot
 
 import (
 	"crypto/ecdsa"
-	"io"
-	"text/template"
-	"time"
-
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -13,6 +9,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"io"
+	"text/template"
 
 	"github.com/shutter-network/shutter/shuttermint/medley"
 )
@@ -21,13 +19,16 @@ type Config struct {
 	ListenAddress  multiaddr.Multiaddr
 	PeerMultiaddrs []multiaddr.Multiaddr
 
-	EthereumURL          string
-	DatabaseURL          string
-	SnapshotHubURL       string
-	SnapshotPollInterval time.Duration
+	EthereumURL    string
+	DatabaseURL    string
+	SnapshotHubURL string
 
 	JSONRPCHost string
 	JSONRPCPort uint16
+
+	MetricsEnabled bool
+	MetricsHost    string
+	MetricsPort    uint16
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey

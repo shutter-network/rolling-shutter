@@ -9,19 +9,17 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/shutter/shuttermint/p2p"
+	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/shutter/shuttermint/snapshot"
+	"github.com/shutter-network/shutter/shuttermint/snapshot/snpdb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"github.com/shutter-network/shutter/shuttermint/medley"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/snapshot"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snpdb"
 )
 
 var (
