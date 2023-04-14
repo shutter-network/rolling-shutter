@@ -1,6 +1,7 @@
 package epochkghandler
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"testing"
@@ -10,13 +11,15 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
+func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -25,140 +28,35 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
+	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
-	eon := uint64(0)
-	epochID, _ := epochid.BigToEpochID(common.Big0)
-	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
-	tkg := initializeEon(ctx, t, db, keyperIndex)
-	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
-	kpr := New(config, dbpool)
 
-	tests := []struct {
-		name  string
-		valid bool
-		msg   *p2pmsg.DecryptionKeyShare
-	}{
-		{
-			name:  "valid decryption key share",
-			valid: true,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.GetInstanceID(),
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:  "invalid decryption key share wrong epoch",
-			valid: false,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.GetInstanceID(),
-				Eon:         eon,
-				EpochID:     wrongEpochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:  "invalid decryption key share wrong instance ID",
-			valid: false,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.GetInstanceID() + 1,
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex,
-				Share:       keyshare,
-			},
-		},
-		{
-			name:  "invalid decryption key share wrong keyper index",
-			valid: false,
-			msg: &p2pmsg.DecryptionKeyShare{
-				InstanceID:  config.GetInstanceID(),
-				Eon:         eon,
-				EpochID:     epochID.Bytes(),
-				KeyperIndex: keyperIndex + 1,
-				Share:       keyshare,
-			},
-		},
+	initializeEon(ctx, t, db, keyperIndex)
+	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
+	// send decryption key share when first trigger is received
+	trigger := &p2pmsg.DecryptionTrigger{
+		EpochID:    epochID.Bytes(),
+		InstanceID: 0,
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			validationResult, err := kpr.validateDecryptionKeyShare(ctx, tc.msg)
-			if tc.valid {
-				assert.NilError(t, err)
-			}
-			assert.Equal(t, validationResult, tc.valid,
-				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
-		})
-	}
-}
+	msgs, err := handler.HandleMessage(ctx, trigger)
+	assert.NilError(t, err)
+	share, err := db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
+		EpochID:     epochID.Bytes(),
+		KeyperIndex: int64(keyperIndex),
+	})
+	assert.NilError(t, err)
+	assert.Check(t, len(msgs) == 1)
+	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShare)
+	assert.Check(t, ok)
+	assert.Check(t, msg.InstanceID == config.GetInstanceID())
+	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
+	assert.Check(t, msg.KeyperIndex == keyperIndex)
+	assert.Check(t, bytes.Equal(msg.Share, share.DecryptionKeyShare))
 
-func TestDecryptionKeyValidatorIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
-
-	keyperIndex := uint64(1)
-	eon := uint64(0)
-	epochID, _ := epochid.BigToEpochID(common.Big0)
-	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
-	tkg := initializeEon(ctx, t, db, keyperIndex)
-	secretKey := tkg.EpochSecretKey(epochID).Marshal()
-
-	kpr := New(config, dbpool)
-
-	tests := []struct {
-		name  string
-		valid bool
-		msg   *p2pmsg.DecryptionKey
-	}{
-		{
-			name:  "valid decryption key",
-			valid: true,
-			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.GetInstanceID(),
-				Eon:        eon,
-				EpochID:    epochID.Bytes(),
-				Key:        secretKey,
-			},
-		},
-		{
-			name:  "invalid decryption key wrong epoch",
-			valid: false,
-			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.GetInstanceID(),
-				Eon:        eon,
-				EpochID:    wrongEpochID.Bytes(),
-				Key:        secretKey,
-			},
-		},
-		{
-			name:  "invalid decryption key wrong instance ID",
-			valid: false,
-			msg: &p2pmsg.DecryptionKey{
-				InstanceID: config.GetInstanceID() + 1,
-				Eon:        eon,
-				EpochID:    epochID.Bytes(),
-				Key:        secretKey,
-			},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			validationResult, err := kpr.validateDecryptionKey(ctx, tc.msg)
-			if tc.valid {
-				assert.NilError(t, err)
-			}
-			assert.Equal(t, validationResult, tc.valid,
-				"validate failed valid=%t msg=%+v type=%T", tc.valid, tc.msg, tc.msg)
-		})
-	}
+	// don't send share when trigger is received again
+	msgs, err = handler.HandleMessage(ctx, trigger)
+	assert.NilError(t, err)
+	assert.Check(t, len(msgs) == 0)
 }
 
 func TestTriggerValidatorIntegration(t *testing.T) {
@@ -170,8 +68,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	kpr := New(config, dbpool)
-
+	var kpr p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 	collatorAddress1 := ethcrypto.PubkeyToAddress(collatorKey1.PublicKey)
@@ -258,7 +155,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 				tc.privKey,
 			)
 			assert.NilError(t, err)
-			validationResult, err := kpr.validateDecryptionTrigger(ctx, msg)
+			validationResult, err := kpr.ValidateMessage(ctx, msg)
 			if tc.valid {
 				assert.NilError(t, err)
 			}

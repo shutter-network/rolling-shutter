@@ -17,11 +17,10 @@ import (
 )
 
 type (
-	HandlerFuncStatic[M p2pmsg.Message] func(context.Context, M) ([]p2pmsg.Message, error)
-	HandlerFunc                         func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
-	HandlerRegistry                     map[protoreflect.FullName]HandlerFunc
-	ValidatorFunc[M p2pmsg.Message]     func(context.Context, M) (bool, error)
-	ValidatorRegistry                   map[string]pubsub.ValidatorEx
+	HandlerFunc       func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
+	HandlerRegistry   map[protoreflect.FullName]HandlerFunc
+	ValidatorFunc     func(context.Context, p2pmsg.Message) (bool, error)
+	ValidatorRegistry map[string]pubsub.ValidatorEx
 )
 
 const (
@@ -29,101 +28,10 @@ const (
 	invalidResultType = pubsub.ValidationReject
 )
 
-// AddValidator will add a validator-function to a P2PHandler instance:
-// The passed in ValidatorFunc function takes a specific message of type M complying to the
-// P2PMessage interface, processes it and returns whether it is valid or not (bool value).
-// If the return value is false, the message is dropped and a potentially raised error is logged.
-// If the validator is registered on the P2Phandler via the AddValidator function,
-// the passed in validator will be called automatically when a message of type M is received
-//
-// For each message type M, there can only be one validator registered per P2PHandler.
-func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M]) error {
-	var messProto M
-	topic := messProto.Topic()
-
-	_, exists := handler.validatorRegistry[topic]
-	if exists {
-		// This is likely not intended and happens when different messages return the same P2PMessage.Topic().
-		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
-		// (If feature needed, allow for chaining of successively registered validator functions per topic)
-		return errors.Errorf(
-			"can't register more than one validator per topic (topic: '%s', message-type: '%s')",
-			topic,
-			reflect.TypeOf(messProto))
-	}
-
-	handleError := func(err error) {
-		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
-	}
-	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
-		var (
-			key M
-			ok  bool
-		)
-		if message.GetTopic() != topic {
-			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.GetTopic()))
-			return invalidResultType
-		}
-		unmshl, traceContext, err := UnmarshalPubsubMessage(message)
-		if err != nil {
-			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
-			return invalidResultType
-		}
-
-		if traceContext != nil && !allowTraceContext {
-			handleError(errors.New("received non-empty trace-context"))
-			return invalidResultType
-		}
-
-		key, ok = unmshl.(M)
-		if !ok {
-			handleError(errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)))
-			return invalidResultType
-		}
-
-		valid, err := valFunc(ctx, key)
-		if err != nil {
-			handleError(err)
-		}
-		if !valid {
-			return invalidResultType
-		}
-		return pubsub.ValidationAccept
-	}
-	handler.validatorRegistry[topic] = validate
-	handler.AddGossipTopic(topic)
-	return nil
-}
-
-// AddHandlerFunc will add a handler-function to a P2PHandler instance:
-// The passed in handlerFunc function takes a specific message of type M complying to the
-// P2PMessage interface, processes it and returns a slice of resulting P2PMessages.
-// If the handler is registered on the P2Phandler via the AddHandlerFunc function,
-// the passed in handler will be called automatically when a message of type M is received,
-// AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler
-//
-// For each message type M, there can only be one handler registered per P2PHandler.
-func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) error {
-	var messProto M
-	messageType := proto.MessageName(messProto)
-
-	_, exists := handler.handlerRegistry[messageType]
-	if exists {
-		return errors.Errorf("Can't register more than one handler per message-type (message-type: '%s')", messageType)
-	}
-
-	f := func(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
-		typedMsg, ok := msg.(M)
-		if !ok {
-			// this is programming error, when unmarshaling of the message did not
-			// result in the expected schema struct / concrete implementation
-			return []p2pmsg.Message{}, errors.New("Message type assertion mismatch")
-		}
-		return handlerFunc(ctx, typedMsg)
-	}
-	handler.handlerRegistry[messageType] = f
-	handler.AddGossipTopic(messProto.Topic())
-	return nil
+type MessageHandler interface {
+	ValidateMessage(context.Context, p2pmsg.Message) (bool, error)
+	HandleMessage(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
+	MessagePrototypes() []p2pmsg.Message
 }
 
 func New(config Config) *P2PHandler {
@@ -140,13 +48,12 @@ func New(config Config) *P2PHandler {
 		}
 	}
 	config.BootstrapPeers = bstrpPeersWithoutSelf
-	h := &P2PHandler{
+	return &P2PHandler{
 		P2P:               NewP2PNode(config),
 		gossipTopicNames:  make(map[string]struct{}),
 		handlerRegistry:   make(HandlerRegistry),
 		validatorRegistry: make(ValidatorRegistry),
 	}
-	return h
 }
 
 type P2PHandler struct {
@@ -157,51 +64,143 @@ type P2PHandler struct {
 	validatorRegistry ValidatorRegistry
 }
 
+// AddHandlerFunc will add a handler-function to a P2PHandler instance:
+// The passed in handlerFunc function takes a specific message of type M complying to the
+// P2PMessage interface, processes it and returns a slice of resulting P2PMessages.
+// If the handler is registered on the P2Phandler via the AddHandlerFunc function,
+// the passed in handler will be called automatically when a message of type M is received,
+// AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler
+//
+// For each message type M, there can only be one handler registered per P2PHandler.
+func (handler *P2PHandler) AddHandlerFunc(handlerFunc HandlerFunc, protos ...p2pmsg.Message) {
+	for _, p := range protos {
+		messageType := proto.MessageName(p)
+		_, exists := handler.handlerRegistry[messageType]
+		if exists {
+			panic(errors.Errorf(
+				"handler already registered: message-type=%s", messageType))
+		}
+		handler.handlerRegistry[messageType] = handlerFunc
+		handler.AddGossipTopic(p.Topic())
+	}
+}
+
+func (handler *P2PHandler) addValidatorImpl(valFunc ValidatorFunc, messProto p2pmsg.Message) {
+	topic := messProto.Topic()
+	_, exists := handler.validatorRegistry[topic]
+	if exists {
+		// This is likely not intended and happens when different messages return the same P2PMessage.Topic().
+		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
+		// (If feature needed, allow for chaining of successively registered validator functions per topic)
+		panic(errors.Errorf(
+			"can't register more than one validator per topic (topic: '%s', message-type: '%s')",
+			topic,
+			reflect.TypeOf(messProto)))
+	}
+	handleError := func(err error) {
+		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
+	}
+	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
+		if message.GetTopic() != topic {
+			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.GetTopic()))
+			return invalidResultType
+		}
+		unmshl, traceContext, err := UnmarshalPubsubMessage(message)
+		if err != nil {
+			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
+			return invalidResultType
+		}
+
+		if traceContext != nil && !allowTraceContext {
+			handleError(errors.New("received non-empty trace-context"))
+			return invalidResultType
+		}
+
+		if reflect.TypeOf(unmshl) != reflect.TypeOf(messProto) {
+			handleError(errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)))
+			return invalidResultType
+		}
+
+		valid, err := valFunc(ctx, unmshl)
+		if err != nil {
+			handleError(err)
+		}
+		if !valid {
+			return invalidResultType
+		}
+		return pubsub.ValidationAccept
+	}
+	handler.validatorRegistry[topic] = validate
+	handler.AddGossipTopic(topic)
+}
+
+// AddValidator will add a validator-function to a P2PHandler instance:
+// The passed in ValidatorFunc function takes a specific message of type M complying to the
+// P2PMessage interface, processes it and returns whether it is valid or not (bool value).
+// If the return value is false, the message is dropped and a potentially raised error is logged.
+// If the validator is registered on the P2Phandler via the AddValidator function,
+// the passed in validator will be called automatically when a message of type M is received
+//
+// For each message type M, there can only be one validator registered per P2PHandler.
+func (handler *P2PHandler) AddValidator(valFunc ValidatorFunc, protos ...p2pmsg.Message) {
+	for _, p := range protos {
+		handler.addValidatorImpl(valFunc, p)
+	}
+}
+
+func (handler *P2PHandler) AddMessageHandler(mhs ...MessageHandler) {
+	for _, mh := range mhs {
+		protos := mh.MessagePrototypes()
+		handler.AddHandlerFunc(mh.HandleMessage, protos...)
+		handler.AddValidator(mh.ValidateMessage, protos...)
+	}
+}
+
 // AddGossipTopic will subscribe to a specific topic on the
 // gossip p2p-messaging layer.
 // This is only necessary to call manually when we want to
 // join a topic for which no handlers or validators are registered
 // with the AddHandlerFunc() and AddValidator() functions
 // (e.g. for a publish only scenario for the topic).
-func (h *P2PHandler) AddGossipTopic(topic string) {
-	h.gossipTopicNames[topic] = struct{}{}
+func (handler *P2PHandler) AddGossipTopic(topic string) {
+	handler.gossipTopicNames[topic] = struct{}{}
 }
 
-func (h *P2PHandler) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
+func (handler *P2PHandler) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
 	runner.Go(func() error {
-		return h.P2P.Run(ctx, h.topics(), h.validatorRegistry)
+		return handler.P2P.Run(ctx, handler.topics(), handler.validatorRegistry)
 	})
-	if h.hasHandler() {
+	if handler.hasHandler() {
 		runner.Go(func() error {
-			return h.runHandleMessages(ctx)
+			return handler.runHandleMessages(ctx)
 		})
 	}
 
 	return nil
 }
 
-func (h *P2PHandler) topics() []string {
-	topics := make([]string, 0, len(h.gossipTopicNames))
-	for topicName := range h.gossipTopicNames {
+func (handler *P2PHandler) topics() []string {
+	topics := make([]string, 0, len(handler.gossipTopicNames))
+	for topicName := range handler.gossipTopicNames {
 		topics = append(topics, topicName)
 	}
 	return topics
 }
 
-func (h *P2PHandler) hasHandler() bool {
-	return len(h.handlerRegistry) > 0
+func (handler *P2PHandler) hasHandler() bool {
+	return len(handler.handlerRegistry) > 0
 }
 
-func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
+func (handler *P2PHandler) runHandleMessages(ctx context.Context) error {
 	// This will consume incoming messages and dispatch them to the registered handler functions
 	// If the handler returns messages, then they will be sent to the broadcast
 	for {
 		select {
-		case msg, ok := <-h.P2P.GossipMessages:
+		case msg, ok := <-handler.P2P.GossipMessages:
 			if !ok {
 				return nil
 			}
-			if err := h.handle(ctx, msg); err != nil {
+			if err := handler.handle(ctx, msg); err != nil {
 				log.Info().Err(err).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
 					Msg("failed to handle message")
 			}
@@ -211,7 +210,7 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 	}
 }
 
-func (h *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
+func (handler *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
 	var msgsOut []p2pmsg.Message
 	var err error
 
@@ -220,10 +219,10 @@ func (h *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
 		return err
 	}
 
-	ctx, span, reportError := newSpanForReceive(ctx, h.P2P, traceContext, msg, m)
+	ctx, span, reportError := newSpanForReceive(ctx, handler.P2P, traceContext, msg, m)
 	defer span.End()
 
-	handlerFunc, exists := h.handlerRegistry[proto.MessageName(m)]
+	handlerFunc, exists := handler.handlerRegistry[proto.MessageName(m)]
 	if !exists {
 		log.Info().Str("message", m.LogInfo()).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
 			Msg("ignoring message, no handler registered for topic")
@@ -237,7 +236,7 @@ func (h *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
 		return reportError(err)
 	}
 	for _, msgOut := range msgsOut {
-		if err := h.SendMessage(ctx, msgOut); err != nil {
+		if err := handler.SendMessage(ctx, msgOut); err != nil {
 			log.Info().Err(err).Str("message", msgOut.LogInfo()).Str("topic", msgOut.Topic()).
 				Msg("failed to send message")
 			continue
@@ -246,9 +245,9 @@ func (h *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
 	return nil
 }
 
-func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
+func (handler *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
 	var traceContext *p2pmsg.TraceContext
-	ctx, span, reportError := newSpanForPublish(ctx, h.P2P, traceContext, msg)
+	ctx, span, reportError := newSpanForPublish(ctx, handler.P2P, traceContext, msg)
 	defer span.End()
 
 	msgBytes, err := p2pmsg.Marshal(msg, traceContext)
@@ -266,7 +265,7 @@ func (h *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryO
 	_, callErr := retry.FunctionCall(
 		ctx,
 		func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, h.P2P.Publish(ctx, msg.Topic(), msgBytes)
+			return struct{}{}, handler.P2P.Publish(ctx, msg.Topic(), msgBytes)
 		},
 		retryOpts...,
 	)

@@ -88,7 +88,7 @@ func (m *MockNode) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (m *MockNode) setupP2PHandler() {
-	p2p.AddHandlerFunc(m.p2p, m.handleEonPublicKey)
+	m.p2p.AddHandlerFunc(m.handleEonPublicKey, &p2pmsg.EonPublicKey{})
 
 	m.p2p.AddGossipTopic(kprtopics.DecryptionTrigger)
 	m.p2p.AddGossipTopic(kprtopics.DecryptionKey)
@@ -98,7 +98,8 @@ func (m *MockNode) logStartupInfo() {
 	log.Info().Hex("eon-public-key", m.eonPublicKey.Marshal()).Msg("starting mocknode")
 }
 
-func (m *MockNode) handleEonPublicKey(_ context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
+func (m *MockNode) handleEonPublicKey(_ context.Context, k p2pmsg.Message) ([]p2pmsg.Message, error) {
+	key := k.(*p2pmsg.EonPublicKey)
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {

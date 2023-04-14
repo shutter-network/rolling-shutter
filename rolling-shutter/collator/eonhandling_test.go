@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
@@ -41,19 +41,16 @@ type keyper struct {
 	msg     *p2pmsg.EonPublicKey
 }
 
-func (k *keyper) handleMsg(ctx context.Context, c *collator) error {
-	if k.msg == nil {
-		return errors.New("Message not initialized")
+func (k *keyper) handleMsg(t *testing.T, ctx context.Context, handler p2p.MessageHandler) { //nolint:revive
+	t.Helper()
+	assert.Check(t, k.msg != nil)
+	ok, err := handler.ValidateMessage(ctx, k.msg)
+	assert.NilError(t, err)
+	if !ok {
+		return
 	}
-	ok, err := c.validateEonPublicKey(ctx, k.msg)
-	if err != nil {
-		return err
-	}
-	if ok {
-		_, err := c.handleEonPublicKey(ctx, k.msg)
-		return err
-	}
-	return nil
+	_, err = handler.HandleMessage(ctx, k.msg)
+	assert.NilError(t, err)
 }
 
 type setupEonKeysParams struct {
@@ -200,22 +197,16 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	})
 	assert.Check(t, len(keypers) > 0)
 
-	// HACK: Only partially instantiating the collator.
-	// This works until the handler/validator functions use something else than
-	// the database-pool
-	c := collator{dbpool: dbpool, Config: config}
+	var handler p2p.MessageHandler = &eonPublicKeyHandler{dbpool: dbpool, config: config}
 
 	for _, k := range keypersBefore {
-		err = k.handleMsg(ctx, &c)
-		assert.NilError(t, err)
+		k.handleMsg(t, ctx, handler)
 	}
 	for _, k := range keypersNoThreshold {
-		err = k.handleMsg(ctx, &c)
-		assert.NilError(t, err)
+		k.handleMsg(t, ctx, handler)
 	}
 	for _, k := range keypers {
-		err = k.handleMsg(ctx, &c)
-		assert.NilError(t, err)
+		k.handleMsg(t, ctx, handler)
 	}
 
 	// Although the no-threshold reaching pubkey message have a

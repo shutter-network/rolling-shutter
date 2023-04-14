@@ -7,12 +7,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -32,13 +34,23 @@ var dbListenChannels []string = []string{
 	newBatchtx,
 }
 
-func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.DecryptionKey) ([]p2pmsg.Message, error) {
+type decryptionKeyHandler struct {
+	Config config.Config
+	dbpool *pgxpool.Pool
+}
+
+func (*decryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
+	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
+}
+
+func (handler *decryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+	msg := m.(*p2pmsg.DecryptionKey)
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		_, err := db.InsertDecryptionKey(ctx, cltrdb.InsertDecryptionKeyParams{
 			EpochID:       epochID.Bytes(),
@@ -53,10 +65,12 @@ func (c *collator) handleDecryptionKey(ctx context.Context, msg *p2pmsg.Decrypti
 	return []p2pmsg.Message{}, nil
 }
 
-func (c *collator) validateDecryptionKey(ctx context.Context, key *p2pmsg.DecryptionKey) (bool, error) {
+func (handler *decryptionKeyHandler) ValidateMessage(ctx context.Context, k p2pmsg.Message) (bool, error) {
+	key := k.(*p2pmsg.DecryptionKey)
+
 	var eonPublicKey shcrypto.EonPublicKey
-	if key.GetInstanceID() != c.Config.InstanceID {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", c.Config.InstanceID, key.GetInstanceID())
+	if key.GetInstanceID() != handler.Config.InstanceID {
+		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.Config.InstanceID, key.GetInstanceID())
 	}
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)
@@ -66,7 +80,7 @@ func (c *collator) validateDecryptionKey(ctx context.Context, key *p2pmsg.Decryp
 		return false, errors.Wrapf(err, "invalid epoch id")
 	}
 
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		eonPub, err := db.GetEonPublicKey(ctx, int64(key.Eon))
 		if err != nil {

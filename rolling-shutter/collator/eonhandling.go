@@ -6,9 +6,11 @@ import (
 	"math"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
@@ -58,15 +60,24 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *p2p
 	return nil
 }
 
-// validateEonPublicKey is a libp2p validator for incoming EonPublicKey messages.
-func (c *collator) validateEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) (bool, error) {
+type eonPublicKeyHandler struct {
+	config config.Config
+	dbpool *pgxpool.Pool
+}
+
+func (*eonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
+	return []p2pmsg.Message{&p2pmsg.EonPublicKey{}}
+}
+
+func (handler *eonPublicKeyHandler) ValidateMessage(ctx context.Context, k p2pmsg.Message) (bool, error) {
+	key := k.(*p2pmsg.EonPublicKey)
 	if err := ensureNoIntegerOverflowsInEonPublicKey(key); err != nil {
 		return false, err
 	}
 
-	if c.Config.InstanceID != key.GetInstanceID() {
+	if handler.config.InstanceID != key.GetInstanceID() {
 		return false, errors.Errorf("eonPublicKey has wrong InstanceID (expected=%d, have=%d)",
-			c.Config.InstanceID, key.GetInstanceID())
+			handler.config.InstanceID, key.GetInstanceID())
 	}
 
 	// Theoretically, there could be a race condition, where we learn of the EonPublicKey
@@ -75,7 +86,7 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *p2pmsg.EonPubl
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
 	var keyperSet chainobsdb.KeyperSet
-	if err := c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	if err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 		keyperSet, err = chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
@@ -91,12 +102,13 @@ func (c *collator) validateEonPublicKey(ctx context.Context, key *p2pmsg.EonPubl
 	return true, nil
 }
 
-func (c *collator) handleEonPublicKey(ctx context.Context, key *p2pmsg.EonPublicKey) ([]p2pmsg.Message, error) {
+func (handler *eonPublicKeyHandler) HandleMessage(ctx context.Context, k p2pmsg.Message) ([]p2pmsg.Message, error) {
+	key := k.(*p2pmsg.EonPublicKey)
 	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {
 		return make([]p2pmsg.Message, 0), err
 	}
-	err = c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 
 		db := cltrdb.New(tx)

@@ -159,11 +159,10 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (c *collator) setupP2PHandler() {
-	p2p.AddValidator(c.p2p, c.validateEonPublicKey)
-	p2p.AddHandlerFunc(c.p2p, c.handleEonPublicKey)
-
-	p2p.AddValidator(c.p2p, c.validateDecryptionKey)
-	p2p.AddHandlerFunc(c.p2p, c.handleDecryptionKey)
+	c.p2p.AddMessageHandler(
+		&eonPublicKeyHandler{config: c.Config, dbpool: c.dbpool},
+		&decryptionKeyHandler{Config: c.Config, dbpool: c.dbpool},
+	)
 
 	c.p2p.AddGossipTopic(cltrtopics.DecryptionTrigger)
 }

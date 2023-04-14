@@ -24,6 +24,7 @@ type Message interface {
 	Topic() string
 	LogInfo() string
 	Validate() error
+	String() string
 }
 
 func Marshal(msg Message, traceContext *TraceContext) ([]byte, error) {

@@ -32,7 +32,7 @@ import (
 )
 
 type keyper struct {
-	config            Config
+	config            *Config
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
@@ -44,13 +44,13 @@ type keyper struct {
 }
 
 func New(config Config) service.Service {
-	return &keyper{config: config}
+	return &keyper{config: &config}
 }
 
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
 // it stores the config's ethereum address into the database. On subsequent uses it compares the
 // stored value and raises an error if it doesn't match.
-func linkConfigToDB(ctx context.Context, config Config, dbpool *pgxpool.Pool) error {
+func linkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
 	cfgAddress := config.GetAddress().Hex()
 	queries := metadb.New(dbpool)
@@ -120,7 +120,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.messageSender = messageSender
 	kpr.l1Client = l1Client
 	kpr.contracts = contracts
-	kpr.shuttermintState = smobserver.NewShuttermintState(&config)
+	kpr.shuttermintState = smobserver.NewShuttermintState(config)
 	kpr.p2p = p2pHandler
 
 	kpr.setupP2PHandler()
@@ -128,10 +128,12 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (kpr *keyper) setupP2PHandler() {
-	epochkghandler.New(
-		&kpr.config,
-		kpr.dbpool,
-	).SetupP2p(kpr.p2p)
+	kpr.p2p.AddMessageHandler(
+		epochkghandler.NewDecryptionKeyHandler(kpr.config, kpr.dbpool),
+		epochkghandler.NewDecryptionKeyShareHandler(kpr.config, kpr.dbpool),
+		epochkghandler.NewDecryptionTriggerHandler(kpr.config, kpr.dbpool),
+		epochkghandler.NewEonPublicKeyHandler(kpr.config, kpr.dbpool),
+	)
 }
 
 func (kpr *keyper) getServices() []service.Service {
@@ -143,7 +145,7 @@ func (kpr *keyper) getServices() []service.Service {
 	}
 
 	if kpr.config.HTTPEnabled {
-		services = append(services, kprapi.NewHTTPService(kpr.dbpool, &kpr.config, kpr.p2p))
+		services = append(services, kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.p2p))
 	}
 	return services
 }
