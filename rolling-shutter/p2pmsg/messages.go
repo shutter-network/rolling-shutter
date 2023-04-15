@@ -20,7 +20,6 @@ const EnvelopeVersion = "0.0.1"
 // Message can be send via the p2p protocol.
 type Message interface {
 	protoreflect.ProtoMessage
-	ImplementsP2PMessage()
 	GetInstanceID() uint64
 	Topic() string
 	LogInfo() string
@@ -75,9 +74,6 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 	return p2pmess, traceContext, nil
 }
 
-func (*DecryptionTrigger) ImplementsP2PMessage() {
-}
-
 func (trigger *DecryptionTrigger) LogInfo() string {
 	epochID, _ := epochid.BytesToEpochID(trigger.EpochID)
 	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochID.String())
@@ -89,9 +85,6 @@ func (*DecryptionTrigger) Topic() string {
 
 func (*DecryptionTrigger) Validate() error {
 	return nil
-}
-
-func (*DecryptionKeyShare) ImplementsP2PMessage() {
 }
 
 func (share *DecryptionKeyShare) LogInfo() string {
@@ -119,9 +112,6 @@ func (share *DecryptionKeyShare) Validate() error {
 	return err
 }
 
-func (*DecryptionKey) ImplementsP2PMessage() {
-}
-
 func (key *DecryptionKey) LogInfo() string {
 	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
 }
@@ -141,9 +131,6 @@ func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) 
 func (key *DecryptionKey) Validate() error {
 	_, err := key.GetEpochSecretKey()
 	return err
-}
-
-func (*EonPublicKey) ImplementsP2PMessage() {
 }
 
 func (e *EonPublicKey) LogInfo() string {
