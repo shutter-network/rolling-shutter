@@ -61,10 +61,6 @@ func WithGracefulIgnore() ValidatorOption {
 	}
 }
 
-func GetMessageType(msg protoreflect.ProtoMessage) protoreflect.FullName {
-	return msg.ProtoReflect().Type().Descriptor().FullName()
-}
-
 // AddValidator will add a validator-function to a P2PHandler instance:
 // The passed in ValidatorFunc function takes a specific message of type M complying to the
 // P2PMessage interface, processes it and returns whether it is valid or not (bool value).
@@ -158,7 +154,7 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 // For each message type M, there can only be one handler registered per P2PHandler.
 func AddHandlerFunc[M p2pmsg.Message](handler *P2PHandler, handlerFunc HandlerFuncStatic[M]) error {
 	var messProto M
-	messageType := GetMessageType(messProto)
+	messageType := proto.MessageName(messProto)
 
 	_, exists := handler.handlerRegistry[messageType]
 	if exists {
