@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
@@ -18,43 +17,6 @@ import (
 
 const EnvelopeVersion = "0.0.1"
 
-// All messages to be used in the P2P Gossip have to be included in this slice,
-// otherwise they won't be known to the marshaling layer.
-var messageTypes = []Message{
-	// Keyper messages
-	new(DecryptionKey),
-	new(DecryptionTrigger),
-	new(DecryptionKeyShare),
-	new(EonPublicKey),
-}
-
-var (
-	topicToProtoName = make(map[string]protoreflect.FullName)
-	protoNames       = make(map[protoreflect.FullName]bool)
-)
-
-func init() {
-	for _, mess := range messageTypes {
-		registerMessage(mess)
-	}
-}
-
-// Instead of using an envelope for the unmarshalling,
-// we simply map one protobuf message type 1 to 1 to a Gossip topic.
-func registerMessage(mess Message) {
-	messageTypeName := mess.ProtoReflect().Type().Descriptor().FullName()
-	topic := mess.Topic()
-
-	if val, exists := topicToProtoName[topic]; exists {
-		if val != messageTypeName {
-			err := errors.Errorf("Topic '%s' already has message type <%s> registered. Registering %s failed", topic, val, messageTypeName)
-			panic(err)
-		}
-	}
-	topicToProtoName[topic] = messageTypeName
-	protoNames[messageTypeName] = true
-}
-
 // Message can be send via the p2p protocol.
 type Message interface {
 	protoreflect.ProtoMessage
@@ -63,22 +25,6 @@ type Message interface {
 	Topic() string
 	LogInfo() string
 	Validate() error
-}
-
-func NewMessageFromTopic(topic string) (Message, error) {
-	name, ok := topicToProtoName[topic]
-	if !ok {
-		return nil, errors.Errorf("No message type found for topic <%s>", topic)
-	}
-	t, err := protoregistry.GlobalTypes.FindMessageByName(name)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error while retrieving message type for topic <%s>", topic)
-	}
-	protomess, ok := t.New().Interface().(Message)
-	if !ok {
-		return nil, errors.Errorf("Error while instantiating message type for topic <%s>", topic)
-	}
-	return protomess, nil
 }
 
 func Marshal(msg Message, traceContext *TraceContext) ([]byte, error) {
@@ -111,24 +57,20 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 	if envelope.GetVersion() != EnvelopeVersion {
 		return nil, nil, errors.New("version mismatch")
 	}
-	traceContext := envelope.GetTrace()
-
-	if !trace.IsEnabled() && traceContext != nil {
-		traceContext = nil
+	var traceContext *TraceContext
+	if trace.IsEnabled() {
+		traceContext = envelope.GetTrace()
 	}
+
 	msg, err := envelope.GetMessage().UnmarshalNew()
 	if err != nil {
 		return nil, traceContext, err
-	}
-	msgFullName := proto.MessageName(msg)
-	if _, ok := protoNames[msgFullName]; !ok {
-		return nil, traceContext, errors.Errorf("unknown message type <%s>", msgFullName.Name())
 	}
 
 	p2pmess, ok := msg.(Message)
 	if !ok {
 		return nil, traceContext, errors.Errorf(
-			"message of type <%s> does not comply with message interface", msgFullName.Name())
+			"message of type <%s> does not comply with message interface", proto.MessageName(msg))
 	}
 	return p2pmess, traceContext, nil
 }
