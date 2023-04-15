@@ -28,7 +28,7 @@ func (room *gossipRoom) ListPeers() []peer.ID {
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the given messages channel.
-func (room *gossipRoom) readLoop(ctx context.Context, messages chan *Message) error {
+func (room *gossipRoom) readLoop(ctx context.Context, messages chan *pubsub.Message) error {
 	for {
 		msg, err := room.subscription.Next(ctx)
 		if err != nil {
@@ -38,16 +38,9 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *Message) er
 		if msg.ReceivedFrom == room.self {
 			continue
 		}
-		m := &Message{
-			Topic:        room.topicName,
-			Message:      msg.Data,
-			Sender:       msg.GetFrom(),
-			ReceivedFrom: msg.ReceivedFrom,
-			ID:           msg.ID,
-		}
 		// send valid messages onto the Messages channel
 		select {
-		case messages <- m:
+		case messages <- msg:
 		case <-ctx.Done():
 			return ctx.Err()
 		}

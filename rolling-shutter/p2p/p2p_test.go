@@ -90,7 +90,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	}()
 	// The following loop publishes the same message over and over. Even though we did call
 	// ConnectToPeer, libp2p takes some time until the peer receives the first message.
-	var message *Message
+	var message *pubsub.Message
 	topicName := gossipTopicNames[0]
 	for message == nil {
 		if err := p2ps[1].Publish(ctx, topicName, testMessage); err != nil {
@@ -108,7 +108,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		case <-time.After(5 * time.Millisecond):
 		}
 	}
-	assert.Equal(t, topicName, message.Topic, "received message with wrong topic")
-	assert.Check(t, bytes.Equal(testMessage, message.Message), "received wrong message")
-	assert.Equal(t, p2ps[1].HostID(), message.Sender.String(), "received message with wrong sender")
+	assert.Equal(t, topicName, message.GetTopic(), "received message with wrong topic")
+	assert.Check(t, bytes.Equal(testMessage, message.GetData()), "received wrong message")
+	assert.Equal(t, p2ps[1].HostID(), message.GetFrom().String(), "received message with wrong sender")
 }

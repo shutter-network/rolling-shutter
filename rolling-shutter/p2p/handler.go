@@ -96,24 +96,16 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 			return errors.Wrap(err, "invalid validator option")
 		}
 	}
-	validate := func(ctx context.Context, sender peer.ID, libp2pMessage *pubsub.Message) pubsub.ValidationResult {
+	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		var (
 			key M
 			ok  bool
 		)
-
-		message := Message{
-			Topic:        *libp2pMessage.Topic,
-			Message:      libp2pMessage.Data,
-			Sender:       libp2pMessage.GetFrom(),
-			ReceivedFrom: libp2pMessage.ReceivedFrom,
-			ID:           libp2pMessage.ID,
-		}
-		if message.Topic != topic {
-			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.Topic))
+		if message.GetTopic() != topic {
+			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.GetTopic()))
 			return val.invalidResultType
 		}
-		unmshl, traceContext, err := message.Unmarshal()
+		unmshl, traceContext, err := UnmarshalPubsubMessage(message)
 		if err != nil {
 			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
 			return val.invalidResultType
@@ -251,7 +243,7 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 				return nil
 			}
 			if err := h.handle(ctx, msg); err != nil {
-				log.Info().Err(err).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
+				log.Info().Err(err).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
 					Msg("failed to handle message")
 			}
 		case <-ctx.Done():
@@ -260,11 +252,11 @@ func (h *P2PHandler) runHandleMessages(ctx context.Context) error {
 	}
 }
 
-func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
+func (h *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) error {
 	var msgsOut []p2pmsg.Message
 	var err error
 
-	m, traceContext, err := msg.Unmarshal()
+	m, traceContext, err := UnmarshalPubsubMessage(msg)
 	if err != nil {
 		return err
 	}
@@ -274,12 +266,12 @@ func (h *P2PHandler) handle(ctx context.Context, msg *Message) error {
 
 	handlerFunc, exists := h.handlerRegistry[proto.MessageName(m)]
 	if !exists {
-		log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
+		log.Info().Str("message", m.LogInfo()).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
 			Msg("ignoring message, no handler registered for topic")
 		return nil
 	}
 
-	log.Info().Str("message", m.LogInfo()).Str("topic", msg.Topic).Str("sender-id", msg.Sender.String()).
+	log.Info().Str("message", m.LogInfo()).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
 		Msg("received message")
 	msgsOut, err = handlerFunc(ctx, m)
 	if err != nil {

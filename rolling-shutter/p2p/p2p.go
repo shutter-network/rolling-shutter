@@ -66,7 +66,7 @@ type P2PNode struct {
 	dht            *dht.IpfsDHT
 	pubSub         *pubsub.PubSub
 	gossipRooms    map[string]*gossipRoom
-	GossipMessages chan *Message
+	GossipMessages chan *pubsub.Message
 }
 
 type Config struct {
@@ -86,7 +86,7 @@ func NewP2PNode(config Config) *P2PNode {
 		host:           nil,
 		pubSub:         nil,
 		gossipRooms:    make(map[string]*gossipRoom),
-		GossipMessages: make(chan *Message, messagesBufSize),
+		GossipMessages: make(chan *pubsub.Message, messagesBufSize),
 	}
 	return &p
 }

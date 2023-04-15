@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pkg/errors"
@@ -74,7 +75,7 @@ func newSpanForReceive(
 	ctx context.Context,
 	p2pnode *P2PNode,
 	traceContext *p2pmsg.TraceContext,
-	msg *Message,
+	msg *pubsub.Message,
 	p2pMsg p2pmsg.Message,
 ) (context.Context, oteltrace.Span, trace.ErrorWrapper) {
 	opName := "receive"
@@ -84,7 +85,7 @@ func newSpanForReceive(
 	var spanKind oteltrace.SpanKind
 
 	netPeer = msg.ReceivedFrom
-	producer = msg.Sender
+	producer = msg.GetFrom()
 	spanKind = oteltrace.SpanKindConsumer
 
 	h := p2pnode.host
@@ -106,8 +107,8 @@ func newSpanForReceive(
 
 	attrs = append(attrs,
 		attribute.String("messaging.source.kind", "topic"),
-		attribute.String("messaging.source.name", msg.Topic),
-		attribute.String("net.peer.name", msg.Sender.String()),
+		attribute.String("messaging.source.name", msg.GetTopic()),
+		attribute.String("net.peer.name", msg.GetFrom().String()),
 	)
 	msgName := string(proto.MessageName(p2pMsg).Name())
 	attrs = append(attrs,
@@ -118,7 +119,7 @@ func newSpanForReceive(
 		attribute.Int64("shutter.instance.id", int64(p2pMsg.GetInstanceID())),
 	)
 	log.Debug().Interface("attrs", attrs).Msg("span with attrs")
-	spanName := opName + " " + msg.Topic
+	spanName := opName + " " + msg.GetTopic()
 
 	if traceContext != nil && trace.IsEnabled() {
 		var err error
