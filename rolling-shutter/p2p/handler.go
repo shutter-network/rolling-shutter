@@ -22,44 +22,12 @@ type (
 	HandlerRegistry                     map[protoreflect.FullName]HandlerFunc
 	ValidatorFunc[M p2pmsg.Message]     func(context.Context, M) (bool, error)
 	ValidatorRegistry                   map[string]pubsub.ValidatorEx
-
-	ValidatorOption func(*validator) error
-	validator       struct {
-		allowTraceContext bool
-		invalidResultType pubsub.ValidationResult
-	}
 )
 
-func defaults() ValidatorOption {
-	return func(v *validator) error {
-		v.allowTraceContext = false
-		v.invalidResultType = pubsub.ValidationReject
-		return nil
-	}
-}
-
-// WithTraceContextPropagation option allows for
-// cross-cutting trace-context to be propagated and accepted.
-// If this is not set, if a peer sends a trace-context within the
-// message envelope, the message will be rejected and the
-// sender will be punished (as per local peer score).
-func WithTraceContextPropagation() ValidatorOption {
-	return func(v *validator) error {
-		v.allowTraceContext = true
-		return nil
-	}
-}
-
-// WithGracefulIgnore option allows to "upgrade" all messages
-// that would have been rejected to a ignore only.
-// This means that the peer will not get punished (as per local
-// peer score and can continue to send messages.
-func WithGracefulIgnore() ValidatorOption {
-	return func(v *validator) error {
-		v.invalidResultType = pubsub.ValidationIgnore
-		return nil
-	}
-}
+const (
+	allowTraceContext = true // whether we allow the trace field to be set in the message envelope
+	invalidResultType = pubsub.ValidationReject
+)
 
 // AddValidator will add a validator-function to a P2PHandler instance:
 // The passed in ValidatorFunc function takes a specific message of type M complying to the
@@ -69,7 +37,7 @@ func WithGracefulIgnore() ValidatorOption {
 // the passed in validator will be called automatically when a message of type M is received
 //
 // For each message type M, there can only be one validator registered per P2PHandler.
-func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M], opts ...ValidatorOption) error {
+func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M]) error {
 	var messProto M
 	topic := messProto.Topic()
 
@@ -87,15 +55,6 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 	handleError := func(err error) {
 		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
 	}
-	val := &validator{
-		allowTraceContext: false,
-	}
-	opts = append([]ValidatorOption{defaults()}, opts...)
-	for _, opt := range opts {
-		if err := opt(val); err != nil {
-			return errors.Wrap(err, "invalid validator option")
-		}
-	}
 	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		var (
 			key M
@@ -103,23 +62,23 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 		)
 		if message.GetTopic() != topic {
 			handleError(errors.Errorf("topic mismatch (message-topic: '%s')", message.GetTopic()))
-			return val.invalidResultType
+			return invalidResultType
 		}
 		unmshl, traceContext, err := UnmarshalPubsubMessage(message)
 		if err != nil {
 			handleError(errors.Wrap(err, "error while unmarshalling message in validator"))
-			return val.invalidResultType
+			return invalidResultType
 		}
 
-		if traceContext != nil && !val.allowTraceContext {
+		if traceContext != nil && !allowTraceContext {
 			handleError(errors.New("received non-empty trace-context"))
-			return val.invalidResultType
+			return invalidResultType
 		}
 
 		key, ok = unmshl.(M)
 		if !ok {
 			handleError(errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)))
-			return val.invalidResultType
+			return invalidResultType
 		}
 
 		valid, err := valFunc(ctx, key)
@@ -127,7 +86,7 @@ func AddValidator[M p2pmsg.Message](handler *P2PHandler, valFunc ValidatorFunc[M
 			handleError(err)
 		}
 		if !valid {
-			return val.invalidResultType
+			return invalidResultType
 		}
 		return pubsub.ValidationAccept
 	}
