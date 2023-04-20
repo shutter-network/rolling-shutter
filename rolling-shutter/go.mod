@@ -3,7 +3,9 @@ module github.com/shutter-network/rolling-shutter/rolling-shutter
 go 1.19
 
 require (
+	github.com/AdamSLevy/jsonrpc2/v14 v14.1.0
 	github.com/benbjohnson/clock v1.3.1
+	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/getkin/kin-openapi v0.87.0
@@ -16,6 +18,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/kr/pretty v0.3.1
 	github.com/libp2p/go-libp2p v0.26.4
+	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/libp2p/go-libp2p-kad-dht v0.21.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/mitchellh/mapstructure v1.5.0

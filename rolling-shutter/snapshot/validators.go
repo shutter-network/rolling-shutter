@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snptopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 )
 
 func (snp *Snapshot) makeMessagesValidators() map[string]pubsub.Validator {

@@ -6,16 +6,16 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	shmsg "github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snptopics"
 )
 
 type (
 	decryptionKey shmsg.DecryptionKey
 	eonPublicKey  shmsg.EonPublicKey
-	timedEpoch    shmsg.TimedEpoch
+	timedEpoch    shmsg.TimedEpoch // FIXME
 )
 
 type message interface {
@@ -31,7 +31,7 @@ func (d *decryptionKey) GetInstanceID() uint64 { return d.InstanceID }
 func (e *eonPublicKey) GetInstanceID() uint64  { return e.InstanceID }
 func (te *timedEpoch) GetInstanceID() uint64   { return te.InstanceID }
 
-func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
+func unmarshalP2PMessage(msg *shmsg.Message) (message, error) {
 	if msg == nil {
 		return nil, nil
 	}
@@ -47,9 +47,9 @@ func unmarshalP2PMessage(msg *p2p.Message) (message, error) {
 	}
 }
 
-func unmarshalDecryptionKey(msg *p2p.Message) (message, error) {
+func unmarshalDecryptionKey(msg *shmsg.Message) (message, error) {
 	decryptionKeyMsg := shmsg.DecryptionKey{}
-	if err := proto.Unmarshal(msg.Message, &decryptionKeyMsg); err != nil {
+	if err := proto.Unmarshal(shmsg.Message, &decryptionKeyMsg); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
 	}
 

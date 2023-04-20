@@ -1,12 +1,11 @@
 package snptopics
 
 import (
-	"github.com/shutter-network/shutter/shuttermint/decryptor/dcrtopics"
-	"github.com/shutter-network/shutter/shuttermint/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 )
 
 const (
-	DecryptionKey = dcrtopics.DecryptionKey
+	DecryptionKey = kprtopics.DecryptionKey
 	EonPublicKey  = kprtopics.EonPublicKey
 	TimedEpoch    = "TimedEpoch"
 )

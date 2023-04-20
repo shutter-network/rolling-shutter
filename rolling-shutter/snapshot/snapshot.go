@@ -10,13 +10,13 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shutter-network/shutter/shuttermint/p2p"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
-	"github.com/shutter-network/shutter/shuttermint/shmsg"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/hubapi"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snpdb"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snpjrpc"
-	"github.com/shutter-network/shutter/shuttermint/snapshot/snptopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/hubapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 )
 
 var gossipTopicNames = [3]string{

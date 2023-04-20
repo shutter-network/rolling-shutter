@@ -12,7 +12,7 @@ import (
 	"io"
 	"text/template"
 
-	"github.com/shutter-network/shutter/shuttermint/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type Config struct {

@@ -3,42 +3,37 @@ package snpdb
 import (
 	"context"
 	_ "embed"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shutter/shuttermint/commondb"
-	"github.com/shutter-network/shutter/shuttermint/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-//go:embed schema.sql
 // CreateSnapshotTables contains the SQL statements to create the decryptor tables.
+//
+//go:embed schema.sql
 var CreateSnapshotTables string
 
 // schemaVersion is used to check that we use the right schema.
 var schemaVersion = shdb.MustFindSchemaVersion(CreateSnapshotTables, "snpdb/schema.sql")
 
 func initSnapshotDB(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, CreateSnapshotTables)
+	err := db.Create(ctx, tx, []string{"snpdb", "chainobsdb", "metadb"})
 	if err != nil {
-		return errors.Wrap(err, "failed to create snapshot tables")
+		return err
 	}
 
-	// FIXME: Add back when / if necessary
-	//_, err = tx.Exec(ctx, commondb.CreateObserveTables)
-	//if err != nil {
-	//	return errors.Wrap(err, "failed to create observe tables")
-	//}
-
-	_, err = tx.Exec(ctx, commondb.CreateMetaInf)
-	if err != nil {
-		return errors.Wrap(err, "failed to create meta_inf table")
-	}
-	err = New(tx).InsertMeta(ctx, InsertMetaParams{Key: shdb.SchemaVersionKey, Value: schemaVersion})
+	err = metadb.New(tx).InsertMeta(ctx, metadb.InsertMetaParams{
+		Key:   shdb.SchemaVersionKey,
+		Value: schemaVersion,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to set schema version in meta_inf table")
 	}
-
 	return nil
 }
 
