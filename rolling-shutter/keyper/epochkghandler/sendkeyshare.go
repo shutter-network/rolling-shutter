@@ -51,6 +51,7 @@ func SendDecryptionKeyShare(
 
 	// check if we already computed (and therefore most likely sent) our key share
 	shareExists, err := db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
+		Eon:         eon.Eon,
 		EpochID:     epochID.Bytes(),
 		KeyperIndex: keyperIndex,
 	})

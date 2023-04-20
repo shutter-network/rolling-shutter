@@ -15,6 +15,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -31,16 +32,20 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	epochID := epochid.Uint64ToEpochID(50)
 	keyperIndex := uint64(1)
 
-	initializeEon(ctx, t, db, keyperIndex)
+	initializeEon(ctx, t, dbpool, keyperIndex)
 	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
 	// send decryption key share when first trigger is received
-	trigger := &p2pmsg.DecryptionTrigger{
-		EpochID:    epochID.Bytes(),
-		InstanceID: 0,
-	}
-	msgs, err := handler.HandleMessage(ctx, trigger)
+	trigger, err := p2pmsg.NewSignedDecryptionTrigger(
+		config.GetInstanceID(),
+		epochID,
+		0,
+		make([]byte, 32),
+		config.GetCollatorKey(),
+	)
 	assert.NilError(t, err)
+	msgs := p2ptest.MustHandleMessage(t, handler, ctx, trigger)
 	share, err := db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
+		Eon:         int64(config.GetEon()),
 		EpochID:     epochID.Bytes(),
 		KeyperIndex: int64(keyperIndex),
 	})
@@ -54,7 +59,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.Check(t, bytes.Equal(msg.Share, share.DecryptionKeyShare))
 
 	// don't send share when trigger is received again
-	msgs, err = handler.HandleMessage(ctx, trigger)
+	msgs = p2ptest.MustHandleMessage(t, handler, ctx, trigger)
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 0)
 }
@@ -68,7 +73,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	var kpr p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
+	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
 	collatorKey1, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 	collatorAddress1 := ethcrypto.PubkeyToAddress(collatorKey1.PublicKey)
@@ -155,12 +160,7 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 				tc.privKey,
 			)
 			assert.NilError(t, err)
-			validationResult, err := kpr.ValidateMessage(ctx, msg)
-			if tc.valid {
-				assert.NilError(t, err)
-			}
-			assert.Equal(t, validationResult, tc.valid,
-				"validate failed valid=%t", tc.valid)
+			p2ptest.MustValidateMessageResult(t, tc.valid, handler, ctx, msg)
 		})
 	}
 }

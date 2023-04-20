@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
@@ -39,18 +40,6 @@ type keyper struct {
 	address string
 	index   uint64
 	msg     *p2pmsg.EonPublicKey
-}
-
-func (k *keyper) handleMsg(t *testing.T, ctx context.Context, handler p2p.MessageHandler) { //nolint:revive
-	t.Helper()
-	assert.Check(t, k.msg != nil)
-	ok, err := handler.ValidateMessage(ctx, k.msg)
-	assert.NilError(t, err)
-	if !ok {
-		return
-	}
-	_, err = handler.HandleMessage(ctx, k.msg)
-	assert.NilError(t, err)
 }
 
 type setupEonKeysParams struct {
@@ -200,13 +189,13 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	var handler p2p.MessageHandler = &eonPublicKeyHandler{dbpool: dbpool, config: config}
 
 	for _, k := range keypersBefore {
-		k.handleMsg(t, ctx, handler)
+		p2ptest.MustHandleMessage(t, handler, ctx, k.msg)
 	}
 	for _, k := range keypersNoThreshold {
-		k.handleMsg(t, ctx, handler)
+		p2ptest.MustHandleMessage(t, handler, ctx, k.msg)
 	}
 	for _, k := range keypers {
-		k.handleMsg(t, ctx, handler)
+		p2ptest.MustHandleMessage(t, handler, ctx, k.msg)
 	}
 
 	// Although the no-threshold reaching pubkey message have a

@@ -2,46 +2,76 @@ package epochkghandler
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-type TestConfig struct{}
+func init() {
+	var err error
+	config.collatorKey, err = ethcrypto.GenerateKey()
+	if err != nil {
+		panic(errors.Wrap(err, "ethcrypto.GenerateKey failed"))
+	}
+}
+
+type TestConfig struct {
+	collatorKey *ecdsa.PrivateKey
+}
 
 var config = &TestConfig{}
 
-func (c *TestConfig) GetAddress() common.Address {
+func (TestConfig) GetAddress() common.Address {
 	return common.HexToAddress("0x2222222222222222222222222222222222222222")
 }
 
-func (c *TestConfig) GetInstanceID() uint64 {
+func (TestConfig) GetInstanceID() uint64 {
 	return 55
+}
+
+func (TestConfig) GetEon() uint64 {
+	return 22
+}
+
+func (c *TestConfig) GetCollatorKey() *ecdsa.PrivateKey {
+	return config.collatorKey
 }
 
 func initializeEon(
 	ctx context.Context,
 	t *testing.T,
-	db *kprdb.Queries,
+	dbpool *pgxpool.Pool,
 	keyperIndex uint64, //nolint:unparam
 ) *testkeygen.TestKeyGenerator {
 	t.Helper()
-	eon := uint64(0)
+	db := kprdb.New(dbpool)
 	keypers := []string{
 		"0x0000000000000000000000000000000000000000",
 		config.GetAddress().Hex(),
 		"0x1111111111111111111111111111111111111111",
 	}
+
+	chdb := chainobsdb.New(dbpool)
+	err := chdb.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
+		ActivationBlockNumber: 0,
+		Collator:              shdb.EncodeAddress(ethcrypto.PubkeyToAddress(config.GetCollatorKey().PublicKey)),
+	})
+	assert.NilError(t, err)
 
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
@@ -51,7 +81,7 @@ func initializeEon(
 		publicKeyShares = append(publicKeyShares, share)
 	}
 	dkgResult := puredkg.Result{
-		Eon:             eon,
+		Eon:             config.GetEon(),
 		NumKeypers:      tkg.NumKeypers,
 		Threshold:       tkg.Threshold,
 		Keyper:          keyperIndex,
@@ -70,14 +100,14 @@ func initializeEon(
 	})
 	assert.NilError(t, err)
 	err = db.InsertEon(ctx, kprdb.InsertEonParams{
-		Eon:                   0,
+		Eon:                   int64(config.GetEon()),
 		Height:                0,
 		ActivationBlockNumber: 0,
 		KeyperConfigIndex:     1,
 	})
 	assert.NilError(t, err)
 	err = db.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{
-		Eon:        0,
+		Eon:        int64(config.GetEon()),
 		Success:    true,
 		Error:      sql.NullString{},
 		PureResult: dkgResultEncoded,
