@@ -21,27 +21,25 @@ jobs:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v15
+          key: gen-clj-v16
       - run:
-          name: Install babashka with asdf
+          name: Install babashka
           command: |
-            if [[ -e ~/.asdf ]]; then
-              echo "asdf already installed"
+            if [[ -e ~/bin/bb ]]; then
+              echo "babashka already installed"
             else
-              git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
-              source ~/.asdf/asdf.sh
-              asdf plugin add babashka
-              asdf install babashka
+              curl -sL https://raw.githubusercontent.com/babashka/babashka/master/install -o ~/install-bb
+              mkdir -p ~/bin
+              bash ~/install-bb --version 1.3.176 --dir ~/bin
             fi
-            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
       - run:
           name: Generate continuation config
           command: |
-            bb -gen-ci
+            ~/bin/bb -gen-ci
       - save_cache:
-          key: gen-clj-v15
+          key: gen-clj-v16
           paths:
-            - ~/.asdf
+            - ~/bin/
       - continuation/continue:
           configuration_path: continue-generated.yml
 
