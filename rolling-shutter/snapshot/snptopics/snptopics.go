@@ -1,11 +1,11 @@
 package snptopics
 
 import (
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 )
 
 const (
-	DecryptionKey = kprtopics.DecryptionKey
+	DecryptionKey = cltrtopics.DecryptionKey
 	EonPublicKey  = kprtopics.EonPublicKey
 	TimedEpoch    = "TimedEpoch"
 )
