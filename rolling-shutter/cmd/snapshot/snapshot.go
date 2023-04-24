@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/rs/zerolog/log"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -92,7 +93,7 @@ func initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Database initialized (%s)", shdb.ConnectionInfo(dbpool))
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database initialized")
 
 	return nil
 }
