@@ -10,11 +10,11 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/hubapi"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 )
