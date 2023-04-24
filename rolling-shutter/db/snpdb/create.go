@@ -13,13 +13,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-// CreateSnapshotTables contains the SQL statements to create the decryptor tables.
-//
-//go:embed schema.sql
-var CreateSnapshotTables string
-
 // schemaVersion is used to check that we use the right schema.
-var schemaVersion = shdb.MustFindSchemaVersion(CreateSnapshotTables, "snpdb/schema.sql")
+var schemaVersion = db.MustFindSchemaVersion("snpdb")
 
 func initSnapshotDB(ctx context.Context, tx pgx.Tx) error {
 	err := db.Create(ctx, tx, []string{"snpdb", "chainobsdb", "metadb"})
