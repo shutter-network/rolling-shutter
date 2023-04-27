@@ -80,12 +80,12 @@ func readKeyperConfig() (keyper.Config, error) {
 	viper.BindEnv("EncryptionKey")
 	viper.BindEnv("DKGPhaseLength")
 	viper.BindEnv("DatabaseURL")
-	viper.BindEnv("ListenAddress")
+	viper.BindEnv("ListenAddresses")
 	viper.BindEnv("CustomBootstrapAddresses")
 
 	viper.SetDefault("ShuttermintURL", "http://localhost:26657")
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/2000")
-	viper.SetDefault("ListenAddress", defaultListenAddress)
+	viper.SetDefault("ListenAddresses", []multiaddr.Multiaddr{defaultListenAddress})
 	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 
 	defer func() {
