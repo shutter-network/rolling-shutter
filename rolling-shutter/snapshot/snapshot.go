@@ -172,7 +172,7 @@ func (snp *Snapshot) handleMessage(ctx context.Context, msg *p2p.Message) error 
 	return nil
 }
 
-func (snp *Snapshot) handleDecryptionKeyInput(
+/* func (snp *Snapshot) handleDecryptionKeyInput(
 	ctx context.Context,
 	config Config,
 	db *snpdb.Queries,
@@ -193,7 +193,7 @@ func (snp *Snapshot) handleDecryptionKeyInput(
 	// FIXME: Apart from needing to be in DB we need to keep track of the proposals better
 	seenProposals[string(key.EpochID)] = struct{}{}
 	return nil
-}
+} */
 
 func (snp *Snapshot) handleRequestEonKey(ctx context.Context) error {
 	row, err := snp.db.GetEonPublicKeyLatest(ctx)

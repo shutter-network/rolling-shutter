@@ -34,6 +34,8 @@ type Config struct {
 
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
+
+	InstanceID uint64
 }
 
 const configTemplate = `# Shutter snapshot config
@@ -65,6 +67,8 @@ CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | Qu
 # Secret Keys
 EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
+
+InstanceID = {{ .InstanceID }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("snapshot", configTemplate)
@@ -98,4 +102,8 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 
 func (config *Config) EthereumAddress() common.Address {
 	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+}
+
+func (config *Config) GetInstanceID() uint64 {
+	return config.InstanceID
 }
