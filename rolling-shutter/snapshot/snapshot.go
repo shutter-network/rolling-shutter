@@ -41,10 +41,11 @@ type Snapshot struct {
 
 func New(config Config) *Snapshot {
 	p2pConfig := p2p.Config{
-		ListenAddr:     config.ListenAddress,
-		PeerMultiaddrs: config.PeerMultiaddrs,
-		PrivKey:        config.P2PKey,
-		MetricsEnabled: config.MetricsEnabled,
+		ListenAddrs:       config.ListenAddresses,
+		BootstrapPeers:    config.CustomBootstrapAddresses, // FIXME: add to own config
+		PrivKey:           config.P2PKey,
+		DisableTopicDHT:   true,
+		DisableRoutingDHT: true,
 	}
 	p2p_instance := p2p.New(p2pConfig)
 

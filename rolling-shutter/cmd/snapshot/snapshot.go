@@ -13,6 +13,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
@@ -101,13 +102,13 @@ func initDB() error {
 func readConfig() (snapshot.Config, error) {
 	viper.SetEnvPrefix("SNAPSHOT")
 	viper.BindEnv("EthereumURL")
-	viper.BindEnv("ListenAddress")
-	viper.BindEnv("PeerMultiaddrs")
+	viper.BindEnv("ListenAddresses")
+	viper.BindEnv("CustomBootstrapAddresses")
 	viper.BindEnv("SnapshotHubURL")
 
 	defaultListenAddress, _ := multiaddr.NewMultiaddr("/ip6/::1/tcp/2000")
-	viper.SetDefault("ListenAddress", defaultListenAddress)
-	viper.SetDefault("PeerMultiaddrs", make([]multiaddr.Multiaddr, 0))
+	viper.SetDefault("ListenAddresses", []multiaddr.Multiaddr{defaultListenAddress})
+	viper.SetDefault("CustomBootstrapAddresses", []peer.AddrInfo{})
 
 	config := snapshot.Config{}
 
@@ -145,10 +146,15 @@ func exampleConfig() (*snapshot.Config, error) {
 	}
 
 	return &snapshot.Config{
-		EthereumURL:    "http://[::1]:8545/",
-		ListenAddress:  p2p.MustMultiaddr("/ip6/::1/tcp/2000"),
-		PeerMultiaddrs: []multiaddr.Multiaddr{},
-		DatabaseURL:    "postgres://localhost:5432/shutter_snapshot",
+		EthereumURL: "http://[::1]:8545/",
+		ListenAddresses: []multiaddr.Multiaddr{
+			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
+		},
+		CustomBootstrapAddresses: []peer.AddrInfo{
+			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
+			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+		},
+		DatabaseURL: "postgres://localhost:5432/shutter_snapshot",
 
 		SnapshotHubURL: "",
 
