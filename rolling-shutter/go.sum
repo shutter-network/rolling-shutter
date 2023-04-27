@@ -1266,8 +1266,8 @@ github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 h1:+FZIDR/D97YOP
 github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63/go.mod h1:X2r9ueLEUZgtx2cIogM0v4Zj5uvvzhuuiu7Pn8HzMPg=
 github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee h1:VO2t6IBpfvW34TdtD/G10VvnGqjLic1jzOuHjUb5VqM=
 github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee/go.mod h1:DWQW5jICDR7UJh4HtxXSM20Churx4CQL0fwL/SoOSA4=
-github.com/pingcap/tidb/parser v0.0.0-20230421064120-d13c8481c633 h1:P0qPovj+lhZC44tFAgtbDQaPHYjiQUS6Ipc+rYpWaTs=
-github.com/pingcap/tidb/parser v0.0.0-20230421064120-d13c8481c633/go.mod h1:R0xUtp5gJK/Xtb+PIvR3Wh/Ayvmorwk0nzT4p3HLZJk=
+github.com/pingcap/tidb/parser v0.0.0-20221230122017-702a5598f90c h1:8npT+cDE5FHn3eH4G5EKIcpNEl9y6k69OZNq7+u/Syc=
+github.com/pingcap/tidb/parser v0.0.0-20221230122017-702a5598f90c/go.mod h1:wjvp+T3/T9XYt0nKqGX3Kc1AKuyUcfno6LTc6b2A6ew=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
 github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8/go.mod h1:HKlIX3XHQyzLZPlr7++PzdhaXEj94dEiJgZDTsxEqUI=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

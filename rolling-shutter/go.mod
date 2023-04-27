@@ -191,7 +191,7 @@ require (
 	github.com/pganalyze/pg_query_go/v2 v2.2.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pingcap/log v0.0.0-20211215031037-e024ba4eb0ee // indirect
-	github.com/pingcap/tidb/parser v0.0.0-20230421064120-d13c8481c633 // indirect
+	github.com/pingcap/tidb/parser v0.0.0-20221230122017-702a5598f90c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
