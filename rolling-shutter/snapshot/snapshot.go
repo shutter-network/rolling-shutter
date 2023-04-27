@@ -12,8 +12,8 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	shmsg "github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/hubapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
