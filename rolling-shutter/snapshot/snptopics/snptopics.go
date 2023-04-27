@@ -6,6 +6,6 @@ import (
 
 const (
 	DecryptionKey = cltrtopics.DecryptionKey
-	EonPublicKey  = kprtopics.EonPublicKey
+	EonPublicKey  = cltrtopics.EonPublicKey
 	TimedEpoch    = "TimedEpoch"
 )
