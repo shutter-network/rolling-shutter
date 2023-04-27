@@ -475,6 +475,69 @@ func (x *Envelope) GetTrace() *TraceContext {
 	return nil
 }
 
+type TimedEpoch struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	InstanceID uint64 `protobuf:"varint,1,opt,name=instanceID,proto3" json:"instanceID,omitempty"`
+	EpochID    []byte `protobuf:"bytes,2,opt,name=epochID,proto3" json:"epochID,omitempty"`
+	NotBefore  uint64 `protobuf:"varint,3,opt,name=notBefore,proto3" json:"notBefore,omitempty"`
+}
+
+func (x *TimedEpoch) Reset() {
+	*x = TimedEpoch{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_gossip_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TimedEpoch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimedEpoch) ProtoMessage() {}
+
+func (x *TimedEpoch) ProtoReflect() protoreflect.Message {
+	mi := &file_gossip_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimedEpoch.ProtoReflect.Descriptor instead.
+func (*TimedEpoch) Descriptor() ([]byte, []int) {
+	return file_gossip_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TimedEpoch) GetInstanceID() uint64 {
+	if x != nil {
+		return x.InstanceID
+	}
+	return 0
+}
+
+func (x *TimedEpoch) GetEpochID() []byte {
+	if x != nil {
+		return x.EpochID
+	}
+	return nil
+}
+
+func (x *TimedEpoch) GetNotBefore() uint64 {
+	if x != nil {
+		return x.NotBefore
+	}
+	return 0
+}
+
 var File_gossip_proto protoreflect.FileDescriptor
 
 var file_gossip_proto_rawDesc = []byte{
@@ -540,8 +603,14 @@ var file_gossip_proto_rawDesc = []byte{
 	0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x32, 0x70, 0x6d, 0x73, 0x67,
 	0x2e, 0x54, 0x72, 0x61, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x48, 0x00, 0x52,
 	0x05, 0x74, 0x72, 0x61, 0x63, 0x65, 0x88, 0x01, 0x01, 0x42, 0x08, 0x0a, 0x06, 0x5f, 0x74, 0x72,
-	0x61, 0x63, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x3b, 0x70, 0x32, 0x70, 0x6d, 0x73, 0x67,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x61, 0x63, 0x65, 0x22, 0x64, 0x0a, 0x0a, 0x54, 0x69, 0x6d, 0x65, 0x64, 0x45, 0x70, 0x6f, 0x63,
+	0x68, 0x12, 0x1e, 0x0a, 0x0a, 0x69, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x69, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49,
+	0x44, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x70, 0x6f, 0x63, 0x68, 0x49, 0x44, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0c, 0x52, 0x07, 0x65, 0x70, 0x6f, 0x63, 0x68, 0x49, 0x44, 0x12, 0x1c, 0x0a, 0x09, 0x6e,
+	0x6f, 0x74, 0x42, 0x65, 0x66, 0x6f, 0x72, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09,
+	0x6e, 0x6f, 0x74, 0x42, 0x65, 0x66, 0x6f, 0x72, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x3b,
+	0x70, 0x32, 0x70, 0x6d, 0x73, 0x67, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -556,7 +625,7 @@ func file_gossip_proto_rawDescGZIP() []byte {
 	return file_gossip_proto_rawDescData
 }
 
-var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_gossip_proto_goTypes = []interface{}{
 	(*DecryptionTrigger)(nil),  // 0: p2pmsg.DecryptionTrigger
 	(*DecryptionKeyShare)(nil), // 1: p2pmsg.DecryptionKeyShare
@@ -564,10 +633,11 @@ var file_gossip_proto_goTypes = []interface{}{
 	(*EonPublicKey)(nil),       // 3: p2pmsg.EonPublicKey
 	(*TraceContext)(nil),       // 4: p2pmsg.TraceContext
 	(*Envelope)(nil),           // 5: p2pmsg.Envelope
-	(*anypb.Any)(nil),          // 6: google.protobuf.Any
+	(*TimedEpoch)(nil),         // 6: p2pmsg.TimedEpoch
+	(*anypb.Any)(nil),          // 7: google.protobuf.Any
 }
 var file_gossip_proto_depIdxs = []int32{
-	6, // 0: p2pmsg.Envelope.message:type_name -> google.protobuf.Any
+	7, // 0: p2pmsg.Envelope.message:type_name -> google.protobuf.Any
 	4, // 1: p2pmsg.Envelope.trace:type_name -> p2pmsg.TraceContext
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
@@ -654,6 +724,18 @@ func file_gossip_proto_init() {
 				return nil
 			}
 		}
+		file_gossip_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TimedEpoch); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_gossip_proto_msgTypes[5].OneofWrappers = []interface{}{}
 	type x struct{}
@@ -662,7 +744,7 @@ func file_gossip_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_gossip_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
