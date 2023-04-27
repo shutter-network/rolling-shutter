@@ -2,11 +2,11 @@ package snapshot
 
 import (
 	"context"
-	"log"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
@@ -66,7 +66,7 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 	}
 	defer dbpool.Close()
 	snp.dbpool = dbpool
-	log.Printf("Connected to database (%s)", shdb.ConnectionInfo(dbpool))
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	err = snpdb.ValidateSnapshotDB(ctx, dbpool)
 	if err != nil {
@@ -145,7 +145,7 @@ func (snp *Snapshot) handleMessage(ctx context.Context, msg *p2p.Message) error 
 
 	unmarshalled, err := unmarshalP2PMessage(msg)
 	if topicError, ok := err.(*unhandledTopicError); ok {
-		log.Println(topicError.Error())
+		log.Print(topicError.Error())
 	} else if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (snp *Snapshot) handleMessage(ctx context.Context, msg *p2p.Message) error 
 	case *eonPublicKey:
 		err = snp.handleEonPublicKeyInput(ctx, typedMsg.Eon, typedMsg.PublicKey)
 	default:
-		log.Println("ignoring message received on topic", msg.Topic)
+		log.Print("ignoring message received on topic", msg.Topic)
 		return nil
 	}
 
