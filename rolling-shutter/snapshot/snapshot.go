@@ -122,6 +122,7 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 	return errorgroup.Wait()
 }
 
+/*
 func (snp *Snapshot) handleMessages(ctx context.Context) error {
 	for {
 		select {
@@ -171,6 +172,7 @@ func (snp *Snapshot) handleMessage(ctx context.Context, msg *p2p.Message) error 
 	}
 	return nil
 }
+*/
 
 /* func (snp *Snapshot) handleDecryptionKeyInput(
 	ctx context.Context,
@@ -207,36 +209,39 @@ func (snp *Snapshot) handleRequestEonKey(ctx context.Context) error {
 	return nil
 }
 
+/*
 func (snp *Snapshot) handleEonPublicKeyInput(
+
 	ctx context.Context,
 	eonId uint64,
 	key []byte,
-) error {
-	err := snp.db.InsertEonPublicKey(
-		ctx, snpdb.InsertEonPublicKeyParams{
-			EonID:        int64(eonId),
-			EonPublicKey: key,
-		},
-	)
-	if err != nil {
-		return err
-	}
-	_, seen := seenEons[eonId]
-	if seen {
+
+	) error {
+		err := snp.db.InsertEonPublicKey(
+			ctx, snpdb.InsertEonPublicKeyParams{
+				EonID:        int64(eonId),
+				EonPublicKey: key,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		_, seen := seenEons[eonId]
+		if seen {
+			return nil
+		}
+
+		metricEons.Inc()
+
+		log.Printf("Sending Eon %d public key to hub", eonId)
+		err = snp.hubapi.SubmitEonKey(eonId, key)
+		if err != nil {
+			return err
+		}
+		seenEons[eonId] = struct{}{}
 		return nil
 	}
-
-	metricEons.Inc()
-
-	log.Printf("Sending Eon %d public key to hub", eonId)
-	err = snp.hubapi.SubmitEonKey(eonId, key)
-	if err != nil {
-		return err
-	}
-	seenEons[eonId] = struct{}{}
-	return nil
-}
-
+*/
 func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochId []byte) error {
 	msg := &shmsg.TimedEpoch{
 		InstanceID: 0,

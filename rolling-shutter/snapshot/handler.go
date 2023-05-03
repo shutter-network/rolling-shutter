@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -117,9 +118,35 @@ func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg
 }
 
 func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
-	var result []p2pmsg.Message
-	//FIXME: add EonPublicKey handling logic
-	return result, nil
+	eonPubKeyMsg := m.(*p2pmsg.EonPublicKey)
+
+	eonId := eonPubKeyMsg.GetEon()
+	key := eonPubKeyMsg.GetPublicKey()
+	db := snpdb.New(handler.dbpool)
+	err := db.InsertEonPublicKey(
+		ctx, snpdb.InsertEonPublicKeyParams{
+			EonID:        int64(eonId),
+			EonPublicKey: key,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, seen := seenEons[eonId]
+	if seen {
+		return nil, nil
+	}
+
+	metricEons.Inc()
+
+	log.Printf("Sending Eon %d public key to hub", eonId)
+	err = handler.snapshot.hubapi.SubmitEonKey(eonId, key)
+	if err != nil {
+		return nil, err
+	}
+	seenEons[eonId] = struct{}{}
+
+	return nil, nil
 }
 
 func (handler *TimedEpochHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
