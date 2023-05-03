@@ -15,14 +15,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/hubapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 )
-
-var gossipTopicNames = [3]string{
-	snptopics.DecryptionKey,
-	snptopics.EonPublicKey,
-	snptopics.TimedEpoch,
-}
 
 // FIXME: Needs to be in DB
 var seenEons = make(map[uint64]struct{})
@@ -85,8 +78,6 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
 	snp.hubapi = hub
 
-	//topicValidators := snp.makeMessagesValidators()
-
 	snp.setupP2PHandler()
 	return runner.StartService(snp.getServices()...)
 }
@@ -116,81 +107,6 @@ func (snp *Snapshot) setupP2PHandler() {
 	)
 }
 
-/*
-func (snp *Snapshot) handleMessages(ctx context.Context) error {
-	for {
-		select {
-		case msg, ok := <-snp.p2p.GossipMessages:
-			if !ok {
-				return nil
-			}
-			if err := snp.handleMessage(ctx, msg); err != nil {
-				log.Printf("error handling message %+v: %s", msg, err)
-				continue
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
-func (snp *Snapshot) handleMessage(ctx context.Context, msg *p2p.Message) error {
-	var msgsOut []shmsg.P2PMessage
-	var err error
-
-	unmarshalled, err := unmarshalP2PMessage(msg)
-	if topicError, ok := err.(*unhandledTopicError); ok {
-		log.Print(topicError.Error())
-	} else if err != nil {
-		return err
-	}
-
-	switch typedMsg := unmarshalled.(type) {
-	case *decryptionKey:
-		err = snp.handleDecryptionKeyInput(ctx, snp.Config, snp.db, typedMsg)
-	case *eonPublicKey:
-		err = snp.handleEonPublicKeyInput(ctx, typedMsg.Eon, typedMsg.PublicKey)
-	default:
-		log.Print("ignoring message received on topic", msg.Topic)
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-	for _, msgOut := range msgsOut {
-		if err := snp.SendMessage(ctx, msgOut); err != nil {
-			log.Printf("error sending message %+v: %s", msgOut, err)
-			continue
-		}
-	}
-	return nil
-}
-*/
-
-/* func (snp *Snapshot) handleDecryptionKeyInput(
-	ctx context.Context,
-	config Config,
-	db *snpdb.Queries,
-	key *decryptionKey,
-) error {
-	_, seen := seenProposals[string(key.EpochID)]
-	if seen {
-		return nil
-	}
-	log.Printf("Sending key %X for proposal %X to hub", key.Key, key.EpochID)
-
-	metricKeysGenerated.Inc()
-
-	err := snp.hubapi.SubmitProposalKey(key.EpochID, key.Key)
-	if err != nil {
-		return err
-	}
-	// FIXME: Apart from needing to be in DB we need to keep track of the proposals better
-	seenProposals[string(key.EpochID)] = struct{}{}
-	return nil
-} */
-
 func (snp *Snapshot) handleRequestEonKey(ctx context.Context) error {
 	row, err := snp.db.GetEonPublicKeyLatest(ctx)
 	if err == pgx.ErrNoRows {
@@ -203,39 +119,6 @@ func (snp *Snapshot) handleRequestEonKey(ctx context.Context) error {
 	return nil
 }
 
-/*
-func (snp *Snapshot) handleEonPublicKeyInput(
-
-	ctx context.Context,
-	eonId uint64,
-	key []byte,
-
-	) error {
-		err := snp.db.InsertEonPublicKey(
-			ctx, snpdb.InsertEonPublicKeyParams{
-				EonID:        int64(eonId),
-				EonPublicKey: key,
-			},
-		)
-		if err != nil {
-			return err
-		}
-		_, seen := seenEons[eonId]
-		if seen {
-			return nil
-		}
-
-		metricEons.Inc()
-
-		log.Printf("Sending Eon %d public key to hub", eonId)
-		err = snp.hubapi.SubmitEonKey(eonId, key)
-		if err != nil {
-			return err
-		}
-		seenEons[eonId] = struct{}{}
-		return nil
-	}
-*/
 func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochId []byte) error {
 	msg := &shmsg.TimedEpoch{
 		InstanceID: 0,

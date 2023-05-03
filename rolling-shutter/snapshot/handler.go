@@ -19,7 +19,6 @@ func NewTimedEpochHandler(config Config, snapshot *Snapshot) p2p.MessageHandler 
 type TimedEpochHandler struct {
 	config   Config
 	snapshot *Snapshot
-	dbpool   *pgxpool.Pool
 }
 
 func NewDecryptionKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
@@ -29,7 +28,6 @@ func NewDecryptionKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandl
 type DecryptionKeyHandler struct {
 	config   Config
 	snapshot *Snapshot
-	dbpool   *pgxpool.Pool
 }
 
 func NewEonPublicKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
