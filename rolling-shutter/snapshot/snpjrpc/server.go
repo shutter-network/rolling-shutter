@@ -9,6 +9,7 @@ import (
 
 	"github.com/bitwurx/jrpc2"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 type SnpJRPC struct {
@@ -114,7 +115,7 @@ func New(
 	jsonrpcPort uint16,
 	getDecryptionKeyCallback func(ctx context.Context, epochId []byte) error,
 	requestEonKeyCallback func(ctx context.Context) error,
-) *SnpJRPC {
+) service.Service {
 	host := fmt.Sprintf("%s:%d", jsonrpcHost, jsonrpcPort)
 	server := jrpc2.NewServer(host, "/api/v1/rpc", nil)
 
@@ -135,4 +136,9 @@ func New(
 	)
 
 	return &jrpc
+}
+
+func (jrpc *SnpJRPC) Start(ctx context.Context, runner service.Runner) error {
+	jrpc.Server.Start()
+	return nil
 }

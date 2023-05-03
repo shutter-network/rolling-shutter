@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/rs/zerolog/log"
 
@@ -18,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot"
@@ -185,22 +183,8 @@ func main() error {
 	if err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Printf("Received %s signal, shutting down", sig)
-		cancel()
-	}()
-
-	snp := snapshot.New(config)
-	err = snp.Run(ctx)
-	if err == context.Canceled {
-		log.Printf("Bye.")
-		return nil
-	}
-	return err
+	return service.RunWithSighandler(
+		context.Background(),
+		snapshot.New(config),
+	)
 }

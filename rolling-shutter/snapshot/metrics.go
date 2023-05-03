@@ -3,10 +3,12 @@ package snapshot
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 var metricKeysGenerated = prometheus.NewCounter(
@@ -45,12 +47,19 @@ func (snp *Snapshot) initMetrics(ctx context.Context) error {
 	return nil
 }
 
-func (snp *Snapshot) runMetricsServer(ctx context.Context) error {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+type MetricsServer struct {
+	mux    *http.ServeMux
+	config *Config
+}
 
-	addr := fmt.Sprintf("%s:%d", snp.Config.MetricsHost, snp.Config.MetricsPort)
+func NewMetricsServer(config Config) service.Service {
+	return &MetricsServer{config: &config, mux: http.NewServeMux()}
+}
+
+func (srv *MetricsServer) Start(ctx context.Context, runner service.Runner) error {
+	srv.mux.Handle("/metrics", promhttp.Handler())
+
+	addr := fmt.Sprintf("%s:%d", srv.config.MetricsHost, srv.config.MetricsPort)
 	log.Info("Running metrics server at %s", addr)
-
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, srv.mux)
 }

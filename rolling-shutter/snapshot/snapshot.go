@@ -7,10 +7,9 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	shmsg "github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -39,7 +38,7 @@ type Snapshot struct {
 	hubapi *hubapi.HubAPI
 }
 
-func New(config Config) *Snapshot {
+func New(config Config) service.Service {
 	p2pConfig := p2p.Config{
 		ListenAddrs:       config.ListenAddresses,
 		BootstrapPeers:    config.CustomBootstrapAddresses, // FIXME: add to own config
@@ -55,7 +54,7 @@ func New(config Config) *Snapshot {
 	}
 }
 
-func (snp *Snapshot) Run(ctx context.Context) error {
+func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	log.Printf(
 		"starting Snapshot Hub interface",
 	)
@@ -64,7 +63,8 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	defer dbpool.Close()
+	runner.Defer(dbpool.Close)
+
 	snp.dbpool = dbpool
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
@@ -85,41 +85,35 @@ func (snp *Snapshot) Run(ctx context.Context) error {
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
 	snp.hubapi = hub
 
-	jrpc := snpjrpc.New(
-		snp.Config.JSONRPCHost,
-		snp.Config.JSONRPCPort,
-		snp.handleDecryptionKeyRequest,
-		snp.handleRequestEonKey,
-	)
+	//topicValidators := snp.makeMessagesValidators()
 
-	errorgroup, errorctx := errgroup.WithContext(ctx)
+	snp.setupP2PHandler()
+	return runner.StartService(snp.getServices()...)
+}
 
-	topicValidators := snp.makeMessagesValidators()
-
-	errorgroup.Go(
-		func() error {
-			return snp.p2p.Run(errorctx, gossipTopicNames[:], topicValidators)
-		},
-	)
-	errorgroup.Go(
-		func() error {
-			return snp.handleMessages(errorctx)
-		},
-	)
-	errorgroup.Go(
-		func() error {
-			jrpc.Server.Start()
-			return nil
-		},
-	)
-	if snp.Config.MetricsEnabled {
-		errorgroup.Go(
-			func() error {
-				return snp.runMetricsServer(errorctx)
-			},
-		)
+func (snp *Snapshot) getServices() []service.Service {
+	services := []service.Service{
+		snp.p2p,
+		snpjrpc.New(
+			snp.Config.JSONRPCHost,
+			snp.Config.JSONRPCPort,
+			snp.handleDecryptionKeyRequest,
+			snp.handleRequestEonKey,
+		),
 	}
-	return errorgroup.Wait()
+	if snp.Config.MetricsEnabled {
+
+		services = append(services, NewMetricsServer(snp.Config))
+	}
+	return services
+}
+
+func (snp *Snapshot) setupP2PHandler() {
+	snp.p2p.AddMessageHandler(
+		NewEonPublicKeyHandler(snp.Config, snp),
+		NewDecryptionKeyHandler(snp.Config, snp),
+		NewTimedEpochHandler(snp.Config, snp),
+	)
 }
 
 /*
@@ -256,12 +250,8 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochId []b
 	return nil
 }
 
-func (snp *Snapshot) SendMessage(ctx context.Context, msg shmsg.P2PMessage) error {
-	msgBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal p2p message")
-	}
+func (snp *Snapshot) SendMessage(ctx context.Context, msg shmsg.Message) error {
 	log.Printf("sending %s", msg.LogInfo())
 
-	return snp.p2p.Publish(ctx, msg.Topic(), msgBytes)
+	return snp.p2p.SendMessage(ctx, msg)
 }
