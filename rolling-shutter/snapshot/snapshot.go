@@ -32,7 +32,7 @@ var seenProposals = make(map[string]struct{})
 type Snapshot struct {
 	Config Config
 
-	p2p    *p2p.P2P
+	p2p    *p2p.P2PHandler
 	dbpool *pgxpool.Pool
 	db     *snpdb.Queries
 
