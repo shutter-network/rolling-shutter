@@ -1,4 +1,4 @@
-FROM golang:1.16 as builder
+FROM golang:1.20 as builder
 
 # Fetch go modules separately to improve cache usage
 RUN mkdir /gomod
