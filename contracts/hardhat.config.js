@@ -88,5 +88,9 @@ module.exports = {
         "0xe887f7d17d07cc7b8004053fb8826f6657084e88904bb61590e498ca04704cf2", // nitro funnel
       ],
     },
+    dockerGeth: {
+      url: "http://geth:8545",
+      accounts: "remote",
+    },
   },
 };
