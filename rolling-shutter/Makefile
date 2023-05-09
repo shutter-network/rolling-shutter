@@ -46,20 +46,27 @@ coverage:
 clean:
 	rm -f ${EXECUTABLE}
 
-install-tools: install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-stringer install-gci install-gotestsum
+install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
+
+# code generation tools: pin version
+install-codegen-tools: install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer
 
 install-sqlc:
-	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc
+	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.17.2
 
 install-abigen:
-	${GO} install github.com/ethereum/go-ethereum/cmd/abigen
+	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.10.26
 
 install-protoc-gen-go:
-	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go
+	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0
 
 install-oapi-codegen:
-	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen
+	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.9.1
 
+install-stringer:
+	${GO} install golang.org/x/tools/cmd/stringer@v0.9.0
+
+# non code generation tools
 install-golangci-lint:
 	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
@@ -68,9 +75,6 @@ install-cobra:
 
 install-gofumpt:
 	${GO} install mvdan.cc/gofumpt@latest
-
-install-stringer:
-	${GO} install golang.org/x/tools/cmd/stringer
 
 install-gci:
 	${GO} install github.com/daixiang0/gci@latest
@@ -88,4 +92,4 @@ lint-changes:
 abigen:
 	go generate -x ./contract
 
-.PHONY: build clean test test-all test-unit test-integration generate install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy
+.PHONY: build clean test test-all test-unit test-integration generate install-codegen-tools install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy

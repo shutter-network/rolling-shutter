@@ -22,7 +22,7 @@ jobs:
       - node/install-packages:
           app-dir: ~/src/contracts
           override-ci-command: npm install
-      - run: make install-protoc-gen-go install-abigen install-oapi-codegen install-stringer install-sqlc
+      - run: make install-codegen-tools
       - run:
           name: Remove generated files
           command: |
