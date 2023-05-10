@@ -8,6 +8,6 @@ else
 fi
 
 echo "Starting entire system"
-$DC up -d --profile dev
+$DC --profile dev up -d
 sleep 5
 $DC ps
