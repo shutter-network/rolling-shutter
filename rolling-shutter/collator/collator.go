@@ -74,10 +74,12 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
+	log.Info().Str("ethereum-url", cfg.EthereumURL).Msg("connecting to ethereum")
 	l1Client, err := ethclient.Dial(cfg.EthereumURL)
 	if err != nil {
 		return err
 	}
+	log.Info().Str("contracts-url", cfg.ContractsURL).Msg("connecting contracts")
 	contractsClient, err := ethclient.Dial(cfg.ContractsURL)
 	if err != nil {
 		return err
@@ -97,6 +99,7 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	log.Info().Str("sequencer-url", cfg.SequencerURL).Msg("connecting sequencer")
 	l2RPCClient, err := rpc.Dial(cfg.SequencerURL)
 	if err != nil {
 		return err

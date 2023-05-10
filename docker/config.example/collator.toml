@@ -3,6 +3,7 @@
 # Peer identity: /p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj
 
 EthereumURL     = "http://geth:8545/"
+ContractsURL    = "http://geth:8545/"
 DeploymentDir   = "./deployments/dockerGeth/"
 
 # DatabaseURL looks like postgres://username:password@localhost:5432/database_name
