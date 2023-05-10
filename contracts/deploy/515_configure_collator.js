@@ -15,6 +15,7 @@ module.exports = async function (hre) {
     (await collator.countNth(lastSetIndex)).toNumber() !==
     collatorAddress.length
   ) {
+    console.log("setting setAdded = false;");
     setAdded = false;
   } else {
     for (const i of Array(collatorAddress.length).keys()) {
@@ -36,17 +37,18 @@ module.exports = async function (hre) {
   const cfg = await ethers.getContract("CollatorConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
   const activationBlockNumber = currentBlock + 10;
-
   const activeConfig = await cfg.getActiveConfig(activationBlockNumber);
   if (activeConfig[1].toNumber() === configSetIndex) {
     console.log("Collator config already added");
     return;
   }
 
-  await cfg.addNewCfg({
+  configSetIndex--;
+  const tx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
   });
+  await tx.wait();
   console.log(
     "configure collator: activationBlockNumber %s collator: %s",
     activationBlockNumber,
