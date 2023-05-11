@@ -79,7 +79,7 @@ func scaleToBlockTime(config *cfg.Config, blockTime float64) {
 	scale(&config.RPC.TimeoutBroadcastTxCommit)
 }
 
-func getArgFromViper[T any](getter func(string) T, name string, required bool) (T, error) {
+func getArgFromViper[T interface{}](getter func(string) T, name string, required bool) (T, error) {
 	if !viper.IsSet(name) && required {
 		var nullVal T
 		return nullVal, errors.Errorf("required argument `%s` not set", name)
