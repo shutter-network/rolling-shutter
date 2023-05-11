@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -19,6 +20,7 @@ var metricKeysGenerated = prometheus.NewCounter(
 		Help:      "Number of generated proposal keys",
 	},
 )
+
 var metricEons = prometheus.NewCounter(
 	prometheus.CounterOpts{
 		Namespace: "shutter",
@@ -56,7 +58,7 @@ func NewMetricsServer(config Config) service.Service {
 	return &MetricsServer{config: &config, mux: http.NewServeMux()}
 }
 
-func (srv *MetricsServer) Start(ctx context.Context, runner service.Runner) error {
+func (srv *MetricsServer) Start(_ context.Context, _ service.Runner) error {
 	srv.mux.Handle("/metrics", promhttp.Handler())
 
 	addr := fmt.Sprintf("%s:%d", srv.config.MetricsHost, srv.config.MetricsPort)

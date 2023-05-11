@@ -18,7 +18,6 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/kr/pretty v0.3.1
 	github.com/libp2p/go-libp2p v0.26.4
-	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/libp2p/go-libp2p-kad-dht v0.21.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/mitchellh/mapstructure v1.5.0

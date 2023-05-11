@@ -9,21 +9,22 @@ import (
 
 	"github.com/bitwurx/jrpc2"
 	"github.com/pkg/errors"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 type SnpJRPC struct {
 	Server *jrpc2.Server
 
-	getDecryptionKeyCallback func(ctx context.Context, epochId []byte) error
+	getDecryptionKeyCallback func(ctx context.Context, epochID []byte) error
 	requestEonKeyCallback    func(ctx context.Context) error
 }
 
 type HexEncodedByteArray []byte
 
 type GetDecryptionKeyParams struct {
-	EonId   *uint64              `json:"eon_id,string"`
-	EpochId *HexEncodedByteArray `json:"proposal"`
+	EonID   *uint64              `json:"eon_id,string"`
+	EpochID *HexEncodedByteArray `json:"proposal"`
 }
 
 func (b HexEncodedByteArray) MarshalJSON() ([]byte, error) {
@@ -44,17 +45,17 @@ func (gdkp *GetDecryptionKeyParams) FromPositional(params []interface{}) error {
 	if len(params) != 2 {
 		return errors.Errorf("Two parameters required")
 	}
-	eonId, err := strconv.ParseUint(params[0].(string), 10, 64)
+	eonID, err := strconv.ParseUint(params[0].(string), 10, 64)
 	if err != nil {
 		return err
 	}
-	var epochId HexEncodedByteArray
-	epochId, err = hex.DecodeString(params[1].(string))
+	var epochID HexEncodedByteArray
+	epochID, err = hex.DecodeString(params[1].(string))
 	if err != nil {
 		return err
 	}
-	gdkp.EonId = &eonId
-	gdkp.EpochId = &epochId
+	gdkp.EonID = &eonID
+	gdkp.EpochID = &epochID
 
 	return nil
 }
@@ -68,7 +69,7 @@ func (snpjrpc *SnpJRPC) GetDecryptionKey(ctx context.Context, params json.RawMes
 		return nil, err
 	}
 
-	if gdkParams.EonId == nil || gdkParams.EpochId == nil {
+	if gdkParams.EonID == nil || gdkParams.EpochID == nil {
 		return nil, &jrpc2.ErrorObject{
 			Code:    jrpc2.InvalidParamsCode,
 			Message: jrpc2.InvalidParamsMsg,
@@ -76,14 +77,14 @@ func (snpjrpc *SnpJRPC) GetDecryptionKey(ctx context.Context, params json.RawMes
 		}
 	}
 
-	err := snpjrpc.getDecryptionKeyCallback(ctx, *gdkParams.EpochId)
+	err := snpjrpc.getDecryptionKeyCallback(ctx, *gdkParams.EpochID)
 	if err != nil {
 		return nil, &jrpc2.ErrorObject{
 			Code:    jrpc2.InternalErrorCode,
 			Message: jrpc2.InternalErrorMsg,
 			Data: fmt.Sprintf(
 				"Error requesting decryption key for proposal %s: %v",
-				*gdkParams.EpochId,
+				*gdkParams.EpochID,
 				err,
 			),
 		}
@@ -92,7 +93,7 @@ func (snpjrpc *SnpJRPC) GetDecryptionKey(ctx context.Context, params json.RawMes
 	return true, nil
 }
 
-func (snpjrpc *SnpJRPC) RequestEonKey(ctx context.Context, params json.RawMessage) (
+func (snpjrpc *SnpJRPC) RequestEonKey(ctx context.Context, _ json.RawMessage) (
 	interface{},
 	*jrpc2.ErrorObject,
 ) {
@@ -107,13 +108,14 @@ func (snpjrpc *SnpJRPC) RequestEonKey(ctx context.Context, params json.RawMessag
 			),
 		}
 	}
+	// FIXME: is this right?
 	return true, nil
 }
 
 func New(
 	jsonrpcHost string,
 	jsonrpcPort uint16,
-	getDecryptionKeyCallback func(ctx context.Context, epochId []byte) error,
+	getDecryptionKeyCallback func(ctx context.Context, epochID []byte) error,
 	requestEonKeyCallback func(ctx context.Context) error,
 ) service.Service {
 	host := fmt.Sprintf("%s:%d", jsonrpcHost, jsonrpcPort)
@@ -138,7 +140,8 @@ func New(
 	return &jrpc
 }
 
-func (jrpc *SnpJRPC) Start(ctx context.Context, runner service.Runner) error {
-	jrpc.Server.Start()
+func (snpjrpc *SnpJRPC) Start(_ context.Context, _ service.Runner) error {
+	// FIXME: this is probably not properly hooked into the service.Runner model
+	snpjrpc.Server.Start()
 	return nil
 }

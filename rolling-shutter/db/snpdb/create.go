@@ -2,15 +2,15 @@ package snpdb
 
 import (
 	"context"
-	_ "embed"
+	_ "embed" // blank import
 
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-
-	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 // schemaVersion is used to check that we use the right schema.

@@ -150,11 +150,11 @@ func (*EonPublicKey) Validate() error {
 	return nil
 }
 
-func (t *TimedEpoch) LogInfo() string {
+func (timedEpoch *TimedEpoch) LogInfo() string {
 	return fmt.Sprintf(
 		"TimedEpoch{id=%d, notBefore=%d}",
-		t.EpochID,
-		t.NotBefore,
+		timedEpoch.EpochID,
+		timedEpoch.NotBefore,
 	)
 }
 
@@ -163,8 +163,8 @@ func (*TimedEpoch) Topic() string {
 }
 
 func (timedEpoch *TimedEpoch) Validate() error {
-	epochId := timedEpoch.GetEpochID()
-	if epochId == nil {
+	epochID := timedEpoch.GetEpochID()
+	if epochID == nil {
 		return errors.Errorf("EpochID is not set")
 	}
 	return nil

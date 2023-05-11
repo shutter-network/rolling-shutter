@@ -17,9 +17,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 )
 
-// FIXME: Needs to be in DB
-var seenEons = make(map[uint64]struct{})
-var seenProposals = make(map[string]struct{})
+// FIXME: Needs to be in DB.
+var (
+	seenEons      = make(map[uint64]struct{})
+	seenProposals = make(map[string]struct{})
+)
 
 type Snapshot struct {
 	Config Config
@@ -39,11 +41,11 @@ func New(config Config) service.Service {
 		DisableTopicDHT:   true,
 		DisableRoutingDHT: true,
 	}
-	p2p_instance := p2p.New(p2pConfig)
+	p2pInstance := p2p.New(p2pConfig)
 
 	return &Snapshot{
 		Config: config,
-		p2p:    p2p_instance,
+		p2p:    p2pInstance,
 	}
 }
 
@@ -93,7 +95,6 @@ func (snp *Snapshot) getServices() []service.Service {
 		),
 	}
 	if snp.Config.MetricsEnabled {
-
 		services = append(services, NewMetricsServer(snp.Config))
 	}
 	return services
@@ -119,17 +120,17 @@ func (snp *Snapshot) handleRequestEonKey(ctx context.Context) error {
 	return nil
 }
 
-func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochId []byte) error {
+func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []byte) error {
 	msg := &shmsg.TimedEpoch{
 		InstanceID: 0,
-		EpochID:    epochId,
+		EpochID:    epochID,
 		NotBefore:  0,
 	}
 	err := snp.SendMessage(ctx, msg)
 	if err != nil {
 		return err
 	}
-	log.Printf("Trigger decryption for proposal %X", epochId)
+	log.Printf("Trigger decryption for proposal %X", epochID)
 	return nil
 }
 
