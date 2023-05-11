@@ -1,5 +1,13 @@
 package testkeygen
 
+// Run the benchmarks with pprof enabled with:
+//
+//     go test -bench=. ./medley/testkeygen -cpuprofile profile.out
+//
+// and view results with
+//
+//     go tool pprof -http=: profile.out
+//
 import (
 	"io"
 	"math/rand"
@@ -104,6 +112,24 @@ func BenchmarkSecretKeyGeneration(b *testing.B) {
 	}
 }
 
+func decryptBlock(b *testing.B, bb *BlockBuilder, keyperIndices []int, shares [][]*shcrypto.EpochSecretKeyShare) {
+	b.Helper()
+	for i := 0; i < len(bb.encryptedTransactions); i++ {
+		secretKey, err := shcrypto.ComputeEpochSecretKey(
+			keyperIndices,
+			shares[i],
+			bb.eonkeys.Threshold,
+		)
+		assert.NilError(b, err)
+		message := &shcrypto.EncryptedMessage{}
+		err = message.Unmarshal(bb.encryptedTransactions[i])
+		assert.NilError(b, err)
+		decryptedBytes, err := message.Decrypt(secretKey)
+		assert.NilError(b, err)
+		assert.DeepEqual(b, decryptedBytes, bb.cleartextTransactions[i])
+	}
+}
+
 func BenchmarkFullBlock(b *testing.B) {
 	bb, err := NewBlockBuilder()
 	assert.NilError(b, err)
@@ -120,19 +146,6 @@ func BenchmarkFullBlock(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		for i := 0; i < len(bb.encryptedTransactions); i++ {
-			secretKey, err := shcrypto.ComputeEpochSecretKey(
-				keyperIndices,
-				shares[i],
-				bb.eonkeys.Threshold,
-			)
-			assert.NilError(b, err)
-			message := &shcrypto.EncryptedMessage{}
-			err = message.Unmarshal(bb.encryptedTransactions[i])
-			assert.NilError(b, err)
-			decryptedBytes, err := message.Decrypt(secretKey)
-			assert.NilError(b, err)
-			assert.DeepEqual(b, decryptedBytes, bb.cleartextTransactions[i])
-		}
+		decryptBlock(b, bb, keyperIndices, shares)
 	}
 }
