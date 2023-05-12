@@ -114,12 +114,9 @@ func BenchmarkSecretKeyGeneration(b *testing.B) {
 
 func decryptBlock(b *testing.B, bb *BlockBuilder, keyperIndices []int, shares [][]*shcrypto.EpochSecretKeyShare) {
 	b.Helper()
+	lagrangeCoeffs := shcrypto.NewLagrangeCoeffs(keyperIndices)
 	for i := 0; i < len(bb.encryptedTransactions); i++ {
-		secretKey, err := shcrypto.ComputeEpochSecretKey(
-			keyperIndices,
-			shares[i],
-			bb.eonkeys.Threshold,
-		)
+		secretKey, err := lagrangeCoeffs.ComputeEpochSecretKey(shares[i])
 		assert.NilError(b, err)
 		message := &shcrypto.EncryptedMessage{}
 		err = message.Unmarshal(bb.encryptedTransactions[i])
