@@ -19,6 +19,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -70,6 +71,14 @@ func initDB() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+
+	err = cltrdb.ValidateDB(ctx, dbpool)
+	if err == nil {
+		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
+		return nil
+	} else if errors.Is(err, metadb.ErrSchemaMismatch) {
+		return err
+	}
 
 	// initialize the db
 	err = cltrdb.InitDB(ctx, dbpool)

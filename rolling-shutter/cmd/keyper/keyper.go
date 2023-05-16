@@ -14,6 +14,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -148,6 +149,14 @@ func initDB() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+
+	err = kprdb.ValidateKeyperDB(ctx, dbpool)
+	if err == nil {
+		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
+		return nil
+	} else if errors.Is(err, metadb.ErrSchemaMismatch) {
+		return err
+	}
 
 	// initialize the db
 	err = kprdb.InitDB(ctx, dbpool)
