@@ -11,7 +11,7 @@ orbs:
 executors:
   cimg-base:
     docker:
-      - image: cimg/base:2022.12
+      - image: cimg/base:2023.05
 
 jobs:
   gen:
@@ -21,7 +21,7 @@ jobs:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v16
+          key: gen-clj-v17
       - run:
           name: Install babashka
           command: |
@@ -30,14 +30,14 @@ jobs:
             else
               curl -sL https://raw.githubusercontent.com/babashka/babashka/master/install -o ~/install-bb
               mkdir -p ~/bin
-              bash ~/install-bb --version 1.3.176 --dir ~/bin
+              bash ~/install-bb --version 1.3.179 --dir ~/bin
             fi
       - run:
           name: Generate continuation config
           command: |
             ~/bin/bb -gen-ci
       - save_cache:
-          key: gen-clj-v16
+          key: gen-clj-v17
           paths:
             - ~/bin/
       - continuation/continue:
