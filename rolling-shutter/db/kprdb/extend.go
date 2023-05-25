@@ -49,19 +49,20 @@ func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.Decryp
 }
 
 func (q *Queries) InsertDecryptionKeyShareMsg(ctx context.Context, msg *p2pmsg.DecryptionKeyShare) error {
-	err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
-		Eon:                int64(msg.Eon),
-		EpochID:            msg.EpochID,
-		KeyperIndex:        int64(msg.KeyperIndex),
-		DecryptionKeyShare: msg.Share,
-	})
-	if err != nil {
-		return errors.Wrapf(
-			err,
-			"failed to insert decryption key share for epoch %d from keyper %d",
-			msg.EpochID,
-			msg.KeyperIndex,
-		)
+	for _, share := range msg.GetShares() {
+		err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
+			Eon:                int64(msg.Eon),
+			EpochID:            share.EpochID,
+			KeyperIndex:        int64(msg.KeyperIndex),
+			DecryptionKeyShare: share.Share,
+		})
+		if err != nil {
+			return errors.Wrapf(
+				err,
+				"failed to insert decryption key share from keyper %d",
+				msg.KeyperIndex,
+			)
+		}
 	}
 	return nil
 }

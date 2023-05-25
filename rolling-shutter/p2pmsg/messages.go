@@ -91,8 +91,7 @@ func (*DecryptionTrigger) Validate() error {
 
 func (share *DecryptionKeyShare) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionKeyShare{epochid=%s, keyperIndex=%d}",
-		share.EpochID,
+		"DecryptionKeyShare{keyperIndex=%d}",
 		share.KeyperIndex,
 	)
 }
@@ -101,7 +100,7 @@ func (*DecryptionKeyShare) Topic() string {
 	return kprtopics.DecryptionKeyShare
 }
 
-func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
+func (share *KeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
 	epochSecretKeyShare := new(shcrypto.EpochSecretKeyShare)
 	if err := epochSecretKeyShare.Unmarshal(share.GetShare()); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key share P2P message")
@@ -110,8 +109,13 @@ func (share *DecryptionKeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecret
 }
 
 func (share *DecryptionKeyShare) Validate() error {
-	_, err := share.GetEpochSecretKeyShare()
-	return err
+	for _, sh := range share.GetShares() {
+		_, err := sh.GetEpochSecretKeyShare()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (key *DecryptionKey) LogInfo() string {

@@ -1,13 +1,13 @@
 package epochkghandler
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
@@ -54,9 +54,16 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShare)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == config.GetInstanceID())
-	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
 	assert.Check(t, msg.KeyperIndex == keyperIndex)
-	assert.Check(t, bytes.Equal(msg.Share, share.DecryptionKeyShare))
+	assert.DeepEqual(t, msg.GetShares(),
+		[]*p2pmsg.KeyShare{
+			{
+				EpochID: epochID.Bytes(),
+				Share:   share.DecryptionKeyShare,
+			},
+		},
+		cmpopts.IgnoreUnexported(p2pmsg.KeyShare{}),
+	)
 
 	// don't send share when trigger is received again
 	msgs = p2ptest.MustHandleMessage(t, handler, ctx, trigger)

@@ -38,9 +38,6 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 	if keyShare.GetInstanceID() != handler.config.GetInstanceID() {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
 	}
-	if _, err := epochid.BytesToEpochID(keyShare.EpochID); err != nil {
-		return false, errors.Wrapf(err, "invalid epoch id")
-	}
 	if keyShare.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
@@ -59,15 +56,26 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 	if err != nil {
 		return false, errors.Errorf("error while decoding pure DKG result for eon %d", keyShare.Eon)
 	}
-	epochSecretKeyShare, err := keyShare.GetEpochSecretKeyShare()
-	if err != nil {
-		return false, err
+	if len(keyShare.Shares) != 1 {
+		return false, errors.New("decryption key share must have exactly one share")
 	}
-	return shcrypto.VerifyEpochSecretKeyShare(
-		epochSecretKeyShare,
-		pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
-		shcrypto.ComputeEpochID(keyShare.EpochID),
-	), nil
+	for _, share := range keyShare.GetShares() {
+		if _, err = epochid.BytesToEpochID(share.EpochID); err != nil {
+			return false, errors.Wrap(err, "invalid epoch id")
+		}
+		epochSecretKeyShare, err := share.GetEpochSecretKeyShare()
+		if err != nil {
+			return false, err
+		}
+		if !shcrypto.VerifyEpochSecretKeyShare(
+			epochSecretKeyShare,
+			pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
+			shcrypto.ComputeEpochID(share.EpochID),
+		) {
+			return false, errors.Errorf("cannot verify secret key share")
+		}
+	}
+	return true, nil
 }
 
 func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
@@ -81,7 +89,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// Check that we don't know the decryption key yet
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
+	epochID, err := epochid.BytesToEpochID(msg.GetShares()[0].EpochID)
 	if err != nil {
 		return nil, err
 	}

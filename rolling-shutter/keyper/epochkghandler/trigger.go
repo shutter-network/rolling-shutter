@@ -73,5 +73,5 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	if err != nil {
 		return nil, err
 	}
-	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), epochID, int64(msg.BlockNumber))
+	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), epochID)
 }

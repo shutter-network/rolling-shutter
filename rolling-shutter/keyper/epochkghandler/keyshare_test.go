@@ -34,9 +34,11 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeyShare{
 		InstanceID:  config.GetInstanceID(),
 		Eon:         config.GetEon(),
-		EpochID:     epochID.Bytes(),
 		KeyperIndex: 0,
-		Share:       tkg.EpochSecretKeyShare(epochID, 0).Marshal(),
+		Shares: []*p2pmsg.KeyShare{{
+			EpochID: epochID.Bytes(),
+			Share:   tkg.EpochSecretKeyShare(epochID, 0).Marshal(),
+		}},
 	})
 	assert.Check(t, len(msgs) == 0)
 
@@ -45,9 +47,11 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	msgs = p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeyShare{
 		InstanceID:  config.GetInstanceID(),
 		Eon:         config.GetEon(),
-		EpochID:     epochID.Bytes(),
 		KeyperIndex: 2,
-		Share:       tkg.EpochSecretKeyShare(epochID, 2).Marshal(),
+		Shares: []*p2pmsg.KeyShare{{
+			EpochID: epochID.Bytes(),
+			Share:   tkg.EpochSecretKeyShare(epochID, 2).Marshal(),
+		}},
 	})
 	assert.Assert(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKey)
@@ -85,9 +89,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
-				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
-				Share:       keyshare,
+				Shares: []*p2pmsg.KeyShare{
+					{
+						EpochID: epochID.Bytes(),
+						Share:   keyshare,
+					},
+				},
 			},
 		},
 		{
@@ -96,9 +104,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
-				EpochID:     wrongEpochID.Bytes(),
 				KeyperIndex: keyperIndex,
-				Share:       keyshare,
+				Shares: []*p2pmsg.KeyShare{
+					{
+						EpochID: wrongEpochID.Bytes(),
+						Share:   keyshare,
+					},
+				},
 			},
 		},
 		{
@@ -107,9 +119,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.GetInstanceID() + 1,
 				Eon:         eon,
-				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex,
-				Share:       keyshare,
+				Shares: []*p2pmsg.KeyShare{
+					{
+						EpochID: epochID.Bytes(),
+						Share:   keyshare,
+					},
+				},
 			},
 		},
 		{
@@ -118,9 +134,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKeyShare{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
-				EpochID:     epochID.Bytes(),
 				KeyperIndex: keyperIndex + 1,
-				Share:       keyshare,
+				Shares: []*p2pmsg.KeyShare{
+					{
+						EpochID: epochID.Bytes(),
+						Share:   keyshare,
+					},
+				},
 			},
 		},
 	}
