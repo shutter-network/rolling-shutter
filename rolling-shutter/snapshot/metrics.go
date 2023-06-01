@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -60,8 +61,14 @@ func NewMetricsServer(config Config) service.Service {
 
 func (srv *MetricsServer) Start(_ context.Context, _ service.Runner) error {
 	srv.mux.Handle("/metrics", promhttp.Handler())
-
 	addr := fmt.Sprintf("%s:%d", srv.config.MetricsHost, srv.config.MetricsPort)
+	server := &http.Server{
+		Addr:         addr,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		Handler:      srv.mux,
+	}
+
 	log.Info("Running metrics server at %s", addr)
-	return http.ListenAndServe(addr, srv.mux)
+	return server.ListenAndServe()
 }
