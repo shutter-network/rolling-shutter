@@ -3,10 +3,10 @@ package fx
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/rpc/client"
@@ -88,10 +88,6 @@ var _ MessageSender = &MockMessageSender{}
 
 var mockMessageSenderBufferSize = 0x10000
 
-func init() {
-	rand.Seed(time.Now().UnixNano()) // Seed the PRNG we use for random nonces
-}
-
 // NewRPCMessageSender creates a new RPCMessageSender.
 func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMessageSender {
 	return RPCMessageSender{
@@ -158,7 +154,11 @@ func (ms *RPCMessageSender) maybeFetchChainID(ctx context.Context) error {
 }
 
 func randomNonce() uint64 {
-	return rand.Uint64()
+	var bytes [8]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		panic("Failed to read random bytes for nonce.")
+	}
+	return binary.LittleEndian.Uint64(bytes[:])
 }
 
 // NewMockMessageSender creates a new MockMessageSender. We use a buffered channel with a rather
