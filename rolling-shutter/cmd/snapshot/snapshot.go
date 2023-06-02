@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -86,6 +87,14 @@ func initDB() error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
+
+	err = snpdb.ValidateSnapshotDB(ctx, dbpool)
+	if err == nil {
+		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
+		return nil
+	} else if errors.Is(err, metadb.ErrSchemaMismatch) {
+		return err
+	}
 
 	// initialize the db
 	err = snpdb.InitDB(ctx, dbpool)
