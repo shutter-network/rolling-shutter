@@ -43,7 +43,6 @@ module.exports = async function (hre) {
     return;
   }
 
-  configSetIndex--;
   const tx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
