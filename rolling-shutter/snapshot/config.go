@@ -25,8 +25,17 @@ type Config struct {
 	DatabaseURL    string
 	SnapshotHubURL string
 
+	JSONRPCHost string
+	JSONRPCPort uint16
+
+	MetricsEnabled bool
+	MetricsHost    string
+	MetricsPort    uint16
+
 	EthereumKey *ecdsa.PrivateKey
 	P2PKey      p2pcrypto.PrivKey
+
+	InstanceID uint64
 }
 
 const configTemplate = `# Shutter snapshot config
@@ -40,7 +49,16 @@ EthereumURL     = "{{ .EthereumURL }}"
 DatabaseURL     = "{{ .DatabaseURL }}"
 
 # Snapshot integration
-SnapshotHubURL  = "{{ .SnapshotHubURL }}"
+SnapshotHubURL       = "{{ .SnapshotHubURL }}"
+
+# JSONRPC configuration
+JSONRPCHost     = "{{ .JSONRPCHost }}"
+JSONRPCPort     = {{ .JSONRPCPort }}
+
+# Metrics configuration
+MetricsEnabled  = {{ .MetricsEnabled }}
+MetricsHost     = "{{ .MetricsHost }}"
+MetricsPort     = {{ .MetricsPort }}
 
 # p2p configuration
 ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
@@ -49,6 +67,8 @@ CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | Qu
 # Secret Keys
 EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
 P2PKey          = "{{ .P2PKey | P2PKey}}"
+
+InstanceID = {{ .InstanceID }}
 `
 
 var tmpl *template.Template = medley.MustBuildTemplate("snapshot", configTemplate)
@@ -64,9 +84,10 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				medley.MultiaddrHook,
-				medley.AddrInfoHook,
 				medley.P2PKeyHook,
 				medley.StringToEcdsaPrivateKey,
+				mapstructure.StringToTimeDurationHookFunc(),
+				medley.AddrInfoHook,
 			),
 		),
 	)
@@ -81,4 +102,8 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 
 func (config *Config) EthereumAddress() common.Address {
 	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+}
+
+func (config *Config) GetInstanceID() uint64 {
+	return config.InstanceID
 }

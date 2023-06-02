@@ -12,6 +12,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
@@ -146,5 +147,25 @@ func (*EonPublicKey) Topic() string {
 }
 
 func (*EonPublicKey) Validate() error {
+	return nil
+}
+
+func (timedEpoch *TimedEpoch) LogInfo() string {
+	return fmt.Sprintf(
+		"TimedEpoch{id=%d, notBefore=%d}",
+		timedEpoch.EpochID,
+		timedEpoch.NotBefore,
+	)
+}
+
+func (*TimedEpoch) Topic() string {
+	return snptopics.TimedEpoch
+}
+
+func (timedEpoch *TimedEpoch) Validate() error {
+	epochID := timedEpoch.GetEpochID()
+	if epochID == nil {
+		return errors.Errorf("EpochID is not set")
+	}
 	return nil
 }

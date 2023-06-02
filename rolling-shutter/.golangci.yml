@@ -145,7 +145,6 @@ linters:
     - whitespace
     - thelper
     - godot
-    - godox
     - forbidigo
 
   # don't enable:
@@ -158,6 +157,7 @@ linters:
   # - prealloc
   # - testpackage
   # - wsl
+  # - godox
 
 issues:
   exclude:

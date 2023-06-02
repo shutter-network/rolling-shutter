@@ -34,6 +34,7 @@ type Config struct {
 	Index         int      `mapstructure:"index"`
 	BlockTime     float64  `mapstructure:"blocktime"`
 	GenesisKeyper []string `mapstructure:"genesis-keyper"`
+	ListenAddress string   `mapstructure:"listen-address"`
 }
 
 func initCmd() *cobra.Command {
@@ -60,6 +61,7 @@ func initCmd() *cobra.Command {
 	cmd.PersistentFlags().Int("index", 0, "keyper index")
 	cmd.PersistentFlags().Float64("blocktime", 1.0, "block time in seconds")
 	cmd.PersistentFlags().StringSlice("genesis-keyper", nil, "genesis keyper address")
+	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint listen address")
 	return cmd
 }
 
@@ -77,7 +79,7 @@ func scaleToBlockTime(config *cfg.Config, blockTime float64) {
 	scale(&config.RPC.TimeoutBroadcastTxCommit)
 }
 
-func getArgFromViper[T any](getter func(string) T, name string, required bool) (T, error) {
+func getArgFromViper[T interface{}](getter func(string) T, name string, required bool) (T, error) {
 	if !viper.IsSet(name) && required {
 		var nullVal T
 		return nullVal, errors.Errorf("required argument `%s` not set", name)
@@ -95,41 +97,43 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 		keypers = append(keypers, common.HexToAddress(a))
 	}
 
-	tendemintCfg := cfg.DefaultConfig()
-	tendemintCfg.LogLevel = tmlog.LogLevelError
-	scaleToBlockTime(tendemintCfg, config.BlockTime)
-	keyper0RPCAddress := tendemintCfg.RPC.ListenAddress
+	tendermintCfg := cfg.DefaultConfig()
+	tendermintCfg.LogLevel = tmlog.LogLevelError
+	tendermintCfg.RPC.ListenAddress = config.ListenAddress
+
+	scaleToBlockTime(tendermintCfg, config.BlockTime)
+	keyper0RPCAddress := tendermintCfg.RPC.ListenAddress
 	rpcAddress, err := adjustPort(keyper0RPCAddress, config.Index)
 	if err != nil {
 		return err
 	}
-	tendemintCfg.RPC.ListenAddress = rpcAddress
+	tendermintCfg.RPC.ListenAddress = rpcAddress
 
-	keyper0P2PAddress := tendemintCfg.P2P.ListenAddress
+	keyper0P2PAddress := tendermintCfg.P2P.ListenAddress
 	p2pAddress, err := adjustPort(keyper0P2PAddress, config.Index)
 	if err != nil {
 		return err
 	}
-	tendemintCfg.P2P.ListenAddress = p2pAddress
+	tendermintCfg.P2P.ListenAddress = p2pAddress
 
-	tendemintCfg.P2P.AllowDuplicateIP = true
-	tendemintCfg.Mode = cfg.ModeValidator
+	tendermintCfg.P2P.AllowDuplicateIP = true
+	tendermintCfg.Mode = cfg.ModeValidator
 
-	tendemintCfg.SetRoot(config.RootDir)
-	if err := tendemintCfg.ValidateBasic(); err != nil {
+	tendermintCfg.SetRoot(config.RootDir)
+	if err := tendermintCfg.ValidateBasic(); err != nil {
 		return errors.Wrap(err, "error in config file")
 	}
-	cfg.EnsureRoot(tendemintCfg.RootDir)
+	cfg.EnsureRoot(tendermintCfg.RootDir)
 
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
-	err = cfg.WriteConfigFile(config.RootDir, tendemintCfg)
+	err = cfg.WriteConfigFile(config.RootDir, tendermintCfg)
 	if err != nil {
 		return err
 	}
 	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3)
 
-	return initFilesWithConfig(tendemintCfg, config, appState)
+	return initFilesWithConfig(tendermintCfg, config, appState)
 }
 
 func adjustPort(address string, keyperIndex int) (string, error) {

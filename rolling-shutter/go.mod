@@ -3,7 +3,9 @@ module github.com/shutter-network/rolling-shutter/rolling-shutter
 go 1.19
 
 require (
+	github.com/AdamSLevy/jsonrpc2/v14 v14.1.0
 	github.com/benbjohnson/clock v1.3.1
+	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/getkin/kin-openapi v0.87.0

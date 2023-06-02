@@ -1,0 +1,36 @@
+# Shutter collator config
+# Ethereum address: 0x2E135FE171fB6351026B75aF688a7F9689B66B87
+# Peer identity: /p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj
+
+EthereumURL     = "http://geth:8545/"
+ContractsURL    = "http://geth:8545/"
+DeploymentDir   = "./deployments/dockerGeth/"
+
+# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
+# If it's empty, we use the standard PG* environment variables
+DatabaseURL     = "postgres://postgres@db:5432/collator"
+
+HTTPListenAddress = ":3000"
+
+# p2p configuration
+ListenAddress	= "/ip4/0.0.0.0/tcp/23000"
+PeerMultiaddrs	= [
+    "/dns4/keyper-0/tcp/23000/p2p/12D3KooWLdS3Lzh5PQ7e3VP1LBr6X6V1vHJV5gxGHU4TzpN1KvQ4",
+    "/dns4/keyper-1/tcp/23000/p2p/12D3KooWShNYN3ZfSiTWGq5TYK9cFkf8SBUQ7aL9dgPiWKcCNc8m",
+    "/dns4/keyper-2/tcp/23000/p2p/12D3KooWGm7rNjmx4TTCuCdPnj2tXhfPCXxyLwdRJSFZuRxTfbWg",
+    "/dns4/snapshot/tcp/23000/p2p/12D3KooWHnFiZQmrMDYfyMJtrubcX4NhHvTgdbTTc5KmZLyKimhY",
+    "/dns4/collator/tcp/23000/p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj"
+]
+
+# Secret Keys
+EthereumKey     = "215ddd19b91c54252bb956c7f88e42122a61bd45a562d5bae38bc2328a9b52d0"
+P2PKey          = "CAESQDTb6IrZcY37WUI2Ld42H4ixyA7S/7ttXBUt0J9EwuPGWfMtbuNarlScRbqIz6Dm8jZqZWkpECDx8r8PwXB97ZQ="
+
+# ID shared by all shutter participants for common instance
+InstanceID = 0
+
+# The duration of an epoch
+EpochDuration = "1s"
+
+# Number of blocks to backdate batches
+ExecutionBlockDelay = 5
