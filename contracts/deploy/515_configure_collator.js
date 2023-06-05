@@ -29,8 +29,10 @@ module.exports = async function (hre) {
     console.log("Collator set already added");
     configSetIndex = lastSetIndex;
   } else {
-    await collator.add(collatorAddress);
-    await collator.append();
+    const tx1 = await collator.add(collatorAddress);
+    await tx1.wait();
+    const tx2 = await collator.append();
+    await tx2.wait();
     configSetIndex = lastSetIndex + 1;
   }
 
