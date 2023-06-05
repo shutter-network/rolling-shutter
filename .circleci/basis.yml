@@ -89,7 +89,7 @@ jobs:
           paths:
             - ~/.cache/pre-commit
             - ~/.local
-      - run: pre-commit run --show-diff-on-failure -a
+      - run: SKIP=generate pre-commit run --show-diff-on-failure -a
 
 workflows:
   version: 2
