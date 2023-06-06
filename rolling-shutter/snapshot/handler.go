@@ -45,11 +45,11 @@ func (*TimedEpochHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
+	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
 }
 
 func (*EonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
+	return []p2pmsg.Message{&p2pmsg.EonPublicKey{}}
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
@@ -75,10 +75,6 @@ func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pm
 
 func (handler *TimedEpochHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
 	// FIXME: add TimedEpoch validation
-	timedEpochMsg := msg.(*p2pmsg.TimedEpoch)
-	if timedEpochMsg.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), timedEpochMsg.GetInstanceID())
-	}
 	return true, nil
 }
 

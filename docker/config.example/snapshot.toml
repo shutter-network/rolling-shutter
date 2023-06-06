@@ -30,6 +30,6 @@ PeerMultiaddrs	= [
     "/dns4/collator/tcp/23000/p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj"
 ]
 
-# Secret Keys
-EthereumKey     = "970f5145a9d31d7734bd7b81320daf3691f3229c20e5a171af30328616508e1e"
+# Secret Keys (we reuse the collator EthereumKey, so snapshot can be authorized against collator contract)
+EthereumKey     = "215ddd19b91c54252bb956c7f88e42122a61bd45a562d5bae38bc2328a9b52d0"
 P2PKey          = "CAESQHZ/uVq1ZWbbQkHVZqBnNwCsq+ygQTLBYogpcARCdBWkdlMKAnx2vuIZo3eAI+iK2KKTeuK7PsK1wO0fwF4bEKc="

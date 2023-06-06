@@ -1,4 +1,7 @@
 # Shutter collator config
+#
+# Note: for snapshot shutter, we don't need to run a collator!
+#
 # Ethereum address: 0x2E135FE171fB6351026B75aF688a7F9689B66B87
 # Peer identity: /p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj
 

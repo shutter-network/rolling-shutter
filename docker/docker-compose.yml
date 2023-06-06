@@ -82,8 +82,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      collator:
-        condition: service_started
       keyper-0:
         condition: service_started
       keyper-1:
@@ -100,7 +98,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - keyper
+      - snapshotkeyper
     command: "--config /config/keyper-0.toml"
     volumes:
       - ./config:/config
@@ -119,7 +117,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - keyper
+      - snapshotkeyper
     command: "--config /config/keyper-1.toml"
     volumes:
       - ./config:/config
@@ -138,27 +136,8 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - keyper
+      - snapshotkeyper
     command: "--config /config/keyper-2.toml"
-    volumes:
-      - ./config:/config
-      - ./data/deployments:/deployments
-    depends_on:
-      db:
-        condition: service_healthy
-      chain:
-        condition: service_started
-      geth:
-        condition: service_healthy
-    logging: *logging
-
-  collator:
-    image: snapshutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - collator
-    command: "--config /config/collator.toml"
     volumes:
       - ./config:/config
       - ./data/deployments:/deployments

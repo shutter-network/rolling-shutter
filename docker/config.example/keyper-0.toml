@@ -24,7 +24,7 @@ PeerMultiaddrs	= [
 # Secret Keys
 EncryptionKey	= "10f6f94127e8df1728bd0fbabb97c74c4610e8fe70847e3fba4153b87f5f3e75"
 SigningKey	= "8843a3df19ec3771f78607e4444614ed1b5918f80253f46555299d0d80b8c1f6"
-ValidatorSeed	= "670c2548e55b902f8b41ba1e078fc647657316f92734e4394b4f77aa85f5a8cd"
+ValidatorPublicKey	= "32e9b4b95033bb914250f708281b377b6cbbb62f60fc17ab51ee9bbf693d28c9"
 P2PKey          = "CAESQOUbjXud1uTt6kAhYJ5ArQiKizbFMTA+yfZtX1wePkfYoKOLvbqdC7DSWEOd5ekZlACy1g5i6qM2KO79Q/NYWt0="
 
 # HTTP interface
