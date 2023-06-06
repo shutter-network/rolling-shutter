@@ -93,6 +93,44 @@ services:
       caddy: live.snapshot.shutter.network
       caddy.reverse_proxy: "{{upstreams 8754}}"
 
+  bootnode-0:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - p2pnode
+    command: "--config /config/bootnode-0.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
+
+  bootnode-1:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - p2pnode
+    command: "--config /config/bootnode-1.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      chain:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
+
   keyper-0:
     image: snapshutter
     restart: always

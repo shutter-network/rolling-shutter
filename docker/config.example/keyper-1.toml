@@ -12,13 +12,10 @@ DatabaseURL		= "postgres://postgres@db:5432/keyper-1"
 DKGPhaseLength		= 8
 
 # p2p configuration
-ListenAddress	= "/ip4/0.0.0.0/tcp/23000"
-PeerMultiaddrs	= [
-    "/dns4/keyper-0/tcp/23000/p2p/12D3KooWLdS3Lzh5PQ7e3VP1LBr6X6V1vHJV5gxGHU4TzpN1KvQ4",
-    "/dns4/keyper-1/tcp/23000/p2p/12D3KooWShNYN3ZfSiTWGq5TYK9cFkf8SBUQ7aL9dgPiWKcCNc8m",
-    "/dns4/keyper-2/tcp/23000/p2p/12D3KooWGm7rNjmx4TTCuCdPnj2tXhfPCXxyLwdRJSFZuRxTfbWg",
-    "/dns4/snapshot/tcp/23000/p2p/12D3KooWHnFiZQmrMDYfyMJtrubcX4NhHvTgdbTTc5KmZLyKimhY",
-    "/dns4/collator/tcp/23000/p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj"
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 
 # Secret Keys
