@@ -1,9 +1,10 @@
-.vscode
-.direnv
+.clj-kondo
 .devenv
+.direnv
 .lsp
+.vscode
+docker/data
 log
 node_modules
-docker/data
-temp
 result
+temp
