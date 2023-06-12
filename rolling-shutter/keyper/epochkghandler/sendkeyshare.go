@@ -23,9 +23,12 @@ func SendDecryptionKeyShare(
 	ctx context.Context,
 	config Config,
 	db *kprdb.Queries,
-	epochID epochid.EpochID,
 	blockNumber int64,
+	epochIDs ...epochid.EpochID,
 ) ([]p2pmsg.Message, error) {
+	if len(epochIDs) == 0 {
+		return nil, errors.New("cannot generate empty decryption key share")
+	}
 	eon, err := db.GetEonForBlockNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon for block %d from db", blockNumber)
@@ -45,18 +48,19 @@ func SendDecryptionKeyShare(
 		}
 	}
 	if keyperIndex == -1 {
-		log.Info().Str("epoch-id", epochID.Hex()).Msg("ignoring decryption trigger: we are not a keyper")
+		log.Info().Msg("ignoring decryption trigger: we are not a keyper")
 		return nil, nil
 	}
 
 	// check if we already computed (and therefore most likely sent) our key share
+	// XXX this only works when we sent the share for exactly one epoch.
 	shareExists, err := db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
 		Eon:         eon.Eon,
-		EpochID:     epochID.Bytes(),
+		EpochID:     epochIDs[0].Bytes(),
 		KeyperIndex: keyperIndex,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get decryption key share for epoch %s from db", epochID)
+		return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
 	}
 	if shareExists {
 		return nil, nil // we already sent our share
@@ -76,22 +80,29 @@ func SendDecryptionKeyShare(
 		return nil, err
 	}
 
+	var shares []*p2pmsg.KeyShare
 	// compute the key share
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
-	share := epochKG.ComputeEpochSecretKeyShare(epochID)
 
-	msg := &p2pmsg.DecryptionKeyShare{
+	for _, epochID := range epochIDs {
+		share := epochKG.ComputeEpochSecretKeyShare(epochID)
+
+		shares = append(shares, &p2pmsg.KeyShare{
+			EpochID: epochID.Bytes(),
+			Share:   share.Marshal(),
+		})
+	}
+
+	msg := &p2pmsg.DecryptionKeyShares{
 		InstanceID:  config.GetInstanceID(),
 		Eon:         uint64(eon.Eon),
-		EpochID:     epochID.Bytes(),
 		KeyperIndex: uint64(keyperIndex),
-		Share:       share.Marshal(),
+		Shares:      shares,
 	}
-	err = db.InsertDecryptionKeyShareMsg(ctx, msg)
+	err = db.InsertDecryptionKeySharesMsg(ctx, msg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
-	log.Info().Str("epoch-id", epochID.Hex()).Int64("block-number", blockNumber).
-		Msg("sending decryption key share")
+	log.Info().Int64("block-number", blockNumber).Msg("sending decryption key share")
 	return []p2pmsg.Message{msg}, nil
 }
