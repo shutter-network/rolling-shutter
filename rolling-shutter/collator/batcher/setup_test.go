@@ -20,6 +20,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/epoch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 )
@@ -54,7 +56,12 @@ func (r *DiffReporter) String() string {
 	return strings.Join(r.diffs, "\n")
 }
 
-func assertEqual(t *testing.T, cancel func(error), x, y any, opts ...gocmp.Option) {
+func assertEqual(
+	t *testing.T,
+	cancel func(error),
+	x, y any,
+	opts ...gocmp.Option,
+) {
 	t.Helper()
 	rep := &DiffReporter{}
 	opts = append(opts, gocmp.Reporter(rep))
@@ -77,20 +84,14 @@ func compareByte(a, b []byte) bool {
 	return bytes.Equal(a, b)
 }
 
-func newTestConfig(t *testing.T) config.Config {
+func newTestConfig(t *testing.T) *config.Config {
 	t.Helper()
 
-	ethereumKey, err := ethcrypto.GenerateKey()
+	cfg := config.New()
+	err := configuration.SetExampleValuesRecursive(cfg)
 	assert.NilError(t, err)
-	return config.Config{
-		EthereumURL:                  "http://127.0.0.1:8454",
-		SequencerURL:                 "http://127.0.0.1:8455",
-		EthereumKey:                  ethereumKey,
-		ExecutionBlockDelay:          uint32(5),
-		InstanceID:                   123,
-		EpochDuration:                2 * time.Second,
-		BatchIndexAcceptenceInterval: 5,
-	}
+	cfg.EpochDuration = &epoch.Duration{Duration: 2 * time.Second}
+	return cfg
 }
 
 type TestParams struct {
@@ -100,11 +101,10 @@ type TestParams struct {
 	TxGasTipCap    *big.Int
 	TxGasFeeCap    *big.Int
 	InitialEpochID epochid.EpochID
-	EpochDuration  time.Duration
 }
 
 type Fixture struct {
-	Config      config.Config
+	Config      *config.Config
 	EthL1Server *sequencer.MockEthServer
 	EthL2Server *sequencer.MockEthServer
 	Address     common.Address
@@ -127,13 +127,10 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	}
 
 	cfg := newTestConfig(t)
-	if params.EpochDuration != 0 {
-		cfg.EpochDuration = params.EpochDuration
-	}
 
 	ethL1 := sequencer.RunMockEthServer(t)
 	t.Cleanup(ethL1.Teardown)
-	cfg.EthereumURL = ethL1.URL
+	cfg.Ethereum.EthereumURL = ethL1.URL
 
 	ethL2 := sequencer.RunMockEthServer(t)
 	t.Cleanup(ethL2.Teardown)
@@ -185,7 +182,10 @@ func (fix *Fixture) AddEonPublicKey(ctx context.Context, t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas int) ([]byte, []byte) {
+func (fix *Fixture) MakeTx(
+	t *testing.T,
+	accountIndex, batchIndex, nonce, gas int,
+) ([]byte, []byte) {
 	t.Helper()
 	assert.Check(t, accountIndex >= 0 && accountIndex < numAccounts)
 	// construct a valid transaction
@@ -198,7 +198,11 @@ func (fix *Fixture) MakeTx(t *testing.T, accountIndex, batchIndex, nonce, gas in
 		EncryptedPayload: []byte("foo"),
 		BatchIndex:       uint64(batchIndex),
 	}
-	tx, err := txtypes.SignNewTx(fix.Keys[accountIndex], txtypes.LatestSignerForChainID(fix.ChainID), txData)
+	tx, err := txtypes.SignNewTx(
+		fix.Keys[accountIndex],
+		txtypes.LatestSignerForChainID(fix.ChainID),
+		txData,
+	)
 	assert.NilError(t, err)
 
 	// marshal tx to bytes

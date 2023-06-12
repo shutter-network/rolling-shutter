@@ -17,7 +17,10 @@ func (dummyMessageHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) 
 	return true, nil
 }
 
-func (dummyMessageHandler) HandleMessage(_ context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (dummyMessageHandler) HandleMessage(
+	_ context.Context,
+	msg p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	log.Info().Str("message", msg.String()).Msg("received message")
 	return nil, nil
 }
@@ -31,16 +34,13 @@ func (dummyMessageHandler) MessagePrototypes() []p2pmsg.Message {
 	}
 }
 
-func New(config Config) service.Service {
-	p2pHandler := p2p.New(
-		p2p.Config{
-			ListenAddrs:     config.ListenAddresses,
-			BootstrapPeers:  config.CustomBootstrapAddresses,
-			PrivKey:         config.PrivateKey,
-			Environment:     config.Environment,
-			IsBootstrapNode: true,
-		},
-	)
-	p2pHandler.AddMessageHandler(dummyMessageHandler{})
-	return p2pHandler
+func New(config *Config) (service.Service, error) {
+	p2pHandler, err := p2p.New(config.P2P)
+	if err != nil {
+		return nil, err
+	}
+	if config.ListenMessages {
+		p2pHandler.AddMessageHandler(dummyMessageHandler{})
+	}
+	return p2pHandler, nil
 }

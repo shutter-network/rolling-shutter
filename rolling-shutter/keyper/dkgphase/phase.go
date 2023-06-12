@@ -2,7 +2,14 @@
 // a block number.
 package dkgphase
 
-import "github.com/shutter-network/shutter/shlib/puredkg"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/shutter-network/shutter/shlib/puredkg"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
+)
 
 // PhaseLength is used to store the accumulated lengths of the DKG phases.
 type PhaseLength struct {
@@ -21,6 +28,23 @@ func NewConstantPhaseLength(l int64) *PhaseLength {
 		accusing:    2 * l,
 		apologizing: 3 * l,
 	}
+}
+
+func (plen *PhaseLength) UnmarshalText(b []byte) error {
+	phaseLenInt, err := strconv.ParseInt(string(b), 10, 64)
+	if err != nil {
+		return err
+	}
+	*plen = *NewConstantPhaseLength(phaseLenInt)
+	return nil
+}
+
+func (plen PhaseLength) String() string {
+	return encodeable.String(plen)
+}
+
+func (plen PhaseLength) MarshalText() (text []byte, err error) {
+	return []byte(fmt.Sprint(plen.dealing)), nil
 }
 
 func (plen *PhaseLength) GetPhaseAtHeight(height int64, eonStartHeight int64) puredkg.Phase {

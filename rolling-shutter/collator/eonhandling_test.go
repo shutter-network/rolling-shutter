@@ -13,6 +13,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/epoch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
@@ -21,19 +23,14 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
-func newTestConfig(t *testing.T) config.Config {
+func newTestConfig(t *testing.T) *config.Config {
 	t.Helper()
 
-	ethereumKey, err := ethcrypto.GenerateKey()
+	cfg := config.New()
+	err := configuration.SetExampleValuesRecursive(cfg)
 	assert.NilError(t, err)
-	return config.Config{
-		EthereumURL:         "http://127.0.0.1:8454",
-		SequencerURL:        "http://127.0.0.1:8455",
-		EthereumKey:         ethereumKey,
-		ExecutionBlockDelay: uint32(5),
-		InstanceID:          123,
-		EpochDuration:       1 * time.Second,
-	}
+	cfg.EpochDuration = &epoch.Duration{Duration: 1 * time.Second}
+	return cfg
 }
 
 type keyper struct {
@@ -52,7 +49,12 @@ type setupEonKeysParams struct {
 	keypers           []*ecdsa.PrivateKey
 }
 
-func setupEonKeys(ctx context.Context, t *testing.T, dbtx chainobsdb.DBTX, params setupEonKeysParams) []keyper {
+func setupEonKeys(
+	ctx context.Context,
+	t *testing.T,
+	dbtx chainobsdb.DBTX,
+	params setupEonKeysParams,
+) []keyper {
 	t.Helper()
 
 	kprs := make([]keyper, 0)
@@ -96,7 +98,12 @@ func setupEonKeys(ctx context.Context, t *testing.T, dbtx chainobsdb.DBTX, param
 	return kprs
 }
 
-func checkDBResult(t *testing.T, kpr []keyper, pubkey cltrdb.EonPublicKeyCandidate, votes []cltrdb.EonPublicKeyVote) {
+func checkDBResult(
+	t *testing.T,
+	kpr []keyper,
+	pubkey cltrdb.EonPublicKeyCandidate,
+	votes []cltrdb.EonPublicKeyVote,
+) {
 	t.Helper()
 
 	assert.Check(t, len(votes) > 0)

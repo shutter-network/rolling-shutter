@@ -346,7 +346,7 @@
    :task (play/generate-config -mocknode-subcommand)}
 
   ;; --------------------------------------
-  ;; -- mock-sequencer
+  ;; -- mocksequencer
 
   -mocksequencer-subcommand
   {:depends []

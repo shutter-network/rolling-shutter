@@ -9,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
@@ -19,9 +18,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 )
 
-var DefaultBootstrapPeers []peer.AddrInfo
+var DefaultBootstrapPeers []*address.P2PAddress
 
 func init() {
 	// NOTE: currently there are no stable production / staging
@@ -30,11 +33,8 @@ func init() {
 	//   for our bootstrap peers will be hardcoded here
 	//   for the production/staging environments
 	for _, s := range []string{} {
-		addrInfo, err := peer.AddrInfoFromString(s)
-		if err != nil {
-			log.Info().Str("address", s).Msg("failed to cast address info, ignoring bootstrap peer")
-		}
-		DefaultBootstrapPeers = append(DefaultBootstrapPeers, *addrInfo)
+		addr := address.MustP2PAddress(s)
+		DefaultBootstrapPeers = append(DefaultBootstrapPeers, addr)
 	}
 }
 
@@ -44,44 +44,36 @@ const (
 	protocolVersion = "/shutter/0.1.0"
 )
 
-type Environment int
-
-//go:generate stringer -type=Environment -output environment_string.gen.go
-const (
-	Staging Environment = iota
-	Production
-	Local
-)
-
 type Notifee interface {
 	NewPeer()
 }
 
 type P2PNode struct {
-	Config Config
+	config p2pNodeConfig
 
-	connmngr       *connmgr.BasicConnMgr
-	mux            sync.Mutex
-	host           host.Host
-	dht            *dht.IpfsDHT
-	pubSub         *pubsub.PubSub
-	gossipRooms    map[string]*gossipRoom
+	connmngr    *connmgr.BasicConnMgr
+	mux         sync.Mutex
+	host        host.Host
+	dht         *dht.IpfsDHT
+	pubSub      *pubsub.PubSub
+	gossipRooms map[string]*gossipRoom
+
 	GossipMessages chan *pubsub.Message
 }
 
-type Config struct {
+type p2pNodeConfig struct {
 	ListenAddrs       []multiaddr.Multiaddr
 	BootstrapPeers    []peer.AddrInfo
-	PrivKey           p2pcrypto.PrivKey
-	Environment       Environment
+	PrivKey           keys.Libp2pPrivate
+	Environment       env.Environment
 	IsBootstrapNode   bool
 	DisableTopicDHT   bool
 	DisableRoutingDHT bool
 }
 
-func NewP2PNode(config Config) *P2PNode {
+func NewP2PNode(config p2pNodeConfig) *P2PNode {
 	p := P2PNode{
-		Config:         config,
+		config:         config,
 		connmngr:       nil,
 		host:           nil,
 		pubSub:         nil,
@@ -91,7 +83,11 @@ func NewP2PNode(config Config) *P2PNode {
 	return &p
 }
 
-func (p *P2PNode) Run(ctx context.Context, topicNames []string, topicValidators ValidatorRegistry) error {
+func (p *P2PNode) Run(
+	ctx context.Context,
+	topicNames []string,
+	topicValidators ValidatorRegistry,
+) error {
 	defer func() {
 		close(p.GossipMessages)
 	}()
@@ -122,7 +118,7 @@ func (p *P2PNode) Run(ctx context.Context, topicNames []string, topicValidators 
 			})
 		}
 
-		err := bootstrap(ctx, p.host, p.Config, p.dht)
+		err := bootstrap(ctx, p.host, p.config, p.dht)
 		if err != nil {
 			return err
 		}
@@ -153,11 +149,11 @@ func (p *P2PNode) init(ctx context.Context) error {
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
-	p2pHost, hashTable, connectionManager, err := createHost(ctx, p.Config)
+	p2pHost, hashTable, connectionManager, err := createHost(ctx, p.config)
 	if err != nil {
 		return err
 	}
-	p2pPubSub, err := createPubSub(ctx, p2pHost, p.Config, hashTable)
+	p2pPubSub, err := createPubSub(ctx, p2pHost, p.config, hashTable)
 	if err != nil {
 		return err
 	}
@@ -170,19 +166,11 @@ func (p *P2PNode) init(ctx context.Context) error {
 	return nil
 }
 
-func createHost(ctx context.Context, config Config) (host.Host, *dht.IpfsDHT, *connmgr.BasicConnMgr, error) {
+func createHost(
+	ctx context.Context,
+	config p2pNodeConfig,
+) (host.Host, *dht.IpfsDHT, *connmgr.BasicConnMgr, error) {
 	var err error
-
-	privKey := config.PrivKey
-	if privKey == nil {
-		privKey, _, err = p2pcrypto.GenerateKeyPair(
-			p2pcrypto.Ed25519,
-			-1,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
 
 	connectionManager, err := connmgr.NewConnManager(
 		160, // Lowwater
@@ -194,7 +182,7 @@ func createHost(ctx context.Context, config Config) (host.Host, *dht.IpfsDHT, *c
 	}
 
 	options := []libp2p.Option{
-		libp2p.Identity(privKey),
+		libp2p.Identity(&config.PrivKey.Key),
 		libp2p.ListenAddrs(config.ListenAddrs...),
 		libp2p.DefaultTransports,
 		libp2p.DefaultSecurity,
@@ -202,7 +190,7 @@ func createHost(ctx context.Context, config Config) (host.Host, *dht.IpfsDHT, *c
 		libp2p.ProtocolVersion(protocolVersion),
 	}
 
-	localNetworking := bool(config.Environment == Local)
+	localNetworking := bool(config.Environment == env.EnvironmentLocal)
 	if !localNetworking {
 		options = append(options,
 			// launch the server-side of AutoNAT too
@@ -235,8 +223,13 @@ func createHost(ctx context.Context, config Config) (host.Host, *dht.IpfsDHT, *c
 	return routedHost, idht, connectionManager, nil
 }
 
-func createPubSub(ctx context.Context, p2pHost host.Host, config Config, hashTable *dht.IpfsDHT) (*pubsub.PubSub, error) {
-	localNetworking := bool(config.Environment == Local)
+func createPubSub(
+	ctx context.Context,
+	p2pHost host.Host,
+	config p2pNodeConfig,
+	hashTable *dht.IpfsDHT,
+) (*pubsub.PubSub, error) {
+	localNetworking := bool(config.Environment == env.EnvironmentLocal)
 	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
 		isBootstrapNode:   config.IsBootstrapNode,
 		isLocalNetworking: localNetworking,
@@ -249,7 +242,10 @@ func createPubSub(ctx context.Context, p2pHost host.Host, config Config, hashTab
 	}
 
 	if !config.DisableTopicDHT {
-		pubsubOptions = append(pubsubOptions, pubsub.WithDiscovery(routing.NewRoutingDiscovery(hashTable)))
+		pubsubOptions = append(
+			pubsubOptions,
+			pubsub.WithDiscovery(routing.NewRoutingDiscovery(hashTable)),
+		)
 	}
 	if config.IsBootstrapNode {
 		// enables the pubsub v1.1 feature to handle discovery and

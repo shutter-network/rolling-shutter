@@ -24,7 +24,7 @@ import (
 )
 
 type MockNode struct {
-	Config Config
+	Config *Config
 
 	mux sync.Mutex
 
@@ -38,7 +38,7 @@ type MockNode struct {
 	cipherTxsSent map[uint64][][]byte
 }
 
-func New(config Config) (*MockNode, error) {
+func New(config *Config) (*MockNode, error) {
 	eonSecretKeyShare, eonPublicKey, err := computeEonKeys(config.EonKeySeed)
 	if err != nil {
 		return nil, err
@@ -49,16 +49,15 @@ func New(config Config) (*MockNode, error) {
 		return nil, err
 	}
 
+	p2pHandler, err := p2p.New(config.P2P)
+	if err != nil {
+		return nil, err
+	}
 	node := &MockNode{
 		Config: config,
 
 		collatorClient: collatorClient,
-		p2p: p2p.New(p2p.Config{
-			ListenAddrs:    config.ListenAddresses,
-			BootstrapPeers: config.CustomBootstrapAddresses,
-			PrivKey:        config.P2PKey,
-			Environment:    p2p.Production,
-		}),
+		p2p:            p2pHandler,
 
 		eonSecretKeyShare: eonSecretKeyShare,
 		eonPublicKey:      eonPublicKey,
@@ -98,7 +97,10 @@ func (m *MockNode) logStartupInfo() {
 	log.Info().Hex("eon-public-key", m.eonPublicKey.Marshal()).Msg("starting mocknode")
 }
 
-func (m *MockNode) handleEonPublicKey(_ context.Context, k p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (m *MockNode) handleEonPublicKey(
+	_ context.Context,
+	k p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	key := k.(*p2pmsg.EonPublicKey)
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -138,7 +140,9 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				continue
 			}
 
-			epochID, err := epochid.BigToEpochID(new(big.Int).SetBytes(nextEpochResponse.JSON200.Id))
+			epochID, err := epochid.BigToEpochID(
+				new(big.Int).SetBytes(nextEpochResponse.JSON200.Id),
+			)
 			if err != nil {
 				log.Error().Msg("error converting epoch-id")
 			}
@@ -160,7 +164,9 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				return err
 			}
 			if response.JSON200 != nil {
-				log.Info().Str("epoch-id", epochID.Hex()).Hex("transaction-id", response.JSON200.Id).
+				log.Info().
+					Str("epoch-id", epochID.Hex()).
+					Hex("transaction-id", response.JSON200.Id).
 					Msg("submitted transaction")
 			} else if response.JSONDefault != nil {
 				jsonDefault := response.JSONDefault
@@ -195,7 +201,9 @@ func (m *MockNode) sendMessages(ctx context.Context) error {
 }
 
 func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPublicKey, error) {
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec // we need the seed for testing and this is a mock function
+	r := rand.New( //nolint:gosec // we need the seed for testing and this is a mock function
+		rand.NewSource(seed),
+	)
 	p, err := shcrypto.RandomPolynomial(r, 0)
 	if err != nil {
 		return nil, nil, err
@@ -208,7 +216,10 @@ func computeEonKeys(seed int64) (*shcrypto.EonSecretKeyShare, *shcrypto.EonPubli
 	return eonSecretKeyShare, eonPublicKey, nil
 }
 
-func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.EonSecretKeyShare) (*shcrypto.EpochSecretKey, error) {
+func computeEpochSecretKey(
+	epochID epochid.EpochID,
+	eonSecretKeyShare *shcrypto.EonSecretKeyShare,
+) (*shcrypto.EpochSecretKey, error) {
 	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
 	epochSecretKeyShare := shcrypto.ComputeEpochSecretKeyShare(eonSecretKeyShare, epochIDG1)
 	return shcrypto.ComputeEpochSecretKey(
@@ -218,7 +229,10 @@ func computeEpochSecretKey(epochID epochid.EpochID, eonSecretKeyShare *shcrypto.
 	)
 }
 
-func encryptRandomMessage(epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, []byte, error) {
+func encryptRandomMessage(
+	epochID epochid.EpochID,
+	eonPublicKey *shcrypto.EonPublicKey,
+) ([]byte, []byte, error) {
 	message := []byte("msgXXXXX")
 	_, err := cryptorand.Read(message[3:])
 	if err != nil {
@@ -269,7 +283,11 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, epochID epochid.EpochI
 	return m.p2p.SendMessage(ctx, msg)
 }
 
-func EncryptShutterPayload(payload *txtypes.ShutterPayload, epoch epochid.EpochID, eonPubKey *shcrypto.EonPublicKey) ([]byte, error) {
+func EncryptShutterPayload(
+	payload *txtypes.ShutterPayload,
+	epoch epochid.EpochID,
+	eonPubKey *shcrypto.EonPublicKey,
+) ([]byte, error) {
 	var encryptedMessage []byte
 	message, err := payload.Encode()
 	if err != nil {
@@ -279,7 +297,11 @@ func EncryptShutterPayload(payload *txtypes.ShutterPayload, epoch epochid.EpochI
 	return encryptedMessage, err
 }
 
-func EncryptMessage(message []byte, epochID epochid.EpochID, eonPublicKey *shcrypto.EonPublicKey) ([]byte, error) {
+func EncryptMessage(
+	message []byte,
+	epochID epochid.EpochID,
+	eonPublicKey *shcrypto.EonPublicKey,
+) ([]byte, error) {
 	sigma, err := shcrypto.RandomSigma(cryptorand.Reader)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate random sigma")

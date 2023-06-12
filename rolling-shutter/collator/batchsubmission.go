@@ -29,8 +29,12 @@ type Submitter struct {
 	collator  *collator
 }
 
-func NewSubmitter(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*Submitter, error) {
-	l1Client, err := ethclient.Dial(cfg.EthereumURL)
+func NewSubmitter(
+	ctx context.Context,
+	cfg *config.Config,
+	dbpool *pgxpool.Pool,
+) (*Submitter, error) {
+	l1Client, err := ethclient.Dial(cfg.Ethereum.EthereumURL)
 	if err != nil {
 		return nil, err
 	}
@@ -53,13 +57,17 @@ func NewSubmitter(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) 
 		l2Client:  l2Client,
 		dbpool:    dbpool,
 		signer:    signer,
-		privKey:   cfg.EthereumKey,
+		privKey:   cfg.Ethereum.PrivateKey.Key,
 		sequencer: sequencer,
 	}, nil
 }
 
 // createBatchTx creates the batchtx for the given epoch.
-func (submitter *Submitter) createBatchTx(ctx context.Context, db *cltrdb.Queries, epoch epochid.EpochID) error {
+func (submitter *Submitter) createBatchTx(
+	ctx context.Context,
+	db *cltrdb.Queries,
+	epoch epochid.EpochID,
+) error {
 	decryptionKey, err := db.GetDecryptionKey(ctx, epoch.Bytes())
 	if err == pgx.ErrNoRows {
 		return nil
@@ -153,7 +161,9 @@ func (submitter *Submitter) submitBatch(ctx context.Context) error {
 	db := cltrdb.New(submitter.dbpool)
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	if err == nil {
-		log.Info().Hex("unsubmitted-epoch", unsubmitted.EpochID).Msg("still have an unsubmitted batch")
+		log.Info().
+			Hex("unsubmitted-epoch", unsubmitted.EpochID).
+			Msg("still have an unsubmitted batch")
 		submitter.collator.signals.newBatchTx()
 		return nil
 	} else if err != pgx.ErrNoRows {

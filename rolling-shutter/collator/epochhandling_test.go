@@ -36,9 +36,15 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	// The reason the p2p.SendMessage works without configuration
 	// is because the handler has no rooms subscribed and thus will actually
 	// skip to forward the messages sent to the transport
-	c := collator{dbpool: dbpool, Config: config, p2p: p2p.New(p2p.Config{})}
+	p2pHandler, err := p2p.New(config.P2P)
+	assert.NilError(t, err)
+	c := collator{dbpool: dbpool, Config: config, p2p: p2pHandler}
 	var newDecryptionTriggerLoop shdb.SignalLoopFunc
-	c.signals.newDecryptionTrigger, newDecryptionTriggerLoop = shdb.NewSignal(ctx, "newDecryptionTrigger", c.sendDecryptionTriggers)
+	c.signals.newDecryptionTrigger, newDecryptionTriggerLoop = shdb.NewSignal(
+		ctx,
+		"newDecryptionTrigger",
+		c.sendDecryptionTriggers,
+	)
 	go func() { _ = newDecryptionTriggerLoop() }()
 
 	trigger := cltrdb.InsertTriggerParams{
@@ -55,7 +61,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 
 	cctx, cancelTimeout := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancelTimeout()
-	err := c.handleDatabaseNotifications(cctx)
+	err = c.handleDatabaseNotifications(cctx)
 	assert.ErrorContains(t, err, "context deadline exceeded")
 
 	// HACK: The handleNewDecryptionTrigger should have

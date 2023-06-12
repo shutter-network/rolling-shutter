@@ -1,75 +1,47 @@
 package p2pnode
 
 import (
-	"crypto/rand"
 	"io"
-	"text/template"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mitchellh/mapstructure"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/spf13/viper"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
+var _ configuration.Config = &Config{}
+
+func NewConfig() *Config {
+	c := &Config{}
+	c.Init()
+	return c
+}
+
 type Config struct {
-	PrivateKey               crypto.PrivKey
-	ListenAddresses          []multiaddr.Multiaddr
-	CustomBootstrapAddresses []peer.AddrInfo
-	Environment              p2p.Environment
+	ListenMessages bool `comment:"whether to register handlers on the messages and log them"`
+
+	P2P *p2p.Config
 }
 
-const configTemplate = `# Shutter  p2p node config
-# Peer role: bootstrap
-# Peer identity: /p2p/{{ .PrivateKey | P2PKeyPublic}}
+func (c *Config) Init() {
+	c.P2P = p2p.NewConfig()
+}
 
-# p2p configuration
-ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
-CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
+func (c *Config) Name() string {
+	return "p2pnode"
+}
 
-# Secret Keys
-PrivateKey          = "{{ .PrivateKey | P2PKey}}"
-
-`
-
-var tmpl *template.Template = medley.MustBuildTemplate("p2pnode", configTemplate)
-
-// GenerateNewKeys generates new keys and stores them inside the Config object.
-func (config *Config) GenerateNewKeys() error {
-	p2pkey, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		return err
-	}
-	config.PrivateKey = p2pkey
+func (c *Config) Validate() error {
 	return nil
 }
 
-// Unmarshal unmarshals a keyper Config from the the given Viper object.
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	err := v.Unmarshal(
-		config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.StringToEnvironment,
-				medley.StringToEd25519PrivateKey,
-				medley.StringToEd25519PublicKey,
-				medley.P2PKeyHook,
-				mapstructure.StringToSliceHookFunc(","),
-				medley.MultiaddrHook,
-				medley.AddrInfoHook,
-			),
-		),
-	)
-	if err != nil {
-		return err
-	}
+func (c *Config) SetDefaultValues() error {
+	c.ListenMessages = true
 	return nil
 }
 
-// WriteTOML writes a toml configuration file with the given config.
-func (config *Config) WriteTOML(w io.Writer) error {
-	return tmpl.Execute(w, config)
+func (c *Config) SetExampleValues() error {
+	return c.SetDefaultValues()
+}
+
+func (c Config) TOMLWriteHeader(w io.Writer) (int, error) {
+	return w.Write([]byte("# Peer role: bootstrap\n"))
 }

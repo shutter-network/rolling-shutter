@@ -1,4 +1,4 @@
-package snapshot_test
+package p2pnode_test
 
 import (
 	"testing"
@@ -7,16 +7,16 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pnode"
 )
 
 func TestSmokeGenerateConfig(t *testing.T) {
-	config := snapshot.NewConfig()
+	config := p2pnode.NewConfig()
 	test.SmokeGenerateConfig(t, config)
 }
 
 func TestParsedConfig(t *testing.T) {
-	config := snapshot.NewConfig()
+	config := p2pnode.NewConfig()
 
 	err := configuration.SetExampleValuesRecursive(config)
 	assert.NilError(t, err)

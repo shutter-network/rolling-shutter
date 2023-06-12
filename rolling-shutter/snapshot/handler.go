@@ -17,7 +17,7 @@ func NewDecryptionKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandl
 }
 
 type DecryptionKeyHandler struct {
-	config   Config
+	config   *Config
 	snapshot *Snapshot
 }
 
@@ -26,7 +26,7 @@ func NewEonPublicKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandle
 }
 
 type EonPublicKeyHandler struct {
-	config   Config
+	config   *Config
 	snapshot *Snapshot
 	dbpool   *pgxpool.Pool
 }
@@ -52,8 +52,8 @@ func (d *DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
 	decryptionKeyMsg := msg.(*p2pmsg.DecryptionKey)
 	// FIXME: check snapshot business logic for decryptionKeyMsg validation
-	if decryptionKeyMsg.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeyMsg.GetInstanceID())
+	if decryptionKeyMsg.GetInstanceID() != handler.config.InstanceID {
+		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, decryptionKeyMsg.GetInstanceID())
 	}
 
 	key, err := decryptionKeyMsg.GetEpochSecretKey()
@@ -72,8 +72,8 @@ func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pm
 
 func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
 	eonKeyMsg := msg.(*p2pmsg.EonPublicKey)
-	if eonKeyMsg.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), eonKeyMsg.GetInstanceID())
+	if eonKeyMsg.GetInstanceID() != handler.config.InstanceID {
+		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, eonKeyMsg.GetInstanceID())
 	}
 	eon := eonKeyMsg.GetEon()
 	if eon == 0 {

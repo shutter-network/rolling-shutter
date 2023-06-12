@@ -27,7 +27,7 @@ var (
 )
 
 type Snapshot struct {
-	Config Config
+	Config *Config
 
 	p2p      *p2p.P2PHandler
 	dbpool   *pgxpool.Pool
@@ -36,20 +36,12 @@ type Snapshot struct {
 	hubapi   *hubapi.HubAPI
 }
 
-func New(config Config) service.Service {
-	p2pConfig := p2p.Config{
-		ListenAddrs:       config.ListenAddresses,
-		BootstrapPeers:    config.CustomBootstrapAddresses, // FIXME: add to own config
-		PrivKey:           config.P2PKey,
-		DisableTopicDHT:   true,
-		DisableRoutingDHT: true,
-	}
-	p2pInstance := p2p.New(p2pConfig)
-
+func New(config *Config) (service.Service, error) {
+	p2pInstance, err := p2p.New(config.P2P)
 	return &Snapshot{
 		Config: config,
 		p2p:    p2pInstance,
-	}
+	}, err
 }
 
 func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {

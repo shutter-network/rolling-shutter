@@ -35,7 +35,7 @@ var dbListenChannels []string = []string{
 }
 
 type decryptionKeyHandler struct {
-	Config config.Config
+	Config *config.Config
 	dbpool *pgxpool.Pool
 }
 
@@ -43,7 +43,10 @@ func (*decryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
 }
 
-func (handler *decryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (handler *decryptionKeyHandler) HandleMessage(
+	ctx context.Context,
+	m p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	msg := m.(*p2pmsg.DecryptionKey)
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
@@ -65,12 +68,19 @@ func (handler *decryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg
 	return []p2pmsg.Message{}, nil
 }
 
-func (handler *decryptionKeyHandler) ValidateMessage(ctx context.Context, k p2pmsg.Message) (bool, error) {
+func (handler *decryptionKeyHandler) ValidateMessage(
+	ctx context.Context,
+	k p2pmsg.Message,
+) (bool, error) {
 	key := k.(*p2pmsg.DecryptionKey)
 
 	var eonPublicKey shcrypto.EonPublicKey
 	if key.GetInstanceID() != handler.Config.InstanceID {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.Config.InstanceID, key.GetInstanceID())
+		return false, errors.Errorf(
+			"instance ID mismatch (want=%d, have=%d)",
+			handler.Config.InstanceID,
+			key.GetInstanceID(),
+		)
 	}
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)

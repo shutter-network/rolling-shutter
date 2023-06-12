@@ -1,114 +1,73 @@
 package config
 
 import (
-	"crypto/ecdsa"
 	"io"
-	"text/template"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mitchellh/mapstructure"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/epoch"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
+var _ configuration.Config = &Config{}
+
+func New() *Config {
+	c := &Config{}
+	c.Init()
+	return c
+}
+
+func (c *Config) Init() {
+	c.P2P = p2p.NewConfig()
+	c.Ethereum = configuration.NewEthnodeConfig()
+}
+
 type Config struct {
-	ListenAddresses          []multiaddr.Multiaddr
-	CustomBootstrapAddresses []peer.AddrInfo
-	Environment              p2p.Environment
-	EthereumURL              string
-	SequencerURL             string
-	ContractsURL             string
-	DeploymentDir            string
-	DatabaseURL              string
-	HTTPListenAddress        string
+	InstanceID  uint64 `shconfig:",required"`
+	DatabaseURL string `shconfig:",required"`
 
-	EthereumKey *ecdsa.PrivateKey
-	P2PKey      p2pcrypto.PrivKey
+	HTTPListenAddress string
 
-	InstanceID uint64
-
-	EpochDuration                time.Duration
+	SequencerURL                 string
+	EpochDuration                *epoch.Duration
 	ExecutionBlockDelay          uint32
 	BatchIndexAcceptenceInterval uint32
+
+	P2P      *p2p.Config
+	Ethereum *configuration.EthnodeConfig
 }
 
-var configTemplate = `# Shutter collator config
-# Ethereum address: {{ .EthereumAddress }}
-# Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
-
-# L1 node URL
-EthereumURL     = "{{ .EthereumURL }}"
-DeploymentDir   = "{{ .DeploymentDir }}"
-
-# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
-# If it's empty, we use the standard PG* environment variables
-DatabaseURL     = "{{ .DatabaseURL }}"
-
-HTTPListenAddress = "{{ .HTTPListenAddress }}"
-
-# JSON RPC endpoint of the sequencer to which batches will be submitted
-SequencerURL = "{{ .SequencerURL }}"
-
-# JSON RPC endpoint of the node where the contracts are deployed
-ContractsURL = "{{ .ContractsURL }}"
-
-# p2p configuration
-ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
-CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
-
-# Secret Keys
-EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
-P2PKey          = "{{ .P2PKey | P2PKey}}"
-
-# ID shared by all shutter participants for common instance
-InstanceID = {{ .InstanceID }}
-
-# The duration of an epoch
-EpochDuration = "{{ .EpochDuration }}"
-
-# Number of blocks to backdate batches
-ExecutionBlockDelay = {{ .ExecutionBlockDelay }}
-`
-
-var tmpl *template.Template = medley.MustBuildTemplate("collator", configTemplate)
-
-// WriteTOML writes a toml configuration file with the given config.
-func (config *Config) WriteTOML(w io.Writer) error {
-	return tmpl.Execute(w, config)
-}
-
-// Unmarshal unmarshals a collator.Config from the given Viper object.
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	err := v.Unmarshal(
-		config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.AddrInfoHook,
-				medley.P2PKeyHook,
-				medley.StringToEcdsaPrivateKey,
-				medley.StringToEnvironment,
-				mapstructure.StringToTimeDurationHookFunc(),
-			),
-		),
-	)
-	if err != nil {
-		return err
-	}
-	if config.EthereumKey == nil {
-		return errors.Errorf("EthereumKey is missing")
-	}
+func (c *Config) Validate() error {
 	return nil
 }
 
-func (config *Config) EthereumAddress() common.Address {
-	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+func (c *Config) Name() string {
+	return "collator"
+}
+
+func (c *Config) SetDefaultValues() error {
+	c.EpochDuration = &epoch.Duration{
+		Duration: time.Second * 5,
+	}
+	c.SequencerURL = "http://127.0.0.1:8555/"
+	// default: the contracts are deployed on L2
+	c.Ethereum.ContractsURL = c.SequencerURL
+	c.BatchIndexAcceptenceInterval = 5
+	c.ExecutionBlockDelay = 5
+	c.HTTPListenAddress = ":3000"
+	return nil
+}
+
+func (c *Config) SetExampleValues() error {
+	err := c.SetDefaultValues()
+	if err != nil {
+		return err
+	}
+	c.InstanceID = 42
+	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
+	return nil
+}
+
+func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
+	return 0, nil
 }

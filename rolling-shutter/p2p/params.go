@@ -13,7 +13,9 @@ type pubSubParamsOptions struct {
 	bootstrapPeers    []peer.AddrInfo
 }
 
-func makePubSubParams(options pubSubParamsOptions) (*pubsub.GossipSubParams, *pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
+func makePubSubParams(
+	options pubSubParamsOptions,
+) (*pubsub.GossipSubParams, *pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
 	gsDefault := pubsub.DefaultGossipSubParams()
 	gossipSubParams := &gsDefault
 	// From the spec:

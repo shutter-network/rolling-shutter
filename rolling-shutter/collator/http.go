@@ -46,6 +46,7 @@ func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 }
 
 func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
+	// FIXME undefined
 	var x oapi.SubmitTransactionJSONBody
 	if err := json.NewDecoder(r.Body).Decode(&x); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid format for SubmitTransaction")
@@ -79,7 +80,11 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(oapi.TransactionId{Id: txid})
 }
 
-func (srv *server) GetEonPublicKey(w http.ResponseWriter, r *http.Request, params oapi.GetEonPublicKeyParams) {
+func (srv *server) GetEonPublicKey(
+	w http.ResponseWriter,
+	r *http.Request,
+	params oapi.GetEonPublicKeyParams,
+) {
 	var (
 		eonPub     cltrdb.EonPublicKeyCandidate
 		votes      []cltrdb.EonPublicKeyVote
