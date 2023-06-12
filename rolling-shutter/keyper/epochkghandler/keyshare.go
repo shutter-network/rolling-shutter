@@ -30,11 +30,11 @@ type DecryptionKeyShareHandler struct {
 }
 
 func (*DecryptionKeyShareHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShare{}}
+	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShares{}}
 }
 
 func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
-	keyShare := msg.(*p2pmsg.DecryptionKeyShare)
+	keyShare := msg.(*p2pmsg.DecryptionKeyShares)
 	if keyShare.GetInstanceID() != handler.config.GetInstanceID() {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
 	}
@@ -79,12 +79,12 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 }
 
 func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
-	msg := m.(*p2pmsg.DecryptionKeyShare)
+	msg := m.(*p2pmsg.DecryptionKeyShares)
 	// Insert the share into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
 	db := kprdb.New(handler.dbpool)
 
-	if err := db.InsertDecryptionKeyShareMsg(ctx, msg); err != nil {
+	if err := db.InsertDecryptionKeySharesMsg(ctx, msg); err != nil {
 		return nil, err
 	}
 

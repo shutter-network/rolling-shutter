@@ -51,7 +51,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Check(t, len(msgs) == 1)
-	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShare)
+	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShares)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == config.GetInstanceID())
 	assert.Check(t, msg.KeyperIndex == keyperIndex)

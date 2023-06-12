@@ -89,15 +89,15 @@ func (*DecryptionTrigger) Validate() error {
 	return nil
 }
 
-func (share *DecryptionKeyShare) LogInfo() string {
+func (share *DecryptionKeyShares) LogInfo() string {
 	return fmt.Sprintf(
-		"DecryptionKeyShare{keyperIndex=%d}",
+		"DecryptionKeyShares{keyperIndex=%d}",
 		share.KeyperIndex,
 	)
 }
 
-func (*DecryptionKeyShare) Topic() string {
-	return kprtopics.DecryptionKeyShare
+func (*DecryptionKeyShares) Topic() string {
+	return kprtopics.DecryptionKeyShares
 }
 
 func (share *KeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, error) {
@@ -108,7 +108,7 @@ func (share *KeyShare) GetEpochSecretKeyShare() (*shcrypto.EpochSecretKeyShare, 
 	return epochSecretKeyShare, nil
 }
 
-func (share *DecryptionKeyShare) Validate() error {
+func (share *DecryptionKeyShares) Validate() error {
 	for _, sh := range share.GetShares() {
 		_, err := sh.GetEpochSecretKeyShare()
 		if err != nil {

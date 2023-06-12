@@ -24,7 +24,7 @@ func (dummyMessageHandler) HandleMessage(_ context.Context, msg p2pmsg.Message) 
 
 func (dummyMessageHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{
-		&p2pmsg.DecryptionKeyShare{},
+		&p2pmsg.DecryptionKeyShares{},
 		&p2pmsg.DecryptionKey{},
 		&p2pmsg.DecryptionTrigger{},
 		&p2pmsg.EonPublicKey{},

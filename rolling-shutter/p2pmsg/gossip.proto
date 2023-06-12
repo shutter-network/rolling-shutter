@@ -20,7 +20,7 @@ message KeyShare {
 }
 
 // TODO: replace keyper index by signature
-message DecryptionKeyShare {
+message DecryptionKeyShares {
     uint64 instanceID = 1;
     uint64 eon = 4;
     uint64 keyperIndex = 5;

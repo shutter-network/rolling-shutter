@@ -93,13 +93,13 @@ func SendDecryptionKeyShare(
 		})
 	}
 
-	msg := &p2pmsg.DecryptionKeyShare{
+	msg := &p2pmsg.DecryptionKeyShares{
 		InstanceID:  config.GetInstanceID(),
 		Eon:         uint64(eon.Eon),
 		KeyperIndex: uint64(keyperIndex),
 		Shares:      shares,
 	}
-	err = db.InsertDecryptionKeyShareMsg(ctx, msg)
+	err = db.InsertDecryptionKeySharesMsg(ctx, msg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}

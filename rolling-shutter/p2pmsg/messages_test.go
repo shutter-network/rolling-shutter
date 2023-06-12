@@ -91,7 +91,7 @@ func TestDecryptionKeyShare(t *testing.T) {
 	keyperIndex := uint64(0)
 	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.epochID, keyperIndex).Marshal()
 
-	orig := &DecryptionKeyShare{
+	orig := &DecryptionKeyShares{
 		InstanceID:  cfg.instanceID,
 		KeyperIndex: keyperIndex,
 		Shares: []*KeyShare{{
@@ -101,7 +101,7 @@ func TestDecryptionKeyShare(t *testing.T) {
 	}
 	m, tc := marshalUnmarshalMessage(t, orig, nil)
 	assert.Assert(t, tc == nil)
-	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKeyShare{}, KeyShare{}))
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKeyShares{}, KeyShare{}))
 }
 
 func TestEonPublicKey(t *testing.T) {
