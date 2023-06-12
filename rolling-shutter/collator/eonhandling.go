@@ -61,7 +61,7 @@ func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *p2p
 }
 
 type eonPublicKeyHandler struct {
-	config config.Config
+	config *config.Config
 	dbpool *pgxpool.Pool
 }
 
@@ -102,7 +102,10 @@ func (handler *eonPublicKeyHandler) ValidateMessage(ctx context.Context, k p2pms
 	return true, nil
 }
 
-func (handler *eonPublicKeyHandler) HandleMessage(ctx context.Context, k p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (handler *eonPublicKeyHandler) HandleMessage(
+	ctx context.Context,
+	k p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	key := k.(*p2pmsg.EonPublicKey)
 	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {

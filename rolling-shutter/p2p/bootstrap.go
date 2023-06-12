@@ -40,7 +40,10 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 		go func(ctx context.Context, a peer.AddrInfo) {
 			defer waitGroup.Done()
 			if err := h.Connect(ctx, a); err != nil {
-				log.Error().Err(err).Str("peer", a.String()).Msg("couldn't connect to boostrap node")
+				log.Error().
+					Err(err).
+					Str("peer", a.String()).
+					Msg("couldn't connect to boostrap node")
 				return
 			}
 			connectedNodes.Add(1)
@@ -54,7 +57,12 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 	return nil
 }
 
-func bootstrap(ctx context.Context, h host.Host, config Config, hashTables ...*dht.IpfsDHT) error {
+func bootstrap(
+	ctx context.Context,
+	h host.Host,
+	config p2pNodeConfig,
+	hashTables ...*dht.IpfsDHT,
+) error {
 	for _, d := range hashTables {
 		if d != nil {
 			if err := d.Bootstrap(ctx); err != nil {

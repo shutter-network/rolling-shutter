@@ -34,7 +34,7 @@ var (
 type Batcher struct {
 	l2Client            L2ClientReader
 	l1EthClient         *ethclient.Client
-	config              config.Config
+	config              *config.Config
 	signer              txtypes.Signer
 	dbpool              *pgxpool.Pool
 	nextBatchChainState *ChainState
@@ -43,7 +43,7 @@ type Batcher struct {
 
 func newBatcherFromClients(
 	ctx context.Context,
-	cfg config.Config,
+	cfg *config.Config,
 	dbpool *pgxpool.Pool,
 	l1EthClient *ethclient.Client,
 	l2Client L2ClientReader,
@@ -72,9 +72,9 @@ func newBatcherFromClients(
 	return btchr, nil
 }
 
-func NewBatcher(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*Batcher, error) {
+func NewBatcher(ctx context.Context, cfg *config.Config, dbpool *pgxpool.Pool) (*Batcher, error) {
 	// l1 client initialisation
-	l1EthClient, err := ethclient.DialContext(ctx, cfg.EthereumURL)
+	l1EthClient, err := ethclient.DialContext(ctx, cfg.Ethereum.EthereumURL)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,10 @@ func NewBatcher(ctx context.Context, cfg config.Config, dbpool *pgxpool.Pool) (*
 }
 
 // initializeNextBatch populates the next_batch table with a valid value.
-func (btchr *Batcher) initializeNextBatch(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uint64, error) {
+func (btchr *Batcher) initializeNextBatch(
+	ctx context.Context,
+	db *cltrdb.Queries,
+) (epochid.EpochID, uint64, error) {
 	var (
 		nextEpochID   epochid.EpochID
 		l1BlockNumber uint64
@@ -170,7 +173,12 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	btchr.nextBatchChainState = NewChainState(btchr.signer, block.BaseFee(), block.GasLimit(), nextBatchEpochID)
+	btchr.nextBatchChainState = NewChainState(
+		btchr.signer,
+		block.BaseFee(),
+		block.GasLimit(),
+		nextBatchEpochID,
+	)
 	err = btchr.loadAndApplyTransactions(ctx, db)
 	if err != nil {
 		// If we fail to load and apply the transaction, the state in nextBatchChainState
@@ -214,7 +222,10 @@ func (btchr *Batcher) applyTransactions(
 ) error {
 	db := cltrdb.New(btchr.dbpool)
 	for i := range unmarshalledTxs {
-		err := btchr.nextBatchChainState.CanApplyTx(&unmarshalledTxs[i], uint64(len(txs[i].TxBytes)))
+		err := btchr.nextBatchChainState.CanApplyTx(
+			&unmarshalledTxs[i],
+			uint64(len(txs[i].TxBytes)),
+		)
 		if txs[i].Status == cltrdb.TxstatusNew {
 			var newStatus cltrdb.Txstatus
 			if err == nil {
@@ -241,7 +252,11 @@ func (btchr *Batcher) applyTransactions(
 	return nil
 }
 
-func (btchr *Batcher) closeBatchImpl(ctx context.Context, db *cltrdb.Queries, l1blockNumber int64) error {
+func (btchr *Batcher) closeBatchImpl(
+	ctx context.Context,
+	db *cltrdb.Queries,
+	l1blockNumber int64,
+) error {
 	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, cltrdb.New(btchr.dbpool))
 	if err != nil {
 		return err
@@ -426,7 +441,10 @@ func (btchr *Batcher) ensureAccountInitialized(ctx context.Context, account comm
 
 // ensureAccountsInitialized ensures that we do have the nonce and balance stored in
 // nextBatchChainState for all senders of the given transactions.
-func (btchr *Batcher) ensureAccountsInitialized(ctx context.Context, txs []txtypes.Transaction) error {
+func (btchr *Batcher) ensureAccountsInitialized(
+	ctx context.Context,
+	txs []txtypes.Transaction,
+) error {
 	for i := range txs {
 		account, err := btchr.signer.Sender(&txs[i])
 		if err != nil {

@@ -1,46 +1,25 @@
-package keyper
+package keyper_test
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 
-	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/shutter/shlib/shtest"
-
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/comparer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
 )
 
-func tomlRoundtrip(t *testing.T, cfg *keyper.Config) *keyper.Config {
-	t.Helper()
-	var buf bytes.Buffer
-	err := cfg.WriteTOML(&buf)
-	assert.NilError(t, err)
-
-	fmt.Println(buf.String())
-
-	v := viper.New()
-	v.SetConfigType("toml")
-
-	err = v.ReadConfig(&buf)
-	assert.NilError(t, err)
-
-	cfg2 := &keyper.Config{}
-	err = cfg2.Unmarshal(v)
-	assert.NilError(t, err)
-	return cfg2
+func TestSmokeGenerateConfig(t *testing.T) {
+	config := keyper.NewConfig()
+	test.SmokeGenerateConfig(t, config)
 }
 
-func TestGeneratedConfigValid(t *testing.T) {
-	cfg, err := exampleConfig()
+func TestParsedConfig(t *testing.T) {
+	config := keyper.NewConfig()
+
+	err := configuration.SetExampleValuesRecursive(config)
 	assert.NilError(t, err)
-	cfg2 := tomlRoundtrip(t, cfg)
-	assert.DeepEqual(t, cfg, cfg2,
-		shtest.BigIntComparer,
-		comparer.P2PPrivKeyComparer,
-		comparer.EciesPrivateKeyComparer,
-	)
+	parsedConfig := test.RoundtripParseConfig(t, config)
+	assert.DeepEqual(t, config, parsedConfig)
 }

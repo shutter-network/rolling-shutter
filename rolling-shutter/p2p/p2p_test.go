@@ -3,19 +3,17 @@ package p2p
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog/log"
 	"gotest.tools/assert"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
 
@@ -33,32 +31,52 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 
 	numBootstrappers := 2
 	numPeers := 2
-	numNodes := numPeers + numBootstrappers
+	configs := []*Config{}
+	bootstrapAddrs := []*address.P2PAddress{}
 
-	privKeys := []p2pcrypto.PrivKey{}
-	listenAddrs := []multiaddr.Multiaddr{}
-	bootStrapAddrs := []peer.AddrInfo{}
-	isBootstrappers := []bool{}
 	firstPort := 2000
-	for i := 0; i < numNodes; i++ {
-		privKey, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
+	for i := 0; i < numBootstrappers; i++ {
+		cfg := NewConfig()
+		err := cfg.SetExampleValues()
 		assert.NilError(t, err)
-		privKeys = append(privKeys, privKey)
 
-		pid, err := peer.IDFromPrivateKey(privKey)
-		assert.NilError(t, err)
 		port := firstPort + i
-		listenAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
-		listenAddrs = append(listenAddrs, listenAddr)
+
+		addr := &address.P2PAddress{}
+		err = encodeable.FromString(addr, fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
 		assert.NilError(t, err)
-		if i >= numNodes-numBootstrappers {
-			isBootstrappers = append(isBootstrappers, true)
-			nodeAddr, err := peer.AddrInfoFromString(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, pid.String()))
-			assert.NilError(t, err)
-			bootStrapAddrs = append(bootStrapAddrs, *nodeAddr)
-		} else {
-			isBootstrappers = append(isBootstrappers, false)
-		}
+		cfg.ListenAddresses = []*address.P2PAddress{addr}
+
+		pid, err := cfg.P2PKey.PeerID()
+		assert.NilError(t, err)
+		externalAddr := &address.P2PAddress{}
+		err = encodeable.FromString(
+			externalAddr,
+			fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, pid),
+		)
+		assert.NilError(t, err)
+		bootstrapAddrs = append(bootstrapAddrs, externalAddr)
+		configs = append(configs, cfg)
+	}
+
+	for _, cfg := range configs {
+		cfg.CustomBootstrapAddresses = bootstrapAddrs
+	}
+
+	for i := 0; i < numPeers; i++ {
+		cfg := NewConfig()
+		err := cfg.SetExampleValues()
+		assert.NilError(t, err)
+
+		port := firstPort + numBootstrappers + i
+
+		addr := &address.P2PAddress{}
+		err = encodeable.FromString(addr, fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
+		assert.NilError(t, err)
+		cfg.ListenAddresses = []*address.P2PAddress{addr}
+		cfg.CustomBootstrapAddresses = bootstrapAddrs
+
+		configs = append(configs, cfg)
 	}
 
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
@@ -68,19 +86,14 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 
 	waitGroup := sync.WaitGroup{}
 	p2ps := []*P2PNode{}
-	for i := 0; i < numNodes; i++ {
-		p := New(Config{
-			ListenAddrs:     []multiaddr.Multiaddr{listenAddrs[i]},
-			BootstrapPeers:  bootStrapAddrs,
-			PrivKey:         privKeys[i],
-			Environment:     Local,
-			IsBootstrapNode: isBootstrappers[i],
-		}).P2P
-		p2ps = append(p2ps, p)
+	for _, cfg := range configs {
+		p2pHandler, err := New(cfg)
+		assert.NilError(t, err)
+		p2ps = append(p2ps, p2pHandler.P2P)
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			err := p.Run(runctx, gossipTopicNames, map[string]pubsub.ValidatorEx{})
+			err := p2pHandler.P2P.Run(runctx, gossipTopicNames, map[string]pubsub.ValidatorEx{})
 			assert.Assert(t, err == context.Canceled)
 		}()
 	}
@@ -110,5 +123,10 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	}
 	assert.Equal(t, topicName, message.GetTopic(), "received message with wrong topic")
 	assert.Check(t, bytes.Equal(testMessage, message.GetData()), "received wrong message")
-	assert.Equal(t, p2ps[1].HostID(), message.GetFrom().String(), "received message with wrong sender")
+	assert.Equal(
+		t,
+		p2ps[1].HostID(),
+		message.GetFrom().String(),
+		"received message with wrong sender",
+	)
 }

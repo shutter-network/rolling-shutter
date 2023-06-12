@@ -257,7 +257,7 @@
 ;; -- mocksequencer
 (defn mocksequencer-subcommand
   []
-  #:subcommand{:cmd 'mock-sequencer
+  #:subcommand{:cmd 'mocksequencer
                :loglevel nil
                :cfgfile "mocksequencer.toml"
                :listening-port sequencer-rpc-port

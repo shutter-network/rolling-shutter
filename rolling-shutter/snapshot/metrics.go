@@ -55,8 +55,8 @@ type MetricsServer struct {
 	config *Config
 }
 
-func NewMetricsServer(config Config) service.Service {
-	return &MetricsServer{config: &config, mux: http.NewServeMux()}
+func NewMetricsServer(config *Config) service.Service {
+	return &MetricsServer{config: config, mux: http.NewServeMux()}
 }
 
 func (srv *MetricsServer) Start(_ context.Context, _ service.Runner) error {

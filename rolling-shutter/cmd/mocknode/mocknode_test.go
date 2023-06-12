@@ -1,40 +1,25 @@
-package mocknode
+package mocknode_test
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 
-	"github.com/spf13/viper"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/comparer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocknode"
 )
 
-func tomlRoundtrip(t *testing.T, cfg *mocknode.Config) *mocknode.Config {
-	t.Helper()
-	var buf bytes.Buffer
-	err := cfg.WriteTOML(&buf)
-	assert.NilError(t, err)
-
-	fmt.Println(buf.String())
-
-	v := viper.New()
-	v.SetConfigType("toml")
-
-	err = v.ReadConfig(&buf)
-	assert.NilError(t, err)
-
-	cfg2 := &mocknode.Config{}
-	err = cfg2.Unmarshal(v)
-	assert.NilError(t, err)
-	return cfg2
+func TestSmokeGenerateConfig(t *testing.T) {
+	config := mocknode.NewConfig()
+	test.SmokeGenerateConfig(t, config)
 }
 
-func TestGeneratedConfigValid(t *testing.T) {
-	cfg, err := exampleConfig()
+func TestParsedConfig(t *testing.T) {
+	config := mocknode.NewConfig()
+
+	err := configuration.SetExampleValuesRecursive(config)
 	assert.NilError(t, err)
-	cfg2 := tomlRoundtrip(t, cfg)
-	assert.DeepEqual(t, cfg, cfg2, comparer.P2PPrivKeyComparer)
+	parsedConfig := test.RoundtripParseConfig(t, config)
+	assert.DeepEqual(t, config, parsedConfig)
 }

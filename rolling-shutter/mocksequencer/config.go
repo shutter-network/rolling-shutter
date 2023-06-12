@@ -2,38 +2,22 @@ package mocksequencer
 
 import (
 	"io"
-	"text/template"
 
-	"github.com/spf13/viper"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 )
 
-var configTemplate = `# Shutter mock sequencer config
-# JSON-RPC endpoint exposed to clients
-HTTPListenAddress = "{{ .HTTPListenAddress }}"
+var _ configuration.Config = &Config{}
 
-# Layer1 JSON-RPC endpoint
-EthereumURL = "{{ .EthereumURL }}"
-
-# Chain config
-ChainID = {{ .ChainID }}
-MaxBlockDeviation = {{ .MaxBlockDeviation }}
-EthereumPollInterval = {{ .EthereumPollInterval }}
-
-# Debug
-Admin = {{ .Admin }}
-Debug = {{ .Debug }}
-
-`
-
-var tmpl *template.Template = medley.MustBuildTemplate("mocksequencer", configTemplate)
+func NewConfig() *Config {
+	return &Config{}
+}
 
 type Config struct {
-	HTTPListenAddress string
-	EthereumURL       string
+	ChainID     uint64 `shconfig:",required"`
+	EthereumURL string
 
-	ChainID              uint64
+	HTTPListenAddress string
+
 	MaxBlockDeviation    uint64
 	EthereumPollInterval uint64
 
@@ -41,12 +25,36 @@ type Config struct {
 	Debug bool
 }
 
-// WriteTOML writes a toml configuration file with the given config.
-func (config *Config) WriteTOML(w io.Writer) error {
-	return tmpl.Execute(w, config)
+func (c *Config) Init() {
 }
 
-// Unmarshal unmarshals a mocksequencer Config from the the given Viper object.
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	return v.Unmarshal(config)
+func (c *Config) Validate() error {
+	return nil
+}
+
+func (c *Config) Name() string {
+	return "mocksequencer"
+}
+
+func (c *Config) SetDefaultValues() error {
+	c.HTTPListenAddress = "localhost:8555"
+	c.EthereumURL = "http://localhost:8545"
+	c.MaxBlockDeviation = 5
+	c.EthereumPollInterval = 1
+	c.Admin = true
+	c.Debug = true
+	return nil
+}
+
+func (c *Config) SetExampleValues() error {
+	err := c.SetDefaultValues()
+	if err != nil {
+		return err
+	}
+	c.ChainID = 42
+	return nil
+}
+
+func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
+	return 0, nil
 }

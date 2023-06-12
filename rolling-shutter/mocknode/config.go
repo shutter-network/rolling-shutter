@@ -2,80 +2,72 @@ package mocknode
 
 import (
 	"io"
-	"text/template"
-
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mitchellh/mapstructure"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/spf13/viper"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
-type Config struct {
-	ListenAddresses          []multiaddr.Multiaddr
-	CustomBootstrapAddresses []peer.AddrInfo
-	Environment              p2p.Environment
-	P2PKey                   p2pcrypto.PrivKey
+var _ configuration.Config = &Config{}
 
-	InstanceID             uint64
-	Rate                   float64
+func NewConfig() *Config {
+	c := &Config{}
+	c.Init()
+	return c
+}
+
+func (c *Config) Init() {
+	c.P2P = p2p.NewConfig()
+	c.Ethereum = configuration.NewEthnodeConfig()
+}
+
+type Config struct {
+	InstanceID uint64 `shconfig:",required"`
+	EonKeySeed int64  `shconfig:",required" comment:"a seed value used to generate the eon key"`
+
+	Rate                   float64 `comment:"overall rate (in seconds) influencing tx send frequency"`
 	SendDecryptionTriggers bool
 	SendDecryptionKeys     bool
 	SendTransactions       bool
 
-	EonKeySeed int64 // a seed value used to generate the eon key
+	P2P      *p2p.Config
+	Ethereum *configuration.EthnodeConfig
 }
 
-var configTemplate = `# Shutter mock node config
-# Peer Identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
-# Eon Public Key: {{ .EonPublicKey | EonPublicKey }}
-
-# p2p configuration
-ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
-CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
-
-# Secret Keys
-P2PKey          = "{{ .P2PKey | P2PKey}}"
-
-# Mock messages
-InstanceID              = {{ .InstanceID }}
-Rate                    = {{ .Rate }}
-SendDecryptionTriggers  = {{ .SendDecryptionTriggers }}
-SendDecryptionKeys      = {{ .SendDecryptionKeys }}
-SendTransactions        = {{ .SendTransactions }}
-
-EonKeySeed         = {{ .EonKeySeed }}
-`
-
-var tmpl *template.Template = medley.MustBuildTemplate("keyper", configTemplate)
-
-// Unmarshal unmarshals a keyper Config from the the given Viper object.
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	return v.Unmarshal(
-		config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.AddrInfoHook,
-				medley.P2PKeyHook,
-			),
-		),
-	)
+func (c *Config) Validate() error {
+	return nil
 }
 
-// WriteTOML writes a toml configuration file with the given config.
-func (config *Config) WriteTOML(w io.Writer) error {
-	return tmpl.Execute(w, config)
+func (c *Config) Name() string {
+	return "mocknode"
+}
+
+func (c *Config) SetDefaultValues() error {
+	c.Rate = 1.0
+	c.SendDecryptionTriggers = true
+	c.SendDecryptionKeys = true
+	c.SendTransactions = true
+	return nil
+}
+
+func (c *Config) SetExampleValues() error {
+	err := c.SetDefaultValues()
+	if err != nil {
+		return err
+	}
+	c.InstanceID = 42
+	c.EonKeySeed = 1337
+	return nil
+}
+
+func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
+	return 0, nil
 }
 
 // EonPublicKey returns the eon public key defined by the seed value in the config.
-func (config *Config) EonPublicKey() *shcrypto.EonPublicKey {
-	_, eonPublicKey, err := computeEonKeys(config.EonKeySeed)
+func (c *Config) EonPublicKey() *shcrypto.EonPublicKey {
+	_, eonPublicKey, err := computeEonKeys(c.EonKeySeed)
 	if err != nil {
 		panic(err)
 	}

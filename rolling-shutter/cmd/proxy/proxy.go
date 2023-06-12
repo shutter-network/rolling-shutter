@@ -8,55 +8,26 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/proxy"
 )
 
-var cfgFile string
-
 func Cmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "proxy",
-		Short: "Run a json rpc proxy",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return proxyMain()
-		},
-	}
-	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
-	cmd.MarkPersistentFlagRequired("config")
-	cmd.MarkPersistentFlagFilename("config")
-	return cmd
+	builder := command.Build(
+		main,
+		// TODO  long usage
+		command.Usage(
+			"Run a Ethereum JSON RPC proxy",
+			"",
+		),
+		command.WithGenerateConfigSubcommand(),
+	)
+	return builder.Command()
 }
 
-func readConfig() (proxy.Config, error) {
-	config := proxy.Config{}
-	viper.AddConfigPath("$HOME/.config/shutter")
-	viper.SetConfigName("proxy")
-	viper.SetConfigType("toml")
-	viper.SetConfigFile(cfgFile)
-	var err error
-	err = viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		// Config file not found
-		if cfgFile != "" {
-			return config, err
-		}
-	} else if err != nil {
-		return config, err // Config file was found but another error was produced
-	}
-	err = config.Unmarshal(viper.GetViper())
-	return config, err
-}
-
-func proxyMain() error {
-	config, err := readConfig()
-	if err != nil {
-		return err
-	}
-
+func main(cfg *proxy.Config) error {
 	log.Info().Msgf("Starting shutter proxy version %s", shversion.Version())
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -69,7 +40,7 @@ func proxyMain() error {
 		cancel()
 	}()
 
-	err = proxy.Run(ctx, config)
+	err := proxy.Run(ctx, cfg)
 	if err == context.Canceled {
 		log.Info().Msg("Bye.")
 		return nil

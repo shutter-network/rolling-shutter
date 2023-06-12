@@ -122,11 +122,11 @@
 
 (defn run-mocksequencer
   []
-  (let [mock-sequencer (play/mocksequencer-subcommand)]
+  (let [mocksequencer (play/mocksequencer-subcommand)]
     {:run :process/run
      :process/id :mocksequencer
-     :process/cmd (play/subcommand-run mock-sequencer)
-     :process/port (:subcommand/listening-port mock-sequencer)
+     :process/cmd (play/subcommand-run mocksequencer)
+     :process/port (:subcommand/listening-port mocksequencer)
      :process/port-timeout 3000}))
 
 (defn run-chain

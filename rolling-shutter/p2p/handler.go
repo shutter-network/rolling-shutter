@@ -6,11 +6,13 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -34,26 +36,64 @@ type MessageHandler interface {
 	MessagePrototypes() []p2pmsg.Message
 }
 
-func New(config Config) *P2PHandler {
-	bootstrapPeers := config.BootstrapPeers
-	if len(bootstrapPeers) == 0 && config.Environment == Production {
-		bootstrapPeers = DefaultBootstrapPeers
+func New(config *Config) (*P2PHandler, error) {
+	peerID, err := config.P2PKey.PeerID()
+	if err != nil {
+		return nil, err
+	}
+
+	listenAddresses := []multiaddr.Multiaddr{}
+	for _, addr := range config.ListenAddresses {
+		listenAddresses = append(listenAddresses, addr.Multiaddr)
+	}
+	cfg := &p2pNodeConfig{
+		ListenAddrs: listenAddresses,
+		PrivKey:     *config.P2PKey,
+		Environment: config.Environment,
+		// for now, disable those features, since
+		// they are not stable from our side
+		DisableTopicDHT:   true,
+		DisableRoutingDHT: true,
+	}
+
+	bootstrapAddresses := config.CustomBootstrapAddresses
+	if len(bootstrapAddresses) == 0 && config.Environment == env.EnvironmentProduction {
+		bootstrapAddresses = DefaultBootstrapPeers
 	}
 	// exclude one's own address from the bootstrap list,
 	// in case we are a bootstrap node
-	bstrpPeersWithoutSelf := []peer.AddrInfo{}
-	for _, bs := range bootstrapPeers {
-		if !bs.ID.MatchesPrivateKey(config.PrivKey) {
-			bstrpPeersWithoutSelf = append(bstrpPeersWithoutSelf, bs)
+	for _, addr := range bootstrapAddresses {
+		bootstrapID, err := addr.Identifier()
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Msg("invalid bootstrap peer address, dropping")
+			continue
+		}
+		if bootstrapID.Equal(peerID) {
+			cfg.IsBootstrapNode = true
+		} else {
+			ai, err := peer.AddrInfoFromP2pAddr(addr.Multiaddr)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("address", addr.String()).
+					Msg("invalid bootstrap peer address, dropping")
+				continue
+			}
+			cfg.BootstrapPeers = append(cfg.BootstrapPeers, *ai)
 		}
 	}
-	config.BootstrapPeers = bstrpPeersWithoutSelf
+	if len(cfg.BootstrapPeers) < 1 {
+		return nil, errors.New("no bootstrap peers configured")
+	}
+
 	return &P2PHandler{
-		P2P:               NewP2PNode(config),
+		P2P:               NewP2PNode(*cfg),
 		gossipTopicNames:  make(map[string]struct{}),
 		handlerRegistry:   make(HandlerRegistry),
 		validatorRegistry: make(ValidatorRegistry),
-	}
+	}, nil
 }
 
 type P2PHandler struct {
@@ -117,7 +157,9 @@ func (handler *P2PHandler) addValidatorImpl(valFunc ValidatorFunc, messProto p2p
 		}
 
 		if reflect.TypeOf(unmshl) != reflect.TypeOf(messProto) {
-			handleError(errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)))
+			handleError(
+				errors.Errorf("received message of unexpected type %s", reflect.TypeOf(unmshl)),
+			)
 			return invalidResultType
 		}
 
@@ -166,7 +208,10 @@ func (handler *P2PHandler) AddGossipTopic(topic string) {
 	handler.gossipTopicNames[topic] = struct{}{}
 }
 
-func (handler *P2PHandler) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
+func (handler *P2PHandler) Start(
+	ctx context.Context,
+	runner service.Runner,
+) error { //nolint:unparam
 	runner.Go(func() error {
 		return handler.P2P.Run(ctx, handler.topics(), handler.validatorRegistry)
 	})
@@ -201,7 +246,10 @@ func (handler *P2PHandler) runHandleMessages(ctx context.Context) error {
 				return nil
 			}
 			if err := handler.handle(ctx, msg); err != nil {
-				log.Info().Err(err).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
+				log.Info().
+					Err(err).
+					Str("topic", msg.GetTopic()).
+					Str("sender-id", msg.GetFrom().String()).
 					Msg("failed to handle message")
 			}
 		case <-ctx.Done():
@@ -224,12 +272,18 @@ func (handler *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) erro
 
 	handlerFunc, exists := handler.handlerRegistry[proto.MessageName(m)]
 	if !exists {
-		log.Info().Str("message", m.LogInfo()).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
+		log.Info().
+			Str("message", m.LogInfo()).
+			Str("topic", msg.GetTopic()).
+			Str("sender-id", msg.GetFrom().String()).
 			Msg("ignoring message, no handler registered for topic")
 		return nil
 	}
 
-	log.Info().Str("message", m.LogInfo()).Str("topic", msg.GetTopic()).Str("sender-id", msg.GetFrom().String()).
+	log.Info().
+		Str("message", m.LogInfo()).
+		Str("topic", msg.GetTopic()).
+		Str("sender-id", msg.GetFrom().String()).
 		Msg("received message")
 	msgsOut, err = handlerFunc(ctx, m)
 	if err != nil {
@@ -245,7 +299,11 @@ func (handler *P2PHandler) handle(ctx context.Context, msg *pubsub.Message) erro
 	return nil
 }
 
-func (handler *P2PHandler) SendMessage(ctx context.Context, msg p2pmsg.Message, retryOpts ...retry.Option) error {
+func (handler *P2PHandler) SendMessage(
+	ctx context.Context,
+	msg p2pmsg.Message,
+	retryOpts ...retry.Option,
+) error {
 	var traceContext *p2pmsg.TraceContext
 	ctx, span, reportError := newSpanForPublish(ctx, handler.P2P, traceContext, msg)
 	defer span.End()

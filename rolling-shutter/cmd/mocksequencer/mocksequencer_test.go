@@ -1,4 +1,4 @@
-package snapshot_test
+package mocksequencer_test
 
 import (
 	"testing"
@@ -7,16 +7,16 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 )
 
 func TestSmokeGenerateConfig(t *testing.T) {
-	config := snapshot.NewConfig()
+	config := mocksequencer.NewConfig()
 	test.SmokeGenerateConfig(t, config)
 }
 
 func TestParsedConfig(t *testing.T) {
-	config := snapshot.NewConfig()
+	config := mocksequencer.NewConfig()
 
 	err := configuration.SetExampleValuesRecursive(config)
 	assert.NilError(t, err)

@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
 
@@ -19,18 +19,13 @@ func init() {
 	testlog.Setup()
 }
 
-func newTestConfig(t *testing.T) config.Config {
+func newTestConfig(t *testing.T) *config.Config {
 	t.Helper()
 
-	ethereumKey, err := ethcrypto.GenerateKey()
+	cfg := config.New()
+	err := configuration.SetExampleValuesRecursive(cfg)
 	assert.NilError(t, err)
-	return config.Config{
-		EthereumURL:         "http://127.0.0.1:8454",
-		SequencerURL:        "http://127.0.0.1:8455",
-		EthereumKey:         ethereumKey,
-		ExecutionBlockDelay: uint32(5),
-		InstanceID:          123,
-	}
+	return cfg
 }
 
 func TestMockEthIntegration(t *testing.T) {
@@ -43,7 +38,7 @@ func TestMockEthIntegration(t *testing.T) {
 	ctx := context.Background()
 	ethClient := ethclient.NewClient(rpcClient)
 
-	address := ethcrypto.PubkeyToAddress(cfg.EthereumKey.PublicKey)
+	address := cfg.Ethereum.PrivateKey.EthereumAddress()
 	balance := big.NewInt(42)
 	nonce := uint64(42)
 	chainID := big.NewInt(0)

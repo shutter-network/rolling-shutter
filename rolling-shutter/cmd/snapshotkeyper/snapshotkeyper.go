@@ -130,7 +130,7 @@ func keyperMain() error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Str("address", config.GetAddress().Hex()).
-		Str("shuttermint", config.ShuttermintURL).
+		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting snapshotkeyper")
 
 	return service.RunWithSighandler(context.Background(), snapshotkeyper.New(config))

@@ -18,14 +18,14 @@ import (
 )
 
 var (
-	logNoColorArg   bool
-	logNoColorName  string = "no-color"
-	logFormatArg    string
-	logFormatName   string = "logformat"
-	logLevelArg     string
-	logLevelName    string = "loglevel"
-	environmentArg  string
-	environmentName string = "environment"
+	logNoColorArg      bool
+	ArgNameNocolor     string = "no-color"
+	logFormatArg       string
+	ArgNameLogformat   string = "logformat"
+	logLevelArg        string
+	ArgNameLoglevel    string = "loglevel"
+	environmentArg     string
+	ArgNameEnvironment string = "environment"
 )
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
@@ -63,7 +63,7 @@ func setupLogging() (zerolog.Logger, error) {
 	// shutter "message"
 	zerolog.MessageFieldName = "log"
 
-	logFormat := viper.GetString(logFormatName)
+	logFormat := viper.GetString(ArgNameLogformat)
 	switch logFormat {
 	case "max", "long":
 		l = configureTime(l)
@@ -82,10 +82,10 @@ func setupLogging() (zerolog.Logger, error) {
 			zerolog.CallerFieldName,
 		}
 	default:
-		return l, errors.Errorf("flag '%s' value '%s' not recognized", logFormatName, logFormat)
+		return l, errors.Errorf("flag '%s' value '%s' not recognized", ArgNameLogformat, logFormat)
 	}
 
-	logLevel := viper.GetString(logLevelName)
+	logLevel := viper.GetString(ArgNameLoglevel)
 	switch logLevel {
 	case "":
 	case "info":
@@ -98,7 +98,7 @@ func setupLogging() (zerolog.Logger, error) {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		golog.SetAllLoggers(golog.LevelDebug)
 	default:
-		return l, errors.Errorf("flag '%s' value '%s' not recognized", logLevelName, logLevel)
+		return l, errors.Errorf("flag '%s' value '%s' not recognized", ArgNameLoglevel, logLevel)
 	}
 
 	// reset the writer
@@ -142,25 +142,25 @@ func Cmd() *cobra.Command {
 	viper.BindEnv("NOCOLOR")
 	cmd.PersistentFlags().BoolVar(
 		&logNoColorArg,
-		logNoColorName,
+		ArgNameNocolor,
 		viper.GetBool("NOCOLOR"),
 		"do not write colored logs")
 
 	cmd.PersistentFlags().StringVar(
 		&logFormatArg,
-		logFormatName,
+		ArgNameLogformat,
 		"long",
 		"set log format, possible values:  min, short, long, max",
 	)
 	cmd.PersistentFlags().StringVar(
 		&logLevelArg,
-		logLevelName,
+		ArgNameLoglevel,
 		"info",
 		"set log level, possible values:  warn, info, debug",
 	)
 	cmd.PersistentFlags().StringVar(
 		&environmentArg,
-		environmentName,
+		ArgNameEnvironment,
 		"production",
 		"set the environment, possible values:  production, staging, local",
 	)

@@ -45,7 +45,7 @@ type signals struct {
 }
 
 type collator struct {
-	Config config.Config
+	Config *config.Config
 
 	l1Client  *ethclient.Client
 	l2Client  *rpc.Client
@@ -57,13 +57,13 @@ type collator struct {
 	signals   signals
 }
 
-func New(cfg config.Config) service.Service {
+func New(cfg *config.Config) service.Service {
 	return &collator{Config: cfg}
 }
 
 func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	cfg := c.Config
-	log.Info().Str("ethereum-address", cfg.EthereumAddress().Hex()).Msg(
+	log.Info().Str("ethereum-address", cfg.Ethereum.PrivateKey.EthereumAddress().Hex()).Msg(
 		"starting collator",
 	)
 
@@ -74,17 +74,17 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
-	log.Info().Str("ethereum-url", cfg.EthereumURL).Msg("connecting to ethereum")
-	l1Client, err := ethclient.Dial(cfg.EthereumURL)
+	log.Info().Str("ethereum-url", cfg.Ethereum.EthereumURL).Msg("connecting to ethereum")
+	l1Client, err := ethclient.Dial(cfg.Ethereum.EthereumURL)
 	if err != nil {
 		return err
 	}
-	log.Info().Str("contracts-url", cfg.ContractsURL).Msg("connecting contracts")
-	contractsClient, err := ethclient.Dial(cfg.ContractsURL)
+	log.Info().Str("contracts-url", cfg.Ethereum.ContractsURL).Msg("connecting contracts")
+	contractsClient, err := ethclient.Dial(cfg.Ethereum.ContractsURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(contractsClient, cfg.DeploymentDir)
+	contracts, err := deployment.NewContracts(contractsClient, cfg.Ethereum.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -112,11 +112,11 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	c.l1Client = l1Client
 	c.l2Client = l2RPCClient
 	c.contracts = contracts
-	c.p2p = p2p.New(p2p.Config{
-		ListenAddrs:    cfg.ListenAddresses,
-		BootstrapPeers: cfg.CustomBootstrapAddresses,
-		PrivKey:        cfg.P2PKey,
-	})
+
+	c.p2p, err = p2p.New(cfg.P2P)
+	if err != nil {
+		return err
+	}
 	c.batcher = btchr
 	c.dbpool = dbpool
 	c.submitter = submitter
@@ -156,7 +156,7 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 		return c.handleDatabaseNotifications(ctx)
 	})
 	runner.Go(func() error {
-		return c.closeBatchesTicker(ctx, c.Config.EpochDuration)
+		return c.closeBatchesTicker(ctx, c.Config.EpochDuration.Duration)
 	})
 	return nil
 }
@@ -282,7 +282,7 @@ func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, e
 
 func (c *collator) getUnsentDecryptionTriggers(
 	ctx context.Context,
-	cfg config.Config,
+	cfg *config.Config,
 ) (
 	[]*p2pmsg.DecryptionTrigger,
 	error,
@@ -308,7 +308,7 @@ func (c *collator) getUnsentDecryptionTriggers(
 			epochID,
 			uint64(trig.L1BlockNumber),
 			trig.BatchHash,
-			cfg.EthereumKey,
+			cfg.Ethereum.PrivateKey.Key,
 		)
 		if err != nil {
 			return nil, err

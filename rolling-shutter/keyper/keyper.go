@@ -44,8 +44,8 @@ type keyper struct {
 	p2p              *p2p.P2PHandler
 }
 
-func New(config Config) service.Service {
-	return &keyper{config: &config}
+func New(config *Config) service.Service {
+	return &keyper{config: config}
 }
 
 // linkConfigToDB ensures that we use a database compatible with the given config. On first use
@@ -53,7 +53,7 @@ func New(config Config) service.Service {
 // stored value and raises an error if it doesn't match.
 func linkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
-	cfgAddress := config.GetAddress().Hex()
+	cfgAddress := config.GetAddress().String()
 	queries := metadb.New(dbpool)
 	dbAddr, err := queries.GetMeta(ctx, addressKey)
 	if err == pgx.ErrNoRows {
@@ -82,15 +82,15 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
-	l1Client, err := ethclient.Dial(config.EthereumURL)
+	l1Client, err := ethclient.Dial(config.Ethereum.EthereumURL)
 	if err != nil {
 		return err
 	}
-	l2Client, err := ethclient.Dial(config.ContractsURL)
+	l2Client, err := ethclient.Dial(config.Ethereum.ContractsURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(l2Client, config.DeploymentDir)
+	contracts, err := deployment.NewContracts(l2Client, config.Ethereum.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -103,18 +103,16 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	shuttermintClient, err := tmhttp.New(config.ShuttermintURL)
+	shuttermintClient, err := tmhttp.New(config.Shuttermint.ShuttermintURL)
 	if err != nil {
 		return err
 	}
-	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.SigningKey)
+	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
 
-	p2pHandler := p2p.New(p2p.Config{
-		ListenAddrs:    config.ListenAddresses,
-		BootstrapPeers: config.CustomBootstrapAddresses,
-		PrivKey:        config.P2PKey,
-		Environment:    p2p.Production,
-	})
+	p2pHandler, err := p2p.New(config.P2P)
+	if err != nil {
+		return err
+	}
 
 	kpr.dbpool = dbpool
 	kpr.shuttermintClient = shuttermintClient
@@ -252,10 +250,10 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	if err != nil {
 		return err
 	}
-	if activationBlockNumber-l1BlockNumber > kpr.config.DKGStartBlockDelta {
+	if activationBlockNumber-l1BlockNumber > kpr.config.Shuttermint.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
 			Uint64("l1-block-number", l1BlockNumber).
-			Uint64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+			Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
 			Msg("not yet submitting config")
 		return nil
 	}
@@ -271,7 +269,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	}
 	log.Info().Interface("keyper-set", keyperSet).
 		Uint64("l1-block-number", l1BlockNumber).
-		Uint64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+		Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
 		Msg("have a new config to be scheduled")
 	batchConfigMsg := shmsg.NewBatchConfig(
 		uint64(keyperSet.ActivationBlockNumber),
@@ -333,7 +331,7 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 				uint64(eonPublicKey.ActivationBlockNumber),
 				uint64(eonPublicKey.KeyperConfigIndex),
 				uint64(eonPublicKey.Eon),
-				kpr.config.SigningKey,
+				kpr.config.Ethereum.PrivateKey.Key,
 			)
 			if err != nil {
 				return errors.Wrap(err, "error while signing EonPublicKey")

@@ -8,33 +8,36 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/url"
 )
 
-type Config struct {
-	CollatorURL, SequencerURL *url.URL
-	HTTPListenAddress         string
+func NewConfig() *Config {
+	c := &Config{}
+	c.Init()
+	return c
 }
 
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	err := v.Unmarshal(config, viper.DecodeHook(
-		mapstructure.ComposeDecodeHookFunc(
-			medley.StringToURL,
-		)))
-	if err != nil {
-		return err
-	}
-	if config.CollatorURL == nil {
+func (c *Config) Init() {
+	c.SequencerURL = &url.URL{}
+	c.CollatorURL = &url.URL{}
+}
+
+type Config struct {
+	CollatorURL       *url.URL
+	SequencerURL      *url.URL
+	HTTPListenAddress string
+}
+
+func (c *Config) Validate() error {
+	if c.CollatorURL == nil {
 		return errors.Errorf("configuration value CollatorURL is missing")
 	}
 	if config.SequencerURL == nil {
@@ -44,6 +47,31 @@ func (config *Config) Unmarshal(v *viper.Viper) error {
 		return errors.Errorf("configuration value HTTPListenAddress is missing")
 	}
 	return nil
+}
+
+func (c *Config) Name() string {
+	return "proxy"
+}
+
+func (c *Config) SetDefaultValues() error {
+	err := c.SequencerURL.UnmarshalText([]byte("http://127.0.0.1:8555/"))
+	if err != nil {
+		return err
+	}
+	err = c.CollatorURL.UnmarshalText([]byte("http://127.0.0.1:3000/"))
+	if err != nil {
+		return err
+	}
+	c.HTTPListenAddress = ":3001"
+	return nil
+}
+
+func (c *Config) SetExampleValues() error {
+	return c.SetDefaultValues()
+}
+
+func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
+	return 0, nil
 }
 
 type JSONRPCProxy struct {
@@ -80,10 +108,11 @@ func (p *JSONRPCProxy) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	p.SelectReverseProxy(rpcreq.Method).ServeHTTP(w, r)
 }
 
-func Run(ctx context.Context, config Config) error {
+// TODO also use the service interface here.
+func Run(ctx context.Context, config *Config) error {
 	p := JSONRPCProxy{
-		collator:  httputil.NewSingleHostReverseProxy(config.CollatorURL),
-		sequencer: httputil.NewSingleHostReverseProxy(config.SequencerURL),
+		collator:  httputil.NewSingleHostReverseProxy(config.CollatorURL.URL),
+		sequencer: httputil.NewSingleHostReverseProxy(config.SequencerURL.URL),
 	}
 	router := chi.NewRouter()
 	router.Post("/*", p.HandleRequest)

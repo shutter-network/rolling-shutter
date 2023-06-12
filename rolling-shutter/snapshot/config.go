@@ -1,29 +1,32 @@
 package snapshot
 
 import (
-	"crypto/ecdsa"
 	"io"
-	"text/template"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mitchellh/mapstructure"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
-type Config struct {
-	ListenAddresses          []multiaddr.Multiaddr
-	CustomBootstrapAddresses []peer.AddrInfo
+var _ configuration.Config = &Config{}
 
-	EthereumURL    string
-	DatabaseURL    string
-	SnapshotHubURL string
+func NewConfig() *Config {
+	c := &Config{}
+	c.Init()
+	return c
+}
+
+func (c *Config) Init() {
+	c.P2P = p2p.NewConfig()
+	c.Ethereum = configuration.NewEthnodeConfig()
+}
+
+type Config struct {
+	InstanceID     uint64 `shconfig:",required"`
+	DatabaseURL    string `shconfig:",required"`
+	SnapshotHubURL string `shconfig:",required"`
 
 	JSONRPCHost string
 	JSONRPCPort uint16
@@ -32,78 +35,45 @@ type Config struct {
 	MetricsHost    string
 	MetricsPort    uint16
 
-	EthereumKey *ecdsa.PrivateKey
-	P2PKey      p2pcrypto.PrivKey
-
-	InstanceID uint64
+	P2P      *p2p.Config
+	Ethereum *configuration.EthnodeConfig
 }
 
-const configTemplate = `# Shutter snapshot config
-# Ethereum address: {{ .EthereumAddress }}
-# Peer identity: /p2p/{{ .P2PKey | P2PKeyPublic}}
-
-EthereumURL     = "{{ .EthereumURL }}"
-
-# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
-# If it's empty, we use the standard PG* environment variables
-DatabaseURL     = "{{ .DatabaseURL }}"
-
-# Snapshot integration
-SnapshotHubURL       = "{{ .SnapshotHubURL }}"
-
-# JSONRPC configuration
-JSONRPCHost     = "{{ .JSONRPCHost }}"
-JSONRPCPort     = {{ .JSONRPCPort }}
-
-# Metrics configuration
-MetricsEnabled  = {{ .MetricsEnabled }}
-MetricsHost     = "{{ .MetricsHost }}"
-MetricsPort     = {{ .MetricsPort }}
-
-# p2p configuration
-ListenAddresses   = [{{ .ListenAddresses | QuoteList}}]
-CustomBootstrapAddresses  = [{{ .CustomBootstrapAddresses | ToMultiAddrList | QuoteList}}]
-
-# Secret Keys
-EthereumKey     = "{{ .EthereumKey | FromECDSA | printf "%x" }}"
-P2PKey          = "{{ .P2PKey | P2PKey}}"
-
-InstanceID = {{ .InstanceID }}
-`
-
-var tmpl *template.Template = medley.MustBuildTemplate("snapshot", configTemplate)
-
-func (config *Config) WriteTOML(w io.Writer) error {
-	return tmpl.Execute(w, config)
-}
-
-// Unmarshal unmarshals a SnapshotConfig from the given Viper object.
-func (config *Config) Unmarshal(v *viper.Viper) error {
-	err := v.Unmarshal(
-		config,
-		viper.DecodeHook(
-			mapstructure.ComposeDecodeHookFunc(
-				medley.MultiaddrHook,
-				medley.P2PKeyHook,
-				medley.StringToEcdsaPrivateKey,
-				mapstructure.StringToTimeDurationHookFunc(),
-				medley.AddrInfoHook,
-			),
-		),
-	)
-	if err != nil {
-		return err
-	}
-	if config.EthereumKey == nil {
-		return errors.Errorf("EthereumKey is missing")
-	}
+func (c *Config) Validate() error {
 	return nil
 }
 
-func (config *Config) EthereumAddress() common.Address {
-	return ethcrypto.PubkeyToAddress(config.EthereumKey.PublicKey)
+func (c *Config) Name() string {
+	return "snapshot"
 }
 
-func (config *Config) GetInstanceID() uint64 {
-	return config.InstanceID
+func (c *Config) SetDefaultValues() error {
+	// overwrite the child config's usual default value
+	c.Ethereum.EthereumURL = "http://[::1]:8545/"
+	c.JSONRPCHost = ""
+	c.JSONRPCPort = 8754
+	c.MetricsEnabled = false
+	c.MetricsHost = "127.0.0.1"
+	c.MetricsPort = 9191
+	return nil
+}
+
+func (c *Config) SetExampleValues() error {
+	err := c.SetDefaultValues()
+	if err != nil {
+		return err
+	}
+	listenAddr, err := multiaddr.NewMultiaddr("/ip6/::1/tcp/2000")
+	if err != nil {
+		return err
+	}
+	// overwrite the child config's usual example value
+	c.P2P.ListenAddresses = []*address.P2PAddress{{Multiaddr: listenAddr}}
+	c.InstanceID = 42
+	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter_snapshot"
+	return nil
+}
+
+func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
+	return 0, nil
 }
