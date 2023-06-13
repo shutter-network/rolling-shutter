@@ -52,7 +52,7 @@ func GetRequiredRecursive(root Config) map[string]any {
 		if n.isBranch {
 			return nil
 		}
-		opts := extractTags(n.field)
+		opts := extractTags(n.fieldType)
 		if opts.required {
 			required[n.path] = true
 		}
@@ -62,14 +62,36 @@ func GetRequiredRecursive(root Config) map[string]any {
 	return required
 }
 
-func SetDefaultValuesRecursive(root Config) error {
+func SetDefaultValuesRecursive(root Config, excludePaths []string) error {
+	exPth := map[string]bool{}
+	for _, p := range excludePaths {
+		exPth[p] = true
+	}
 	execFn := func(n *node) error {
-		if !n.isBranch {
+		_, excluded := exPth[n.path]
+		if !n.isBranch || excluded {
 			return nil
 		}
 		return n.config.SetDefaultValues()
 	}
-	return traverseRecursive(root, execFn)
+	// since parent nodes are executed after child nodes,
+	// we need a second pass to reset excluded fields.
+	// this is not efficient, but ok for config parsing
+	execFnResetExcluded := func(n *node) error {
+		_, excluded := exPth[n.path]
+		if !n.isBranch && excluded {
+			if n.fieldValue.CanSet() {
+				n.fieldValue.SetZero()
+			}
+			return nil
+		}
+		return nil
+	}
+	err := traverseRecursive(root, execFn)
+	if err != nil {
+		return err
+	}
+	return traverseRecursive(root, execFnResetExcluded)
 }
 
 func SetExampleValuesRecursive(root Config) error {
@@ -92,7 +114,7 @@ func GetEnvironmentVarsRecursive(root Config) map[string][]string {
 			// this is the old naming scheme, without the sub-config
 			// qualifiers ("P2P", "ETHEREUM") and with a subcommand specific
 			// prefix (e.g. KEYPER_CUSTOMBOOTSTRAPADDRESSES)
-			strings.ToUpper(root.Name() + "_" + n.field.Name),
+			strings.ToUpper(root.Name() + "_" + n.fieldType.Name),
 
 			// full path with a generic prefix not dependend on the
 			// subcommand executed
@@ -137,7 +159,8 @@ type (
 		previousNodes []*node
 		path          string
 		config        Config
-		field         *reflect.StructField
+		fieldType     *reflect.StructField
+		fieldValue    *reflect.Value
 	}
 )
 
@@ -151,7 +174,7 @@ func traverseRecursive(root Config, exec execFunc) error {
 		previousNodes: []*node{},
 		config:        root,
 		path:          "",
-		field:         nil,
+		fieldType:     nil,
 	}
 	err := execRecursive(rootNode, exec, stopNever)
 	if err != nil {
@@ -160,7 +183,7 @@ func traverseRecursive(root Config, exec execFunc) error {
 	return nil
 }
 
-// stopAfterTopLevel executes only root and the root's child nodes
+// stopAfterTopLevel executes only root and the root's child nodes.
 func stopAfterTopLevel(n *node) bool {
 	return len(n.previousNodes) > 2
 }
@@ -214,7 +237,8 @@ func execRecursive(n *node, exec execFunc, stop stopFunc) *execErr {
 				previousNodes: newPath,
 				path:          nextPath,
 				config:        n.config,
-				field:         &structField,
+				fieldType:     &structField,
+				fieldValue:    &fld,
 			}
 			fieldVal := fld.Interface()
 			nestedConfigVal, isNestedConfig := fieldVal.(Config)

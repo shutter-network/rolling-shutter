@@ -87,7 +87,9 @@ func ParseCLI(v *viper.Viper, cmd *cobra.Command, config configuration.Config) e
 // have to be native types or implement the encoding.TextUnmarshaler
 // interface.
 func ParseViper(v *viper.Viper, config configuration.Config) error {
-	err := configuration.SetDefaultValuesRecursive(config)
+	// set the default values recursively for all configuration options
+	// the user did not provide by any means
+	err := configuration.SetDefaultValuesRecursive(config, v.AllKeys())
 	if err != nil {
 		return err
 	}
