@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -121,7 +122,7 @@ func generateConfig() error {
 	if err != nil {
 		return err
 	}
-	return medley.SecureSpit(outputFile, buf.Bytes())
+	return medley.SecureSpit(afero.NewOsFs(), outputFile, buf.Bytes())
 }
 
 func main() error {

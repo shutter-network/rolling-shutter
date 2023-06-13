@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -63,7 +64,7 @@ func generateConfig() error {
 	if err != nil {
 		return err
 	}
-	return medley.SecureSpit(outputFile, buf.Bytes())
+	return medley.SecureSpit(afero.NewOsFs(), outputFile, buf.Bytes())
 }
 
 func generateConfigCmd() *cobra.Command {
