@@ -18,14 +18,12 @@ import (
 )
 
 var (
-	logNoColorArg      bool
-	ArgNameNocolor     string = "no-color"
-	logFormatArg       string
-	ArgNameLogformat   string = "logformat"
-	logLevelArg        string
-	ArgNameLoglevel    string = "loglevel"
-	environmentArg     string
-	ArgNameEnvironment string = "environment"
+	logNoColorArg    bool
+	ArgNameNocolor   string = "no-color"
+	logFormatArg     string
+	ArgNameLogformat string = "logformat"
+	logLevelArg      string
+	ArgNameLoglevel  string = "loglevel"
 )
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
@@ -157,12 +155,6 @@ func Cmd() *cobra.Command {
 		ArgNameLoglevel,
 		"info",
 		"set log level, possible values:  warn, info, debug",
-	)
-	cmd.PersistentFlags().StringVar(
-		&environmentArg,
-		ArgNameEnvironment,
-		"production",
-		"set the environment, possible values:  production, staging, local",
 	)
 	return cmd
 }
