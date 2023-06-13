@@ -9,6 +9,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -59,7 +60,9 @@ func Cmd() *cobra.Command {
 			if err != nil {
 				return errors.WithMessage(err, "Please check your configuration")
 			}
-			log.Debug().Str("env-in-cfg", config.Environment.String()).Msg("got deserialized config")
+			log.Debug().
+				Str("env-in-cfg", config.Environment.String()).
+				Msg("got deserialized config")
 			return main(config)
 		},
 	}
@@ -117,8 +120,12 @@ func exampleConfig() (*p2pnode.Config, error) {
 		ListenAddresses: defaultListenAddrs,
 		// use the default ones for that environment when empty
 		CustomBootstrapAddresses: []peer.AddrInfo{
-			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
-			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+			p2p.MustAddrInfo(
+				"/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg",
+			),
+			p2p.MustAddrInfo(
+				"/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP",
+			),
 		},
 		Environment: p2p.Staging,
 	}
@@ -139,5 +146,5 @@ func generateConfig() error {
 	if err = cfg.WriteTOML(buf); err != nil {
 		return errors.Wrap(err, "failed to write p2pnode config file")
 	}
-	return medley.SecureSpit(outputFile, buf.Bytes())
+	return medley.SecureSpit(afero.NewOsFs(), outputFile, buf.Bytes())
 }

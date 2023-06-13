@@ -12,6 +12,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -158,8 +159,12 @@ func exampleConfig() (*snapshot.Config, error) {
 			p2p.MustMultiaddr("/ip4/127.0.0.1/tcp/2000"),
 		},
 		CustomBootstrapAddresses: []peer.AddrInfo{
-			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg"),
-			p2p.MustAddrInfo("/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP"),
+			p2p.MustAddrInfo(
+				"/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg",
+			),
+			p2p.MustAddrInfo(
+				"/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP",
+			),
 		},
 		DatabaseURL: "postgres://localhost:5432/shutter_snapshot",
 
@@ -184,7 +189,7 @@ func generateConfig() error {
 	if err != nil {
 		return err
 	}
-	return medley.SecureSpit(outputFile, buf.Bytes())
+	return medley.SecureSpit(afero.NewOsFs(), outputFile, buf.Bytes())
 }
 
 func main() error {
