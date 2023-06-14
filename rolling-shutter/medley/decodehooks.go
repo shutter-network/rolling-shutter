@@ -3,21 +3,22 @@ package medley
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"encoding"
 	"encoding/hex"
 	"fmt"
 	"net/url"
 	"reflect"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mitchellh/mapstructure"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 )
 
 // MultiaddrHook is a mapstructure decode hook for multiaddrs.
@@ -75,7 +76,62 @@ func StringToURL(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 	return url.Parse(data.(string))
 }
 
-func StringToEd25519PublicKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+func TextUnmarshalerHook(from reflect.Value, to reflect.Value) (interface{}, error) {
+	data := from.Interface()
+	if from.Kind() != reflect.String {
+		return data, nil
+	}
+	// create new instance
+	toNew := reflect.New(to.Type())
+	resultPtr := toNew.Interface()
+	umshl, ok := resultPtr.(encoding.TextUnmarshaler)
+	if !ok {
+		return data, nil
+	}
+	err := umshl.UnmarshalText([]byte(data.(string)))
+	if err != nil {
+		return nil, err
+	}
+	if to.Kind() == reflect.Pointer {
+		return umshl, nil
+	}
+	// if to type is no ptr type,
+	// return the element
+	return toNew.Elem().Interface(), nil
+}
+
+func TextMarshalerHook(from reflect.Value, to reflect.Value) (interface{}, error) {
+	if from.Kind() == reflect.Ptr {
+		from = from.Elem()
+	}
+
+	data := from.Interface()
+	if to.Kind() != reflect.String {
+		return data, nil
+	}
+	fromType := from.Type()
+	result := reflect.New(fromType).Interface()
+	_, ok := result.(encoding.TextMarshaler)
+	if !ok {
+		return data, nil
+	}
+
+	marshaller, ok := data.(encoding.TextMarshaler)
+	if !ok {
+		return data, nil
+	}
+	mshl, err := marshaller.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return string(mshl), nil
+}
+
+func StringToEd25519PublicKey(
+	f reflect.Type,
+	t reflect.Type,
+	data interface{},
+) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PublicKey{}) {
 		return data, nil
 	}
@@ -89,7 +145,11 @@ func StringToEd25519PublicKey(f reflect.Type, t reflect.Type, data interface{}) 
 	return ed25519.PublicKey(p), nil
 }
 
-func StringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+func StringToEd25519PrivateKey(
+	f reflect.Type,
+	t reflect.Type,
+	data interface{},
+) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(ed25519.PrivateKey{}) {
 		return data, nil
 	}
@@ -98,35 +158,42 @@ func StringToEd25519PrivateKey(f reflect.Type, t reflect.Type, data interface{})
 		return nil, err
 	}
 	if len(seed) != ed25519.SeedSize {
-		return nil, errors.Errorf("invalid seed length %d (must be %d)", len(seed), ed25519.SeedSize)
+		return nil, errors.Errorf(
+			"invalid seed length %d (must be %d)",
+			len(seed),
+			ed25519.SeedSize,
+		)
 	}
 	return ed25519.NewKeyFromSeed(seed), nil
 }
 
 func StringToEnvironment(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f.Kind() != reflect.String || t != reflect.TypeOf(p2p.Staging) {
+	if f.Kind() != reflect.String || t != reflect.TypeOf(env.EnvironmentStaging) {
 		return data, nil
 	}
-	switch data.(string) {
-	case strings.ToLower(p2p.Staging.String()):
-		return p2p.Staging, nil
-	case strings.ToLower(p2p.Production.String()):
-		return p2p.Production, nil
-	case strings.ToLower(p2p.Local.String()):
-		return p2p.Local, nil
-	default:
-		return nil, errors.Errorf("unknown environment %s", data.(string))
+	result, err := env.ParseEnvironment(data.(string))
+	if err != nil {
+		return nil, err
 	}
+	return result, nil
 }
 
-func StringToEcdsaPrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+func StringToEcdsaPrivateKey(
+	f reflect.Type,
+	t reflect.Type,
+	data interface{},
+) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(&ecdsa.PrivateKey{}) {
 		return data, nil
 	}
 	return crypto.HexToECDSA(data.(string))
 }
 
-func StringToEciesPrivateKey(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+func StringToEciesPrivateKey(
+	f reflect.Type,
+	t reflect.Type,
+	data interface{},
+) (interface{}, error) {
 	if f.Kind() != reflect.String || t != reflect.TypeOf(&ecies.PrivateKey{}) {
 		return data, nil
 	}
@@ -149,4 +216,36 @@ func StringToAddress(f reflect.Type, t reflect.Type, data interface{}) (interfac
 		return nil, fmt.Errorf("not a checksummed address: %s", ds)
 	}
 	return addr, nil
+}
+
+func mapstructureDecode(input, result any, hookFunc mapstructure.DecodeHookFunc) error {
+	decoder, err := mapstructure.NewDecoder(
+		&mapstructure.DecoderConfig{
+			Result:     result,
+			DecodeHook: hookFunc,
+		})
+	if err != nil {
+		return err
+	}
+	return decoder.Decode(input)
+}
+
+func MapstructureMarshal(input, result any) error {
+	return mapstructureDecode(
+		input,
+		result,
+		mapstructure.ComposeDecodeHookFunc(
+			TextMarshalerHook,
+		),
+	)
+}
+
+func MapstructureUnmarshal(input, result any) error {
+	return mapstructureDecode(
+		input,
+		result,
+		mapstructure.ComposeDecodeHookFunc(
+			TextUnmarshalerHook,
+		),
+	)
 }
