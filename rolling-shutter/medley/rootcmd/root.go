@@ -121,8 +121,9 @@ func setupLogging() (zerolog.Logger, error) {
 
 func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Version:      shversion.Version(),
-		SilenceUsage: true,
+		Version:           shversion.Version(),
+		SilenceUsage:      true,
+		DisableAutoGenTag: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := medley.BindFlags(cmd)
 			if err != nil {

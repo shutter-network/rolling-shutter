@@ -2,3 +2,4 @@ node_modules/
 /contracts/artifacts/
 /contracts/combined.json
 /contracts/cache/
+/rolling-shutter/docs/
