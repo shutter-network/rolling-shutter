@@ -49,13 +49,16 @@ clean:
 install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
-install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer
+install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer install-go-enum
 
 install-npm:
 	cd ../contracts && npm install
 
 install-sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.1
+
+install-go-enum:
+	${GO} install github.com/abice/go-enum@v0.5.6
 
 install-abigen:
 	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.10.26
