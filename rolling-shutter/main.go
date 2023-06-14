@@ -42,5 +42,5 @@ func cmd() *cobra.Command {
 }
 
 func main() {
-	rootcmd.Main(cmd())
+	rootcmd.Main(cmd.Command())
 }

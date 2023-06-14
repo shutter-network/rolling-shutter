@@ -36,6 +36,9 @@ test: test-unit
 
 test-all: test-unit test-integration
 
+docs:
+	${GO} run -C docs gendocs.go
+
 generate: install-codegen-tools
 	${GO} generate -x ./...
 
@@ -49,7 +52,7 @@ clean:
 install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
-install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer install-go-enum
+install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer install-go-enum install-cobra
 
 install-npm:
 	cd ../contracts && npm install
@@ -104,4 +107,4 @@ lint-changes:
 abigen:
 	go generate -x ./contract
 
-.PHONY: build clean test test-all test-unit test-integration generate install-codegen-tools install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy
+.PHONY: build clean docs test test-all test-unit test-integration generate install-codegen-tools install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy

@@ -26,6 +26,10 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
+        exclude: |
+          (?x)(
+              ^rolling-shutter/docs/.*\.md$|
+          )
       - id: trailing-whitespace
 
   - repo: https://github.com/pre-commit/mirrors-prettier
