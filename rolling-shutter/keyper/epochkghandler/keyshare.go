@@ -146,7 +146,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.String()).
+	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.LogInfo()).
 		Msg("broadcasting decryption key")
 	return []p2pmsg.Message{message}, nil
 }

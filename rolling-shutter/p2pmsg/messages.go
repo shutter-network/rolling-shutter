@@ -78,7 +78,7 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 
 func (trigger *DecryptionTrigger) LogInfo() string {
 	epochID, _ := epochid.BytesToEpochID(trigger.EpochID)
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochID.String())
+	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", epochID.String())
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -119,7 +119,7 @@ func (share *DecryptionKeyShares) Validate() error {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
+	return fmt.Sprintf("DecryptionKey{epochid=%x}", key.EpochID)
 }
 
 func (*DecryptionKey) Topic() string {
@@ -156,7 +156,7 @@ func (*EonPublicKey) Validate() error {
 
 func (timedEpoch *TimedEpoch) LogInfo() string {
 	return fmt.Sprintf(
-		"TimedEpoch{id=%d, notBefore=%d}",
+		"TimedEpoch{id=%x, notBefore=%d}",
 		timedEpoch.EpochID,
 		timedEpoch.NotBefore,
 	)
