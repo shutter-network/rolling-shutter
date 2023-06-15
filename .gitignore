@@ -3,3 +3,4 @@
 .lsp
 log
 node_modules
+docker/data

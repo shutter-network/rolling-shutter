@@ -32,7 +32,7 @@ services:
     command: >
       --datadir /data
       --dev
-      --dev.period 15
+      --dev.period 6
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
