@@ -31,7 +31,7 @@ type DecryptionKeyHandler struct {
 }
 
 func NewEonPublicKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
-	return &EonPublicKeyHandler{config: config, snapshot: snapshot}
+	return &EonPublicKeyHandler{config: config, snapshot: snapshot, dbpool: snapshot.dbpool}
 }
 
 type EonPublicKeyHandler struct {
