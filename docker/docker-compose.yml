@@ -60,6 +60,7 @@ services:
       - chain
     volumes:
       - ./data/chain:/chain
+      - ./config/priv_validator_key.json:/data/chain/config/priv_validator_key.json:ro
       - ./data/deployments:/deployments
     command: "--config /chain/config/config.toml"
     depends_on:
