@@ -112,7 +112,8 @@ func (snp *Snapshot) setupP2PHandler() {
 	snp.p2p.AddMessageHandler(
 		NewEonPublicKeyHandler(snp.Config, snp),
 		NewDecryptionKeyHandler(snp.Config, snp),
-		NewTimedEpochHandler(snp.Config, snp),
+		// We need the decryption trigger handler in order to be subscribed to the topic mesh.
+		NewDecryptionTriggerHandler(),
 	)
 }
 

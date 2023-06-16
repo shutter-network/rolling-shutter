@@ -12,15 +12,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
-func NewTimedEpochHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
-	return &TimedEpochHandler{config: config, snapshot: snapshot}
-}
-
-type TimedEpochHandler struct {
-	config   Config
-	snapshot *Snapshot
-}
-
 func NewDecryptionKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
 	return &DecryptionKeyHandler{config: config, snapshot: snapshot}
 }
@@ -40,9 +31,11 @@ type EonPublicKeyHandler struct {
 	dbpool   *pgxpool.Pool
 }
 
-func (*TimedEpochHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
+func NewDecryptionTriggerHandler() p2p.MessageHandler {
+	return &DecryptionTriggerHandler{}
 }
+
+type DecryptionTriggerHandler struct{}
 
 func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
@@ -50,6 +43,10 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (*EonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.EonPublicKey{}}
+}
+
+func (d *DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
+	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
@@ -70,11 +67,6 @@ func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pm
 		return false, errors.Wrap(err, "failed to encode decryption key")
 	}
 
-	return true, nil
-}
-
-func (handler *TimedEpochHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
-	// FIXME: add TimedEpoch validation
 	return true, nil
 }
 
@@ -142,8 +134,12 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 	return nil, nil
 }
 
-func (handler *TimedEpochHandler) HandleMessage(_ context.Context, _ p2pmsg.Message) ([]p2pmsg.Message, error) {
-	var result []p2pmsg.Message
-	// FIXME: add TimedEpoch handling logic
-	return result, nil
+func (d *DecryptionTriggerHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) (bool, error) {
+	log.Printf("Validating decryptionTrigger")
+	return true, nil
+}
+
+func (d *DecryptionTriggerHandler) HandleMessage(_ context.Context, _ p2pmsg.Message) ([]p2pmsg.Message, error) {
+	log.Printf("Ignoring decryptionTrigger")
+	return nil, nil
 }
