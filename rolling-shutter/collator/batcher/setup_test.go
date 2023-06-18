@@ -54,7 +54,7 @@ func (r *DiffReporter) String() string {
 	return strings.Join(r.diffs, "\n")
 }
 
-func assertEqual(t *testing.T, cancel func(error), x, y any, opts ...gocmp.Option) { //nolint:unparam
+func assertEqual(t *testing.T, cancel func(error), x, y any, opts ...gocmp.Option) {
 	t.Helper()
 	rep := &DiffReporter{}
 	opts = append(opts, gocmp.Reporter(rep))

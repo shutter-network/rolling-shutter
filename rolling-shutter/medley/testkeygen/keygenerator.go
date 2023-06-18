@@ -22,6 +22,7 @@ type TestKeyGenerator struct {
 }
 
 func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64) *TestKeyGenerator {
+	t.Helper()
 	return &TestKeyGenerator{
 		t:           t,
 		eonInterval: 100, // 0 stands for infinity

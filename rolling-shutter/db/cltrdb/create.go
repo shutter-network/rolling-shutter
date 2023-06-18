@@ -40,6 +40,6 @@ func InitDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 }
 
 // ValidateDB checks that the database schema is compatible.
-func ValidateDB(ctx context.Context, db DBTX) error {
-	return metadb.ValidateSchemaVersion(ctx, db, schemaVersion)
+func ValidateDB(ctx context.Context, dbtx DBTX) error {
+	return metadb.ValidateSchemaVersion(ctx, dbtx, schemaVersion)
 }

@@ -124,20 +124,21 @@ func (s *L1Service) listenAndServe(ctx context.Context) error {
 	return mocksequencer.RPCListenAndServe(ctx, rpcServer, s.URL, make(<-chan error))
 }
 
-func NewFixtures(ctx context.Context, numSenders int, serveHTTP bool) (fx *Fixtures, err error) {
+func NewFixtures(ctx context.Context, numSenders int, serveHTTP bool) (*Fixtures, error) {
+	var err error
 	chainID := big.NewInt(42)
 	signer := txtypes.NewLondonSigner(chainID)
-	fx = &Fixtures{
+	fx := &Fixtures{
 		Signer:  signer,
 		ChainID: chainID,
 	}
 	fx.KeyEnvironment, err = encoding.NewEonKeyEnvironment()
 	if err != nil {
-		return
+		return nil, err
 	}
 	fx.PrivkeyCollator, err = ethcrypto.GenerateKey()
 	if err != nil {
-		return
+		return nil, err
 	}
 	fx.AddressCollator = ethcrypto.PubkeyToAddress(fx.PrivkeyCollator.PublicKey)
 
@@ -148,14 +149,14 @@ func NewFixtures(ctx context.Context, numSenders int, serveHTTP bool) (fx *Fixtu
 		var p *ecdsa.PrivateKey
 		p, err = ethcrypto.GenerateKey()
 		if err != nil {
-			return
+			return nil, err
 		}
 		fx.PrivkeySenders[i] = p
 		fx.AddressSenders[i] = ethcrypto.PubkeyToAddress(p.PublicKey)
 	}
 	eonPubKey, err := fx.KeyEnvironment.EonPublicKey().GobEncode()
 	if err != nil {
-		return fx, err
+		return nil, err
 	}
 
 	// right now the tests will fail if any of those ports

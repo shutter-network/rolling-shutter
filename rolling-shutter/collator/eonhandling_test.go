@@ -130,7 +130,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	ctx := context.Background()
 	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
 	defer closedb()
-	config := newTestConfig(t)
+	testConfig := newTestConfig(t)
 	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2)
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
 
@@ -152,7 +152,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 
 	// Insert pubkey with not enough signatures
 	keypersNoThreshold := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:        config.InstanceID,
+		instanceID:        testConfig.InstanceID,
 		eon:               1,
 		keyperConfigIndex: uint64(0),
 		activationBlock:   activationBlockNoThreshold,
@@ -165,7 +165,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	// Insert pubkeys with enough signatures and new key / keyperConfigIndex / keyperset
 	// but same activation-block
 	keypersBefore := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:        config.InstanceID,
+		instanceID:        testConfig.InstanceID,
 		eon:               2,
 		keyperConfigIndex: uint64(1),
 		activationBlock:   activationBlockBefore,
@@ -176,7 +176,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	assert.Check(t, len(keypersBefore) > 0)
 
 	keypers := setupEonKeys(ctx, t, dbpool, setupEonKeysParams{
-		instanceID:        config.InstanceID,
+		instanceID:        testConfig.InstanceID,
 		eon:               3,
 		keyperConfigIndex: uint64(2),
 		activationBlock:   activationBlock,
@@ -186,7 +186,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	})
 	assert.Check(t, len(keypers) > 0)
 
-	var handler p2p.MessageHandler = &eonPublicKeyHandler{dbpool: dbpool, config: config}
+	var handler p2p.MessageHandler = &eonPublicKeyHandler{dbpool: dbpool, config: testConfig}
 
 	for _, k := range keypersBefore {
 		p2ptest.MustHandleMessage(t, handler, ctx, k.msg)
