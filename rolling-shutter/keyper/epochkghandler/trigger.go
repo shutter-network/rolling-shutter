@@ -58,7 +58,10 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 
 	signatureValid, err := p2pmsg.VerifySignature(trigger, collator)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %d", trigger.EpochID)
+		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %x", trigger.EpochID)
+	}
+	if !signatureValid {
+		return false, errors.Errorf("decryption trigger signature invalid for epoch: %x", trigger.EpochID)
 	}
 	return signatureValid, nil
 }
@@ -68,7 +71,7 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	if !ok {
 		return nil, errors.New("Message type assertion mismatch")
 	}
-	log.Info().Str("message", msg.String()).Msg("received decryption trigger")
+	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err

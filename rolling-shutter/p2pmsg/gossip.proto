@@ -59,9 +59,3 @@ message Envelope {
     google.protobuf.Any message = 2;
     optional TraceContext trace = 3;
 }
-
-message TimedEpoch {
-    uint64 instanceID = 1;
-    bytes epochID = 2;
-    uint64 notBefore = 3;
-}

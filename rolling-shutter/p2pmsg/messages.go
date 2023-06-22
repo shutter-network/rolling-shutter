@@ -12,7 +12,6 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snptopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
@@ -78,7 +77,7 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 
 func (trigger *DecryptionTrigger) LogInfo() string {
 	epochID, _ := epochid.BytesToEpochID(trigger.EpochID)
-	return fmt.Sprintf("DecryptionTrigger{epochid=%s}", epochID.String())
+	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", epochID.String())
 }
 
 func (*DecryptionTrigger) Topic() string {
@@ -119,7 +118,7 @@ func (share *DecryptionKeyShares) Validate() error {
 }
 
 func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%s}", key.EpochID)
+	return fmt.Sprintf("DecryptionKey{epochid=%x}", key.EpochID)
 }
 
 func (*DecryptionKey) Topic() string {
@@ -151,25 +150,5 @@ func (*EonPublicKey) Topic() string {
 }
 
 func (*EonPublicKey) Validate() error {
-	return nil
-}
-
-func (timedEpoch *TimedEpoch) LogInfo() string {
-	return fmt.Sprintf(
-		"TimedEpoch{id=%d, notBefore=%d}",
-		timedEpoch.EpochID,
-		timedEpoch.NotBefore,
-	)
-}
-
-func (*TimedEpoch) Topic() string {
-	return snptopics.TimedEpoch
-}
-
-func (timedEpoch *TimedEpoch) Validate() error {
-	epochID := timedEpoch.GetEpochID()
-	if epochID == nil {
-		return errors.Errorf("EpochID is not set")
-	}
 	return nil
 }

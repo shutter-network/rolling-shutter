@@ -1,0 +1,13 @@
+# Shutter  p2p node config
+# Peer role: bootstrap
+# Peer identity: /p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo
+
+# p2p configuration
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+
+# Secret Keys
+PrivateKey          = "CAESQCywBzANmzk2gFd63qkQ8+PlZzy/IqK9Wuv5d6FB1cYh+SggYvQ9pBD5FPLqTbc7garDqgQUJz/6Gpi6Ssbcx44="

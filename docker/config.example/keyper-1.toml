@@ -12,19 +12,16 @@ DatabaseURL		= "postgres://postgres@db:5432/keyper-1"
 DKGPhaseLength		= 8
 
 # p2p configuration
-ListenAddress	= "/ip4/0.0.0.0/tcp/23000"
-PeerMultiaddrs	= [
-    "/dns4/keyper-0/tcp/23000/p2p/12D3KooWLdS3Lzh5PQ7e3VP1LBr6X6V1vHJV5gxGHU4TzpN1KvQ4",
-    "/dns4/keyper-1/tcp/23000/p2p/12D3KooWShNYN3ZfSiTWGq5TYK9cFkf8SBUQ7aL9dgPiWKcCNc8m",
-    "/dns4/keyper-2/tcp/23000/p2p/12D3KooWGm7rNjmx4TTCuCdPnj2tXhfPCXxyLwdRJSFZuRxTfbWg",
-    "/dns4/snapshot/tcp/23000/p2p/12D3KooWHnFiZQmrMDYfyMJtrubcX4NhHvTgdbTTc5KmZLyKimhY",
-    "/dns4/collator/tcp/23000/p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj"
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 
 # Secret Keys
 EncryptionKey	= "cea283bae6753e58668be7984ba301d80e3c65bb4dd98a25b8719bafa83431c9"
 SigningKey	= "59a707ab3c1a5d85aad03302467fdb05715bbcd23be4a02375b91a0b30bf30f1"
-ValidatorSeed	= "05124392f5571cd80f93ff12b7acbafbebb7592877dad00aaf8d9cda0b9b7192"
+ValidatorPublicKey	= "32e9b4b95033bb914250f708281b377b6cbbb62f60fc17ab51ee9bbf693d28c9"
 P2PKey          = "CAESQFjNOcIGvYpaZMnnWsGkX0v7SG79qEoWNmEHTT8fTJ/s+swIlp/XCoSDnh5hlpbeGdDu04Tg5PIUIcH9Xj7ZmYY="
 
 # HTTP interface
