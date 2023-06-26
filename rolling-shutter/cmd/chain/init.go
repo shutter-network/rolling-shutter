@@ -4,6 +4,7 @@ package chain
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -177,6 +178,14 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 			Str("stateFile", privValStateFile).
 			Msg("Generated private validator")
 	}
+
+	validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
+	validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
+	err = os.WriteFile(validatorPubKeyPath, []byte(validatorPublicKeyHex), 0o644)
+	if err != nil {
+		return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
+	}
+	log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
 
 	nodeKeyFile := tendermintConfig.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
