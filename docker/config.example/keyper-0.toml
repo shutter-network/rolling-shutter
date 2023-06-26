@@ -2,7 +2,7 @@
 # Ethereum address: 0x312Ce8a364eF6785bBf47d612D1C4205E0Ba7243
 # Peer identity: /p2p/12D3KooWLdS3Lzh5PQ7e3VP1LBr6X6V1vHJV5gxGHU4TzpN1KvQ4
 
-ShuttermintURL		= "http://chain:26657"
+ShuttermintURL		= "http://chain-0:26657"
 EthereumURL         = "http://geth:8545/"
 DeploymentDir       = "./deployments/dockerGeth/"
 

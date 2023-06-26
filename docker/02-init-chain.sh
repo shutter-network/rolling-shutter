@@ -10,30 +10,39 @@ fi
 
 $DC stop geth
 $DC rm -f geth
-$DC stop chain
-$DC rm -f chain
+$DC stop chain-{0..2}
+$DC rm -f chain-{0..2}
 
 rm -rf data/geth
-rm -rf data/chain
+rm -rf data/chain-{0..2}
+mkdir -p data/chain-{0..2}/config
 rm -rf data/deployments
 
 $DC up deploy-contracts  # has geth as dependency
 
-$DC run --rm --no-deps chain init \
+
+for num in 0 1 2; do
+cmd=chain-$num
+$DC run --rm --no-deps ${cmd} init \
   --root /chain \
   --genesis-keyper 0x440Dc6F164e9241F04d282215ceF2780cd0B755e \
-  --dev \
   --blocktime 5 \
   --listen-address tcp://0.0.0.0:26657
+sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/chain-${num}/config/priv_validator_pubkey.hex)\"" config/keyper-${num}.toml
+done
 
-$DC up -d chain
+$DC up -d chain-{0..2}
+
 echo "We need to wait for the chain to reach height >= 1"
 sleep 25
 echo "This will take a while..."
-$DC run --rm --no-deps --entrypoint /rolling-shutter chain bootstrap \
+
+for num in 0 1 2; do
+cmd=chain-$num
+$DC run --rm --no-deps --entrypoint /rolling-shutter ${cmd} bootstrap \
   --deployment-dir /deployments/dockerGeth \
   --ethereum-url http://geth:8545 \
-  --shuttermint-url http://chain:26657 \
+  --shuttermint-url http://$cmd:26657 \
   --signing-key 479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
-
-$DC stop geth chain
+done
+$DC stop geth chain-{0..2}

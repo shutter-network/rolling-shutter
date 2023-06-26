@@ -52,15 +52,44 @@ services:
         condition: service_healthy
     logging: *logging
 
-  chain:
+  chain-0:
     image: snapshutter
     restart: always
     entrypoint:
       - /rolling-shutter
       - chain
     volumes:
-      - ./data/chain:/chain
-      - ./config/priv_validator_key.json:/data/chain/config/priv_validator_key.json:ro
+      - ./data/chain-0:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      geth:
+        condition: service_healthy
+    logging: *logging
+
+  chain-1:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-1:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      geth:
+        condition: service_healthy
+    logging: *logging
+
+  chain-2:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-2:/chain
       - ./data/deployments:/deployments
     command: "--config /chain/config/config.toml"
     depends_on:
@@ -107,7 +136,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain:
+      chain-0:
+        condition: service_started
+      chain-1:
+        condition: service_started
+      chain-2:
         condition: service_started
       geth:
         condition: service_healthy
@@ -126,7 +159,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain:
+      chain-0:
+        condition: service_started
+      chain-1:
+        condition: service_started
+      chain-2:
         condition: service_started
       geth:
         condition: service_healthy
@@ -145,7 +182,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain:
+      chain-0:
         condition: service_started
       geth:
         condition: service_healthy
@@ -164,7 +201,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain:
+      chain-1:
         condition: service_started
       geth:
         condition: service_healthy
@@ -183,7 +220,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain:
+      chain-2:
         condition: service_started
       geth:
         condition: service_healthy
