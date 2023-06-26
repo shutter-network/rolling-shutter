@@ -196,7 +196,7 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 			return err
 		}
 		idpath := nodeKeyFile + ".id"
-		err = os.WriteFile(idpath, []byte(nodeid), 0o755)
+		err = os.WriteFile(idpath, []byte(nodeid), 0o644)
 		if err != nil {
 			return errors.Wrapf(err, "Could not write to %s", idpath)
 		}
