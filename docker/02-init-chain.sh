@@ -29,6 +29,11 @@ $DC run --rm --no-deps ${cmd} init \
   --blocktime 5 \
   --listen-address tcp://0.0.0.0:26657
 sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/chain-${num}/config/priv_validator_pubkey.hex)\"" config/keyper-${num}.toml
+if [ $num -eq 0 ];
+then
+    cp data/chain-0/config/genesis.json data/chain-1/config/
+    cp data/chain-0/config/genesis.json data/chain-2/config/
+fi
 done
 
 $DC up -d chain-{0..2}
@@ -37,7 +42,7 @@ echo "We need to wait for the chain to reach height >= 1"
 sleep 25
 echo "This will take a while..."
 
-for num in 0 1 2; do
+for num in 0; do
 cmd=chain-$num
 $DC run --rm --no-deps --entrypoint /rolling-shutter ${cmd} bootstrap \
   --deployment-dir /deployments/dockerGeth \
