@@ -36,7 +36,18 @@ then
 fi
 done
 
-$DC up -d chain-{0..2}
+bootstrap_peers=$(cat data/chain-0/config/node_key.json.id)@chain-0:26656
+for num in 1 2; do
+cmd=chain-$num
+bootstrap_peers=${bootstrap_peers},$(cat data/${cmd}/config/node_key.json.id)@${cmd}:26656
+done
+
+for num in 0 1 2; do
+  cmd=chain-$num
+  peers=$(echo ${bootstrap_peers}|cut -d',' -f $(( ((num + 1) % 3) + 1)),$(( ((num + 2) % 3) + 1)))
+  sed -i "/^persistent-peers =/c\persistent-peers = \"${peers}\"" data/${cmd}/config/config.toml
+  done
+$DC up -d chain-{0..2} keyper-{0..2}
 
 echo "We need to wait for the chain to reach height >= 1"
 sleep 25
@@ -50,4 +61,4 @@ $DC run --rm --no-deps --entrypoint /rolling-shutter ${cmd} bootstrap \
   --shuttermint-url http://$cmd:26657 \
   --signing-key 479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
 done
-$DC stop geth chain-{0..2}
+$DC stop -t 30 geth chain-{0..2}
