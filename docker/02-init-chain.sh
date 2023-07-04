@@ -26,7 +26,7 @@ cmd=chain-$num
 $DC run --rm --no-deps ${cmd} init \
   --root /chain \
   --genesis-keyper 0x440Dc6F164e9241F04d282215ceF2780cd0B755e \
-  --blocktime 5 \
+  --blocktime 1 \
   --listen-address tcp://0.0.0.0:26657
 sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/chain-${num}/config/priv_validator_pubkey.hex)\"" config/keyper-${num}.toml
 if [ $num -eq 0 ];
