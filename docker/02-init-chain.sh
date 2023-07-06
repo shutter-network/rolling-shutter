@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -xe
 
+BB="docker run --rm -v$(pwd)/data:/data -w / busybox"
 if docker compose ls >/dev/null 2>&1; then
   # compose v2
   DC="docker compose"
@@ -13,10 +14,10 @@ $DC rm -f geth
 $DC stop chain-{0..2}
 $DC rm -f chain-{0..2}
 
-rm -rf data/geth
-rm -rf data/chain-{0..2}
-mkdir -p data/chain-{0..2}/config
-rm -rf data/deployments
+${BB} rm -rf data/geth
+${BB} rm -rf data/chain-{0..2}
+${BB} mkdir -p data/chain-{0..2}/config
+${BB} rm -rf data/deployments
 
 $DC up deploy-contracts  # has geth as dependency
 
@@ -31,8 +32,8 @@ $DC run --rm --no-deps ${cmd} init \
 sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/chain-${num}/config/priv_validator_pubkey.hex)\"" config/keyper-${num}.toml
 if [ $num -eq 0 ];
 then
-    cp data/chain-0/config/genesis.json data/chain-1/config/
-    cp data/chain-0/config/genesis.json data/chain-2/config/
+    ${BB} cp data/chain-0/config/genesis.json data/chain-1/config/
+    ${BB} cp data/chain-0/config/genesis.json data/chain-2/config/
 fi
 done
 
@@ -45,7 +46,7 @@ done
 for num in 0 1 2; do
   cmd=chain-$num
   peers=$(echo ${bootstrap_peers}|cut -d',' -f $(( ((num + 1) % 3) + 1)),$(( ((num + 2) % 3) + 1)))
-  sed -i "/^persistent-peers =/c\persistent-peers = \"${peers}\"" data/${cmd}/config/config.toml
+  ${BB} sed -i "/^persistent-peers =/c\persistent-peers = \"${peers}\"" data/${cmd}/config/config.toml
   done
 $DC up -d chain-{0..2} keyper-{0..2}
 
@@ -61,4 +62,4 @@ $DC run --rm --no-deps --entrypoint /rolling-shutter ${cmd} bootstrap \
   --shuttermint-url http://$cmd:26657 \
   --signing-key 479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
 done
-$DC stop -t 30 geth chain-{0..2}
+$DC stop -t 30 geth chain-{0..2} keyper-{0..2}
