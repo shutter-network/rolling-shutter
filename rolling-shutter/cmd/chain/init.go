@@ -29,6 +29,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
 
+const VALIDATOR = "validator"
+
 type Config struct {
 	RootDir       string   `mapstructure:"root"`
 	DevMode       bool     `mapstructure:"dev"`
@@ -36,6 +38,7 @@ type Config struct {
 	BlockTime     float64  `mapstructure:"blocktime"`
 	GenesisKeyper []string `mapstructure:"genesis-keyper"`
 	ListenAddress string   `mapstructure:"listen-address"`
+	Role          string   `mapstructure:"role"`
 }
 
 func initCmd() *cobra.Command {
@@ -62,7 +65,8 @@ func initCmd() *cobra.Command {
 	cmd.PersistentFlags().Int("index", 0, "keyper index")
 	cmd.PersistentFlags().Float64("blocktime", 1.0, "block time in seconds")
 	cmd.PersistentFlags().StringSlice("genesis-keyper", nil, "genesis keyper address")
-	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint listen address")
+	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint RPC listen address")
+	cmd.PersistentFlags().String("role", "validator", "tendermint node role (validator, sentry, seed)")
 	return cmd
 }
 
@@ -91,11 +95,13 @@ func getArgFromViper[T interface{}](getter func(string) T, name string, required
 func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	keypers := []common.Address{}
 
-	for _, a := range config.GenesisKeyper {
-		if !common.IsHexAddress(a) {
-			return errors.Errorf("--genesis-keyper argument '%s' is not an address", a)
+	if config.Role == VALIDATOR {
+		for _, a := range config.GenesisKeyper {
+			if !common.IsHexAddress(a) {
+				return errors.Errorf("--genesis-keyper argument '%s' is not an address", a)
+			}
+			keypers = append(keypers, common.HexToAddress(a))
 		}
-		keypers = append(keypers, common.HexToAddress(a))
 	}
 
 	tendermintCfg := cfg.DefaultConfig()
@@ -126,6 +132,23 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	}
 	cfg.EnsureRoot(tendermintCfg.RootDir)
 
+	// set up according to the network role: https://docs.tendermint.com/v0.34/tendermint-core/validators.html
+	switch config.Role {
+	case VALIDATOR:
+		tendermintCfg.P2P.PexReactor = false
+		tendermintCfg.Mode = cfg.ModeValidator
+		tendermintCfg.P2P.AddrBookStrict = false
+	case "sentry": // even though "sentry" nodes are documented, there is no special mode
+		tendermintCfg.P2P.PexReactor = true
+		tendermintCfg.Mode = cfg.ModeFull
+		tendermintCfg.P2P.AddrBookStrict = false
+	case "seed":
+		tendermintCfg.P2P.PexReactor = true
+		tendermintCfg.Mode = cfg.ModeSeed
+		tendermintCfg.P2P.AddrBookStrict = false
+	default:
+		return errors.Errorf("illegal value for --role: %s", config.Role)
+	}
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
 	err = cfg.WriteConfigFile(config.RootDir, tendermintCfg)
@@ -153,39 +176,72 @@ func adjustPort(address string, keyperIndex int) (string, error) {
 }
 
 func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState app.GenesisAppState) error {
-	// private validator
-	privValKeyFile := tendermintConfig.PrivValidator.KeyFile()
-	privValStateFile := tendermintConfig.PrivValidator.StateFile()
-	var pv *privval.FilePV
 	var err error
-	if tmos.FileExists(privValKeyFile) {
-		pv, err = privval.LoadFilePV(privValKeyFile, privValStateFile)
-		if err != nil {
-			return err
+	if config.Role == VALIDATOR {
+		// private validator
+		privValKeyFile := tendermintConfig.PrivValidator.KeyFile()
+		privValStateFile := tendermintConfig.PrivValidator.StateFile()
+		var pv *privval.FilePV
+		if tmos.FileExists(privValKeyFile) {
+			pv, err = privval.LoadFilePV(privValKeyFile, privValStateFile)
+			if err != nil {
+				return err
+			}
+			log.Info().
+				Str("privValKeyFile", privValKeyFile).
+				Str("stateFile", privValStateFile).
+				Msg("Found private validator")
+		} else {
+			pv, err = privval.GenFilePV(privValKeyFile, privValStateFile, types.ABCIPubKeyTypeEd25519)
+			if err != nil {
+				return err
+			}
+			pv.Save()
+			log.Info().
+				Str("privValKeyFile", privValKeyFile).
+				Str("stateFile", privValStateFile).
+				Msg("Generated private validator")
 		}
-		log.Info().
-			Str("privValKeyFile", privValKeyFile).
-			Str("stateFile", privValStateFile).
-			Msg("Found private validator")
-	} else {
-		pv, err = privval.GenFilePV(privValKeyFile, privValStateFile, types.ABCIPubKeyTypeEd25519)
-		if err != nil {
-			return err
-		}
-		pv.Save()
-		log.Info().
-			Str("privValKeyFile", privValKeyFile).
-			Str("stateFile", privValStateFile).
-			Msg("Generated private validator")
-	}
 
-	validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
-	validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
-	err = os.WriteFile(validatorPubKeyPath, []byte(validatorPublicKeyHex), 0o644)
-	if err != nil {
-		return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
+		validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
+		validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
+		err = os.WriteFile(validatorPubKeyPath, []byte(validatorPublicKeyHex), 0o644)
+		if err != nil {
+			return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
+		}
+		log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
+
+		// genesis file
+		genFile := tendermintConfig.GenesisFile()
+		if tmos.FileExists(genFile) {
+			log.Info().Str("path", genFile).Msg("Found genesis file")
+		} else {
+			appStateBytes, err := amino.NewCodec().MarshalJSONIndent(appState, "", "    ")
+			if err != nil {
+				return err
+			}
+			genDoc := types.GenesisDoc{
+				ChainID:         fmt.Sprintf("shutter-test-chain-%v", tmrand.Str(6)),
+				GenesisTime:     tmtime.Now(),
+				ConsensusParams: types.DefaultConsensusParams(),
+				AppState:        appStateBytes,
+			}
+			pubKey, err := pv.GetPubKey(context.Background())
+			if err != nil {
+				return errors.Wrap(err, "can't get pubkey")
+			}
+			genDoc.Validators = []types.GenesisValidator{{
+				Address: pubKey.Address(),
+				PubKey:  pubKey,
+				Power:   10,
+			}}
+
+			if err := genDoc.SaveAs(genFile); err != nil {
+				return err
+			}
+			log.Info().Str("path", genFile).Msg("Generated genesis file")
+		}
 	}
-	log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
 
 	nodeKeyFile := tendermintConfig.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
@@ -203,36 +259,6 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		log.Info().Str("path", nodeKeyFile).Str("id", string(nodeid)).Msg("Generated node key")
 	}
 
-	// genesis file
-	genFile := tendermintConfig.GenesisFile()
-	if tmos.FileExists(genFile) {
-		log.Info().Str("path", genFile).Msg("Found genesis file")
-	} else {
-		appStateBytes, err := amino.NewCodec().MarshalJSONIndent(appState, "", "    ")
-		if err != nil {
-			return err
-		}
-		genDoc := types.GenesisDoc{
-			ChainID:         fmt.Sprintf("shutter-test-chain-%v", tmrand.Str(6)),
-			GenesisTime:     tmtime.Now(),
-			ConsensusParams: types.DefaultConsensusParams(),
-			AppState:        appStateBytes,
-		}
-		pubKey, err := pv.GetPubKey(context.Background())
-		if err != nil {
-			return errors.Wrap(err, "can't get pubkey")
-		}
-		genDoc.Validators = []types.GenesisValidator{{
-			Address: pubKey.Address(),
-			PubKey:  pubKey,
-			Power:   10,
-		}}
-
-		if err := genDoc.SaveAs(genFile); err != nil {
-			return err
-		}
-		log.Info().Str("path", genFile).Msg("Generated genesis file")
-	}
 	a := app.NewShutterApp()
 	a.Gobpath = filepath.Join(tendermintConfig.DBDir(), "shutter.gob")
 	a.DevMode = config.DevMode
