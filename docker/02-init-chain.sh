@@ -50,7 +50,7 @@ for num in 0 1 2; do
 $DC up -d chain-{0..2} keyper-{0..2}
 
 echo "We need to wait for the chain to reach height >= 1"
-sleep 25
+sleep 5
 echo "This will take a while..."
 
 for num in 0; do
