@@ -173,8 +173,6 @@
 (defn subcommand-run
   [{:subcommand/keys [cmd cfgfile loglevel]}]
   ['rolling-shutter
-   (str "--environment")
-   (str "local")
    (str "--loglevel")
    (str (or loglevel default-loglevel))
    (str cmd)
@@ -216,8 +214,10 @@
                               "DKGStartBlockDelta" 5
                               "ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
                               "HTTPEnabled" true
+                              "Environment" "local"
                               "HTTPListenAddress" (format ":%d" (+ 24000 n))
-                              "ContractsURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)}}))
+                              "EthereumURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)
+                              "ContractsURL" (format "http://127.0.0.1:%d/" contracts-rpc-port)}}))
 
 ;; -- mocknode-subcommand
 (defn mocknode-subcommand
@@ -239,7 +239,8 @@
                  :cfgfile (format "p2p-%s.toml" n)
                  :p2p-port p2p-port
                  :db nil
-                 :toml-edits {"ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]}}))
+                 :toml-edits {"ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
+                              "Environment" "local"}}))
 
 ;; -- collator
 (defn collator-subcommand
@@ -252,6 +253,9 @@
                  :db "collator"
                  :toml-edits {"DatabaseURL" (format "postgres:///collator")
                               "ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
+                              "Environment" "local"
+                              "EthereumURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)
+                              "ContractsURL" (format "http://127.0.0.1:%d/" contracts-rpc-port)
                               "SequencerURL" (format "http://localhost:%d" sequencer-rpc-port)}}))
 
 ;; -- mocksequencer
