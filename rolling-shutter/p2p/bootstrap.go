@@ -40,7 +40,7 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 		go func(ctx context.Context, a peer.AddrInfo) {
 			defer waitGroup.Done()
 			if err := h.Connect(ctx, a); err != nil {
-				log.Error().
+				log.Debug().
 					Err(err).
 					Str("peer", a.String()).
 					Msg("couldn't connect to boostrap node")
