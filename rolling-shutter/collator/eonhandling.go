@@ -34,20 +34,30 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *p2pmsg.EonPublicKey) error {
 // ensureEonPublicKeyMatchesKeyperSet checks that the information stored in the EonPublicKey
 // matches the chainobsdb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
-func ensureEonPublicKeyMatchesKeyperSet(keyperSet chainobsdb.KeyperSet, key *p2pmsg.EonPublicKey) error {
+func ensureEonPublicKeyMatchesKeyperSet(
+	keyperSet chainobsdb.KeyperSet,
+	key *p2pmsg.EonPublicKey,
+) error {
 	activationBlock := int64(key.ActivationBlock)
 
 	// Ensure that the information in the keyperSet matches the information stored in the EonPublicKey
 	if keyperSet.ActivationBlockNumber != activationBlock {
 		// Can also happen when the Keyper is dishonest.
-		return errors.Errorf("eonPublicKey message's activation-block (%d) does not match the expected"+
-			"activation-block on-chain (%d)", activationBlock, keyperSet.ActivationBlockNumber)
+		return errors.Errorf(
+			"eonPublicKey message's activation-block (%d) does not match the expected"+
+				"activation-block on-chain (%d)",
+			activationBlock,
+			keyperSet.ActivationBlockNumber,
+		)
 	}
 
 	recoveredAddress, err := p2pmsg.RecoverAddress(key)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
-			"(activation-block=%d)", activationBlock))
+		return errors.Wrap(
+			err,
+			fmt.Sprintf("Validation: Error while recovering signature for EonPublicKey "+
+				"(activation-block=%d)", activationBlock),
+		)
 	}
 	_, ok := kprdb.GetKeyperIndex(recoveredAddress, keyperSet.Keypers)
 
@@ -69,7 +79,10 @@ func (*eonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.EonPublicKey{}}
 }
 
-func (handler *eonPublicKeyHandler) ValidateMessage(ctx context.Context, k p2pmsg.Message) (bool, error) {
+func (handler *eonPublicKeyHandler) ValidateMessage(
+	ctx context.Context,
+	k p2pmsg.Message,
+) (bool, error) {
 	key := k.(*p2pmsg.EonPublicKey)
 	if err := ensureNoIntegerOverflowsInEonPublicKey(key); err != nil {
 		return false, err
