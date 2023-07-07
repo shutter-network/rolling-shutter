@@ -2,13 +2,13 @@ linters-settings:
   unparam:
     check-exported: true
   depguard:
-    list-type: blacklist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
+    rules:
+      main:
+        files:
+          - $all
+        deny:
+          - pkg: github.com/sirupsen/logrus
+            description: "Don't use"
   dupl:
     threshold: 100
   exhaustive:
