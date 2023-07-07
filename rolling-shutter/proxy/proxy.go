@@ -40,10 +40,10 @@ func (c *Config) Validate() error {
 	if c.CollatorURL == nil {
 		return errors.Errorf("configuration value CollatorURL is missing")
 	}
-	if config.SequencerURL == nil {
+	if c.SequencerURL == nil {
 		return errors.Errorf("configuration value SequencerURL is missing")
 	}
-	if config.HTTPListenAddress == "" {
+	if c.HTTPListenAddress == "" {
 		return errors.Errorf("configuration value HTTPListenAddress is missing")
 	}
 	return nil
