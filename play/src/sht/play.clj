@@ -286,6 +286,11 @@
                          :params params
                          :id 1}))
 
+(defn get-jsonrpc
+  [url]
+  (http/get url)
+)
+
 (defn post-jsonrpc
   [url body]
   (http/post url

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -xe
 
+BB="docker run --rm -v$(pwd)/data:/data -w / busybox"
 if docker compose ls >/dev/null 2>&1; then
   DC="docker compose"
 else
@@ -10,7 +11,7 @@ fi
 $DC stop db
 $DC rm -f db
 
-rm -rf data/db
+${BB} rm -rf data/db
 
 $DC up -d db
 sleep 40

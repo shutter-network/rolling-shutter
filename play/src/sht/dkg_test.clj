@@ -15,7 +15,7 @@
             [sht.play :as play]))
 
 (set! *warn-on-reflection* true)
-
+(declare rpc-laddr-port)
 (defonce play-db-password (or (System/getenv "PLAY_DB_PASSWORD") ""))
 
 (defn decode-epochid
@@ -108,6 +108,17 @@
   (fn [sys {:keyper/keys [description]}]
     description))
 
+(defn get-chain-validators
+  [n]
+  (play/get-jsonrpc-result (play/get-jsonrpc (format "http://localhost:%d/validators" (rpc-laddr-port n)))))
+
+(defmethod runner/check :chain/count-validators check-chain-count-validators
+  [sys {:chain/keys [num expected-count] :as m}]
+  (let [response (get-chain-validators num)]
+    {:chk/ok? (= expected-count (count (:validators response)))
+     :chk/description "check number of validators"
+     :chk/info response}))
+
 (defmethod runner/run ::add-spare-keyper-set
   [sys m]
   (runner/dispatch sys {:run :process/run
@@ -128,11 +139,15 @@
                                          :extra-env {"DEPLOY_CONF" deploy-conf-path}}
                           :process/cmd ["npx" "hardhat" "run" "--network" "localhost" "scripts/configure-keypers.js"]})))
 
+(defn- rpc-laddr-port
+  [n]
+  (+ 28000 n))
+
 (defn- chain-set-ports
   [path seeds n]
   (let [m (toml/read (slurp path) :keywordize true)
         m (-> m
-              (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (+ 28000 n)))
+              (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (rpc-laddr-port n)))
               (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
               (assoc-in [:p2p :persistent-peers] seeds))]
     (spit path (toml-writer/dump m))))
@@ -374,6 +389,14 @@
                                    :keyper/eon 1
                                    :keyper/num keyper})}
 
+                  {:check :loop/until
+                   :loop/description "All chains should see 3 validators"
+                   :loop/timeout-ms (* 20 1000)
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :chain/count-validators
+                                   :chain/num keyper
+                                   :chain/expected-count 3})}
+
                   (for [keyper (range num-initial-keypers)]
                     {:check :keyper/non-zero-activation-block
                      :keyper/num keyper})
@@ -404,6 +427,14 @@
                                   {:check :keyper/dkg-success
                                    :keyper/eon 2
                                    :keyper/num keyper})}
+                  {:check :loop/until
+                   :loop/description "All chains should see 4 validators"
+                   :loop/timeout-ms (* 20 1000)
+                   :loop/checks (for [keyper (range num-keypers)]
+                                  {:check :chain/count-validators
+                                   :chain/num keyper
+                                   :chain/expected-count 4})}
+
                   (for [keyper (range num-keypers)]
                     {:check :keyper/tendermint-batch-config-started
                      :keyper-num keyper})
