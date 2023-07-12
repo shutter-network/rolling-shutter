@@ -52,49 +52,111 @@ services:
         condition: service_healthy
     logging: *logging
 
-  chain-0:
+  chain-0-validator:
     image: snapshutter
     restart: always
     entrypoint:
       - /rolling-shutter
       - chain
     volumes:
-      - ./data/chain-0:/chain
+      - ./data/chain-0-validator:/chain
       - ./data/deployments:/deployments
     command: "--config /chain/config/config.toml"
     depends_on:
       geth:
         condition: service_healthy
+      chain-0-sentry:
+        condition: service_started
     logging: *logging
 
-  chain-1:
+  chain-0-sentry:
     image: snapshutter
     restart: always
     entrypoint:
       - /rolling-shutter
       - chain
     volumes:
-      - ./data/chain-1:/chain
+      - ./data/chain-0-sentry:/chain
       - ./data/deployments:/deployments
     command: "--config /chain/config/config.toml"
     depends_on:
-      geth:
-        condition: service_healthy
+      chain-seed:
+        condition: service_started
     logging: *logging
 
-  chain-2:
+  chain-1-validator:
     image: snapshutter
     restart: always
     entrypoint:
       - /rolling-shutter
       - chain
     volumes:
-      - ./data/chain-2:/chain
+      - ./data/chain-1-validator:/chain
       - ./data/deployments:/deployments
     command: "--config /chain/config/config.toml"
     depends_on:
       geth:
         condition: service_healthy
+      chain-1-sentry:
+        condition: service_started
+    logging: *logging
+
+  chain-1-sentry:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-1-sentry:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      chain-seed:
+        condition: service_started
+    logging: *logging
+
+  chain-2-validator:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-2-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      geth:
+        condition: service_healthy
+      chain-2-sentry:
+        condition: service_started
+    logging: *logging
+
+  chain-2-sentry:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-2-sentry:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      chain-seed:
+        condition: service_started
+    logging: *logging
+
+  chain-seed:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-seed:/chain
+    command: "--config /chain/config/config.toml"
     logging: *logging
 
   snapshot:
@@ -136,11 +198,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0:
+      chain-0-sentry:
         condition: service_started
-      chain-1:
+      chain-1-sentry:
         condition: service_started
-      chain-2:
+      chain-2-sentry:
         condition: service_started
       geth:
         condition: service_healthy
@@ -159,11 +221,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0:
+      chain-0-sentry:
         condition: service_started
-      chain-1:
+      chain-1-sentry:
         condition: service_started
-      chain-2:
+      chain-2-sentry:
         condition: service_started
       geth:
         condition: service_healthy
@@ -182,7 +244,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0:
+      chain-0-sentry:
         condition: service_started
       geth:
         condition: service_healthy
@@ -201,7 +263,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-1:
+      chain-1-sentry:
         condition: service_started
       geth:
         condition: service_healthy
@@ -220,7 +282,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-2:
+      chain-2-sentry:
         condition: service_started
       geth:
         condition: service_healthy
