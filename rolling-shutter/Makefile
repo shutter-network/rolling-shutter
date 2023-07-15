@@ -52,7 +52,7 @@ install-tools: install-codegen-tools install-golangci-lint install-cobra install
 install-codegen-tools: install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer
 
 install-sqlc:
-	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.18.0
+	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.1
 
 install-abigen:
 	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.10.26
