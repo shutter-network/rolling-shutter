@@ -227,7 +227,10 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	}
 
 	if len(app.Configs) == 1 && len(app.Configs[0].Keypers) == 0 {
-		log.Info().Msg("initializing new chain")
+		log.Info().
+			Uint64("initial-eon", genesisState.InitialEon).
+			Str("chain-id", req.ChainId).
+			Msg("initializing new chain")
 		for i, k := range genesisState.Keypers {
 			log.Info().Int("index", i).Str("keyper", k.String()).Msg("initial keyper")
 		}
@@ -237,14 +240,24 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		}
 		app.Validators = validators
 		app.Configs = []*BatchConfig{&bc}
-
+		app.EONCounter = genesisState.InitialEon
 		app.CheckTxState = NewCheckTxState()
 		app.updateCheckTxMembers()
-	} else if !reflect.DeepEqual(bc, *app.Configs[0]) {
-		log.Fatal().
-			Interface("initial-state", bc).
-			Interface("stored-state", app.Configs[0]).
-			Msg("mismatch between stored app state and initial app state")
+	} else {
+		// XXX This else block is not executed anymore. Maybe we should remove it.
+		// Ensure that our app state matches the genesis config
+		if !reflect.DeepEqual(bc, *app.Configs[0]) {
+			log.Fatal().
+				Interface("initial-state", bc).
+				Interface("stored-state", app.Configs[0]).
+				Msg("mismatch between stored app state and initial app state")
+		}
+		if app.EONCounter < genesisState.InitialEon {
+			log.Fatal().
+				Uint64("EonCounter", app.EONCounter).
+				Uint64("InitialEon", genesisState.InitialEon).
+				Msg("mismatch between stored app state and initial app state")
+		}
 	}
 
 	app.ChainID = req.ChainId

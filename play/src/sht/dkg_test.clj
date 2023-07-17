@@ -457,7 +457,7 @@
                 (for [keyper (range num-keypers)]
                   {:check :keyper/meta-inf
                    :keyper-num keyper})
-                (build/run-chain)
+                (build/run-chain :initial-eon 1200)
                 (build/run-node conf)
                 (build/run-p2pnodes conf)
 
@@ -474,7 +474,7 @@
                  :loop/checks (for [keyper (range (dec threshold))]
                                 {:check :keyper/eon-exists
                                  :keyper/num keyper
-                                 :keyper/eon 1})}
+                                 :keyper/eon 1201})}
 
                 {:check :loop/until
                  :loop/description "all keypers should fail the dkg process"
@@ -491,14 +491,14 @@
                  :loop/checks (for [keyper (range num-keypers)]
                                 {:check :keyper/eon-exists
                                  :keyper/num keyper
-                                 :keyper/eon 2})}
+                                 :keyper/eon 1202})}
 
                 {:check :loop/until
                  :loop/description "all keypers should succeed with the dkg process"
                  :loop/timeout-ms (* 60 1000)
                  :loop/checks (for [keyper (range num-keypers)]
                                 {:check :keyper/dkg-success
-                                 :keyper/eon 2
+                                 :keyper/eon 1202
                                  :keyper/num keyper})}
 
                 (for [keyper (range num-keypers)]
@@ -506,7 +506,7 @@
                     :keyper/num keyper}
                    {:check :keyper/ordered-eons-match
                     :keyper/num keyper
-                    :keyper/ordered-eons [1 2]}])]})
+                    :keyper/ordered-eons [1201 1202]}])]})
 (defn generate-tests
   []
   (concat

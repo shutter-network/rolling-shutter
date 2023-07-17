@@ -39,6 +39,7 @@ type Config struct {
 	GenesisKeyper []string `mapstructure:"genesis-keyper"`
 	ListenAddress string   `mapstructure:"listen-address"`
 	Role          string   `mapstructure:"role"`
+	InitialEon    uint64   `mapstructure:"initial-eon"`
 }
 
 func initCmd() *cobra.Command {
@@ -67,6 +68,7 @@ func initCmd() *cobra.Command {
 	cmd.PersistentFlags().StringSlice("genesis-keyper", nil, "genesis keyper address")
 	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint RPC listen address")
 	cmd.PersistentFlags().String("role", "validator", "tendermint node role (validator, sentry, seed)")
+	cmd.PersistentFlags().Uint64("initial-eon", 0, "initial eon")
 	return cmd
 }
 
@@ -155,7 +157,7 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	if err != nil {
 		return err
 	}
-	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3)
+	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3, config.InitialEon)
 
 	return initFilesWithConfig(tendermintCfg, config, appState)
 }
