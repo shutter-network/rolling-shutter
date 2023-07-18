@@ -3,9 +3,9 @@ package trace
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
-	"github.com/tendermint/tendermint/libs/sync"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -23,7 +23,7 @@ import (
 
 const name = "p2p"
 
-var enabled sync.AtomicBool
+var enabled atomic.Bool
 
 type ErrorWrapper func(error) error
 
@@ -76,15 +76,15 @@ func StartSpan(ctx context.Context) (nctx context.Context, span oteltrace.Span, 
 // a configuration option through the whole callstack
 // in all relevant parts of the application.
 func IsEnabled() bool {
-	return enabled.IsSet()
+	return enabled.Load()
 }
 
 func SetEnabled() {
-	enabled.Set()
+	enabled.Store(true)
 }
 
 func SetDisabled() {
-	enabled.UnSet()
+	enabled.Store(false)
 }
 
 func Run(
