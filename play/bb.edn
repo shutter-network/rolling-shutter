@@ -148,7 +148,16 @@
   (concat [(src-file "db/sqlc.yaml")] (fs/glob src-dir "**.sql"))
 
   -go-files
-  (concat (fs/glob src-dir "**.go") [(src-file "go.mod") (src-file "go.sum")])
+  (->> (p/process ["go" "list" "-m" "-f={{.Dir}}"]
+                  {:out :string
+                   :err :string
+                   :dir src-dir})
+       p/check
+       :out
+       str/split-lines
+       (mapcat (fn [dir]
+                 (concat (fs/glob dir "**.go")
+                         [(fs/path dir "go.mod") (fs/path dir "go.sum")]))))
 
   -protoc-files
   (fs/glob src-dir "**.proto")
