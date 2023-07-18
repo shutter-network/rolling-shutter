@@ -149,7 +149,7 @@
         m (-> m
               (assoc-in [:rpc :laddr] (format "tcp://127.0.0.1:%d" (rpc-laddr-port n)))
               (assoc-in [:p2p :laddr] (format "tcp://127.0.0.1:%d" (+ 27000 n)))
-              (assoc-in [:p2p :persistent-peers] seeds))]
+              (assoc-in [:p2p :persistent_peers] seeds))]
     (spit path (toml-writer/dump m))))
 
 (defn- sys-chain-config-path
