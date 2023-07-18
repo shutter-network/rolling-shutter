@@ -1,6 +1,6 @@
 module github.com/shutter-network/rolling-shutter/rolling-shutter
 
-go 1.19
+go 1.20
 
 require (
 	github.com/AdamSLevy/jsonrpc2/v14 v14.1.0
