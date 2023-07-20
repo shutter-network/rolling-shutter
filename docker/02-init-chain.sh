@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
-set -xe
 
-BB="docker run --rm -v$(pwd)/data:/data -w / busybox"
-if docker compose ls >/dev/null 2>&1; then
-    # compose v2
-    DC="docker compose"
-else
-    DC=docker-compose
-fi
+source ./common.sh
 
 $DC stop geth
 $DC rm -f geth

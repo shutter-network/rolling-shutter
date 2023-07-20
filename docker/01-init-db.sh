@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-set -xe
 
-BB="docker run --rm -v$(pwd)/data:/data -w / busybox"
-if docker compose ls >/dev/null 2>&1; then
-    DC="docker compose"
-else
-    DC=docker-compose
-fi
+source ./common.sh
 
 $DC stop db
 $DC rm -f db
@@ -14,7 +8,7 @@ $DC rm -f db
 ${BB} rm -rf data/db
 
 $DC up -d db
-sleep 40
+$DC run --rm --no-deps dockerize -wait tcp://db:5432 -timeout 40s
 
 for cmd in snapshot keyper-0 keyper-1 keyper-2; do
     $DC exec db createdb -U postgres $cmd

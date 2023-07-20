@@ -311,3 +311,8 @@ services:
     restart: always
     profiles:
       - dev
+
+  dockerize:
+    image: jwilder/dockerize
+    profiles:
+      - script

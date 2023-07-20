@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
-set -xe
 
-if docker compose ls >/dev/null 2>&1; then
-    DC="docker compose"
-else
-    DC=docker-compose
-fi
+source ./common.sh
 
 echo "Testing decryption key generation"
 EPOCH_ID="480184f2b2dedec2641fb1a0b8cb1f0a8af8e7edd90f2f5acfc0858c29ed964c"
