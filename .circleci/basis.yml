@@ -82,10 +82,10 @@ jobs:
           keys:
             - go-mod-v6-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
       - restore_cache:
-          key: pre-commit-cache-v10-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v11-{{ checksum ".pre-commit-config.yaml" }}
       - run: pre-commit install-hooks
       - save_cache:
-          key: pre-commit-cache-v10-{{ checksum ".pre-commit-config.yaml" }}
+          key: pre-commit-cache-v11-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
             - ~/.local

@@ -2,9 +2,9 @@
 set -xe
 
 if docker compose ls >/dev/null 2>&1; then
-  DC="docker compose"
+    DC="docker compose"
 else
-  DC=docker-compose
+    DC=docker-compose
 fi
 
 echo "Starting entire system"
