@@ -1,2 +1,6 @@
+contracts/combined.json
 contracts/node_modules
 docker/data
+play/work
+rolling-shutter/bin
+tools/snapshot/dummyserver/dist
