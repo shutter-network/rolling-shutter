@@ -8,9 +8,8 @@ import (
 )
 
 type pubSubParamsOptions struct {
-	isBootstrapNode   bool
-	isLocalNetworking bool
-	bootstrapPeers    []peer.AddrInfo
+	isBootstrapNode bool
+	bootstrapPeers  []peer.AddrInfo
 }
 
 func makePubSubParams(
@@ -82,9 +81,6 @@ func makePubSubParams(
 		DecayToZero:   0.01,
 
 		RetainScore: 12 * time.Hour,
-	}
-	if options.isLocalNetworking {
-		peerScoreParams.IPColocationFactorWeight = 0
 	}
 	return gossipSubParams, peerScoreParams, peerScoreThresholds
 }

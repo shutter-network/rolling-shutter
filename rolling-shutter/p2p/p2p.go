@@ -229,11 +229,9 @@ func createPubSub(
 	config p2pNodeConfig,
 	hashTable *dht.IpfsDHT,
 ) (*pubsub.PubSub, error) {
-	localNetworking := bool(config.Environment == env.EnvironmentLocal)
 	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
-		isBootstrapNode:   config.IsBootstrapNode,
-		isLocalNetworking: localNetworking,
-		bootstrapPeers:    config.BootstrapPeers,
+		isBootstrapNode: config.IsBootstrapNode,
+		bootstrapPeers:  config.BootstrapPeers,
 	})
 
 	pubsubOptions := []pubsub.Option{
