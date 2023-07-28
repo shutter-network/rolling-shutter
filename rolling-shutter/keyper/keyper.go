@@ -48,10 +48,10 @@ func New(config *Config) service.Service {
 	return &keyper{config: config}
 }
 
-// linkConfigToDB ensures that we use a database compatible with the given config. On first use
+// LinkConfigToDB ensures that we use a database compatible with the given config. On first use
 // it stores the config's ethereum address into the database. On subsequent uses it compares the
 // stored value and raises an error if it doesn't match.
-func linkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
+func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
 	cfgAddress := config.GetAddress().String()
 	queries := metadb.New(dbpool)
@@ -99,7 +99,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	err = linkConfigToDB(ctx, config, dbpool)
+	err = LinkConfigToDB(ctx, config, dbpool)
 	if err != nil {
 		return err
 	}

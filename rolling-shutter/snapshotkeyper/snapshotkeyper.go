@@ -17,7 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
@@ -33,7 +33,7 @@ import (
 )
 
 type snapshotkeyper struct {
-	config            *Config
+	config            *keyper.Config
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
@@ -44,33 +44,8 @@ type snapshotkeyper struct {
 	p2p              *p2p.P2PHandler
 }
 
-func New(config Config) service.Service {
-	return &snapshotkeyper{config: &config}
-}
-
-// linkConfigToDB ensures that we use a database compatible with the given config. On first use
-// it stores the config's ethereum address into the database. On subsequent uses it compares the
-// stored value and raises an error if it doesn't match.
-func linkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
-	const addressKey = "ethereum address"
-	cfgAddress := config.GetAddress().Hex()
-	queries := metadb.New(dbpool)
-	dbAddr, err := queries.GetMeta(ctx, addressKey)
-	if err == pgx.ErrNoRows {
-		return queries.InsertMeta(ctx, metadb.InsertMetaParams{
-			Key:   addressKey,
-			Value: cfgAddress,
-		})
-	} else if err != nil {
-		return err
-	}
-
-	if dbAddr != cfgAddress {
-		return errors.Errorf(
-			"database linked to wrong address %s, config address is %s",
-			dbAddr, cfgAddress)
-	}
-	return nil
+func New(config *keyper.Config) service.Service {
+	return &snapshotkeyper{config: config}
 }
 
 func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) error {
@@ -82,11 +57,11 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
-	l1Client, err := ethclient.Dial(config.EthereumURL)
+	l1Client, err := ethclient.Dial(config.Ethereum.EthereumURL)
 	if err != nil {
 		return err
 	}
-	contracts, err := deployment.NewContracts(l1Client, config.DeploymentDir)
+	contracts, err := deployment.NewContracts(l1Client, config.Ethereum.DeploymentDir)
 	if err != nil {
 		return err
 	}
@@ -95,22 +70,20 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	if err != nil {
 		return err
 	}
-	err = linkConfigToDB(ctx, config, dbpool)
+	err = keyper.LinkConfigToDB(ctx, config, dbpool)
 	if err != nil {
 		return err
 	}
-	shuttermintClient, err := tmhttp.New(config.ShuttermintURL)
+	shuttermintClient, err := tmhttp.New(config.Shuttermint.ShuttermintURL)
 	if err != nil {
 		return err
 	}
-	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.SigningKey)
+	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
 
-	p2pHandler := p2p.New(p2p.Config{
-		ListenAddrs:    config.ListenAddresses,
-		BootstrapPeers: config.CustomBootstrapAddresses,
-		PrivKey:        config.P2PKey,
-		Environment:    p2p.Production,
-	})
+	p2pHandler, err := p2p.New(config.P2P)
+	if err != nil {
+		return err
+	}
 
 	snkpr.dbpool = dbpool
 	snkpr.shuttermintClient = shuttermintClient
@@ -172,7 +145,11 @@ func (snkpr *snapshotkeyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx
 // NewBlockSeen messages to the shuttermint chain, so that the chain can start new batch configs if
 // enough keypers have seen a block past the start block of some BatchConfig. We only send messages
 // when the current block we see, could lead to a batch config being started.
-func (snkpr *snapshotkeyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
+func (snkpr *snapshotkeyper) sendNewBlockSeen(
+	ctx context.Context,
+	tx pgx.Tx,
+	l1BlockNumber uint64,
+) error {
 	q := kprdb.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
 	if err != nil {
@@ -216,7 +193,10 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 	}
 
 	cq := chainobsdb.New(tx)
-	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.KeyperConfigIndex)+1)
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
+		ctx,
+		int64(latestBatchConfig.KeyperConfigIndex)+1,
+	)
 	if err == pgx.ErrNoRows {
 		return nil
 	}
@@ -237,10 +217,10 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	if activationBlockNumber-l1BlockNumber > snkpr.config.DKGStartBlockDelta {
+	if activationBlockNumber-l1BlockNumber > snkpr.config.Shuttermint.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
 			Uint64("l1-block-number", l1BlockNumber).
-			Uint64("dkg-start-delta", snkpr.config.DKGStartBlockDelta).
+			Uint64("dkg-start-delta", snkpr.config.Shuttermint.DKGStartBlockDelta).
 			Msg("not yet submitting config")
 		return nil
 	}
@@ -275,7 +255,12 @@ func (snkpr *snapshotkeyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 
-		err = smobserver.SyncAppWithDB(ctx, snkpr.shuttermintClient, snkpr.dbpool, snkpr.shuttermintState)
+		err = smobserver.SyncAppWithDB(
+			ctx,
+			snkpr.shuttermintClient,
+			snkpr.dbpool,
+			snkpr.shuttermintState,
+		)
 		if err != nil {
 			return err
 		}
@@ -315,7 +300,7 @@ func (snkpr *snapshotkeyper) broadcastEonPublicKeys(ctx context.Context) error {
 				uint64(eonPublicKey.ActivationBlockNumber),
 				uint64(eonPublicKey.KeyperConfigIndex),
 				uint64(eonPublicKey.Eon),
-				snkpr.config.SigningKey,
+				snkpr.config.Ethereum.PrivateKey.Key,
 			)
 			if err != nil {
 				return errors.Wrap(err, "error while signing EonPublicKey")
