@@ -12,7 +12,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
-func NewDecryptionKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
+func NewDecryptionKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
 	return &DecryptionKeyHandler{config: config, snapshot: snapshot}
 }
 
@@ -21,7 +21,7 @@ type DecryptionKeyHandler struct {
 	snapshot *Snapshot
 }
 
-func NewEonPublicKeyHandler(config Config, snapshot *Snapshot) p2p.MessageHandler {
+func NewEonPublicKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
 	return &EonPublicKeyHandler{config: config, snapshot: snapshot, dbpool: snapshot.dbpool}
 }
 

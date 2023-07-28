@@ -48,7 +48,7 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	log.Printf(
 		"starting Snapshot Hub interface",
 	)
-	l1Client, err := ethclient.Dial(snp.Config.EthereumURL)
+	l1Client, err := ethclient.Dial(snp.Config.Ethereum.EthereumURL)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 		convEpoch,
 		blockNumber,
 		zeroTXHash,
-		snp.Config.EthereumKey,
+		snp.Config.Ethereum.PrivateKey.Key,
 	)
 	if err != nil {
 		return err
