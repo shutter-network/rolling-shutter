@@ -1,31 +1,33 @@
-# Shutter keyper config
-# Ethereum address: 0xf2e086D9a2e20D7479c630b8Aa64D476E1aE20Ec
-# Peer identity: /p2p/12D3KooWGm7rNjmx4TTCuCdPnj2tXhfPCXxyLwdRJSFZuRxTfbWg
+# Peer identity: /p2p/12D3KooWLwtKMLJqRGWB3AGi87u8Sc7hwp6a6PDMAyWEAsHnjGJG
+# Ethereum address: 0x4F01A5A4Ef09c08Df83A85885516424A4a53be68
 
-ShuttermintURL		= "http://chain-2-sentry:26657"
-EthereumURL         = "http://geth:8545/"
-DeploymentDir       = "./deployments/dockerGeth/"
 
-# DatabaseURL looks like postgres://username:password@localhost:5432/database_name
-# If it's empty, we use the standard PG* environment variables
+InstanceID = 0
+# If it's empty, we use the standard PG_ environment variables
 DatabaseURL		= "postgres://postgres@db:5432/keyper-2"
-DKGPhaseLength		= 8
+HTTPEnabled = false
+HTTPListenAddress = ':3000'
 
-# p2p configuration
+[P2P]
+P2PKey = 'CAESQJrsyuTYZZpjqfbXTtMbrQOuS1XtzD+M6ssAZLo5R26fpV218+TTRXw4mkAdaxWpIDX0ZEQH5NC8A8+1nWvbF2U='
 ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
 CustomBootstrapAddresses  = [
     "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
     "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 
-# Secret Keys
-EncryptionKey	= "60c9411408d6a352e026b43251b53955d366eda712ac7e5ef836c85aed09e7c3"
-SigningKey	= "0afbc7c0c4c9899d7c6b5161f3d8b974db70aa944bb2195c3b0d8bb21f89841c"
-ValidatorPublicKey	= "32e9b4b95033bb914250f708281b377b6cbbb62f60fc17ab51ee9bbf693d28c9"
-P2PKey          = "CAESQOI+ph9Krw4jsWc0z09zlSzT0W6KBrZjltOUuyU3in1zZyzgy7FC78gcpePiRt9VWad2An2t/NyPZv7avLlVsHE="
+[Ethereum]
+PrivateKey = 'e9383a24352f05bc11895c0da19efb6b83c726f05643c38f64b4146f19215125'
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL = 'http://127.0.0.1:8555/'
+# Contract source directory
+DeploymentDir       = "./deployments/dockerGeth/"
+# The layer 1 JSON RPC endpoint
+EthereumURL         = "http://geth:8545/"
 
-# HTTP interface
-HTTPEnabled       = false
-HTTPListenAddress = ":3000"
-
-InstanceID = 0
+[Shuttermint]
+ShuttermintURL		= "http://chain-2-sentry:26657"
+ValidatorPublicKey = '720accc33c2bce1319d12b5f23f81b39a33f487e21c4a4d7ca1e1f7954a24172'
+DKGPhaseLength = 8
+DKGStartBlockDelta = 200
