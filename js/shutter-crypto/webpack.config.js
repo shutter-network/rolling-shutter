@@ -18,7 +18,7 @@ module.exports = {
   resolve: {
     fallback: {
       fs: false,
-      crypto: false,
+      crypto: path.resolve(__dirname, "src", "_node18_crypto_fallback.js"),
       util: false,
     },
   },

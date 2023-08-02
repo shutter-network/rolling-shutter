@@ -36,3 +36,11 @@ path is available).
 ### `async shutterCrypto.verifyDecryptionKey(decryptionKey, eonPublicKey, epochId)`
 
 ...
+
+## Releases
+
+### `0.1.0-beta.3` - 2022-07-18
+
+First usable version
+
+This includes significant size reduction of the generated wasm file.

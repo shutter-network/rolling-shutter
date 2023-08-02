@@ -1,0 +1,18 @@
+diff --git a/wasm_exec.js b/wasm_exec.js
+index 8021b44..13d0075 100644
+--- a/wasm_exec.js
++++ b/wasm_exec.js
+@@ -101,12 +101,7 @@
+ 	}
+
+ 	if (!global.crypto) {
+-		const nodeCrypto = require("crypto");
+-		global.crypto = {
+-			getRandomValues(b) {
+-				nodeCrypto.randomFillSync(b);
+-			},
+-		};
++		global.crypto = require("crypto");
+ 	}
+
+ 	if (!global.performance) {
