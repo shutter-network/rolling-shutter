@@ -6,7 +6,7 @@ interact with the Shutter Network.
 ## Installation
 
 ```
-npm install @shutter-network/shutter-crypto@beta
+npm install @shutter-network/shutter-crypto
 ```
 
 ## Usage
@@ -38,6 +38,10 @@ path is available).
 ...
 
 ## Releases
+
+### `1.0.1` - 2023-08-02
+
+Only contains a fix in the README.
 
 ### `1.0.0` - 2023-08-02
 
