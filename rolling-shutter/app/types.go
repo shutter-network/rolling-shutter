@@ -17,12 +17,16 @@ import (
 // providing the first real BatchConfig to be used. We use common.MixedcaseAddress to hold the list
 // of keypers as that one serializes as checksum address.
 type GenesisAppState struct {
-	Keypers   []common.MixedcaseAddress `json:"keypers"`
-	Threshold uint64                    `json:"threshold"`
+	Keypers    []common.MixedcaseAddress `json:"keypers"`
+	Threshold  uint64                    `json:"threshold"`
+	InitialEon uint64                    `json:"initialEon"`
 }
 
-func NewGenesisAppState(keypers []common.Address, threshold int) GenesisAppState {
-	appState := GenesisAppState{Threshold: uint64(threshold)}
+func NewGenesisAppState(keypers []common.Address, threshold int, initialEon uint64) GenesisAppState {
+	appState := GenesisAppState{
+		Threshold:  uint64(threshold),
+		InitialEon: initialEon,
+	}
 	for _, k := range keypers {
 		appState.Keypers = append(appState.Keypers, common.NewMixedcaseAddress(k))
 	}

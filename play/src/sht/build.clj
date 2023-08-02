@@ -130,11 +130,11 @@
      :process/port-timeout 3000}))
 
 (defn run-chain
-  []
+  [& {:keys [initial-eon] :or {initial-eon 0}}]
   [{:run :process/run
     :process/wait true
     :process/id :init-chain
-    :process/cmd ['rolling-shutter "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1"]}
+    :process/cmd ['rolling-shutter "chain" "init" "--root" "testchain" "--dev" "--blocktime" "1" "--initial-eon" initial-eon]}
    {:run :process/run
     :process/id :chain
     :process/cmd ['rolling-shutter "chain" "--config" "testchain/config/config.toml"]
