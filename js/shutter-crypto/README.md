@@ -39,6 +39,15 @@ path is available).
 
 ## Releases
 
+### `1.0.0` - 2023-08-02
+
+Stable release.
+
+Changes:
+
+- Fix node v18 incompatibility
+- Add README
+
 ### `0.1.0-beta.3` - 2022-07-18
 
 First usable version
