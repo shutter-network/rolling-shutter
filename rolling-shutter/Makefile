@@ -82,6 +82,12 @@ install-gci:
 install-gotestsum:
 	${GO} install gotest.tools/gotestsum@latest
 
+install-asdf-plugins:
+	../tools/asdf-install-plugins.sh
+
+install-asdf: install-asdf-plugins
+	asdf install
+
 lint:
 	golangci-lint run --tests
 

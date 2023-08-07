@@ -49,36 +49,9 @@ And tell bash to source asdf's init file by appending these two lines to
 . $HOME/.asdf/completions/asdf.bash
 ```
 
-When asdf is ready, install the needed plugins. In case you don't want to manage
-some of the tools with asdf, skip installation of the corresponding plugins.
+When asdf is ready, install the needed plugins. See the file
+[`.asdf-plugins`](../.asdf-plugins) in the project root for a list.
 
-```
-asdf plugin add babashka
-asdf plugin add circleci https://github.com/trnubo/asdf-circleci.git
-asdf plugin add golang
-asdf plugin add golangci-lint
-asdf plugin add nodejs
-asdf plugin add protoc
-asdf plugin add sqlc https://github.com/schmir/asdf-sqlc.git
-asdf plugin add solidity
-asdf plugin add tinygo https://github.com/schmir/asdf-tinygo.git
-asdf plugin add binaryen https://github.com/birros/asdf-binaryen.git
-asdf plugin add pre-commit
-```
-
-Finally, install the tools by running the following inside the rolling shutter
-git repository:
-
-```
-asdf install
-```
-
-If you want to run the whole system tests inside the play directory, you also
-have to install clojure and java:
-
-```
-asdf plugin add java
-asdf plugin add clojure
-asdf install java
-asdf install clojure
-```
+The `install-asdf` make target automates installing the required plugins and
+tools. In case you don't want to manage some of the tools with asdf, skip
+installation of the corresponding plugins.
