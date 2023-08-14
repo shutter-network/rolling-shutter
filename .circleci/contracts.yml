@@ -1,6 +1,6 @@
 jobs:
   hardhat:
-    executor: node14
+    executor: node18
     working_directory: ~/src/contracts
     steps:
       - checkout:

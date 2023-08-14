@@ -72,11 +72,9 @@ contract KeypersConfigsList is Ownable {
         });
     }
 
-    function getActiveConfig(uint64 activationBlockNumber)
-        public
-        view
-        returns (KeypersConfig memory)
-    {
+    function getActiveConfig(
+        uint64 activationBlockNumber
+    ) public view returns (KeypersConfig memory) {
         for (uint256 i = keypersConfigs.length - 1; true; i--) {
             if (
                 keypersConfigs[i].activationBlockNumber <= activationBlockNumber

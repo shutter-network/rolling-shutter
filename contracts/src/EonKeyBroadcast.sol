@@ -41,10 +41,10 @@ contract EonKeyStorage is Ownable {
     /// @notice Add a new key to the storage.
     /// @param serializedKey The key to insert
     /// @param activationBlockNumber The block number from which on the key shall be used
-    function insert(bytes memory serializedKey, uint64 activationBlockNumber)
-        external
-        onlyOwner
-    {
+    function insert(
+        bytes memory serializedKey,
+        uint64 activationBlockNumber
+    ) external onlyOwner {
         uint64 newIndex;
         uint64 index = 1;
         Key memory key = keys[index];

@@ -55,11 +55,9 @@ contract CollatorConfigsList is Ownable {
         });
     }
 
-    function getActiveConfig(uint64 activationBlockNumber)
-        public
-        view
-        returns (CollatorConfig memory)
-    {
+    function getActiveConfig(
+        uint64 activationBlockNumber
+    ) public view returns (CollatorConfig memory) {
         for (uint256 i = collatorConfigs.length - 1; true; i--) {
             if (
                 collatorConfigs[i].activationBlockNumber <=

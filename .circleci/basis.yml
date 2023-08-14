@@ -36,9 +36,9 @@ executors:
       - image: cimg/python:3.11.1-node@sha256:fac71c651914675c788807a3024d3730d897d3c898c47fa207268082fcba41c8
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  node14:
+  node18:
     docker:
-      - image: cimg/node:14.17.4
+      - image: cimg/node:18.17.0
 
   go:
     docker:
