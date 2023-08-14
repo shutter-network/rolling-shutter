@@ -1,5 +1,6 @@
 (ns gen
   (:require [clj-yaml.core :as yaml]
+            [clojure.java.io]
             [clojure.java.shell :as shell]
             [clojure.string :as str]))
 
@@ -16,7 +17,7 @@
    [#"\.circleci/basis.yml$" :build-all?]])
 
 (defn extra-keywords
-  [{:keys [head base] :as opts}]
+  [_opts]
   (merge {}
          (when (or (not (empty? (System/getenv "CIRCLE_TAG")))
                    (= "main" (System/getenv "CIRCLE_BRANCH")))
@@ -47,8 +48,8 @@
 
 (defn shell-out
   [& args]
-  (let [{:keys [exit out err] :as res} (apply shell/sh args)]
-    (if-not (zero? exit)
+  (let [{:keys [exit out] :as res} (apply shell/sh args)]
+    (when-not (zero? exit)
       (throw (ex-info "running shell command failed" (assoc res :args args))))
     out))
 
@@ -76,7 +77,7 @@
     (last maps)))
 
 (defn set-head
-  [{:keys [head base] :as opts}]
+  [{:keys [head] :as opts}]
   (let [head (first (remove empty? [head (System/getenv "CIRCLE_SHA1") "HEAD"]))
         head (str/trim (shell-out "git" "rev-parse" head))]
     (assoc opts :head head)))

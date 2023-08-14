@@ -2,14 +2,14 @@
  :resource-paths []
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         cheshire/cheshire {:mvn/version "5.11.0"}
-        com.github.seancorfield/next.jdbc {:mvn/version "1.3.874"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.3.883"}
         org.postgresql/postgresql {:mvn/version "42.6.0"}
-        com.taoensso/timbre {:mvn/version "6.1.0"}
+        com.taoensso/timbre {:mvn/version "6.2.2"}
         toml/toml {:mvn/version "0.1.4"}
         mvxcvi/puget {:mvn/version "1.3.4"}
-        org.babashka/http-client {:mvn/version "0.2.9"}
-        babashka/fs {:mvn/version "0.3.17"}
-        babashka/process {:mvn/version "0.4.16"}
+        org.babashka/http-client {:mvn/version "0.4.13"}
+        babashka/fs {:mvn/version "0.4.19"}
+        babashka/process {:mvn/version "0.5.21"}
         org.clojars.lispyclouds/contajners {:mvn/version "0.0.6"}}
 
  :aliases {;; (deprecated) Run tests with clojure -X:run-tests
@@ -17,7 +17,7 @@
            ;; Run with clojure -M:test
            :test {:main-opts ["-m" "sht.core"]}
            ;; Build uberjar with clojure -T:build
-           :build {:deps {io.github.clojure/tools.build {:mvn/version "0.9.4"}}
+           :build {:deps {io.github.clojure/tools.build {:mvn/version "0.9.5"}}
                    :ns-default build
                    :exec-fn uber}
            :dev {:extra-paths ["dev"]}}}
