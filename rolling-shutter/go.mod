@@ -230,3 +230,5 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/bitwurx/jrpc2 => github.com/ulope/jrpc2 v0.0.0-20230706135348-a95cf3d96bd2

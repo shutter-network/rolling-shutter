@@ -5,10 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/bitwurx/jrpc2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -16,6 +19,7 @@ import (
 type SnpJRPC struct {
 	Server *jrpc2.Server
 
+	httpServer               *http.Server
 	getDecryptionKeyCallback func(ctx context.Context, epochID []byte) error
 	requestEonKeyCallback    func(ctx context.Context) error
 }
@@ -117,13 +121,14 @@ func New(
 	jsonrpcPort uint16,
 	getDecryptionKeyCallback func(ctx context.Context, epochID []byte) error,
 	requestEonKeyCallback func(ctx context.Context) error,
-) service.Service {
+) *SnpJRPC {
 	host := fmt.Sprintf("%s:%d", jsonrpcHost, jsonrpcPort)
 	server := jrpc2.NewServer(host, "/api/v1/rpc", nil)
 
 	jrpc := SnpJRPC{
 		Server: server,
 
+		httpServer:               nil,
 		getDecryptionKeyCallback: getDecryptionKeyCallback,
 		requestEonKeyCallback:    requestEonKeyCallback,
 	}
@@ -140,8 +145,30 @@ func New(
 	return &jrpc
 }
 
-func (snpjrpc *SnpJRPC) Start(_ context.Context, _ service.Runner) error {
-	// FIXME: this is probably not properly hooked into the service.Runner model
-	snpjrpc.Server.Start()
+func (snpjrpc *SnpJRPC) Start(_ context.Context, group service.Runner) error {
+	group.Go(func() error {
+		httpServer := snpjrpc.Server.Prepare()
+		log.Info().Str("address", snpjrpc.Server.Host).Msg("Running JSON-RPC server at")
+		if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
 	return nil
+}
+
+func (snpjrpc *SnpJRPC) Shutdown() {
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	connectionsClosed := make(chan struct{})
+
+	go func() {
+		if err := snpjrpc.httpServer.Shutdown(timeoutCtx); err != nil {
+			log.Error().Err(err).Msg("Error shutting down JSON-RPC server")
+		}
+		close(connectionsClosed)
+	}()
+	<-connectionsClosed
+	log.Debug().Msg("JSON-RPC server shut down")
 }

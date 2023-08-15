@@ -34,14 +34,22 @@ type Snapshot struct {
 	db       *snpdb.Queries
 	l1Client *ethclient.Client
 	hubapi   *hubapi.HubAPI
+	jrpc     *snpjrpc.SnpJRPC
 }
 
 func New(config *Config) (service.Service, error) {
 	p2pInstance, err := p2p.New(config.P2P)
-	return &Snapshot{
+	snp := &Snapshot{
 		Config: config,
 		p2p:    p2pInstance,
-	}, err
+	}
+	snp.jrpc = snpjrpc.New(
+		snp.Config.JSONRPCHost,
+		snp.Config.JSONRPCPort,
+		snp.handleDecryptionKeyRequest,
+		snp.handleRequestEonKey,
+	)
+	return snp, err
 }
 
 func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
@@ -80,6 +88,8 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
 	snp.hubapi = hub
 
+	runner.Defer(snp.jrpc.Shutdown)
+
 	snp.setupP2PHandler()
 	return runner.StartService(snp.getServices()...)
 }
@@ -87,12 +97,7 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 func (snp *Snapshot) getServices() []service.Service {
 	services := []service.Service{
 		snp.p2p,
-		snpjrpc.New(
-			snp.Config.JSONRPCHost,
-			snp.Config.JSONRPCPort,
-			snp.handleDecryptionKeyRequest,
-			snp.handleRequestEonKey,
-		),
+		snp.jrpc,
 	}
 	if snp.Config.MetricsEnabled {
 		services = append(services, NewMetricsServer(snp.Config))
