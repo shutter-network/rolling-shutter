@@ -4,13 +4,13 @@ source ./common.sh
 
 $DC stop geth
 $DC rm -f geth
-$DC stop chain-{0..2}-{validator,sentry} chain-seed
-$DC rm -f chain-{0..2}-{validator,sentry} chain-seed
+$DC stop chain-{0..3}-{validator,sentry} chain-seed
+$DC rm -f chain-{0..3}-{validator,sentry} chain-seed
 
 ${BB} rm -rf data/geth
-${BB} rm -rf data/chain-{0..2}-{validator,sentry} data/chain-seed
-${BB} mkdir -p data/chain-{0..2}-{validator,sentry}/config data/chain-seed/config
-${BB} chmod -R a+rwX data/chain-{0..2}-{validator,sentry}/config data/chain-seed/config
+${BB} rm -rf data/chain-{0..3}-{validator,sentry} data/chain-seed
+${BB} mkdir -p data/chain-{0..3}-{validator,sentry}/config data/chain-seed/config
+${BB} chmod -R a+rwX data/chain-{0..3}-{validator,sentry}/config data/chain-seed/config
 ${BB} rm -rf data/deployments
 
 # has geth as dependency
@@ -25,7 +25,7 @@ $DC run --rm --no-deps chain-seed init \
     --listen-address tcp://127.0.0.1:${TM_RPC_PORT} \
     --role seed
 
-for num in 0 1 2; do
+for num in 0 1 2 3; do
     validator_cmd=chain-$num-validator
     sentry_cmd=chain-$num-sentry
 
@@ -54,7 +54,7 @@ done
 
 seed_node=$(cat data/chain-seed/config/node_key.json.id)@chain-seed:${TM_P2P_PORT}
 
-for num in 0 1 2; do
+for num in 0 1 2 3; do
     sentry_cmd=chain-$num-sentry
     validator_cmd=chain-$num-validator
 
@@ -74,7 +74,7 @@ for num in 0 1 2; do
     ${BB} sed -i "/^external-address =/c\external-address = \"${validator_cmd}:${TM_P2P_PORT}\"" data/${validator_cmd}/config/config.toml
 done
 
-$DC up -d chain-seed chain-{0..2}-{sentry,validator} keyper-{0..2}
+$DC up -d chain-seed chain-{0..3}-{sentry,validator} keyper-{0..3}
 
 echo "We need to wait for the chain to reach height >= 1"
 sleep 5
@@ -86,4 +86,4 @@ $DC run --rm --no-deps --entrypoint /rolling-shutter chain-0-validator bootstrap
     --shuttermint-url http://chain-0-sentry:${TM_RPC_PORT} \
     --signing-key 479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
 
-$DC stop -t 30 geth chain-seed chain-{0..2}-{sentry,validator} keyper-{0..2}
+$DC stop -t 30 geth chain-seed chain-{0..3}-{sentry,validator} keyper-{0..3}

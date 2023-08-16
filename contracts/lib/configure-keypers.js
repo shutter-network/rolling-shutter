@@ -6,7 +6,10 @@ const { ethers } = require("hardhat");
 
 // const { inspect } = require("util");
 
-async function configure_keypers(keyperAddrs) {
+//TODO since we want to call this for new keypers
+// this should also check and eventually fund the
+// keypers if they are below the target funding.
+async function configure_keypers(keyperAddrs, blockOffset = 10) {
   if (keyperAddrs.length == 0) {
     console.log("WARNING: cannot configure keypers: no keyper addresses given");
     return;

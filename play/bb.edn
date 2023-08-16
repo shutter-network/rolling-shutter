@@ -420,7 +420,9 @@
   -deploy-conf
   {:doc "Generate a deploy config"
    :depends [-keypers -collator]
-   :task (let [conf {:keypers -keypers
+   ; FIXME keypers is now a list of lists, where
+   ; the first list is the initially deployed keyper set
+   :task (let [conf {:keypers [-keypers]
                      :collator -collator
                      :fundValue "100"}
                play-json (str (fs/absolutize "play.json"))]
