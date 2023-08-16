@@ -86,8 +86,9 @@ extendEnvironment((hre) => {
     };
   }
 
-  hre.getKeyperAddresses = async function () {
-    if (hre.deployConf.keypers === null) {
+  hre.getKeyperAddresses = async function (index = 0) {
+    const keypers = hre.deployConf.keypers?.at(index);
+    if (keypers === undefined) {
       const { keyper0, keyper1, keyper2 } = await hre.getNamedAccounts();
       if (keyper0 && keyper1 && keyper2) {
         return [keyper0, keyper1, keyper2];
@@ -95,7 +96,7 @@ extendEnvironment((hre) => {
         return [];
       }
     } else {
-      return hre.deployConf.keypers;
+      return keypers;
     }
   };
 
@@ -125,6 +126,7 @@ module.exports = {
     keyper0: 1,
     keyper1: 2,
     keyper2: 3,
+    keyper3: 4,
     collator: 7,
     bank: {
       // an account that has funds

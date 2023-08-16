@@ -148,6 +148,38 @@ services:
         condition: service_started
     logging: *logging
 
+  chain-3-validator:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-3-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      geth:
+        condition: service_healthy
+      chain-3-sentry:
+        condition: service_started
+    logging: *logging
+
+  chain-3-sentry:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-3-sentry:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      chain-seed:
+        condition: service_started
+    logging: *logging
+
   chain-seed:
     image: snapshutter
     restart: always
@@ -180,6 +212,8 @@ services:
         condition: service_started
       keyper-2:
         condition: service_started
+      keyper-3:
+        condition: service_started
     logging: *logging
     labels:
       caddy: live.snapshot.shutter.network
@@ -204,6 +238,8 @@ services:
         condition: service_started
       chain-2-sentry:
         condition: service_started
+      chain-3-sentry:
+        condition: service_started
       geth:
         condition: service_healthy
     logging: *logging
@@ -227,6 +263,8 @@ services:
         condition: service_started
       chain-2-sentry:
         condition: service_started
+      chain-3-sentry:
+        condition: service_started
       geth:
         condition: service_healthy
     logging: *logging
@@ -236,6 +274,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
+      - "--loglevel=debug"
       - snapshotkeyper
     command: "--config /config/keyper-0.toml"
     volumes:
@@ -248,6 +287,10 @@ services:
         condition: service_healthy
       chain-0-sentry:
         condition: service_started
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
       geth:
         condition: service_healthy
     logging: *logging
@@ -257,6 +300,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
+      - "--loglevel=debug"
       - snapshotkeyper
     command: "--config /config/keyper-1.toml"
     volumes:
@@ -269,6 +313,10 @@ services:
         condition: service_healthy
       chain-1-sentry:
         condition: service_started
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
       geth:
         condition: service_healthy
     logging: *logging
@@ -278,6 +326,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
+      - "--loglevel=debug"
       - snapshotkeyper
     command: "--config /config/keyper-2.toml"
     volumes:
@@ -289,6 +338,34 @@ services:
       db:
         condition: service_healthy
       chain-2-sentry:
+        condition: service_started
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
+      geth:
+        condition: service_healthy
+    logging: *logging
+
+  keyper-3:
+    image: snapshutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - "--loglevel=debug"
+      - snapshotkeyper
+    command: "--config /config/keyper-3.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      chain-3-sentry:
+        condition: service_started
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
         condition: service_started
       geth:
         condition: service_healthy

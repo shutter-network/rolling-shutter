@@ -2,6 +2,7 @@
 # Peer role: bootstrap
 
 # whether to register handlers on the messages and log them
+InstanceID = 0
 ListenMessages = true
 
 [P2P]
