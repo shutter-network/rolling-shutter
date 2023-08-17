@@ -158,7 +158,12 @@ func (kpr *keyper) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
-func (kpr *keyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
+func (kpr *keyper) handleOnChainChanges(
+	ctx context.Context,
+	tx pgx.Tx,
+	l1BlockNumber uint64,
+) error {
+	log.Info().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
 	err := kpr.handleOnChainKeyperSetChanges(ctx, tx)
 	if err != nil {
 		return err
@@ -218,7 +223,10 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	}
 
 	cq := chainobsdb.New(tx)
-	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, int64(latestBatchConfig.KeyperConfigIndex)+1)
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
+		ctx,
+		int64(latestBatchConfig.KeyperConfigIndex)+1,
+	)
 	if err == pgx.ErrNoRows {
 		return nil
 	}
@@ -240,8 +248,13 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		return err
 	}
 
+	// FIXME I think this only works in the tests by accident, because the timespans are so
+	// short and the activation block numbers are already in the past when we hit the l1-chain?
 	if keyperSet.ActivationBlockNumber-lastBlock > kpr.config.DKGStartBlockDelta {
-		log.Info().Interface("keyper-set", keyperSet).Msg("not yet submitting config")
+		log.Info().Interface("keyper-set", keyperSet).
+			Int64("last-block-seen", lastBlock).
+			Int64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+			Msg("not yet submitting config")
 		return nil
 	}
 
@@ -254,7 +267,10 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 	if err != nil {
 		return err
 	}
-	log.Info().Interface("keyper-set", keyperSet).Msg("have a new config to be scheduled")
+	log.Info().Interface("keyper-set", keyperSet).
+		Int64("last-block-seen", lastBlock).
+		Int64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+		Msg("have a new config to be scheduled")
 	batchConfigMsg := shmsg.NewBatchConfig(
 		uint64(keyperSet.ActivationBlockNumber),
 		keypers,
