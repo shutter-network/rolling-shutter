@@ -1,6 +1,9 @@
 .vscode
 .direnv
+.devenv
 .lsp
 log
 node_modules
 docker/data
+temp
+result
