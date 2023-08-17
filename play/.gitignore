@@ -13,3 +13,4 @@
 /ci-bb.edn
 *.jar
 /target/
+.clj-kondo
