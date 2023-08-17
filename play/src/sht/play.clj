@@ -213,6 +213,7 @@
                  :cfgfile (format "keyper-%s.toml" n)
                  :toml-edits {"DatabaseURL" (format "postgres:///%s" db)
                               "DKGPhaseLength" 8
+                              "DKGStartBlockDelta" 5
                               "ListenAddresses" [(format "/ip4/127.0.0.1/tcp/%d" p2p-port)]
                               "HTTPEnabled" true
                               "HTTPListenAddress" (format ":%d" (+ 24000 n))

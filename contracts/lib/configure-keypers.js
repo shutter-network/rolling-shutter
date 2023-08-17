@@ -43,7 +43,7 @@ async function configure_keypers(keyperAddrs) {
 
   const cfg = await ethers.getContract("KeyperConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
-  const activationBlockNumber = currentBlock + 10;
+  const activationBlockNumber = currentBlock + 15;
 
   const activeConfig = await cfg.getActiveConfig(activationBlockNumber);
   if (activeConfig[1].toNumber() === configSetIndex) {
