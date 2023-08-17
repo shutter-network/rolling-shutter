@@ -35,7 +35,7 @@ type Config struct {
 	EncryptionKey            *ecies.PrivateKey
 	P2PKey                   p2pcrypto.PrivKey
 	DKGPhaseLength           uint64 // in shuttermint blocks
-	DKGStartBlockDelta       int64
+	DKGStartBlockDelta       uint64
 	ListenAddresses          []multiaddr.Multiaddr
 	CustomBootstrapAddresses []peer.AddrInfo
 	Environment              p2p.Environment

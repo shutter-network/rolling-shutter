@@ -155,7 +155,8 @@ func (snkpr *snapshotkeyper) handleContractEvents(ctx context.Context) error {
 }
 
 func (snkpr *snapshotkeyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
-	err := snkpr.handleOnChainKeyperSetChanges(ctx, tx)
+	log.Info().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
+	err := snkpr.handleOnChainKeyperSetChanges(ctx, tx, l1BlockNumber)
 	if err != nil {
 		return err
 	}
@@ -203,7 +204,7 @@ func (snkpr *snapshotkeyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1
 }
 
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
-func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx) error {
+func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
 	q := kprdb.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
@@ -231,12 +232,16 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return nil
 	}
 
-	lastBlock, err := q.GetLastBlockSeen(ctx)
-	if err != nil {
-		return err
+	activationBlockNumber := uint64(keyperSet.ActivationBlockNumber)
+	if activationBlockNumber-l1BlockNumber > snkpr.config.DKGStartBlockDelta {
+		log.Info().Interface("keyper-set", keyperSet).
+			Uint64("l1-block-number", l1BlockNumber).
+			Uint64("dkg-start-delta", snkpr.config.DKGStartBlockDelta).
+			Msg("not yet submitting config")
+		return nil
 	}
 
-	if keyperSet.ActivationBlockNumber-lastBlock > snkpr.config.DKGStartBlockDelta {
+	if activationBlockNumber-l1BlockNumber > snkpr.config.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).Msg("not yet submitting config")
 		return nil
 	}
