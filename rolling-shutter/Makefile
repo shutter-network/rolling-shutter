@@ -36,7 +36,7 @@ test: test-unit
 
 test-all: test-unit test-integration
 
-generate:
+generate: install-codegen-tools
 	${GO} generate -x ./...
 
 coverage:
@@ -49,7 +49,10 @@ clean:
 install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
-install-codegen-tools: install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer
+install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer
+
+install-npm:
+	cd ../contracts && npm install
 
 install-sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.1
