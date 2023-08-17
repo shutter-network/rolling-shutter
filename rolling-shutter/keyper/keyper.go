@@ -164,7 +164,7 @@ func (kpr *keyper) handleOnChainChanges(
 	l1BlockNumber uint64,
 ) error {
 	log.Info().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
-	err := kpr.handleOnChainKeyperSetChanges(ctx, tx)
+	err := kpr.handleOnChainKeyperSetChanges(ctx, tx, l1BlockNumber)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,11 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 }
 
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
-func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx) error {
+func (kpr *keyper) handleOnChainKeyperSetChanges(
+	ctx context.Context,
+	tx pgx.Tx,
+	l1BlockNumber uint64,
+) error {
 	q := kprdb.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
@@ -243,17 +247,12 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		return nil
 	}
 
-	lastBlock, err := q.GetLastBlockSeen(ctx)
-	if err != nil {
-		return err
-	}
-
-	// FIXME I think this only works in the tests by accident, because the timespans are so
-	// short and the activation block numbers are already in the past when we hit the l1-chain?
-	if keyperSet.ActivationBlockNumber-lastBlock > kpr.config.DKGStartBlockDelta {
+	// FIXME this could theoretically be negative
+	activationBlockNumber := uint64(keyperSet.ActivationBlockNumber)
+	if activationBlockNumber-l1BlockNumber > kpr.config.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
-			Int64("last-block-seen", lastBlock).
-			Int64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+			Uint64("l1-block-number", l1BlockNumber).
+			Uint64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
 			Msg("not yet submitting config")
 		return nil
 	}
@@ -268,8 +267,8 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx)
 		return err
 	}
 	log.Info().Interface("keyper-set", keyperSet).
-		Int64("last-block-seen", lastBlock).
-		Int64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
+		Uint64("l1-block-number", l1BlockNumber).
+		Uint64("dkg-start-delta", kpr.config.DKGStartBlockDelta).
 		Msg("have a new config to be scheduled")
 	batchConfigMsg := shmsg.NewBatchConfig(
 		uint64(keyperSet.ActivationBlockNumber),
