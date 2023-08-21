@@ -22,6 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -232,7 +233,10 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return nil
 	}
 
-	activationBlockNumber := uint64(keyperSet.ActivationBlockNumber)
+	activationBlockNumber, err := medley.Int64ToUint64Safe(keyperSet.ActivationBlockNumber)
+	if err != nil {
+		return err
+	}
 	if activationBlockNumber-l1BlockNumber > snkpr.config.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
 			Uint64("l1-block-number", l1BlockNumber).
