@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -199,4 +200,18 @@ func ShowHelpAndExit(cmd *cobra.Command, args []string) {
 	_ = args
 	_ = cmd.Help()
 	os.Exit(1)
+}
+
+func Uint64ToInt64Safe(u uint64) (int64, error) {
+	if u > math.MaxInt64 {
+		return math.MaxInt64, errors.New("int64 overflow")
+	}
+	return int64(u), nil
+}
+
+func Int64ToUint64Safe(i int64) (uint64, error) {
+	if i < 0 {
+		return 0, errors.New("uint64 can't be negative")
+	}
+	return uint64(i), nil
 }
