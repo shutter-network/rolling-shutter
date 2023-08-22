@@ -30,5 +30,6 @@ EthereumURL         = "http://geth:8545/"
 [Shuttermint]
 ShuttermintURL		= "http://chain-0-sentry:26657"
 ValidatorPublicKey = '720accc33c2bce1319d12b5f23f81b39a33f487e21c4a4d7ca1e1f7954a24172'
+EncryptionKey = 'e5c124eb4d3c13fa46532107b69b5abfa11e8aaf3a7a86d11ef370470834e076'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 200

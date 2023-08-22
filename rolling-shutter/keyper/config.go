@@ -63,7 +63,7 @@ func (c *Config) GetValidatorPublicKey() ed25519.PublicKey {
 func (c *Config) GetEncryptionKey() *ecies.PrivateKey {
 	// OPTIM this could be cached, but it is only used for
 	// 		eon DKG (rarely) and does not do any computation
-	return ecies.ImportECDSA(c.Ethereum.PrivateKey.Key)
+	return ecies.ImportECDSA(c.Shuttermint.EncryptionKey.Key)
 }
 
 func (c *Config) GetInstanceID() uint64 {
@@ -107,12 +107,14 @@ func NewShuttermintConfig() *ShuttermintConfig {
 type ShuttermintConfig struct {
 	ShuttermintURL     string
 	ValidatorPublicKey *keys.Ed25519Public `shconfig:",required"`
+	EncryptionKey      *keys.ECDSAPrivate  `shconfig:",required"`
 	DKGPhaseLength     int64               // in shuttermint blocks
 	DKGStartBlockDelta uint64
 }
 
 func (c *ShuttermintConfig) Init() {
 	c.ValidatorPublicKey = &keys.Ed25519Public{}
+	c.EncryptionKey = &keys.ECDSAPrivate{}
 }
 
 func (c *ShuttermintConfig) Name() string {
@@ -140,6 +142,11 @@ func (c *ShuttermintConfig) SetExampleValues() error {
 	}
 
 	valPriv, err := keys.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	c.EncryptionKey, err = keys.GenerateECDSAKey(rand.Reader)
 	if err != nil {
 		return err
 	}
