@@ -31,7 +31,7 @@ jobs:
       - run:
           name: Remove generated doc files
           command: |
-            find ./docs -name '*.md' |xargs rm
+            find ./docs -name '*.md' -delete
       - run: make docs
       - save_cache:
           key: rs-generate-v18-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
