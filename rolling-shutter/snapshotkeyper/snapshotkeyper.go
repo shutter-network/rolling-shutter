@@ -245,11 +245,6 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return nil
 	}
 
-	if activationBlockNumber-l1BlockNumber > snkpr.config.DKGStartBlockDelta {
-		log.Info().Interface("keyper-set", keyperSet).Msg("not yet submitting config")
-		return nil
-	}
-
 	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
 		return nil
