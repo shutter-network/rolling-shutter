@@ -64,7 +64,7 @@ repos:
       - id: eslint
 
   - repo: https://github.com/shutter-network/pre-commit-go-hooks
-    rev: "7a66f5523b34139615a0c95f2b8a441dbc1778dc"
+    rev: "9f4fc1448722928abeede7bb06c96fb46039e6dd"
     hooks:
       - id: shfmt
         args: ["-i", "4"]
@@ -87,7 +87,7 @@ repos:
               ^rolling-shutter/p2pmsg/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
-      - id: gofumpt
+      - id: golines-gofumpt
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
