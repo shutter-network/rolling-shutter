@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -6,6 +8,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd"
 )
 
+//go:generate go run gendocs.go
 func main() {
 	err := doc.GenMarkdownTree(cmd.Command(), "./")
 	if err != nil {

@@ -27,12 +27,11 @@ jobs:
           name: Remove generated files
           command: |
             find . -name '*.gen.go' |xargs rm
-      - run: make generate
       - run:
           name: Remove generated doc files
           command: |
             find ./docs -name '*.md' -delete
-      - run: make docs
+      - run: make generate
       - save_cache:
           key: rs-generate-v18-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:

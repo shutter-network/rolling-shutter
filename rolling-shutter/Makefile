@@ -36,11 +36,9 @@ test: test-unit
 
 test-all: test-unit test-integration
 
-docs:
-	${GO} run -C docs gendocs.go
-
 generate: install-codegen-tools
-	${GO} generate -x ./...
+	${GO} generate -skip="gendocs.go" -x ./...
+	${GO} generate -run="gendocs.go" -x ./...
 
 coverage:
 	${GO} test ${GOFLAGS} -covermode=count -coverprofile=coverage.out ./...
@@ -107,4 +105,4 @@ lint-changes:
 abigen:
 	go generate -x ./contract
 
-.PHONY: build clean docs test test-all test-unit test-integration generate install-codegen-tools install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy
+.PHONY: build clean test test-all test-unit test-integration generate install-codegen-tools install-abigen install-protoc-gen-go install-oapi-codegen install-golangci-lint install-cobra install-gofumpt install-gotestsum install-tools lint lint-changes coverage abigen shcryptowasm wasm wasm-js wasm-legacy
