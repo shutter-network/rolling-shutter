@@ -94,6 +94,27 @@ jobs:
           paths:
             - "~/.cache/go-build"
 
+  build-docker-image:
+    docker:
+      - image: cimg/base:2023.08
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: "Build docker image"
+          command: |
+            export DOCKER_BUILDKIT=1
+            docker build -f docker/build-src/snapshot/Dockerfile -t snapshot:latest .
+      - run:
+          name: "Upload docker image"
+          command: |
+            TAG=ghcr.io/shutter-network/snapshot-$CIRCLE_BRANCH:$(git rev-list --count HEAD)
+            echo "Uploading $TAG"
+            echo $UPLOAD_GHCR_IO | docker login ghcr.io -u rolling-shutter-deployment --password-stdin
+            docker tag snapshot:latest $TAG
+            docker push $TAG
+
   build-release:
     parameters:
       go-os-arch:
@@ -186,6 +207,12 @@ jobs:
 workflows:
   rolling-shutter:
     jobs:
+      - build-docker-image:
+          filters:
+            branches:
+              only: /[a-z0-9]+/
+          context:
+            - upload-release
       - rs-generate:
           filters:
             tags:
