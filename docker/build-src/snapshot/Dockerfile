@@ -1,10 +1,10 @@
 FROM golang:1.20 as builder
-
+ENV GOMODCACHE=/root/.cache/mod
 # Fetch go modules separately to improve cache usage
 RUN mkdir /gomod
 COPY /rolling-shutter/go.* /gomod/
 WORKDIR /gomod
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache go mod download
 
 # Build binary
 COPY / /src
