@@ -7,13 +7,13 @@ WORKDIR /gomod
 RUN go mod download
 
 # Build binary
-COPY /rolling-shutter /rolling-shutter
-WORKDIR /rolling-shutter
+COPY / /src
+WORKDIR /src/rolling-shutter
 RUN --mount=type=cache,target=/root/.cache CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-v make build
 
 FROM scratch as runner
 
-COPY --from=builder /rolling-shutter/bin/rolling-shutter /rolling-shutter
+COPY --from=builder /src/rolling-shutter/bin/rolling-shutter /rolling-shutter
 
 # Use 'uclibc' flavor to avoid https://github.com/docker-library/busybox/issues/155#issuecomment-1344375664
 RUN --mount=from=busybox:uclibc,src=/bin,dst=/bin mkdir -p /etc/ssl
