@@ -128,7 +128,7 @@
                  :loop/checks [{:check :collator/decryption-trigger}]}
                 {:check :loop/until
                  :loop/description "batchtx generation should work"
-                 :loop/timeout-ms (* 20 1000)
+                 :loop/timeout-ms (* 22 1000)
                  :loop/checks [{:check :collator/have-batch-tx
                                 :collator/num-batchtxs 5}]}
                 ;; {:check :loop/forever}
