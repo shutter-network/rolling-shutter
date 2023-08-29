@@ -31,6 +31,50 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
+task("verify-all", "Verifies all contracts", async (taskArgs, hre) => {
+  const keypers = await hre.ethers.getContract("Keypers");
+  console.log("Verifying Keypers @ %s", keypers.address);
+  await hre.run("verify:verify", {
+    address: keypers.address,
+    constructorArguments: [],
+  });
+
+  const keyperConfig = await hre.ethers.getContract("KeyperConfig");
+  console.log("Verifying KeyperConfig @ %s", keyperConfig.address);
+  await hre.run("verify:verify", {
+    address: keyperConfig.address,
+    constructorArguments: [keypers.address],
+  });
+
+  const collator = await hre.ethers.getContract("Collator");
+  console.log("Verifying Collator @ %s", collator.address);
+  await hre.run("verify:verify", {
+    address: collator.address,
+    constructorArguments: [],
+  });
+
+  const collatorConfig = await hre.ethers.getContract("CollatorConfig");
+  console.log("Verifying CollatorConfig @ %s", collatorConfig.address);
+  await hre.run("verify:verify", {
+    address: collatorConfig.address,
+    constructorArguments: [collator.address],
+  });
+
+  const eonKeyStorage = await hre.ethers.getContract("EonKeyStorage");
+  console.log("Verifying EonKeyStorage @ %s", eonKeyStorage.address);
+  await hre.run("verify:verify", {
+    address: eonKeyStorage.address,
+    constructorArguments: [],
+  });
+
+  const batchCounter = await hre.ethers.getContract("BatchCounter");
+  console.log("Verifying BatchCounter @ %s", batchCounter.address);
+  await hre.run("verify:verify", {
+    address: batchCounter.address,
+    constructorArguments: [],
+  });
+});
+
 extendEnvironment((hre) => {
   if (process.env.DEPLOY_CONF !== undefined) {
     hre.deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
