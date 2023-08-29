@@ -9,6 +9,18 @@ const { task, extendEnvironment } = require("hardhat/config");
 const fs = require("fs");
 const process = require("process");
 
+let etherscanAPIKey = {};
+if (process.env.GNOSISSCAN_API_KEY !== undefined) {
+  etherscanAPIKey.gnosis = process.env.GNOSISSCAN_API_KEY;
+  // console.log("Using etherscan API key configured via GNOSISSCAN_API_KEY");
+}
+
+let gnosisAccounts = [];
+if (process.env.GNOSIS_DEPLOY_KEY !== undefined) {
+  gnosisAccounts.push(process.env.GNOSIS_DEPLOY_KEY);
+  // console.log("Using gnosis deploy key configured via GNOSIS_DEPLOY_KEY");
+}
+
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
@@ -83,6 +95,10 @@ module.exports = {
         interval: 1500,
       },
     },
+    gnosis: {
+      url: "https://rpc.gnosischain.com",
+      accounts: gnosisAccounts,
+    },
     nitro: {
       url: "http://localhost:8547",
       accounts: [
@@ -94,5 +110,18 @@ module.exports = {
       url: "http://geth:8545",
       accounts: "remote",
     },
+  },
+  etherscan: {
+    customChains: [
+      {
+        network: "gnosis",
+        chainId: 100,
+        urls: {
+          apiURL: "https://api.gnosisscan.io/api",
+          browserURL: "https://gnosisscan.io/",
+        },
+      },
+    ],
+    apiKey: etherscanAPIKey,
   },
 };
