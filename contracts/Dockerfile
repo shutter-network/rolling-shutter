@@ -9,4 +9,5 @@ VOLUME /contracts/deployments
 COPY /contracts /contracts
 COPY --from=builder /contracts /contracts
 WORKDIR /contracts
+RUN ["/nodejs/bin/node", "node_modules/.bin/hardhat", "compile"]
 ENTRYPOINT ["/nodejs/bin/node", "node_modules/.bin/hardhat"]

@@ -1,5 +1,6 @@
 contracts/combined.json
 contracts/node_modules
+contracts/deployments
 docker/data
 play/work
 rolling-shutter/bin
