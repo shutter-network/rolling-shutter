@@ -10,8 +10,35 @@ jobs:
       - run: npx hardhat --network ganache test
       - run: npx hardhat deploy
 
+  build-contracts-docker-image:
+    docker:
+      - image: cimg/base:2023.08
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: "Build docker image"
+          command: |
+            export DOCKER_BUILDKIT=1
+            docker build -f contracts/Dockerfile -t contracts:latest .
+      - run:
+          name: "Upload docker image"
+          command: |
+            TAG=ghcr.io/shutter-network/contracts-$CIRCLE_BRANCH:$(git rev-list --count HEAD)
+            echo "Uploading $TAG"
+            echo $UPLOAD_GHCR_IO | docker login ghcr.io -u rolling-shutter-deployment --password-stdin
+            docker tag contracts:latest $TAG
+            docker push $TAG
+
 workflows:
   version: 2
   contracts:
     jobs:
       - hardhat
+      - build-contracts-docker-image:
+          filters:
+            branches:
+              only: /[a-z0-9]+/
+          context:
+            - upload-release
