@@ -12,6 +12,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -30,6 +31,7 @@ func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Ethereum = configuration.NewEthnodeConfig()
 	c.Shuttermint = NewShuttermintConfig()
+	c.Metrics = metricsserver.NewConfig()
 }
 
 type Config struct {
@@ -42,6 +44,7 @@ type Config struct {
 	P2P         *p2p.Config
 	Ethereum    *configuration.EthnodeConfig
 	Shuttermint *ShuttermintConfig
+	Metrics     *metricsserver.MetricsConfig
 }
 
 func (c *Config) Validate() error {

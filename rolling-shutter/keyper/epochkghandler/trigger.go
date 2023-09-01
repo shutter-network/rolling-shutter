@@ -71,6 +71,7 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	if !ok {
 		return nil, errors.New("Message type assertion mismatch")
 	}
+	metricsEpochKGDectyptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
 	epochID, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {

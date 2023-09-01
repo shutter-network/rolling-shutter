@@ -69,6 +69,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 }
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+	metricsEpochKGDecryptionKeysReceived.Inc()
 	key := msg.(*p2pmsg.DecryptionKey)
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.

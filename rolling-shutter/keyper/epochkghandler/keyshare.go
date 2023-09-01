@@ -79,6 +79,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 }
 
 func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+	metricsEpochKGDecryptionKeySharesReceived.Inc()
 	msg := m.(*p2pmsg.DecryptionKeyShares)
 	// Insert the share into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
@@ -146,6 +147,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	if err != nil {
 		return nil, err
 	}
+	metricsEpochKGDecryptionKeysGenerated.Inc()
 	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.LogInfo()).
 		Msg("broadcasting decryption key")
 	return []p2pmsg.Message{message}, nil

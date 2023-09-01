@@ -103,6 +103,7 @@ func SendDecryptionKeyShare(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
+	metricsEpochKGDecryptionKeySharesSent.Inc()
 	log.Info().Int64("block-number", blockNumber).Msg("sending decryption key share")
 	return []p2pmsg.Message{msg}, nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -42,6 +43,7 @@ type snapshotkeyper struct {
 
 	shuttermintState *smobserver.ShuttermintState
 	p2p              *p2p.P2PHandler
+	metricsServer    *metricsserver.MetricsServer
 }
 
 func New(config *keyper.Config) service.Service {
@@ -85,6 +87,12 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 		return err
 	}
 
+	if snkpr.config.Metrics.Enabled {
+		epochkghandler.InitMetrics()
+		snkpr.metricsServer = metricsserver.New(snkpr.config.Metrics)
+		runner.Defer(snkpr.metricsServer.Shutdown)
+	}
+
 	snkpr.dbpool = dbpool
 	snkpr.shuttermintClient = shuttermintClient
 	snkpr.messageSender = messageSender
@@ -116,6 +124,9 @@ func (snkpr *snapshotkeyper) getServices() []service.Service {
 
 	if snkpr.config.HTTPEnabled {
 		services = append(services, kprapi.NewHTTPService(snkpr.dbpool, snkpr.config, snkpr.p2p))
+	}
+	if snkpr.config.Metrics.Enabled {
+		services = append(services, snkpr.metricsServer)
 	}
 	return services
 }
