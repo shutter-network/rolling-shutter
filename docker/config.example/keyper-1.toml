@@ -33,3 +33,8 @@ ValidatorPublicKey = '720accc33c2bce1319d12b5f23f81b39a33f487e21c4a4d7ca1e1f7954
 EncryptionKey = '8972bbbcf5b4a9eaef0030b1eff64332e7188ff4dd523314176956b5c624ca8b'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 200
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100

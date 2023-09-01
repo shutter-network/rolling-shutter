@@ -3,14 +3,11 @@
 # Ethereum address: 0x2E135FE171fB6351026B75aF688a7F9689B66B87
 
 
-InstanceID = 42
+InstanceID = 0
 DatabaseURL     = "postgres://postgres@db:5432/snapshot"
 SnapshotHubURL       = "http://dummyserver:5000"
 JSONRPCHost = ''
 JSONRPCPort = 8754
-MetricsEnabled  = true
-MetricsHost     = "0.0.0.0"
-MetricsPort     = 9100
 
 [P2P]
 P2PKey = 'CAESQIL98WGKWUdyzp8mznCV8jJv5Lqsbz2jDNqaY7BXrjCJX5sSskzcPC6U25ZRn98qyvXrunN9DT8AkS1T5PcD/Z4='
@@ -30,3 +27,8 @@ ContractsURL = 'http://127.0.0.1:8555/'
 DeploymentDir = './deployments/localhost/'
 # The layer 1 JSON RPC endpoint
 EthereumURL     = "http://geth:8545/"
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100

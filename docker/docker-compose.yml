@@ -241,6 +241,8 @@ services:
     volumes:
       - ./config:/config
       - ./data/deployments:/deployments
+    ports:
+      - "9200:9100"
     depends_on:
       db:
         condition: service_healthy
@@ -260,6 +262,8 @@ services:
     volumes:
       - ./config:/config
       - ./data/deployments:/deployments
+    ports:
+      - "9201:9100"
     depends_on:
       db:
         condition: service_healthy
@@ -279,6 +283,8 @@ services:
     volumes:
       - ./config:/config
       - ./data/deployments:/deployments
+    ports:
+      - "9202:9100"
     depends_on:
       db:
         condition: service_healthy
