@@ -7,6 +7,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -21,6 +22,7 @@ func NewConfig() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Ethereum = configuration.NewEthnodeConfig()
+	c.Metrics = metricsserver.NewConfig()
 }
 
 type Config struct {
@@ -31,12 +33,9 @@ type Config struct {
 	JSONRPCHost string
 	JSONRPCPort uint16
 
-	MetricsEnabled bool
-	MetricsHost    string
-	MetricsPort    uint16
-
 	P2P      *p2p.Config
 	Ethereum *configuration.EthnodeConfig
+	Metrics  *metricsserver.MetricsConfig
 }
 
 func (c *Config) Validate() error {
@@ -52,9 +51,9 @@ func (c *Config) SetDefaultValues() error {
 	c.Ethereum.EthereumURL = "http://[::1]:8545/"
 	c.JSONRPCHost = ""
 	c.JSONRPCPort = 8754
-	c.MetricsEnabled = false
-	c.MetricsHost = "127.0.0.1"
-	c.MetricsPort = 9191
+	c.Metrics.Enabled = false
+	c.Metrics.Host = "127.0.0.1"
+	c.Metrics.Port = 9191
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -29,12 +30,13 @@ var (
 type Snapshot struct {
 	Config *Config
 
-	p2p      *p2p.P2PHandler
-	dbpool   *pgxpool.Pool
-	db       *snpdb.Queries
-	l1Client *ethclient.Client
-	hubapi   *hubapi.HubAPI
-	jrpc     *snpjrpc.SnpJRPC
+	p2p           *p2p.P2PHandler
+	dbpool        *pgxpool.Pool
+	db            *snpdb.Queries
+	l1Client      *ethclient.Client
+	hubapi        *hubapi.HubAPI
+	jrpc          *snpjrpc.SnpJRPC
+	metricsServer *metricsserver.MetricsServer
 }
 
 func New(config *Config) (service.Service, error) {
@@ -78,11 +80,13 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	db := snpdb.New(dbpool)
 	snp.db = db
 
-	if snp.Config.MetricsEnabled {
+	if snp.Config.Metrics.Enabled {
 		err = snp.initMetrics(ctx)
 		if err != nil {
 			return err
 		}
+		snp.metricsServer = metricsserver.New(snp.Config.Metrics)
+		runner.Defer(snp.metricsServer.Shutdown)
 	}
 
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
@@ -99,8 +103,8 @@ func (snp *Snapshot) getServices() []service.Service {
 		snp.p2p,
 		snp.jrpc,
 	}
-	if snp.Config.MetricsEnabled {
-		services = append(services, NewMetricsServer(snp.Config))
+	if snp.Config.Metrics.Enabled {
+		services = append(services, snp.metricsServer)
 	}
 	return services
 }

@@ -67,8 +67,5 @@ func main(config *snapshot.Config) error {
 	if err != nil {
 		return err
 	}
-	return service.RunWithSighandler(
-		context.Background(),
-		snp,
-	)
+	return service.RunWithSighandler(context.Background(), snp)
 }
