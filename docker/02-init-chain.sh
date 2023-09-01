@@ -43,7 +43,7 @@ for num in 0 1 2; do
         --listen-address tcp://127.0.0.1:${TM_RPC_PORT} \
         --role validator
 
-    sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/${validator_cmd}/config/priv_validator_pubkey.hex)\"" config/keyper-${num}.toml
+    ${BB} sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/${validator_cmd}/config/priv_validator_pubkey.hex)\"" /config/keyper-${num}.toml
 
     if [ $num -eq 0 ]; then
         for destination in data/chain-seed/config/ data/chain-{1..2}-validator/config/ data/chain-{0..2}-sentry/config/; do
