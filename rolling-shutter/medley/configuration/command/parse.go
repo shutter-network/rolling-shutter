@@ -87,9 +87,22 @@ func ParseCLI(v *viper.Viper, cmd *cobra.Command, config configuration.Config) e
 // have to be native types or implement the encoding.TextUnmarshaler
 // interface.
 func ParseViper(v *viper.Viper, config configuration.Config) error {
+	// This filtering is here because the AllKeys() also returns keys with value nil,
+	// although it doesn't say so in the docstring
+	keysSetByUser := []string{}
+	for _, k := range v.AllKeys() {
+		value := v.Get(k)
+		if value == nil {
+			// should not happen, since AllKeys() returns only keys holding a value,
+			// check just in case anything changes
+			continue
+		}
+		keysSetByUser = append(keysSetByUser, k)
+	}
+
 	// set the default values recursively for all configuration options
 	// the user did not provide by any means
-	err := configuration.SetDefaultValuesRecursive(config, v.AllKeys())
+	err := configuration.SetDefaultValuesRecursive(config, keysSetByUser)
 	if err != nil {
 		return err
 	}
