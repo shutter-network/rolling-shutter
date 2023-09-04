@@ -22,6 +22,7 @@ func Cmd() *cobra.Command {
 			"",
 		),
 		command.WithGenerateConfigSubcommand(),
+		command.WithDumpConfigSubcommand(),
 	)
 	return builder.Command()
 }

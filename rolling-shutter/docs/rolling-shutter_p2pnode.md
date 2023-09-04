@@ -24,5 +24,6 @@ rolling-shutter p2pnode [flags]
 ### SEE ALSO
 
 * [rolling-shutter](rolling-shutter.md)	 - A collection of commands to run and interact with Rolling Shutter nodes
+* [rolling-shutter p2pnode dump-config](rolling-shutter_p2pnode_dump-config.md)	 - Dump a 'p2pnode' configuration file, based on given config and env vars
 * [rolling-shutter p2pnode generate-config](rolling-shutter_p2pnode_generate-config.md)	 - Generate a 'p2pnode' configuration file
 

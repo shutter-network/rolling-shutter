@@ -29,6 +29,16 @@ func WithGenerateConfigSubcommand() Option {
 	}
 }
 
+// WithDumpConfigSubcommand attaches an additional subcommand
+// 'dump-config' to the command.
+// This allows to parse the given configuration (file, env-var),
+// and write out all accumulated values in a configuration file.
+func WithDumpConfigSubcommand() Option {
+	return func(c *commandBuilderConfig) {
+		c.dumpConfig = true
+	}
+}
+
 // WithFileSystem overwrites overwrite the `afero` Filesystem wrapper used
 // for reading and writing configuration files.
 // This is mainly helpful for tests, where an in-memory filesystem
