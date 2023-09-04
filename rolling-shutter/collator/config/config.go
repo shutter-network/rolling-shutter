@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/epoch"
+	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -20,6 +20,7 @@ func New() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Ethereum = configuration.NewEthnodeConfig()
+	c.EpochDuration = &enctime.Duration{}
 }
 
 type Config struct {
@@ -29,7 +30,7 @@ type Config struct {
 	HTTPListenAddress string
 
 	SequencerURL                 string
-	EpochDuration                *epoch.Duration
+	EpochDuration                *enctime.Duration
 	ExecutionBlockDelay          uint32
 	BatchIndexAcceptenceInterval uint32
 
@@ -46,7 +47,7 @@ func (c *Config) Name() string {
 }
 
 func (c *Config) SetDefaultValues() error {
-	c.EpochDuration = &epoch.Duration{
+	c.EpochDuration = &enctime.Duration{
 		Duration: time.Second * 5,
 	}
 	c.SequencerURL = "http://127.0.0.1:8555/"

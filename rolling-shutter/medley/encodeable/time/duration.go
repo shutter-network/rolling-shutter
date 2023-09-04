@@ -1,13 +1,13 @@
-package epoch
+package time
 
-import "time"
+import _time "time"
 
 type Duration struct {
-	time.Duration
+	_time.Duration
 }
 
 func (k *Duration) UnmarshalText(b []byte) error {
-	dur, err := time.ParseDuration(string(b))
+	dur, err := _time.ParseDuration(string(b))
 	if err != nil {
 		return err
 	}
