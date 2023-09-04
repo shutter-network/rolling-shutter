@@ -21,7 +21,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/epoch"
+	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 )
@@ -90,7 +90,7 @@ func newTestConfig(t *testing.T) *config.Config {
 	cfg := config.New()
 	err := configuration.SetExampleValuesRecursive(cfg)
 	assert.NilError(t, err)
-	cfg.EpochDuration = &epoch.Duration{Duration: 2 * time.Second}
+	cfg.EpochDuration = &enctime.Duration{Duration: 2 * time.Second}
 	return cfg
 }
 
