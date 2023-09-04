@@ -33,12 +33,13 @@ func (mc *MetricsConfig) Validate() error {
 
 func (mc *MetricsConfig) SetDefaultValues() error {
 	mc.Enabled = false
-	mc.Host = "[::]"
-	mc.Port = 9191
 	return nil
 }
 
 func (mc *MetricsConfig) SetExampleValues() error {
+	mc.Enabled = false
+	mc.Host = "[::]"
+	mc.Port = 9100
 	return nil
 }
 
