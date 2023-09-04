@@ -33,7 +33,7 @@ func (mc *MetricsConfig) Validate() error {
 
 func (mc *MetricsConfig) SetDefaultValues() error {
 	mc.Enabled = false
-	mc.Host = "::1"
+	mc.Host = "[::]"
 	mc.Port = 9191
 	return nil
 }
