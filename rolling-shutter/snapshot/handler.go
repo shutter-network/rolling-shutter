@@ -7,7 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/shutter/shlib/shcrypto"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -49,7 +52,9 @@ func (d *DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
 }
 
-func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
+func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
+	var eonPublicKey shcrypto.EonPublicKey
+
 	decryptionKeyMsg := msg.(*p2pmsg.DecryptionKey)
 	// FIXME: check snapshot business logic for decryptionKeyMsg validation
 	if decryptionKeyMsg.GetInstanceID() != handler.config.InstanceID {
@@ -65,6 +70,30 @@ func (handler *DecryptionKeyHandler) ValidateMessage(_ context.Context, msg p2pm
 	_, err = key.GobEncode()
 	if err != nil {
 		return false, errors.Wrap(err, "failed to encode decryption key")
+	}
+
+	eonID, err := medley.Uint64ToInt64Safe(decryptionKeyMsg.GetEon())
+	if err != nil {
+		return false, errors.Wrap(err, "can't cast eon to int64")
+	}
+
+	eon, err := handler.snapshot.db.GetEonPublicKey(ctx, eonID)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to retrieve eon for decryption key")
+	}
+
+	err = eonPublicKey.GobDecode(eon)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to retrieve eon for decryption key")
+	}
+
+	epochID := decryptionKeyMsg.GetEpochID()
+	ok, err := shcrypto.VerifyEpochSecretKey(key, &eonPublicKey, epochID)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
 	}
 
 	return true, nil
