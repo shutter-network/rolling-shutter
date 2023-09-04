@@ -28,6 +28,7 @@ type CommandBuilder[T configuration.Config] struct {
 }
 
 type commandBuilderConfig struct {
+	dumpConfig     bool
 	generateConfig bool
 	name           string
 	shortUsage     string
@@ -40,6 +41,7 @@ func newCommandBuilder(name string) *commandBuilderConfig {
 	return &commandBuilderConfig{
 		name:           name,
 		generateConfig: false,
+		dumpConfig:     false,
 		shortUsage:     fmt.Sprintf("start the '%s'", name),
 		longUsage:      "",
 		filesystem:     afero.NewOsFs(),
@@ -121,6 +123,36 @@ func Build[T configuration.Config](
 		genConfigCmd.PersistentFlags().String("output", "", "output file")
 		genConfigCmd.MarkPersistentFlagRequired("output")
 		cb.cobraCommand.AddCommand(genConfigCmd)
+	}
+	if builder.dumpConfig {
+		dumpConfigCmd := &cobra.Command{
+			Use:   "dump-config",
+			Short: fmt.Sprintf("Dump a '%s' configuration file, based on given config and env vars", builder.name),
+			Args:  cobra.NoArgs,
+			RunE: func(cmd *cobra.Command, args []string) error {
+				cfg := newConfigForFunc(main)
+				cfg.Init()
+				v := viper.GetViper()
+				v.SetFs(builder.filesystem)
+				err := ParseCLI(v, cmd, cfg)
+				if err != nil {
+					return errors.Wrap(err, "unable to parse configuration")
+				}
+				outPath, err := cmd.Flags().GetString("output")
+				if err != nil {
+					return err
+				}
+				log.Debug().
+					Interface("config", cfg).
+					Msg("dumping config")
+				return WriteConfig(builder.filesystem, cfg, outPath)
+			},
+		}
+		dumpConfigCmd.PersistentFlags().String("output", "", "output file")
+		dumpConfigCmd.MarkPersistentFlagRequired("output")
+		dumpConfigCmd.PersistentFlags().String("config", "", "config file")
+		dumpConfigCmd.MarkPersistentFlagFilename("config")
+		cb.cobraCommand.AddCommand(dumpConfigCmd)
 	}
 	return cb
 }

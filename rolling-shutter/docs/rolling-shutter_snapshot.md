@@ -24,6 +24,7 @@ rolling-shutter snapshot [flags]
 ### SEE ALSO
 
 * [rolling-shutter](rolling-shutter.md)	 - A collection of commands to run and interact with Rolling Shutter nodes
+* [rolling-shutter snapshot dump-config](rolling-shutter_snapshot_dump-config.md)	 - Dump a 'snapshot' configuration file, based on given config and env vars
 * [rolling-shutter snapshot generate-config](rolling-shutter_snapshot_generate-config.md)	 - Generate a 'snapshot' configuration file
 * [rolling-shutter snapshot initdb](rolling-shutter_snapshot_initdb.md)	 - Initialize the database of the 'snapshot'
 

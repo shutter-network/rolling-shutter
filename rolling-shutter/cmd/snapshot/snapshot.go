@@ -30,6 +30,7 @@ func Cmd() *cobra.Command {
 			"",
 		),
 		command.WithGenerateConfigSubcommand(),
+		command.WithDumpConfigSubcommand(),
 	)
 	builder.AddInitDBCommand(initDB)
 	return builder.Command()

@@ -28,6 +28,7 @@ func Cmd() *cobra.Command {
 Shuttermint node which have to be started separately in advance.`,
 		),
 		command.WithGenerateConfigSubcommand(),
+		command.WithDumpConfigSubcommand(),
 	)
 	builder.AddInitDBCommand(initDB)
 	return builder.Command()

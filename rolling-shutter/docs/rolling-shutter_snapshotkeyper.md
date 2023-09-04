@@ -29,6 +29,7 @@ rolling-shutter snapshotkeyper [flags]
 ### SEE ALSO
 
 * [rolling-shutter](rolling-shutter.md)	 - A collection of commands to run and interact with Rolling Shutter nodes
+* [rolling-shutter snapshotkeyper dump-config](rolling-shutter_snapshotkeyper_dump-config.md)	 - Dump a 'snapshotkeyper' configuration file, based on given config and env vars
 * [rolling-shutter snapshotkeyper generate-config](rolling-shutter_snapshotkeyper_generate-config.md)	 - Generate a 'snapshotkeyper' configuration file
 * [rolling-shutter snapshotkeyper initdb](rolling-shutter_snapshotkeyper_initdb.md)	 - Initialize the database of the 'snapshotkeyper'
 
