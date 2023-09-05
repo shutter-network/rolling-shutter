@@ -36,6 +36,10 @@ services:
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
+    # No idea why this is suddenly needed - the HEALTHCHECK is defined in the dockerfile but doesn't get picked up anymore...
+    healthcheck:
+      test: >
+        curl -sSf -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" --data-raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[], "id": 1}'
     logging: *logging
 
   deploy-contracts:
