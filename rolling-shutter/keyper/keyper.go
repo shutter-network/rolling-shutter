@@ -119,7 +119,6 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	if kpr.config.Metrics.Enabled {
 		epochkghandler.InitMetrics()
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
-		runner.Defer(kpr.metricsServer.Shutdown)
 	}
 
 	kpr.dbpool = dbpool

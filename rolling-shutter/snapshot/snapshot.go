@@ -86,7 +86,6 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 			return err
 		}
 		snp.metricsServer = metricsserver.New(snp.Config.Metrics)
-		runner.Defer(snp.metricsServer.Shutdown)
 	}
 
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
