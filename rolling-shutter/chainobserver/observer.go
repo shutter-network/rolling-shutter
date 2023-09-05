@@ -55,8 +55,28 @@ func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*events
 	if err != nil {
 		return errors.Wrap(err, "failed to get last synced event from db")
 	}
-	fromBlock := uint64(eventSyncProgress.NextBlockNumber)
-	fromLogIndex := uint64(eventSyncProgress.NextLogIndex)
+
+	var fromBlock, fromLogIndex uint64
+	if len(eventTypes) == 0 {
+		return errors.New("no events to observe")
+	}
+
+	// first find the min of all event's from-blocks
+	fromBlock = eventTypes[0].FromBlockNumber
+	for _, event := range eventTypes {
+		if event.FromBlockNumber < fromBlock {
+			fromBlock = event.FromBlockNumber
+		}
+	}
+
+	// then check if our saved progress is already later
+	progressBlock := uint64(eventSyncProgress.NextBlockNumber)
+	if progressBlock > fromBlock {
+		fromBlock = progressBlock
+		// only use the saved log index when we're using the
+		// saved block-number
+		fromLogIndex = uint64(eventSyncProgress.NextLogIndex)
+	}
 
 	log.Info().Uint64("from-block", fromBlock).Uint64("from-log-index", fromLogIndex).
 		Msg("starting event syncing")

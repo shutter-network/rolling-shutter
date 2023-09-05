@@ -118,11 +118,12 @@ func (c *Contracts) initKeypersConfigsList() error {
 	}
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.KeypersConfigsListNewConfig = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "NewConfig",
-		Type:     reflect.TypeOf(contract.KeypersConfigsListNewConfig{}),
+		Contract:        boundContract,
+		Address:         d.Address,
+		FromBlockNumber: d.DeployBlockNumber,
+		ABI:             d.ABI,
+		Name:            "NewConfig",
+		Type:            reflect.TypeOf(contract.KeypersConfigsListNewConfig{}),
 	}
 	return nil
 }
@@ -139,11 +140,12 @@ func (c *Contracts) initCollatorConfigsList() error {
 	}
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.CollatorConfigsListNewConfig = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "NewConfig",
-		Type:     reflect.TypeOf(contract.CollatorConfigsListNewConfig{}),
+		Contract:        boundContract,
+		FromBlockNumber: d.DeployBlockNumber,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "NewConfig",
+		Type:            reflect.TypeOf(contract.CollatorConfigsListNewConfig{}),
 	}
 	return nil
 }
@@ -160,25 +162,28 @@ func (c *Contracts) initKeypers() error {
 	}
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.KeypersAdded = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "Added",
-		Type:     reflect.TypeOf(contract.AddrsSeqAdded{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "Added",
+		Type:            reflect.TypeOf(contract.AddrsSeqAdded{}),
 	}
 	c.KeypersAppended = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "Appended",
-		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "Appended",
+		Type:            reflect.TypeOf(contract.AddrsSeqAppended{}),
 	}
 	c.KeypersOwnershipTransferred = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "OwnershipTransferred",
-		Type:     reflect.TypeOf(contract.AddrsSeqOwnershipTransferred{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "OwnershipTransferred",
+		Type:            reflect.TypeOf(contract.AddrsSeqOwnershipTransferred{}),
 	}
 	return nil
 }
@@ -195,25 +200,28 @@ func (c *Contracts) initCollator() error {
 	}
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.CollatorsAdded = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "Added",
-		Type:     reflect.TypeOf(contract.AddrsSeqAdded{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "Added",
+		Type:            reflect.TypeOf(contract.AddrsSeqAdded{}),
 	}
 	c.CollatorsAppended = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "Appended",
-		Type:     reflect.TypeOf(contract.AddrsSeqAppended{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "Appended",
+		Type:            reflect.TypeOf(contract.AddrsSeqAppended{}),
 	}
 	c.CollatorsOwnershipTransferred = &eventsyncer.EventType{
-		Contract: boundContract,
-		Address:  d.Address,
-		ABI:      d.ABI,
-		Name:     "OwnershipTransferred",
-		Type:     reflect.TypeOf(contract.AddrsSeqOwnershipTransferred{}),
+		FromBlockNumber: d.DeployBlockNumber,
+		Contract:        boundContract,
+		Address:         d.Address,
+		ABI:             d.ABI,
+		Name:            "OwnershipTransferred",
+		Type:            reflect.TypeOf(contract.AddrsSeqOwnershipTransferred{}),
 	}
 	return nil
 }

@@ -33,11 +33,12 @@ var (
 
 // EventType defines a single event type to filter for.
 type EventType struct {
-	Contract *bind.BoundContract
-	Address  common.Address
-	ABI      abi.ABI
-	Name     string
-	Type     reflect.Type
+	Contract        *bind.BoundContract
+	Address         common.Address
+	FromBlockNumber uint64
+	ABI             abi.ABI
+	Name            string
+	Type            reflect.Type
 }
 
 // logChannelItem is what is put on the (internal) channel of found logs. It can either contain a
