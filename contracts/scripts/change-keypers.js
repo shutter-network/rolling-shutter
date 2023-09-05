@@ -20,13 +20,24 @@ async function main() {
     console.error("please set DEPLOY_CONF environment variable");
     return;
   }
+
+  if (process.env.KEYPER_SET_INDEX === undefined) {
+    console.error("please set KEYPER_SET_INDEX environment variable");
+    return;
+  }
+
+  const keyperSetIndex = parseInt(process.env.KEYPER_SET_INDEX);
+
   // TODO can we get access to the hre in a script like this?
   // TODO use a different json file to determine the keyper changes
   const deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
 
-  const newKeyperSet = deployConf.keypers?.at(1);
+  const newKeyperSet = deployConf.keypers?.at(keyperSetIndex);
   if (newKeyperSet === undefined) {
-    console.error("no updated keyper set defined in DEPLOY_CONF");
+    console.error(
+      "no updated keyper set defined in DEPLOY_CONF at index %s",
+      keyperSetIndex
+    );
     return;
   }
 
