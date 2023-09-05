@@ -265,6 +265,7 @@ func (snkpr *snapshotkeyper) operateShuttermint(ctx context.Context) error {
 	for {
 		l1BlockNumber, err := retry.FunctionCall(ctx, snkpr.l1Client.BlockNumber)
 		if err != nil {
+			log.Err(err).Msg("Error when getting block")
 			return err
 		}
 
@@ -275,17 +276,20 @@ func (snkpr *snapshotkeyper) operateShuttermint(ctx context.Context) error {
 			snkpr.shuttermintState,
 		)
 		if err != nil {
+			log.Err(err).Msg("Error on syncing app with db")
 			return err
 		}
 		err = snkpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 			return snkpr.handleOnChainChanges(ctx, tx, l1BlockNumber)
 		})
 		if err != nil {
+			log.Err(err).Msg("Error on handling onChainChanges")
 			return err
 		}
 
 		err = fx.SendShutterMessages(ctx, kprdb.New(snkpr.dbpool), &snkpr.messageSender)
 		if err != nil {
+			log.Err(err).Msg("Error sending shutter messages")
 			return err
 		}
 		select {
