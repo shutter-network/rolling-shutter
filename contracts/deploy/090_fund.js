@@ -1,5 +1,4 @@
 const { ethers } = require("hardhat");
-const { BigNumber } = require("ethers");
 const { fund } = require("../lib/fund.js");
 
 module.exports = async function (hre) {
