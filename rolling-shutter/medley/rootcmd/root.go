@@ -162,10 +162,9 @@ func Cmd() *cobra.Command {
 
 func Main(c *cobra.Command) {
 	status := 0
-
 	if err := c.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		status = 1
 	}
-
 	os.Exit(status)
 }
