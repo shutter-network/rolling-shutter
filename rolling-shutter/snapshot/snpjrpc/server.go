@@ -145,7 +145,7 @@ func New(
 	return &jrpc
 }
 
-func (snpjrpc *SnpJRPC) Start(_ context.Context, group service.Runner) error {
+func (snpjrpc *SnpJRPC) Start(ctx context.Context, group service.Runner) error { //nolint:unparam
 	group.Go(func() error {
 		httpServer := snpjrpc.Server.Prepare()
 		log.Info().Str("address", snpjrpc.Server.Host).Msg("Running JSON-RPC server at")
@@ -153,6 +153,11 @@ func (snpjrpc *SnpJRPC) Start(_ context.Context, group service.Runner) error {
 			return err
 		}
 		return nil
+	})
+	group.Go(func() error {
+		<-ctx.Done()
+		snpjrpc.Shutdown()
+		return ctx.Err()
 	})
 	return nil
 }

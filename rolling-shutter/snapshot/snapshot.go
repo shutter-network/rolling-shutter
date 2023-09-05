@@ -91,8 +91,6 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	hub := hubapi.New(snp.Config.SnapshotHubURL)
 	snp.hubapi = hub
 
-	runner.Defer(snp.jrpc.Shutdown)
-
 	snp.setupP2PHandler()
 	return runner.StartService(snp.getServices()...)
 }
