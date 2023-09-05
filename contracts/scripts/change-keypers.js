@@ -16,6 +16,10 @@ process.chdir(path.dirname(__dirname)); // allow calling the script from anywher
 const hre = require("hardhat");
 
 async function main() {
+  if (process.env.DEPLOY_CONF === undefined) {
+    console.error("please set DEPLOY_CONF environment variable");
+    return;
+  }
   // TODO can we get access to the hre in a script like this?
   // TODO use a different json file to determine the keyper changes
   const deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
