@@ -5,6 +5,7 @@
 const fs = require("fs");
 const process = require("process");
 const path = require("path");
+const { ethers } = require("hardhat");
 const { configure_keypers } = require("../lib/configure-keypers.js");
 const { fund } = require("../lib/fund.js");
 

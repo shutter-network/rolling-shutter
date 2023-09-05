@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
 //TODO since we want to call this for new keypers
 // this should also check and eventually fund the
 // keypers if they are below the target funding.
-async function configure_keypers(keyperAddrs, blockOffset = 10) {
+async function configure_keypers(keyperAddrs, blockOffset = 15) {
   if (keyperAddrs.length == 0) {
     console.log("WARNING: cannot configure keypers: no keyper addresses given");
     return;
@@ -46,7 +46,7 @@ async function configure_keypers(keyperAddrs, blockOffset = 10) {
 
   const cfg = await ethers.getContract("KeyperConfig");
   const currentBlock = await ethers.provider.getBlockNumber();
-  const activationBlockNumber = currentBlock + 15;
+  const activationBlockNumber = currentBlock + blockOffset;
 
   const activeConfig = await cfg.getActiveConfig(activationBlockNumber);
   if (activeConfig[1].toNumber() === configSetIndex) {
