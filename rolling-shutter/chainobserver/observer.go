@@ -68,12 +68,17 @@ func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*events
 	})
 	errorgroup.Go(func() error {
 		for {
-			eventSyncUpdate, err := syncer.Next(errorctx)
-			if err != nil {
-				return err
-			}
-			if err := chainobs.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
-				return err
+			select {
+			case <-errorctx.Done():
+				return errorctx.Err()
+			default:
+				eventSyncUpdate, err := syncer.Next(errorctx)
+				if err != nil {
+					return err
+				}
+				if err := chainobs.handleEventSyncUpdate(errorctx, eventSyncUpdate); err != nil {
+					return err
+				}
 			}
 		}
 	})
