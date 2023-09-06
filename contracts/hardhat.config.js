@@ -143,7 +143,7 @@ module.exports = {
       },
     },
     gnosis: {
-      url: "https://rpc.gnosischain.com",
+      url: "https://rpc.gnosis.gateway.fm",
       accounts: gnosisAccounts,
     },
     nitro: {
