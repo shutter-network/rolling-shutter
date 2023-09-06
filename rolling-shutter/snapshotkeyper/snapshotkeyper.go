@@ -90,7 +90,6 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	if snkpr.config.Metrics.Enabled {
 		epochkghandler.InitMetrics()
 		snkpr.metricsServer = metricsserver.New(snkpr.config.Metrics)
-		runner.Defer(snkpr.metricsServer.Shutdown)
 	}
 
 	snkpr.dbpool = dbpool
