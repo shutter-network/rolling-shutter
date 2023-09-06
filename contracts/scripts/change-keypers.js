@@ -27,9 +27,6 @@ async function main() {
   }
 
   const keyperSetIndex = parseInt(process.env.KEYPER_SET_INDEX);
-
-  // TODO can we get access to the hre in a script like this?
-  // TODO use a different json file to determine the keyper changes
   const deployConf = JSON.parse(fs.readFileSync(process.env.DEPLOY_CONF));
 
   const newKeyperSet = deployConf.keypers?.at(keyperSetIndex);
@@ -45,8 +42,9 @@ async function main() {
   const bankSigner = await ethers.getSigner(bank);
 
   const fundValue = hre.deployConf.fundValue;
+  const activationBlockOffset = hre.deployConf.activationBlockOffset;
   await fund(newKeyperSet, bankSigner, fundValue);
-  await configure_keypers(newKeyperSet, 30);
+  await configure_keypers(newKeyperSet, activationBlockOffset);
 }
 
 main()

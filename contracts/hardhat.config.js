@@ -83,6 +83,7 @@ extendEnvironment((hre) => {
       keypers: null,
       collator: null,
       fundValue: "",
+      activationBlockOffset: 30,
     };
   }
 
