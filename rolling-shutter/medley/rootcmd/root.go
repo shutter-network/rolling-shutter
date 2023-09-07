@@ -4,6 +4,7 @@ package rootcmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	golog "github.com/ipfs/go-log/v2"
@@ -24,6 +25,7 @@ var (
 	ArgNameLogformat string = "logformat"
 	logLevelArg      string
 	ArgNameLoglevel  string = "loglevel"
+	reLogLevelConfig        = regexp.MustCompile("^(?:(?P<logger>[\\w/._-]+)?:(?P<level>debug|info|warn(?:ing)?|error|fatal|panic),?)+$")
 )
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
@@ -96,7 +98,29 @@ func setupLogging() (zerolog.Logger, error) {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		golog.SetAllLoggers(golog.LevelDebug)
 	default:
-		return l, errors.Errorf("flag '%s' value '%s' not recognized", ArgNameLoglevel, logLevel)
+		if !reLogLevelConfig.MatchString(logLevel) {
+			return l, errors.Errorf("flag '%s' value '%s' not recognized", ArgNameLoglevel, logLevel)
+		}
+		// parse the log level config and set the log levels
+		for _, loggerLevel := range strings.Split(logLevel, ",") {
+			loggerLevel = strings.TrimSpace(loggerLevel)
+			if loggerLevel == "" {
+				continue
+			}
+			parts := strings.SplitN(loggerLevel, ":", 2)
+			loggerName := parts[0]
+			levelName := parts[1]
+			if loggerName == "" {
+				level, err := zerolog.ParseLevel(levelName)
+				if err != nil {
+					return l, errors.Wrapf(err, "flag '%s' value '%s' not recognized", ArgNameLoglevel, logLevel)
+				}
+				zerolog.SetGlobalLevel(level)
+				golog.SetLogLevel("*", levelName)
+			} else {
+				golog.SetLogLevel(loggerName, levelName)
+			}
+		}
 	}
 
 	// reset the writer

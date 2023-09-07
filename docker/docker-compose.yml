@@ -278,7 +278,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - "--loglevel=debug"
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
       - snapshotkeyper
     command: "--config /config/keyper-0.toml"
     volumes:
@@ -304,7 +304,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - "--loglevel=debug"
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
       - snapshotkeyper
     command: "--config /config/keyper-1.toml"
     volumes:
@@ -330,7 +330,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - "--loglevel=debug"
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
       - snapshotkeyper
     command: "--config /config/keyper-2.toml"
     volumes:
@@ -356,7 +356,7 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - "--loglevel=debug"
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
       - snapshotkeyper
     command: "--config /config/keyper-3.toml"
     volumes:
