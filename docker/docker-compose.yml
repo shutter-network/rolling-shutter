@@ -51,6 +51,7 @@ services:
       - ./config:/config
     environment:
       DEPLOY_CONF: /config/node-deploy.json
+      KEYPER_SET_INDEX: 0
     depends_on:
       geth:
         condition: service_healthy

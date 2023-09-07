@@ -87,7 +87,10 @@ extendEnvironment((hre) => {
     };
   }
 
-  hre.getKeyperAddresses = async function (index = 0) {
+  hre.getKeyperAddresses = async function (index = -1) {
+    if (index === -1) {
+      index = parseInt(process.env.KEYPER_SET_INDEX ?? 0, 10);
+    }
     const keypers = hre.deployConf.keypers?.at(index);
     if (keypers === undefined) {
       const { keyper0, keyper1, keyper2 } = await hre.getNamedAccounts();
