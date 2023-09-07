@@ -14,5 +14,5 @@
   "decryptors": ["0x0000000000000000000000000000000000000000"],
   "collator": "0x2E135FE171fB6351026B75aF688a7F9689B66B87",
   "fundValue": "1000",
-  "activationBlockOffset": "30"
+  "activationBlockOffset": 30
 }

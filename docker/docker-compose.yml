@@ -407,6 +407,18 @@ services:
       - dev
     logging: *logging
 
+  metrics:
+    build:
+      context: build-src/metrics
+    restart: always
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./data/metrics:/victoria-metrics-data
+    profiles:
+      - dev
+    logging: *logging
+
   dockerize:
     image: jwilder/dockerize
     profiles:
