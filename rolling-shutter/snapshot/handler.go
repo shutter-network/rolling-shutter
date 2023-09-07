@@ -16,12 +16,13 @@ import (
 )
 
 func NewDecryptionKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
-	return &DecryptionKeyHandler{config: config, snapshot: snapshot}
+	return &DecryptionKeyHandler{config: config, snapshot: snapshot, dbpool: snapshot.dbpool}
 }
 
 type DecryptionKeyHandler struct {
 	config   *Config
 	snapshot *Snapshot
+	dbpool   *pgxpool.Pool
 }
 
 func NewEonPublicKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
@@ -111,23 +112,33 @@ func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pms
 	return true, nil
 }
 
-func (handler *DecryptionKeyHandler) HandleMessage(_ context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
 	var result []p2pmsg.Message
 	key := m.(*p2pmsg.DecryptionKey)
-	_, seen := seenProposals[string(key.EpochID)]
-	if seen {
+	db := snpdb.New(handler.dbpool)
+
+	rows, err := db.InsertDecryptionKey(
+		ctx, snpdb.InsertDecryptionKeyParams{
+			EpochID: key.EpochID,
+			Key:     key.Key,
+		},
+	)
+	if err != nil {
+		return result, err
+	}
+
+	// already seen
+	if rows == 0 {
 		return result, nil
 	}
 	log.Printf("Sending key %X for proposal %X to hub", key.Key, key.EpochID)
 
 	metricKeysGenerated.Inc()
 
-	err := handler.snapshot.hubapi.SubmitProposalKey(key.EpochID, key.Key)
+	err = handler.snapshot.hubapi.SubmitProposalKey(key.EpochID, key.Key)
 	if err != nil {
 		return result, err
 	}
-	// FIXME: Apart from needing to be in DB we need to keep track of the proposals better
-	seenProposals[string(key.EpochID)] = struct{}{}
 	return result, nil
 }
 
@@ -137,7 +148,7 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 	eonID := eonPubKeyMsg.GetEon()
 	key := eonPubKeyMsg.GetPublicKey()
 	db := snpdb.New(handler.dbpool)
-	err := db.InsertEonPublicKey(
+	rows, err := db.InsertEonPublicKey(
 		ctx, snpdb.InsertEonPublicKeyParams{
 			EonID:        int64(eonID),
 			EonPublicKey: key,
@@ -146,8 +157,8 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 	if err != nil {
 		return nil, err
 	}
-	_, seen := seenEons[eonID]
-	if seen {
+	// we have already seen the eon
+	if rows == 0 {
 		return nil, nil
 	}
 
@@ -158,7 +169,6 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 	if err != nil {
 		return nil, err
 	}
-	seenEons[eonID] = struct{}{}
 
 	return nil, nil
 }

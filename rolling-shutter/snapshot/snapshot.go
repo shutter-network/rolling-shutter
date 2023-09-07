@@ -20,12 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 )
 
-// FIXME: Needs to be in DB.
-var (
-	seenEons      = make(map[uint64]struct{})
-	seenProposals = make(map[string]struct{})
-	zeroTXHash    = make([]byte, 32)
-)
+var zeroTXHash = make([]byte, 32)
 
 type Snapshot struct {
 	Config *Config
