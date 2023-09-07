@@ -20,6 +20,8 @@ services:
       - ./data/db:/var/lib/postgresql/data
     healthcheck:
       test: pg_isready -U postgres
+      start_period: "30s"
+      start_interval: "2s"
     logging: *logging
 
   geth:
@@ -32,7 +34,8 @@ services:
     command: >
       --datadir /data
       --dev
-      --dev.period 3
+      --dev.period 1
+      --ipcdisable
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
@@ -40,6 +43,8 @@ services:
     healthcheck:
       test: >
         curl -sSf -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" --data-raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[], "id": 1}'
+      start_period: "30s"
+      start_interval: "2s"
     logging: *logging
 
   deploy-contracts:
@@ -391,6 +396,7 @@ services:
       CADDY_INGRESS_NETWORKS: snapshutter_default
     labels:
       caddy.email: devops@brainbot.com
+    logging: *logging
 
   dummyserver:
     build:
@@ -399,8 +405,10 @@ services:
     restart: always
     profiles:
       - dev
+    logging: *logging
 
   dockerize:
     image: jwilder/dockerize
     profiles:
       - script
+    logging: *logging

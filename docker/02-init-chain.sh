@@ -46,7 +46,7 @@ for num in 0 1 2 3; do
     ${BB} sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/${validator_cmd}/config/priv_validator_pubkey.hex)\"" /config/keyper-${num}.toml
 
     if [ $num -eq 0 ]; then
-        for destination in data/chain-seed/config/ data/chain-{1..2}-validator/config/ data/chain-{0..2}-sentry/config/; do
+        for destination in data/chain-seed/config/ data/chain-{1..3}-validator/config/ data/chain-{0..3}-sentry/config/; do
             ${BB} cp -v data/chain-0-validator/config/genesis.json "${destination}"
         done
     fi
@@ -78,7 +78,6 @@ $DC up -d chain-seed chain-{0..3}-{sentry,validator} keyper-{0..3}
 
 echo "We need to wait for the chain to reach height >= 1"
 sleep 5
-echo "This will take a while..."
 
 $DC run --rm --no-deps --entrypoint /rolling-shutter chain-0-validator bootstrap \
     --deployment-dir /deployments/dockerGeth \
