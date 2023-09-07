@@ -74,15 +74,4 @@ for num in 0 1 2 3; do
     ${BB} sed -i "/^external-address =/c\external-address = \"${validator_cmd}:${TM_P2P_PORT}\"" data/${validator_cmd}/config/config.toml
 done
 
-$DC up -d chain-seed chain-{0..3}-{sentry,validator} keyper-{0..3}
-
-echo "We need to wait for the chain to reach height >= 1"
-sleep 5
-
-$DC run --rm --no-deps --entrypoint /rolling-shutter chain-0-validator bootstrap \
-    --deployment-dir /deployments/dockerGeth \
-    --ethereum-url http://geth:8545 \
-    --shuttermint-url http://chain-0-sentry:${TM_RPC_PORT} \
-    --signing-key 479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
-
-$DC stop -t 30 geth chain-seed chain-{0..3}-{sentry,validator} keyper-{0..3}
+$DC stop -t 30
