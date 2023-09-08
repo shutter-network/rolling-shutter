@@ -3,6 +3,7 @@ package snapshotkeyper
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -139,7 +140,7 @@ func (snkpr *snapshotkeyper) handleContractEvents(ctx context.Context) error {
 }
 
 func (snkpr *snapshotkeyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
-	log.Info().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
+	log.Debug().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
 	err := snkpr.handleOnChainKeyperSetChanges(ctx, tx, l1BlockNumber)
 	if err != nil {
 		return err
@@ -179,7 +180,11 @@ func (snkpr *snapshotkeyper) sendNewBlockSeen(
 	}
 
 	blockSeenMsg := shmsg.NewBlockSeen(l1BlockNumber)
-	err = q.ScheduleShutterMessage(ctx, "block seen", blockSeenMsg)
+	err = q.ScheduleShutterMessage(
+		ctx,
+		fmt.Sprintf("block seen (block=%d)", l1BlockNumber),
+		blockSeenMsg,
+	)
 	if err != nil {
 		return err
 	}
@@ -253,7 +258,12 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		uint64(keyperSet.Threshold),
 		uint64(keyperSet.KeyperConfigIndex),
 	)
-	err = q.ScheduleShutterMessage(ctx, "new batch config", batchConfigMsg)
+	err = q.ScheduleShutterMessage(
+		ctx,
+		fmt.Sprintf("new batch config (activation-block-number=%d, config-index=%d)",
+			keyperSet.ActivationBlockNumber, keyperSet.KeyperConfigIndex),
+		batchConfigMsg,
+	)
 	if err != nil {
 		return err
 	}

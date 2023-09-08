@@ -33,7 +33,8 @@ func SendShutterMessages(
 		if err != nil {
 			return err // XXX retry
 		}
-		log.Info().Int32("id", outgoing.ID).Str("description", outgoing.Description).
+		log.Info().Int32("id", outgoing.ID).
+			Str("description", outgoing.Description).
 			Msg("send shuttermint message")
 		err = queries.DeleteShutterMessage(ctx, outgoing.ID)
 		if err != nil {
