@@ -131,6 +131,14 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 	if err != nil {
 		return err
 	}
+	// First check if the key is already in the database.
+	decryptionKey, err := snp.db.GetDecryptionKey(ctx, epochID)
+	if err == nil {
+		err = snp.hubapi.SubmitProposalKey(epochID, decryptionKey.Key)
+		return err
+	} else if err != nil && err != pgx.ErrNoRows {
+		return err
+	}
 	trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(
 		snp.Config.InstanceID,
 		convEpoch,
