@@ -16,9 +16,6 @@ ${BB} rm -rf data/deployments
 # has geth as dependency
 $DC up deploy-contracts
 
-TM_P2P_PORT=26656
-TM_RPC_PORT=26657
-
 $DC run --rm --no-deps chain-seed init \
     --root /chain \
     --blocktime 1 \
