@@ -3,6 +3,7 @@ package keyper
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -172,7 +173,7 @@ func (kpr *keyper) handleOnChainChanges(
 	tx pgx.Tx,
 	l1BlockNumber uint64,
 ) error {
-	log.Info().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
+	log.Debug().Uint64("l1-block-number", l1BlockNumber).Msg("handle on chain changes")
 	err := kpr.handleOnChainKeyperSetChanges(ctx, tx, l1BlockNumber)
 	if err != nil {
 		return err
@@ -208,7 +209,11 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 	}
 
 	blockSeenMsg := shmsg.NewBlockSeen(l1BlockNumber)
-	err = q.ScheduleShutterMessage(ctx, "block seen", blockSeenMsg)
+	err = q.ScheduleShutterMessage(
+		ctx,
+		fmt.Sprintf("block seen (block=%d)", l1BlockNumber),
+		blockSeenMsg,
+	)
 	if err != nil {
 		return err
 	}
@@ -289,7 +294,12 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 		uint64(keyperSet.Threshold),
 		uint64(keyperSet.KeyperConfigIndex),
 	)
-	err = q.ScheduleShutterMessage(ctx, "new batch config", batchConfigMsg)
+	err = q.ScheduleShutterMessage(
+		ctx,
+		fmt.Sprintf("new batch config (activation-block-number=%d, config-index=%d)",
+			keyperSet.ActivationBlockNumber, keyperSet.KeyperConfigIndex),
+		batchConfigMsg,
+	)
 	if err != nil {
 		return err
 	}

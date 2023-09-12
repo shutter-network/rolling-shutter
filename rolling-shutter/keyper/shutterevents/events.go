@@ -30,8 +30,8 @@ type Accusation struct {
 
 func (acc *Accusation) String() string {
 	return fmt.Sprintf(
-		"Accusation{Height: %d, Eon: %d, Sender: %s, Accused: %s}",
-		acc.Height, acc.Eon, acc.Sender, acc.Accused)
+		"Accusation{Height=%d, Eon=%d, Sender=%s, Accused=%s}",
+		acc.Height, acc.Eon, acc.Sender.String(), encodeAddresses(acc.Accused))
 }
 
 func (acc Accusation) MakeABCIEvent() abcitypes.Event {
@@ -104,8 +104,8 @@ type Apology struct {
 
 func (msg *Apology) String() string {
 	return fmt.Sprintf(
-		"Apology{Height: %d, Eon: %d, Sender: %s, Accusers: %s}",
-		msg.Height, msg.Eon, msg.Sender, msg.Accusers)
+		"Apology{Height=%d, Eon=%d, Sender=%s, Accusers=%s}",
+		msg.Height, msg.Eon, msg.Sender, encodeAddresses(msg.Accusers))
 }
 
 func (msg Apology) MakeABCIEvent() abcitypes.Event {
@@ -176,6 +176,19 @@ type BatchConfig struct {
 	KeyperConfigIndex     uint64
 	Started               bool
 	ValidatorsUpdated     bool
+}
+
+func (bc *BatchConfig) String() string {
+	return fmt.Sprintf(
+		"BatchConfig{Height=%d, Keypers=%s, ActivationBlockNumber=%d, Threshold=%d, ConfigIndex=%d, Started=%t, ValidatorsUpdated=%t}",
+		bc.Height,
+		encodeAddresses(bc.Keypers),
+		bc.ActivationBlockNumber,
+		bc.Threshold,
+		bc.KeyperConfigIndex,
+		bc.Started,
+		bc.ValidatorsUpdated,
+	)
 }
 
 func (bc BatchConfig) MakeABCIEvent() abcitypes.Event {
@@ -255,6 +268,14 @@ func (bcs BatchConfigStarted) MakeABCIEvent() abcitypes.Event {
 	}
 }
 
+func (bcs *BatchConfigStarted) String() string {
+	return fmt.Sprintf(
+		"BatchConfigStarted{Height=%d, ConfigIndex=%d}",
+		bcs.Height,
+		bcs.KeyperConfigIndex,
+	)
+}
+
 // makeBatchConfigStarted creates a BatchConfigEvent from the given tendermint event of type
 // "shutter.batch-config-started".
 func makeBatchConfigStarted(ev abcitypes.Event, height int64) (*BatchConfigStarted, error) {
@@ -290,6 +311,14 @@ func (msg CheckIn) MakeABCIEvent() abcitypes.Event {
 			},
 		},
 	}
+}
+
+func (msg *CheckIn) String() string {
+	return fmt.Sprintf(
+		"CheckIn{Height=%d, Sender=%s}",
+		msg.Height,
+		msg.Sender.String(),
+	)
 }
 
 // makeCheckIn creates a CheckInEvent from the given tendermint event of type "shutter.check-in".
@@ -335,6 +364,16 @@ func (msg EonStarted) MakeABCIEvent() abcitypes.Event {
 	}
 }
 
+func (msg *EonStarted) String() string {
+	return fmt.Sprintf(
+		"EonStarted{Height=%d, Eon=%d, ActivationBlockNumber=%d, ConfigIndex=%d}",
+		msg.Height,
+		msg.Eon,
+		msg.ActivationBlockNumber,
+		msg.KeyperConfigIndex,
+	)
+}
+
 // PolyCommitment represents a broadcasted polynomial commitment message.
 type PolyCommitment struct {
 	Height int64
@@ -348,7 +387,7 @@ func (msg *PolyCommitment) String() string {
 		"PolyCommitment{Height=%d, Eon=%d, Sender=%s}",
 		msg.Height,
 		msg.Eon,
-		msg.Sender,
+		msg.Sender.String(),
 	)
 }
 
@@ -402,11 +441,11 @@ type PolyEval struct {
 
 func (msg *PolyEval) String() string {
 	return fmt.Sprintf(
-		"PolyEval{Height: %d, Sender: %s, Eon: %d, Receivers: %s}",
+		"PolyEval{Height=%d, Sender=%s, Eon=%d, Receivers=%s}",
 		msg.Height,
 		msg.Sender,
 		msg.Eon,
-		msg.Receivers)
+		encodeAddresses(msg.Receivers))
 }
 
 func (msg PolyEval) MakeABCIEvent() abcitypes.Event {
@@ -459,6 +498,7 @@ func makePolyEval(ev abcitypes.Event, height int64) (*PolyEval, error) {
 // IEvent is an interface for the event types declared above.
 type IEvent interface {
 	MakeABCIEvent() abcitypes.Event
+	String() string
 }
 
 // makeEonStarted creates a EonStartedEvent from the given tendermint event of type

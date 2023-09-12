@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -199,7 +200,7 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 		}()
 		return queries.ScheduleShutterMessage(
 			ctx,
-			fmt.Sprintf("poly eval eon=%d", currentEon),
+			fmt.Sprintf("poly eval (eon=%d)", currentEon),
 			shmsg.NewPolyEval(uint64(currentEon), receivers, encryptedEvals),
 		)
 	}
@@ -248,11 +249,12 @@ func (st *ShuttermintState) handleBatchConfig(
 			return nil
 		}
 		st.isKeyper = true
+		pubKey := st.config.GetValidatorPublicKey()
 		err := queries.ScheduleShutterMessage(
 			ctx,
-			"check-in",
+			fmt.Sprintf("check-in (validator-pub-key=%s)", hex.EncodeToString(pubKey)),
 			shmsg.NewCheckIn(
-				st.config.GetValidatorPublicKey(),
+				pubKey,
 				&st.config.GetEncryptionKey().PublicKey,
 			),
 		)
@@ -362,7 +364,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 	dkg.markDirty()
 	err = queries.ScheduleShutterMessage(
 		ctx,
-		fmt.Sprintf("poly commitment, eon=%d", eon),
+		fmt.Sprintf("poly commitment (eon=%d)", eon),
 		shmsg.NewPolyCommitment(eon, commitment.Gammas),
 	)
 	if err != nil {
@@ -394,7 +396,7 @@ func (st *ShuttermintState) startPhase2Accusing(
 		}
 		err := queries.ScheduleShutterMessage(
 			ctx,
-			fmt.Sprintf("accusations, eon=%d, count=%d", eon, len(accusations)),
+			fmt.Sprintf("accusations (eon=%d, count=%d)", eon, len(accusations)),
 			shmsg.NewAccusation(eon, accused),
 		)
 		if err != nil {
@@ -423,7 +425,7 @@ func (st *ShuttermintState) startPhase3Apologizing(
 
 		err := queries.ScheduleShutterMessage(
 			ctx,
-			fmt.Sprintf("apologies, eon=%d, count=%d", eon, len(apologies)),
+			fmt.Sprintf("apologies (eon=%d, count=%d)", eon, len(apologies)),
 			shmsg.NewApology(eon, accusers, polyEvals),
 		)
 		if err != nil {
@@ -485,7 +487,7 @@ func (st *ShuttermintState) finalizeDKG(
 
 	err = queries.ScheduleShutterMessage(
 		ctx,
-		"reporting DKG result",
+		fmt.Sprintf("reporting DKG result (eon=%d)", dkgresult.Eon),
 		dkgresultmsg,
 	)
 	if err != nil {
@@ -737,6 +739,7 @@ func (st *ShuttermintState) HandleEvent(
 	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent,
 ) error {
 	var err error
+	log.Info().Str("event", event.String()).Msg("handle shuttermint event")
 	switch e := event.(type) {
 	case *shutterevents.CheckIn:
 		err = st.handleCheckIn(ctx, queries, e)
