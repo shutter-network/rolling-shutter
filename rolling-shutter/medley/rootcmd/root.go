@@ -25,7 +25,7 @@ var (
 	ArgNameLogformat string = "logformat"
 	logLevelArg      string
 	ArgNameLoglevel  string = "loglevel"
-	reLogLevelConfig        = regexp.MustCompile("^(?:(?P<logger>[\\w/._-]+)?:(?P<level>debug|info|warn(?:ing)?|error|fatal|panic),?)+$")
+	reLogLevelConfig        = regexp.MustCompile(`^(?:([\w/.-]+)?:(debug|info|warn(?:ing)?|error|fatal|panic),?)+$`)
 )
 
 func configureCaller(l zerolog.Logger, short bool) zerolog.Logger {
@@ -116,9 +116,9 @@ func setupLogging() (zerolog.Logger, error) {
 					return l, errors.Wrapf(err, "flag '%s' value '%s' not recognized", ArgNameLoglevel, logLevel)
 				}
 				zerolog.SetGlobalLevel(level)
-				golog.SetLogLevel("*", levelName)
+				_ = golog.SetLogLevel("*", levelName)
 			} else {
-				golog.SetLogLevel(loggerName, levelName)
+				_ = golog.SetLogLevel(loggerName, levelName)
 			}
 		}
 	}
