@@ -20,12 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 )
 
-// FIXME: Needs to be in DB.
-var (
-	seenEons      = make(map[uint64]struct{})
-	seenProposals = make(map[string]struct{})
-	zeroTXHash    = make([]byte, 32)
-)
+var zeroTXHash = make([]byte, 32)
 
 type Snapshot struct {
 	Config *Config
@@ -134,6 +129,14 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 	}
 	convEpoch, err := epochid.BytesToEpochID(epochID)
 	if err != nil {
+		return err
+	}
+	// First check if the key is already in the database.
+	decryptionKey, err := snp.db.GetDecryptionKey(ctx, epochID)
+	if err == nil {
+		err = snp.hubapi.SubmitProposalKey(epochID, decryptionKey.Key)
+		return err
+	} else if err != nil && err != pgx.ErrNoRows {
 		return err
 	}
 	trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(

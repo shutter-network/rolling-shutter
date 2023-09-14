@@ -16,7 +16,7 @@ INSERT INTO decryption_key (
 )
 ON CONFLICT DO NOTHING;
 
--- name: InsertEonPublicKey :exec
+-- name: InsertEonPublicKey :execrows
 INSERT INTO eon_public_key (
         eon_id,
         eon_public_key

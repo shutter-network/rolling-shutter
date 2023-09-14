@@ -96,7 +96,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 	return result.RowsAffected(), nil
 }
 
-const insertEonPublicKey = `-- name: InsertEonPublicKey :exec
+const insertEonPublicKey = `-- name: InsertEonPublicKey :execrows
 INSERT INTO eon_public_key (
         eon_id,
         eon_public_key
@@ -111,7 +111,10 @@ type InsertEonPublicKeyParams struct {
 	EonPublicKey []byte
 }
 
-func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) error {
-	_, err := q.db.Exec(ctx, insertEonPublicKey, arg.EonID, arg.EonPublicKey)
-	return err
+func (q *Queries) InsertEonPublicKey(ctx context.Context, arg InsertEonPublicKeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertEonPublicKey, arg.EonID, arg.EonPublicKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
