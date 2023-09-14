@@ -6,6 +6,7 @@ TINYGO		?= tinygo
 WASMOPT     ?= wasm-opt
 BINDIR		?= ./bin
 EXECUTABLE	?= ${BINDIR}/rolling-shutter
+GOPATH          ?= $(${GO} env GOPATH)
 
 build:
 	${GO} build ${GOFLAGS} -o ${EXECUTABLE}
@@ -37,8 +38,8 @@ test: test-unit
 test-all: test-unit test-integration
 
 generate: install-codegen-tools
-	${GO} generate -skip="gendocs.go" -x ./...
-	${GO} generate -run="gendocs.go" -x ./...
+	${GO} generate -skip="make docs" -x ./...
+	${GO} generate -run="make docs" -x ./...
 
 coverage:
 	${GO} test ${GOFLAGS} -covermode=count -coverprofile=coverage.out ./...
@@ -50,35 +51,40 @@ clean:
 install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
-install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-stringer install-go-enum install-cobra
+install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-go-enum
 
-install-npm:
+../contracts/node_modules/.mark-npm-install: ../contracts/package.json ../contracts/package-lock.json
 	cd ../contracts && npm install
+	@touch ../contracts/node_modules/.mark-npm-install
 
-install-sqlc:
+install-npm: ../contracts/node_modules/.mark-npm-install
+
+${GOPATH}/bin/sqlc:
 	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.1
+install-sqlc: ${GOPATH}/bin/sqlc
 
-install-go-enum:
+
+${GOPATH}/bin/go-enum:
 	${GO} install github.com/abice/go-enum@v0.5.6
+install-go-enum: ${GOPATH}/bin/go-enum
 
-install-abigen:
+${GOPATH}/bin/abigen:
 	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.10.26
+install-abigen: ${GOPATH}/bin/abigen
 
-install-protoc-gen-go:
+
+${GOPATH}/bin/protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0
+install-protoc-gen-go: ${GOPATH}/bin/protoc-gen-go
 
-install-oapi-codegen:
+
+${GOPATH}/bin/oapi-codegen:
 	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.9.1
-
-install-stringer:
-	${GO} install golang.org/x/tools/cmd/stringer@v0.9.0
+install-oapi-codegen: ${GOPATH}/bin/oapi-codegen
 
 # non code generation tools
 install-golangci-lint:
 	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-install-cobra:
-	${GO} install github.com/spf13/cobra-cli@latest
 
 install-gofumpt:
 	${GO} install mvdan.cc/gofumpt@latest
