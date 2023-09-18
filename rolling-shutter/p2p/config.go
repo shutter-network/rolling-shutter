@@ -41,7 +41,7 @@ func (c *Config) Init() {
 }
 
 type Config struct {
-	P2PKey                   *keys.Libp2pPrivate `shconfig:",required"`
+	P2PKey                   *keys.Libp2pPrivate `shconfig:",required,sensitive"`
 	ListenAddresses          []*address.P2PAddress
 	CustomBootstrapAddresses []*address.P2PAddress `comment:"Overwrite p2p boostrap nodes"`
 	Environment              env.Environment

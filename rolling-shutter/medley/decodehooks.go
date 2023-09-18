@@ -58,7 +58,7 @@ func TextMarshalerHook(from reflect.Value, to reflect.Value) (interface{}, error
 	return string(mshl), nil
 }
 
-func mapstructureDecode(input, result any, hookFunc mapstructure.DecodeHookFunc) error {
+func MapstructureDecode(input, result any, hookFunc mapstructure.DecodeHookFunc) error {
 	decoder, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{
 			Result:     result,
@@ -71,7 +71,7 @@ func mapstructureDecode(input, result any, hookFunc mapstructure.DecodeHookFunc)
 }
 
 func MapstructureMarshal(input, result any) error {
-	return mapstructureDecode(
+	return MapstructureDecode(
 		input,
 		result,
 		mapstructure.ComposeDecodeHookFunc(
@@ -81,7 +81,7 @@ func MapstructureMarshal(input, result any) error {
 }
 
 func MapstructureUnmarshal(input, result any) error {
-	return mapstructureDecode(
+	return MapstructureDecode(
 		input,
 		result,
 		mapstructure.ComposeDecodeHookFunc(

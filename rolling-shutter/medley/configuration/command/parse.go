@@ -5,6 +5,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -135,4 +136,18 @@ func ParseViper(v *viper.Viper, config configuration.Config) error {
 		return err
 	}
 	return config.Validate()
+}
+
+func LogConfig(ev *zerolog.Event, config configuration.Config, msg string) error {
+	s := configuration.GetSensitiveRecursive(config)
+	redactedPaths := []string{}
+	for redacted := range s {
+		redactedPaths = append(redactedPaths, redacted)
+	}
+	dc, err := configuration.ToDict(config, redactedPaths)
+	if err != nil {
+		return err
+	}
+	ev.Interface("config", dc).Msg(msg)
+	return nil
 }
