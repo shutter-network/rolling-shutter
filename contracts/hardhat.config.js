@@ -84,6 +84,7 @@ extendEnvironment((hre) => {
       collator: null,
       fundValue: "",
       activationBlockOffset: 30,
+      thresholdRatio: 2 / 3,
     };
   }
 

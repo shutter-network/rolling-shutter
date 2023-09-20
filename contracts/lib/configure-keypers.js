@@ -9,7 +9,11 @@ const { ethers } = require("hardhat");
 //TODO since we want to call this for new keypers
 // this should also check and eventually fund the
 // keypers if they are below the target funding.
-async function configure_keypers(keyperAddrs, blockOffset = 15) {
+async function configure_keypers(
+  keyperAddrs,
+  blockOffset = 15,
+  threshold_ratio = 2 / 3
+) {
   if (keyperAddrs.length == 0) {
     console.log("WARNING: cannot configure keypers: no keyper addresses given");
     return;
@@ -54,10 +58,11 @@ async function configure_keypers(keyperAddrs, blockOffset = 15) {
     return;
   }
 
+  const threshold = Math.ceil(keyperAddrs.length * threshold_ratio);
   const tx = await cfg.addNewCfg({
     activationBlockNumber: activationBlockNumber,
     setIndex: configSetIndex,
-    threshold: Math.ceil((keyperAddrs.length / 3) * 2),
+    threshold: threshold,
   });
   await tx.wait();
   console.log(
