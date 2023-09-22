@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
 func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
@@ -20,10 +20,11 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 	}
 	var err error
 	ctx := context.Background()
-	db, _, closedb := testdb.NewCollatorTestDB(ctx, t)
-	defer closedb()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+	db := database.New(dbpool)
 
-	err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+	err = db.InsertEonPublicKeyCandidate(ctx, database.InsertEonPublicKeyCandidateParams{
 		Hash:                  []byte{1, 1},
 		EonPublicKey:          []byte{1, 1, 1},
 		ActivationBlockNumber: 50,
@@ -32,7 +33,7 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+	err = db.InsertEonPublicKeyCandidate(ctx, database.InsertEonPublicKeyCandidateParams{
 		Hash:                  []byte{2, 2},
 		EonPublicKey:          []byte{2, 2, 2},
 		ActivationBlockNumber: 100,
@@ -41,7 +42,7 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+	err = db.InsertEonPublicKeyCandidate(ctx, database.InsertEonPublicKeyCandidateParams{
 		Hash:                  []byte{3, 3},
 		EonPublicKey:          []byte{3, 3, 3},
 		ActivationBlockNumber: 100,
@@ -60,7 +61,7 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 	// nothing is confirmed yet, so we should not find anything
 	eonPubKey, err := db.FindEonPublicKeyForBlock(ctx, 150)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, eonPubKey, cltrdb.EonPublicKeyCandidate{
+	assert.DeepEqual(t, eonPubKey, database.EonPublicKeyCandidate{
 		Hash:                  []byte{1, 1},
 		EonPublicKey:          []byte{1, 1, 1},
 		ActivationBlockNumber: 50,
@@ -79,7 +80,7 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 	// number of the later keys
 	eonPubKey, err = db.FindEonPublicKeyForBlock(ctx, 99)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, eonPubKey, cltrdb.EonPublicKeyCandidate{
+	assert.DeepEqual(t, eonPubKey, database.EonPublicKeyCandidate{
 		Hash:                  []byte{1, 1},
 		EonPublicKey:          []byte{1, 1, 1},
 		ActivationBlockNumber: 50,
@@ -90,7 +91,7 @@ func TestFindEonPublicKeyForBlockIntegration(t *testing.T) {
 
 	eonPubKey, err = db.FindEonPublicKeyForBlock(ctx, 100)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, eonPubKey, cltrdb.EonPublicKeyCandidate{
+	assert.DeepEqual(t, eonPubKey, database.EonPublicKeyCandidate{
 		Hash:                  []byte{3, 3},
 		EonPublicKey:          []byte{3, 3, 3},
 		ActivationBlockNumber: 100,

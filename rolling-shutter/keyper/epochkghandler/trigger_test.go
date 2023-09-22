@@ -10,10 +10,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	chainobscolldb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -24,15 +24,16 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-
-	ctx := context.Background()
-	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
-
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
-	initializeEon(ctx, t, dbpool, keyperIndex)
+	ctx := context.Background()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+	queries := database.New(dbpool)
+
+	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+
 	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
 	// send decryption key share when first trigger is received
 	trigger, err := p2pmsg.NewSignedDecryptionTrigger(
@@ -44,7 +45,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	)
 	assert.NilError(t, err)
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, trigger)
-	share, err := db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
+	share, err := queries.GetDecryptionKeyShare(ctx, database.GetDecryptionKeyShareParams{
 		Eon:         int64(config.GetEon()),
 		EpochID:     identityPreimage.Bytes(),
 		KeyperIndex: int64(keyperIndex),
@@ -77,8 +78,8 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
 
 	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
 	collatorKey1, err := ethcrypto.GenerateKey()
@@ -97,12 +98,13 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
-	err = chainobsdb.New(dbpool).InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
+
+	err = chainobscolldb.New(dbpool).InsertChainCollator(ctx, chainobscolldb.InsertChainCollatorParams{
 		ActivationBlockNumber: int64(activationBlk1),
 		Collator:              collator1,
 	})
 	assert.NilError(t, err)
-	err = chainobsdb.New(dbpool).InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
+	err = chainobscolldb.New(dbpool).InsertChainCollator(ctx, chainobscolldb.InsertChainCollatorParams{
 		ActivationBlockNumber: int64(activationBlk2),
 		Collator:              collator2,
 	})

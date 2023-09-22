@@ -14,7 +14,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/client"
 )
@@ -65,7 +65,7 @@ func NewSubmitter(
 // createBatchTx creates the batchtx for the given epoch.
 func (submitter *Submitter) createBatchTx(
 	ctx context.Context,
-	db *cltrdb.Queries,
+	db *database.Queries,
 	identityPreimage identitypreimage.IdentityPreimage,
 ) error {
 	decryptionKey, err := db.GetDecryptionKey(ctx, identityPreimage.Bytes())
@@ -115,7 +115,7 @@ func (submitter *Submitter) createBatchTx(
 	if err != nil {
 		return err
 	}
-	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
+	err = db.InsertBatchTx(ctx, database.InsertBatchTxParams{
 		EpochID:   identityPreimage.Bytes(),
 		Marshaled: txbytes,
 	})
@@ -129,7 +129,7 @@ func (submitter *Submitter) createBatchTx(
 // submitBatchTxToSequencer reads the unsubmitted batchtx from the database and tries to submit it
 // to the sequencer.
 func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error {
-	db := cltrdb.New(submitter.dbpool)
+	db := database.New(submitter.dbpool)
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	if err == pgx.ErrNoRows {
 		return nil
@@ -155,7 +155,7 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 }
 
 func (submitter *Submitter) submitBatch(ctx context.Context) error {
-	db := cltrdb.New(submitter.dbpool)
+	db := database.New(submitter.dbpool)
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	if err == nil {
 		log.Info().

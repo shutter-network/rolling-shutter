@@ -12,7 +12,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -42,7 +42,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
 
-	dkgResultDB, err := kprdb.New(handler.dbpool).GetDKGResult(ctx, int64(keyShare.Eon))
+	dkgResultDB, err := database.New(handler.dbpool).GetDKGResult(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
 	}
@@ -81,7 +81,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	msg := m.(*p2pmsg.DecryptionKeyShares)
 	// Insert the share into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
-	db := kprdb.New(handler.dbpool)
+	db := database.New(handler.dbpool)
 
 	if err := db.InsertDecryptionKeySharesMsg(ctx, msg); err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	// Check that we don't know the decryption key yet
 	identityPreimage := identitypreimage.IdentityPreimage(msg.GetShares()[0].EpochID)
 
-	keyExists, err := db.ExistsDecryptionKey(ctx, kprdb.ExistsDecryptionKeyParams{
+	keyExists, err := db.ExistsDecryptionKey(ctx, database.ExistsDecryptionKeyParams{
 		Eon:     int64(msg.Eon),
 		EpochID: identityPreimage.Bytes(),
 	})
@@ -154,8 +154,8 @@ func (handler *DecryptionKeyShareHandler) aggregateDecryptionKeySharesFromDB(
 	pureDKGResult *puredkg.Result,
 	identityPreimage identitypreimage.IdentityPreimage,
 ) (*epochkg.EpochKG, error) {
-	db := kprdb.New(handler.dbpool)
-	shares, err := db.SelectDecryptionKeyShares(ctx, kprdb.SelectDecryptionKeySharesParams{
+	db := database.New(handler.dbpool)
+	shares, err := db.SelectDecryptionKeyShares(ctx, database.SelectDecryptionKeySharesParams{
 		Eon:     int64(pureDKGResult.Eon),
 		EpochID: identityPreimage.Bytes(),
 	})

@@ -10,14 +10,14 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"gotest.tools/assert"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -52,7 +52,7 @@ type setupEonKeysParams struct {
 func setupEonKeys(
 	ctx context.Context,
 	t *testing.T,
-	dbtx chainobsdb.DBTX,
+	dbtx obskeyper.DBTX,
 	params setupEonKeysParams,
 ) []keyper {
 	t.Helper()
@@ -86,8 +86,8 @@ func setupEonKeys(
 		keyperSet = append(keyperSet, k.address)
 	}
 
-	db := chainobsdb.New(dbtx)
-	err := db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
+	db := obskeyper.New(dbtx)
+	err := db.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(params.keyperConfigIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),
@@ -101,8 +101,8 @@ func setupEonKeys(
 func checkDBResult(
 	t *testing.T,
 	kpr []keyper,
-	pubkey cltrdb.EonPublicKeyCandidate,
-	votes []cltrdb.EonPublicKeyVote,
+	pubkey database.EonPublicKeyCandidate,
+	votes []database.EonPublicKeyVote,
 ) {
 	t.Helper()
 
@@ -135,8 +135,10 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
-	defer closedb()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+	db := database.New(dbpool)
+
 	testConfig := newTestConfig(t)
 	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)

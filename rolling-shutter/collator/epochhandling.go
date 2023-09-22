@@ -15,7 +15,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -51,8 +51,8 @@ func (handler *decryptionKeyHandler) HandleMessage(
 	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := cltrdb.New(tx)
-		_, err := db.InsertDecryptionKey(ctx, cltrdb.InsertDecryptionKeyParams{
+		db := database.New(tx)
+		_, err := db.InsertDecryptionKey(ctx, database.InsertDecryptionKeyParams{
 			EpochID:       identityPreimage.Bytes(),
 			DecryptionKey: msg.Key,
 		})
@@ -85,7 +85,7 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 	identityPreimage := identitypreimage.IdentityPreimage(key.EpochID)
 
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := cltrdb.New(tx)
+		db := database.New(tx)
 		eonPub, err := db.GetEonPublicKey(ctx, int64(key.Eon))
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve EonPublicKey from DB")
@@ -132,7 +132,7 @@ func (c *collator) sendDecryptionTriggers(ctx context.Context) error {
 			continue // continue sending other messages
 		}
 		err = c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-			return cltrdb.New(dbtx).UpdateDecryptionTriggerSent(ctx, msg.EpochID)
+			return database.New(dbtx).UpdateDecryptionTriggerSent(ctx, msg.EpochID)
 		})
 		if err != nil {
 			return err

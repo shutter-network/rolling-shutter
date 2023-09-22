@@ -23,10 +23,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/cltrtopics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -62,17 +63,16 @@ func New(cfg *config.Config) service.Service {
 }
 
 func (c *collator) Start(ctx context.Context, runner service.Runner) error {
+	var err error
 	cfg := c.Config
 	log.Info().Str("ethereum-address", cfg.Ethereum.PrivateKey.EthereumAddress().Hex()).Msg(
 		"starting collator",
 	)
 
-	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
+	c.dbpool, err = db.Connect(ctx, runner, cfg.DatabaseURL, database.Definition.Name())
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	runner.Defer(dbpool.Close)
-	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	log.Info().Str("ethereum-url", cfg.Ethereum.EthereumURL).Msg("connecting to ethereum")
 	l1Client, err := ethclient.Dial(cfg.Ethereum.EthereumURL)
@@ -89,12 +89,12 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	err = cltrdb.ValidateDB(ctx, dbpool)
+	err = c.dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
 		return err
 	}
 
-	btchr, err := batcher.NewBatcher(ctx, cfg, dbpool)
+	btchr, err := batcher.NewBatcher(ctx, cfg, c.dbpool)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	submitter, err := NewSubmitter(ctx, cfg, dbpool)
+	submitter, err := NewSubmitter(ctx, cfg, c.dbpool)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,6 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 	c.batcher = btchr
-	c.dbpool = dbpool
 	c.submitter = submitter
 	c.submitter.collator = c
 	c.setupP2PHandler()
@@ -271,9 +270,9 @@ func (c *collator) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }
 
-func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (identitypreimage.IdentityPreimage, error) {
+func getNextEpochID(ctx context.Context, queries *database.Queries) (identitypreimage.IdentityPreimage, error) {
 	var nextIdentityPreimage identitypreimage.IdentityPreimage
-	b, err := db.GetNextBatch(ctx)
+	b, err := queries.GetNextBatch(ctx)
 	if err != nil {
 		return nextIdentityPreimage, err
 	}
@@ -287,10 +286,10 @@ func (c *collator) getUnsentDecryptionTriggers(
 	[]*p2pmsg.DecryptionTrigger,
 	error,
 ) {
-	var triggers []cltrdb.DecryptionTrigger
+	var triggers []database.DecryptionTrigger
 	err := c.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		var err error
-		db := cltrdb.New(dbtx)
+		db := database.New(dbtx)
 		triggers, err = db.GetUnsentTriggers(ctx)
 		return err
 	})

@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -25,9 +25,13 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
-	defer closedb()
+	t.Cleanup(cancel)
+
+	dbpool, dbclose := testsetup.NewTestDBPool(context.Background(), t, database.Definition)
+	t.Cleanup(dbclose)
+
+	db := database.New(dbpool)
+
 	config := newTestConfig(t)
 
 	// HACK: Only partially instantiating the collator.
@@ -47,7 +51,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	)
 	go func() { _ = newDecryptionTriggerLoop() }()
 
-	trigger := cltrdb.InsertTriggerParams{
+	trigger := database.InsertTriggerParams{
 		EpochID:       identitypreimage.Uint64ToIdentityPreimage(3).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{0, 1}).Bytes(),
 		L1BlockNumber: 42,

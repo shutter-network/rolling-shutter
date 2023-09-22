@@ -7,9 +7,9 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
 // TestDBSubmissionIntegration tests the basic database query functions that we've implemented.
@@ -19,8 +19,10 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, _, closedb := testdb.NewCollatorTestDB(ctx, t)
-	defer closedb()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+	db := database.New(dbpool)
 
 	// Trying to get the unsubmitted batch should give us an error
 	_, err := db.GetUnsubmittedBatchTx(ctx)
@@ -28,7 +30,7 @@ func TestDBSubmissionIntegration(t *testing.T) {
 
 	// Insert a batchtx
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(1).Bytes()
-	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
+	err = db.InsertBatchTx(ctx, database.InsertBatchTxParams{
 		EpochID:   identityPreimage,
 		Marshaled: []byte{1, 2, 3},
 	})
@@ -37,14 +39,14 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	// We should now have a unsubmitted batchtx
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, unsubmitted, cltrdb.Batchtx{
+	assert.DeepEqual(t, unsubmitted, database.Batchtx{
 		EpochID:   identityPreimage,
 		Marshaled: []byte{1, 2, 3},
 	})
 
 	identityPreimage2 := identitypreimage.Uint64ToIdentityPreimage(2).Bytes()
 	// We should not be able to add a second batchtx
-	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
+	err = db.InsertBatchTx(ctx, database.InsertBatchTxParams{
 		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})
@@ -58,7 +60,7 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	assert.Equal(t, err, pgx.ErrNoRows)
 
 	// We should now be able to add a second batchtx
-	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
+	err = db.InsertBatchTx(ctx, database.InsertBatchTxParams{
 		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})
@@ -67,7 +69,7 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	// And we should have a new unsubmitted batchtx
 	unsubmitted, err = db.GetUnsubmittedBatchTx(ctx)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, unsubmitted, cltrdb.Batchtx{
+	assert.DeepEqual(t, unsubmitted, database.Batchtx{
 		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})

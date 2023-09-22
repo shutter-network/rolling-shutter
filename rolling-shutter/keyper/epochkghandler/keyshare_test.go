@@ -8,8 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/assert"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -20,13 +21,14 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
 
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
-	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
+	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 	encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
 
@@ -67,14 +69,15 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
 
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
-	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
+	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 	keyshare := tkg.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal()
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 

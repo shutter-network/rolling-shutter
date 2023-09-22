@@ -10,8 +10,8 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 )
 
 type server struct {
@@ -34,7 +34,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
-	db := cltrdb.New(srv.c.dbpool)
+	db := database.New(srv.c.dbpool)
 	epoch, _, err := batchhandler.GetNextBatch(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
@@ -86,15 +86,15 @@ func (srv *server) GetEonPublicKey(
 	params oapi.GetEonPublicKeyParams,
 ) {
 	var (
-		eonPub     cltrdb.EonPublicKeyCandidate
-		votes      []cltrdb.EonPublicKeyVote
+		eonPub     database.EonPublicKeyCandidate
+		votes      []database.EonPublicKeyVote
 		signatures [][]byte
 	)
 	ctx := r.Context()
 
 	err := srv.c.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
-		db := cltrdb.New(tx)
+		db := database.New(tx)
 		eonPub, err = db.FindEonPublicKeyForBlock(ctx, params.ActivationBlock)
 		if err != nil {
 			return err

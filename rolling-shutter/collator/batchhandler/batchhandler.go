@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
@@ -17,7 +17,7 @@ func ComputeNextEpochID(identityPreimage identitypreimage.IdentityPreimage) iden
 }
 
 // GetNextBatch gets the epochID and block number that will be used in the next batch.
-func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (identitypreimage.IdentityPreimage, uint64, error) {
+func GetNextBatch(ctx context.Context, db *database.Queries) (identitypreimage.IdentityPreimage, uint64, error) {
 	b, err := db.GetNextBatch(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error

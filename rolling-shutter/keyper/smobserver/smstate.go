@@ -18,7 +18,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -73,7 +73,7 @@ func (st *ShuttermintState) Invalidate() {
 	*st = *NewShuttermintState(st.config)
 }
 
-func (st *ShuttermintState) Load(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) Load(ctx context.Context, queries *database.Queries) error {
 	if st.synchronized {
 		return nil
 	}
@@ -95,7 +95,7 @@ func (st *ShuttermintState) Load(ctx context.Context, queries *kprdb.Queries) er
 	return nil
 }
 
-func (st *ShuttermintState) loadDKG(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) loadDKG(ctx context.Context, queries *database.Queries) error {
 	dkgs, err := queries.SelectPureDKG(ctx)
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *kprdb.Queries)
 	return nil
 }
 
-func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *database.Queries) error {
 	keys, err := queries.GetEncryptionKeys(ctx)
 	if err != nil {
 		return err
@@ -154,11 +154,11 @@ func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *kpr
 	return nil
 }
 
-func (st *ShuttermintState) BeforeSaveHook(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) BeforeSaveHook(ctx context.Context, queries *database.Queries) error {
 	return st.sendPolyEvals(ctx, queries)
 }
 
-func (st *ShuttermintState) Save(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) Save(ctx context.Context, queries *database.Queries) error {
 	for eon, a := range st.dkg {
 		if !a.dirty {
 			continue
@@ -168,7 +168,7 @@ func (st *ShuttermintState) Save(ctx context.Context, queries *kprdb.Queries) er
 			return err
 		}
 
-		err = queries.InsertPureDKG(ctx, kprdb.InsertPureDKGParams{
+		err = queries.InsertPureDKG(ctx, database.InsertPureDKGParams{
 			Eon:     int64(eon),
 			Puredkg: pureBytes,
 		})
@@ -180,7 +180,7 @@ func (st *ShuttermintState) Save(ctx context.Context, queries *kprdb.Queries) er
 	return nil
 }
 
-func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Queries) error {
+func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database.Queries) error {
 	evals, err := queries.PolyEvalsWithEncryptionKeys(ctx)
 	if err != nil {
 		return err
@@ -230,7 +230,7 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 		receivers = append(receivers, receiver)
 		encryptedEvals = append(encryptedEvals, encrypted)
 
-		err = queries.DeletePolyEval(ctx, kprdb.DeletePolyEvalParams{
+		err = queries.DeletePolyEval(ctx, database.DeletePolyEvalParams{
 			Eon:             eval.Eon,
 			ReceiverAddress: eval.ReceiverAddress,
 		})
@@ -242,7 +242,7 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *kprdb.Qu
 }
 
 func (st *ShuttermintState) handleBatchConfig(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.BatchConfig,
+	ctx context.Context, queries *database.Queries, e *shutterevents.BatchConfig,
 ) error {
 	if !st.isKeyper {
 		if !e.IsKeyper(st.config.GetAddress()) {
@@ -268,7 +268,7 @@ func (st *ShuttermintState) handleBatchConfig(
 	}
 	return queries.InsertBatchConfig(
 		ctx,
-		kprdb.InsertBatchConfigParams{
+		database.InsertBatchConfigParams{
 			KeyperConfigIndex:     int32(e.KeyperConfigIndex),
 			Height:                e.Height,
 			Threshold:             int32(e.Threshold),
@@ -281,14 +281,14 @@ func (st *ShuttermintState) handleBatchConfig(
 
 func (st *ShuttermintState) handleBatchConfigStarted(
 	ctx context.Context,
-	queries *kprdb.Queries,
+	queries *database.Queries,
 	e *shutterevents.BatchConfigStarted,
 ) error {
 	return queries.SetBatchConfigStarted(ctx, int32(e.KeyperConfigIndex))
 }
 
 func (st *ShuttermintState) handleEonStarted(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.EonStarted,
+	ctx context.Context, queries *database.Queries, e *shutterevents.EonStarted,
 ) error {
 	if !st.isKeyper {
 		return nil
@@ -296,7 +296,7 @@ func (st *ShuttermintState) handleEonStarted(
 	if e.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d of eon start would overflow int64", e.ActivationBlockNumber)
 	}
-	err := queries.InsertEon(ctx, kprdb.InsertEonParams{
+	err := queries.InsertEon(ctx, database.InsertEonParams{
 		Eon:                   int64(e.Eon),
 		Height:                e.Height,
 		ActivationBlockNumber: int64(e.ActivationBlockNumber),
@@ -354,7 +354,7 @@ func (st *ShuttermintState) handleEonStarted(
 }
 
 func (st *ShuttermintState) startPhase1Dealing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+	ctx context.Context, queries *database.Queries, eon uint64, dkg *ActiveDKG,
 ) error {
 	pure := dkg.pure
 	commitment, polyEvals, err := pure.StartPhase1Dealing()
@@ -372,7 +372,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 	}
 
 	for _, eval := range polyEvals {
-		err = queries.InsertPolyEval(ctx, kprdb.InsertPolyEvalParams{
+		err = queries.InsertPolyEval(ctx, database.InsertPolyEvalParams{
 			Eon:             int64(eon),
 			ReceiverAddress: shdb.EncodeAddress(dkg.keypers[eval.Receiver]),
 			Eval:            shdb.EncodeBigint(eval.Eval),
@@ -385,7 +385,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 }
 
 func (st *ShuttermintState) startPhase2Accusing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+	ctx context.Context, queries *database.Queries, eon uint64, dkg *ActiveDKG,
 ) error {
 	accusations := dkg.pure.StartPhase2Accusing()
 	dkg.markDirty()
@@ -410,7 +410,7 @@ func (st *ShuttermintState) startPhase2Accusing(
 }
 
 func (st *ShuttermintState) startPhase3Apologizing(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+	ctx context.Context, queries *database.Queries, eon uint64, dkg *ActiveDKG,
 ) error {
 	apologies := dkg.pure.StartPhase3Apologizing()
 	dkg.markDirty()
@@ -439,7 +439,7 @@ func (st *ShuttermintState) startPhase3Apologizing(
 }
 
 func (st *ShuttermintState) finalizeDKG(
-	ctx context.Context, queries *kprdb.Queries, eon uint64, dkg *ActiveDKG,
+	ctx context.Context, queries *database.Queries, eon uint64, dkg *ActiveDKG,
 ) error {
 	dkg.pure.Finalize()
 	// There's no need to call dkg.markDirty() here, since we now remove the object from memory
@@ -479,7 +479,7 @@ func (st *ShuttermintState) finalizeDKG(
 			return err
 		}
 		publicKeyBytes, _ := dkgresult.PublicKey.GobEncode()
-		err := queries.InsertEonPublicKey(ctx, kprdb.InsertEonPublicKeyParams{EonPublicKey: publicKeyBytes, Eon: int64(dkgresult.Eon)})
+		err := queries.InsertEonPublicKey(ctx, database.InsertEonPublicKeyParams{EonPublicKey: publicKeyBytes, Eon: int64(dkgresult.Eon)})
 		if err != nil {
 			return err
 		}
@@ -494,7 +494,7 @@ func (st *ShuttermintState) finalizeDKG(
 		return err
 	}
 
-	return queries.InsertDKGResult(ctx, kprdb.InsertDKGResultParams{
+	return queries.InsertDKGResult(ctx, database.InsertDKGResultParams{
 		Eon:        int64(eon),
 		Success:    pureResult != nil,
 		Error:      dkgerror,
@@ -503,7 +503,7 @@ func (st *ShuttermintState) finalizeDKG(
 }
 
 func (st *ShuttermintState) shiftPhase(
-	ctx context.Context, queries *kprdb.Queries, height int64, eon uint64, dkg *ActiveDKG,
+	ctx context.Context, queries *database.Queries, height int64, eon uint64, dkg *ActiveDKG,
 ) error {
 	phase := st.phaseLength.GetPhaseAtHeight(height, dkg.startHeight)
 	for currentPhase := dkg.pure.Phase; currentPhase < phase; currentPhase = dkg.pure.Phase {
@@ -538,7 +538,7 @@ func (st *ShuttermintState) shiftPhase(
 }
 
 func (st *ShuttermintState) shiftPhases(
-	ctx context.Context, queries *kprdb.Queries, height int64,
+	ctx context.Context, queries *database.Queries, height int64,
 ) error {
 	for eon, dkg := range st.dkg {
 		err := st.shiftPhase(ctx, queries, height, eon, dkg)
@@ -550,10 +550,10 @@ func (st *ShuttermintState) shiftPhases(
 }
 
 func (st *ShuttermintState) handleCheckIn(
-	ctx context.Context, queries *kprdb.Queries, e *shutterevents.CheckIn,
+	ctx context.Context, queries *database.Queries, e *shutterevents.CheckIn,
 ) error {
 	st.encryptionKeys[e.Sender] = e.EncryptionPublicKey
-	err := queries.InsertEncryptionKey(ctx, kprdb.InsertEncryptionKeyParams{
+	err := queries.InsertEncryptionKey(ctx, database.InsertEncryptionKeyParams{
 		Address:             shdb.EncodeAddress(e.Sender),
 		EncryptionPublicKey: shdb.EncodeEciesPublicKey(e.EncryptionPublicKey),
 	})
@@ -561,7 +561,7 @@ func (st *ShuttermintState) handleCheckIn(
 }
 
 func (st *ShuttermintState) handlePolyCommitment(
-	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyCommitment,
+	_ context.Context, _ *database.Queries, e *shutterevents.PolyCommitment,
 ) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
@@ -595,7 +595,7 @@ func (st *ShuttermintState) decryptPolyEval(encrypted []byte) ([]byte, error) {
 }
 
 func (st *ShuttermintState) handlePolyEval(
-	_ context.Context, _ *kprdb.Queries, e *shutterevents.PolyEval,
+	_ context.Context, _ *database.Queries, e *shutterevents.PolyEval,
 ) error {
 	myAddress := st.config.GetAddress()
 	if e.Sender == myAddress {
@@ -649,7 +649,7 @@ func (st *ShuttermintState) handlePolyEval(
 }
 
 func (st *ShuttermintState) handleAccusation(
-	_ context.Context, _ *kprdb.Queries, e *shutterevents.Accusation,
+	_ context.Context, _ *database.Queries, e *shutterevents.Accusation,
 ) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
@@ -694,7 +694,7 @@ func (st *ShuttermintState) handleAccusation(
 }
 
 func (st *ShuttermintState) handleApology(
-	_ context.Context, _ *kprdb.Queries, e *shutterevents.Apology,
+	_ context.Context, _ *database.Queries, e *shutterevents.Apology,
 ) error { //nolint:unparam
 	dkg, ok := st.dkg[e.Eon]
 	if !ok {
@@ -736,7 +736,7 @@ func (st *ShuttermintState) handleApology(
 }
 
 func (st *ShuttermintState) HandleEvent(
-	ctx context.Context, queries *kprdb.Queries, event shutterevents.IEvent,
+	ctx context.Context, queries *database.Queries, event shutterevents.IEvent,
 ) error {
 	var err error
 	log.Info().Str("event", event.String()).Msg("handle shuttermint event")

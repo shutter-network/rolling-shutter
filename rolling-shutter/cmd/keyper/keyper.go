@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func Cmd() *cobra.Command {
@@ -41,28 +40,14 @@ func main(config *keyper.Config) error {
 	return service.RunWithSighandler(context.Background(), keyper.New(config))
 }
 
-func initDB(config *keyper.Config) error {
+func initDB(cfg *keyper.Config) error {
 	ctx := context.Background()
 
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 	defer dbpool.Close()
 
-	err = kprdb.ValidateKeyperDB(ctx, dbpool)
-	if err == nil {
-		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
-		return nil
-	} else if errors.Is(err, metadb.ErrSchemaMismatch) {
-		return err
-	}
-
-	// initialize the db
-	err = kprdb.InitDB(ctx, dbpool)
-	if err != nil {
-		return err
-	}
-	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database initialized")
-	return nil
+	return db.InitDB(ctx, dbpool, database.Definition.Name(), database.Definition)
 }

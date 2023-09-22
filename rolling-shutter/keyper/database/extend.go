@@ -32,7 +32,7 @@ func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.Decryp
 	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 	tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
 		Eon:           int64(msg.Eon),
-		EpochID:       identityPreimage,
+		EpochID:       identityPreimage.Bytes(),
 		DecryptionKey: msg.Key,
 	})
 	if err != nil {

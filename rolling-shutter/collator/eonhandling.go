@@ -10,10 +10,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
+	kprdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -35,7 +35,7 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *p2pmsg.EonPublicKey) error {
 // matches the chainobsdb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
 func ensureEonPublicKeyMatchesKeyperSet(
-	keyperSet chainobsdb.KeyperSet,
+	keyperSet obskeyper.KeyperSet,
 	key *p2pmsg.EonPublicKey,
 ) error {
 	activationBlock := int64(key.ActivationBlock)
@@ -59,7 +59,7 @@ func ensureEonPublicKeyMatchesKeyperSet(
 				"(activation-block=%d)", activationBlock),
 		)
 	}
-	_, ok := kprdb.GetKeyperIndex(recoveredAddress, keyperSet.Keypers)
+	_, ok := kprdatabase.GetKeyperIndex(recoveredAddress, keyperSet.Keypers)
 
 	if !ok {
 		return errors.Errorf(
@@ -98,10 +98,10 @@ func (handler *eonPublicKeyHandler) ValidateMessage(
 	// because of that.
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
-	var keyperSet chainobsdb.KeyperSet
+	var keyperSet obskeyper.KeyperSet
 	if err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
-		keyperSet, err = chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		keyperSet, err = obskeyper.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		return err
@@ -127,15 +127,15 @@ func (handler *eonPublicKeyHandler) HandleMessage(
 	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
 
-		db := cltrdb.New(tx)
-		keyperSet, err := chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		db := database.New(tx)
+		keyperSet, err := obskeyper.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve keyper set from db")
 		}
 		hash := key.Hash()
-		err = db.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+		err = db.InsertEonPublicKeyCandidate(ctx, database.InsertEonPublicKeyCandidateParams{
 			Hash:                  hash,
 			EonPublicKey:          key.PublicKey,
 			ActivationBlockNumber: int64(key.ActivationBlock),
@@ -145,7 +145,7 @@ func (handler *eonPublicKeyHandler) HandleMessage(
 		if err != nil {
 			return err
 		}
-		insertEonPublicKeyVoteParam := cltrdb.InsertEonPublicKeyVoteParams{
+		insertEonPublicKeyVoteParam := database.InsertEonPublicKeyVoteParams{
 			Hash:              hash,
 			Sender:            shdb.EncodeAddress(recoveredAddress),
 			Signature:         key.Signature,

@@ -19,11 +19,11 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
 const numAccounts = 5
@@ -111,7 +111,7 @@ type Fixture struct {
 	Coinbase    common.Address
 	Batcher     *Batcher
 	Params      TestParams
-	DB          *cltrdb.Queries
+	DB          *database.Queries
 	ChainID     *big.Int
 	Keys        [numAccounts]*ecdsa.PrivateKey
 }
@@ -137,8 +137,9 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	cfg.SequencerURL = ethL2.URL
 	ethL2.SetBatchIndex(params.InitialIdentityPreimage.Uint64() - 1)
 
-	db, dbpool, dbteardown := testdb.NewCollatorTestDB(ctx, t)
+	dbpool, dbteardown := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	t.Cleanup(dbteardown)
+	db := database.New(dbpool)
 
 	address := ethcrypto.PubkeyToAddress(keys[0].PublicKey)
 	chainID := big.NewInt(199)
@@ -173,7 +174,7 @@ func (fix *Fixture) AddEonPublicKey(ctx context.Context, t *testing.T) {
 	t.Helper()
 	hash := []byte{1, 2, 3}
 	pubkey := []byte{4, 5, 6}
-	err := fix.DB.InsertEonPublicKeyCandidate(ctx, cltrdb.InsertEonPublicKeyCandidateParams{
+	err := fix.DB.InsertEonPublicKeyCandidate(ctx, database.InsertEonPublicKeyCandidateParams{
 		Hash:         hash,
 		EonPublicKey: pubkey,
 	})

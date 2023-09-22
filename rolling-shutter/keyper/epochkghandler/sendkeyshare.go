@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -22,7 +22,7 @@ type Config interface {
 func SendDecryptionKeyShare(
 	ctx context.Context,
 	config Config,
-	db *kprdb.Queries,
+	db *database.Queries,
 	blockNumber int64,
 	identityPreimages ...identitypreimage.IdentityPreimage,
 ) ([]p2pmsg.Message, error) {
@@ -54,7 +54,7 @@ func SendDecryptionKeyShare(
 
 	// check if we already computed (and therefore most likely sent) our key share
 	// XXX this only works when we sent the share for exactly one epoch.
-	shareExists, err := db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
+	shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
 		Eon:         eon.Eon,
 		EpochID:     identityPreimages[0].Bytes(),
 		KeyperIndex: keyperIndex,
