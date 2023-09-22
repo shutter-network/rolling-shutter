@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -21,14 +21,17 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+
+	queries := database.New(dbpool)
 
 	eon := config.GetEon()
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
-	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
+	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
 	encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
@@ -41,7 +44,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		Key:        encodedDecryptionKey,
 	})
 	assert.Check(t, len(msgs) == 0)
-	key, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
+	key, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
 		Eon:     int64(eon),
 		EpochID: identityPreimage.Bytes(),
 	})
@@ -55,14 +58,14 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
-	defer closedb()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
 
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
-	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
+	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 	secretKey := tkg.EpochSecretKey(identityPreimage).Marshal()
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}

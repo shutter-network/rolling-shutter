@@ -13,7 +13,7 @@ import (
 	"github.com/tendermint/tendermint/rpc/client"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 )
 
@@ -52,7 +52,7 @@ func SyncAppWithDB(
 }
 
 func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
-	q := kprdb.New(smdrv.dbpool)
+	q := database.New(smdrv.dbpool)
 	oldMeta, err := q.TMGetSyncMeta(ctx)
 	if err != nil {
 		return err
@@ -96,7 +96,7 @@ func (smdrv *ShuttermintDriver) fetchEvents2(ctx context.Context, heightFrom, la
 			return err
 		}
 		err = smdrv.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			return smdrv.handleBlock(ctx, kprdb.New(tx), results, lastCommittedHeight)
+			return smdrv.handleBlock(ctx, database.New(tx), results, lastCommittedHeight)
 		})
 		if err != nil {
 			smdrv.shuttermintState.Invalidate()
@@ -158,7 +158,7 @@ func (smdrv *ShuttermintDriver) fetchEvents(ctx context.Context, heightFrom, las
 
 func (smdrv *ShuttermintDriver) handleBlock(
 	ctx context.Context,
-	queries *kprdb.Queries,
+	queries *database.Queries,
 	block *coretypes.ResultBlockResults,
 	lastCommittedHeight int64,
 ) error {
@@ -174,7 +174,7 @@ func (smdrv *ShuttermintDriver) handleBlock(
 		)
 	}
 
-	err = queries.TMSetSyncMeta(ctx, kprdb.TMSetSyncMetaParams{
+	err = queries.TMSetSyncMeta(ctx, database.TMSetSyncMetaParams{
 		CurrentBlock:        block.Height,
 		LastCommittedHeight: lastCommittedHeight,
 		SyncTimestamp:       time.Now(),
@@ -218,7 +218,7 @@ func (smdrv *ShuttermintDriver) handleBlock(
 }
 
 func (smdrv *ShuttermintDriver) innerHandleTransactions(
-	ctx context.Context, queries *kprdb.Queries,
+	ctx context.Context, queries *database.Queries,
 	txs []*coretypes.ResultTx,
 	oldCurrentBlock, newCurrentBlock, lastCommittedHeight int64,
 ) error {
@@ -235,7 +235,7 @@ func (smdrv *ShuttermintDriver) innerHandleTransactions(
 	if err != nil {
 		return err
 	}
-	err = queries.TMSetSyncMeta(ctx, kprdb.TMSetSyncMetaParams{
+	err = queries.TMSetSyncMeta(ctx, database.TMSetSyncMetaParams{
 		CurrentBlock:        newCurrentBlock,
 		LastCommittedHeight: lastCommittedHeight,
 		SyncTimestamp:       time.Now(),
@@ -277,7 +277,7 @@ func (smdrv *ShuttermintDriver) handleTransactions(
 ) error {
 	err := smdrv.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		return smdrv.innerHandleTransactions(
-			ctx, kprdb.New(tx), txs, oldCurrentBlock, newCurrentBlock, lastCommittedHeight,
+			ctx, database.New(tx), txs, oldCurrentBlock, newCurrentBlock, lastCommittedHeight,
 		)
 	})
 	if err != nil {

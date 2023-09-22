@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	chainobscolldb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
+	kprdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -40,7 +40,7 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 	if blk > math.MaxInt64 {
 		return false, errors.Errorf("block number %d overflows int64", blk)
 	}
-	chainCollator, err := chainobsdb.New(handler.dbpool).GetChainCollator(ctx, int64(blk))
+	chainCollator, err := chainobscolldb.New(handler.dbpool).GetChainCollator(ctx, int64(blk))
 	if err == pgx.ErrNoRows {
 		return false, errors.Errorf("got decryption trigger with no collator for given block number: %d", blk)
 	}

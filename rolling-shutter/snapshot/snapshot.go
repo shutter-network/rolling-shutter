@@ -9,13 +9,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/hubapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/snpjrpc"
 )
@@ -27,7 +28,7 @@ type Snapshot struct {
 
 	p2p           *p2p.P2PHandler
 	dbpool        *pgxpool.Pool
-	db            *snpdb.Queries
+	db            *database.Queries
 	l1Client      *ethclient.Client
 	hubapi        *hubapi.HubAPI
 	jrpc          *snpjrpc.SnpJRPC
@@ -68,12 +69,11 @@ func (snp *Snapshot) Start(ctx context.Context, runner service.Runner) error {
 	snp.dbpool = dbpool
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
-	err = snpdb.ValidateSnapshotDB(ctx, dbpool)
+	err = dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
 		return err
 	}
-	db := snpdb.New(dbpool)
-	snp.db = db
+	snp.db = database.New(dbpool)
 
 	if snp.Config.Metrics.Enabled {
 		err = snp.initMetrics(ctx)

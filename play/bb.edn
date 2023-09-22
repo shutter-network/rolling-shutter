@@ -145,7 +145,10 @@
   (src-file "collator/oapi/oapi.yaml")
 
   -sqlc-files
-  (concat [(src-file "db/sqlc.yaml")] (fs/glob src-dir "**.sql"))
+  (fs/glob src-dir "**/sqlc.yaml")
+
+  -sql-files
+  (fs/glob src-dir "**.sql")
 
   -go-files
   (->> (p/process ["go" "list" "-m" "-f={{.Dir}}"]
@@ -252,11 +255,11 @@
 
   build:sqlc
   {:doc "Run sqlc"
-   :depends [-sqlc-files]
+   :depends [-sqlc-files -sql-files]
    :task (when (and (not windows?)
-                    (seq (fs/modified-since exe -sqlc-files)))
+                    (seq (fs/modified-since exe (concat -sqlc-files -sql-files))))
            (run '-install:sqlc)
-           (run-process '[sqlc generate] {:dir (-> src-dir (fs/path "db") str)}))}
+           (run-process '[go generate -run="sqlc generate" -x ./...] {:dir src-dir}))}
 
   build:protoc
   {:doc "Run protoc"

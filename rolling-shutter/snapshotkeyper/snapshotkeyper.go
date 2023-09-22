@@ -15,15 +15,16 @@ import (
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
+	chainobskprdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -69,7 +70,7 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 		return err
 	}
 
-	err = kprdb.ValidateKeyperDB(ctx, dbpool)
+	err = snkpr.dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
 		return err
 	}
@@ -161,14 +162,14 @@ func (snkpr *snapshotkeyper) sendNewBlockSeen(
 	tx pgx.Tx,
 	l1BlockNumber uint64,
 ) error {
-	q := kprdb.New(tx)
+	q := database.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
 	if err != nil {
 		return err
 	}
 
 	count, err := q.CountBatchConfigsInBlockRange(ctx,
-		kprdb.CountBatchConfigsInBlockRangeParams{
+		database.CountBatchConfigsInBlockRangeParams{
 			StartBlock: lastBlock,
 			EndBlock:   int64(l1BlockNumber),
 		})
@@ -198,7 +199,7 @@ func (snkpr *snapshotkeyper) sendNewBlockSeen(
 
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
 func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
-	q := kprdb.New(tx)
+	q := database.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
 		log.Print("no batch config found in tendermint")
@@ -207,7 +208,7 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return err
 	}
 
-	cq := chainobsdb.New(tx)
+	cq := chainobskprdb.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
 		ctx,
 		int64(latestBatchConfig.KeyperConfigIndex)+1,
@@ -296,7 +297,7 @@ func (snkpr *snapshotkeyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 
-		err = fx.SendShutterMessages(ctx, kprdb.New(snkpr.dbpool), &snkpr.messageSender)
+		err = fx.SendShutterMessages(ctx, database.New(snkpr.dbpool), &snkpr.messageSender)
 		if err != nil {
 			log.Err(err).Msg("Error sending shutter messages")
 			return err
@@ -311,12 +312,12 @@ func (snkpr *snapshotkeyper) operateShuttermint(ctx context.Context) error {
 
 func (snkpr *snapshotkeyper) broadcastEonPublicKeys(ctx context.Context) error {
 	for {
-		eonPublicKeys, err := kprdb.New(snkpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
+		eonPublicKeys, err := database.New(snkpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
 		if err != nil {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			_, exists := kprdb.GetKeyperIndex(snkpr.config.GetAddress(), eonPublicKey.Keypers)
+			_, exists := database.GetKeyperIndex(snkpr.config.GetAddress(), eonPublicKey.Keypers)
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}

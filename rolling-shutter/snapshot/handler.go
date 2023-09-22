@@ -9,10 +9,10 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/database"
 )
 
 func NewDecryptionKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
@@ -115,10 +115,10 @@ func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pms
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
 	var result []p2pmsg.Message
 	key := m.(*p2pmsg.DecryptionKey)
-	db := snpdb.New(handler.dbpool)
+	db := database.New(handler.dbpool)
 
 	rows, err := db.InsertDecryptionKey(
-		ctx, snpdb.InsertDecryptionKeyParams{
+		ctx, database.InsertDecryptionKeyParams{
 			EpochID: key.EpochID,
 			Key:     key.Key,
 		},
@@ -147,9 +147,9 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 
 	eonID := eonPubKeyMsg.GetEon()
 	key := eonPubKeyMsg.GetPublicKey()
-	db := snpdb.New(handler.dbpool)
+	db := database.New(handler.dbpool)
 	rows, err := db.InsertEonPublicKey(
-		ctx, snpdb.InsertEonPublicKeyParams{
+		ctx, database.InsertEonPublicKeyParams{
 			EonID:        int64(eonID),
 			EonPublicKey: key,
 		},

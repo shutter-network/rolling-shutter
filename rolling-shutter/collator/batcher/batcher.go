@@ -16,7 +16,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -89,7 +89,7 @@ func NewBatcher(ctx context.Context, cfg *config.Config, dbpool *pgxpool.Pool) (
 // initializeNextBatch populates the next_batch table with a valid value.
 func (btchr *Batcher) initializeNextBatch(
 	ctx context.Context,
-	db *cltrdb.Queries,
+	db *database.Queries,
 ) (identitypreimage.IdentityPreimage, uint64, error) {
 	var (
 		nextIdentityPreimage identitypreimage.IdentityPreimage
@@ -109,7 +109,7 @@ func (btchr *Batcher) initializeNextBatch(
 		return nextIdentityPreimage, l1BlockNumber, err
 	}
 	nextIdentityPreimage = identitypreimage.Uint64ToIdentityPreimage(l2batchIndex + 1)
-	err = db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+	err = db.SetNextBatch(ctx, database.SetNextBatchParams{
 		EpochID:       nextIdentityPreimage.Bytes(),
 		L1BlockNumber: int64(l1BlockNumber),
 	})
@@ -142,7 +142,7 @@ func (btchr *Batcher) EnsureChainState(ctx context.Context) error {
 // nil and return an error.
 func (btchr *Batcher) initChainState(ctx context.Context) error {
 	btchr.nextBatchChainState = nil
-	db := cltrdb.New(btchr.dbpool)
+	db := database.New(btchr.dbpool)
 	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, db)
 	if err == pgx.ErrNoRows {
 		// the DB does not have a NextBatch set yet.
@@ -192,13 +192,13 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 }
 
 // loadAndApplyTransactions loads transactions from the database for the current batch.
-func (btchr *Batcher) loadAndApplyTransactions(ctx context.Context, db *cltrdb.Queries) error {
+func (btchr *Batcher) loadAndApplyTransactions(ctx context.Context, db *database.Queries) error {
 	txs, err := db.GetNonRejectedTransactionsByEpoch(ctx, btchr.nextBatchChainState.identityPreimage.Bytes())
 	if err != nil {
 		return err
 	}
 
-	unmarshalledTxs, err := cltrdb.UnmarshalTransactions(txs)
+	unmarshalledTxs, err := database.UnmarshalTransactions(txs)
 	if err != nil {
 		return err
 	}
@@ -218,29 +218,29 @@ func (btchr *Batcher) loadAndApplyTransactions(ctx context.Context, db *cltrdb.Q
 func (btchr *Batcher) applyTransactions(
 	ctx context.Context,
 	unmarshalledTxs []txtypes.Transaction,
-	txs []cltrdb.Transaction,
+	txs []database.Transaction,
 ) error {
-	db := cltrdb.New(btchr.dbpool)
+	db := database.New(btchr.dbpool)
 	for i := range unmarshalledTxs {
 		err := btchr.nextBatchChainState.CanApplyTx(
 			&unmarshalledTxs[i],
 			uint64(len(txs[i].TxBytes)),
 		)
-		if txs[i].Status == cltrdb.TxstatusNew {
-			var newStatus cltrdb.Txstatus
+		if txs[i].Status == database.TxstatusNew {
+			var newStatus database.Txstatus
 			if err == nil {
-				newStatus = cltrdb.TxstatusCommitted
+				newStatus = database.TxstatusCommitted
 			} else {
-				newStatus = cltrdb.TxstatusRejected
+				newStatus = database.TxstatusRejected
 			}
-			err = db.SetTransactionStatus(ctx, cltrdb.SetTransactionStatusParams{
+			err = db.SetTransactionStatus(ctx, database.SetTransactionStatusParams{
 				TxHash: txs[i].TxHash,
 				Status: newStatus,
 			})
 			if err != nil {
 				return err
 			}
-			if newStatus == cltrdb.TxstatusCommitted {
+			if newStatus == database.TxstatusCommitted {
 				btchr.nextBatchChainState.ApplyTx(&unmarshalledTxs[i], uint64(len(txs[i].TxBytes)))
 			}
 		} else if err == nil {
@@ -254,10 +254,10 @@ func (btchr *Batcher) applyTransactions(
 
 func (btchr *Batcher) closeBatchImpl(
 	ctx context.Context,
-	db *cltrdb.Queries,
+	db *database.Queries,
 	l1blockNumber int64,
 ) error {
-	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, cltrdb.New(btchr.dbpool))
+	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, database.New(btchr.dbpool))
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (btchr *Batcher) closeBatchImpl(
 	txsHash := hashTransactions(txs)
 
 	// Write back the generated trigger to the database
-	err = db.InsertTrigger(ctx, cltrdb.InsertTriggerParams{
+	err = db.InsertTrigger(ctx, database.InsertTriggerParams{
 		EpochID:       nextBatchEpochID.Bytes(),
 		BatchHash:     txsHash,
 		L1BlockNumber: l1blockNumber,
@@ -294,7 +294,7 @@ func (btchr *Batcher) closeBatchImpl(
 
 	newEpoch := batchhandler.ComputeNextEpochID(nextBatchEpochID)
 
-	return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
+	return db.SetNextBatch(ctx, database.SetNextBatchParams{
 		EpochID:       newEpoch.Bytes(),
 		L1BlockNumber: l1blockNumber,
 	})
@@ -318,7 +318,7 @@ func (btchr *Batcher) CloseBatch(ctx context.Context) error {
 	}
 
 	err = btchr.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		return btchr.closeBatchImpl(ctx, cltrdb.New(dbtx), int64(l1blockNumber))
+		return btchr.closeBatchImpl(ctx, database.New(dbtx), int64(l1blockNumber))
 	})
 
 	if err != nil {
@@ -371,7 +371,7 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 		}
 	}
 
-	db := cltrdb.New(btchr.dbpool)
+	db := database.New(btchr.dbpool)
 	nextBatchEpochID, _, err := batchhandler.GetNextBatch(ctx, db)
 	if err != nil {
 		return err
@@ -386,7 +386,7 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 
 	txInNextBatch := btchr.nextBatchChainState != nil && tx.BatchIndex() == nextBatchIndex
 
-	txstatus := cltrdb.TxstatusNew
+	txstatus := database.TxstatusNew
 	if txInNextBatch {
 		// If the tx goes into the next batch, we ensure it can be applied by calling
 		// CanApplyTx after making sure we have the current nonce and balance for the
@@ -399,12 +399,12 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 		if err != nil {
 			return err
 		}
-		txstatus = cltrdb.TxstatusCommitted
+		txstatus = database.TxstatusCommitted
 	}
 
 	err = btchr.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		identityPreimage := identitypreimage.Uint64ToIdentityPreimage(tx.BatchIndex()).Bytes()
-		return cltrdb.New(dbtx).InsertTx(ctx, cltrdb.InsertTxParams{
+		return database.New(dbtx).InsertTx(ctx, database.InsertTxParams{
 			TxHash:  tx.Hash().Bytes(),
 			EpochID: identityPreimage,
 			TxBytes: txBytes,
@@ -456,7 +456,7 @@ func (btchr *Batcher) ensureAccountsInitialized(
 	return nil
 }
 
-func hashTransactions(txs []cltrdb.Transaction) []byte {
+func hashTransactions(txs []database.Transaction) []byte {
 	txHashes := make([][]byte, len(txs))
 	for i, t := range txs {
 		txHashes[i] = t.TxHash

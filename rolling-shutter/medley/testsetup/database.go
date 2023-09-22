@@ -1,4 +1,4 @@
-package testdb
+package testsetup
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
 
@@ -38,10 +37,12 @@ BEGIN
 END $$;
 `
 
-// NewTestDBPool connects to a test db specified an environment variable and clears it from all
+var testDBSuffix = "-test"
+
+// newDBPoolTeardown connects to a test db specified an environment variable and clears it from all
 // schemas we might have created. It returns the db connection pool and a close function. Call the
 // close function at the end of the test to reset the db again and close the connection.
-func NewTestDBPool(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
+func newDBPoolTeardown(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 
 	testDBURL, exists := os.LookupEnv(testDBURLVar)
@@ -72,29 +73,16 @@ func NewTestDBPool(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
 	return dbpool, closedb
 }
 
-func NewKeyperTestDB(ctx context.Context, t *testing.T) (*kprdb.Queries, *pgxpool.Pool, func()) {
+func NewTestDBPool(ctx context.Context, t *testing.T, definition db.Definition) (*pgxpool.Pool, func()) {
 	t.Helper()
 
-	dbpool, closedb := NewTestDBPool(ctx, t)
-	db := kprdb.New(dbpool)
-	err := kprdb.InitDB(ctx, dbpool)
-	if err != nil {
-		closedb()
-		t.Fatalf("failed to initialize keyper db")
-	}
-	return db, dbpool, closedb
-}
+	dbpool, closedb := newDBPoolTeardown(ctx, t)
 
-func NewCollatorTestDB(ctx context.Context, t *testing.T) (*cltrdb.Queries, *pgxpool.Pool, func()) {
-	t.Helper()
-
-	dbpool, closedb := NewTestDBPool(ctx, t)
-	db := cltrdb.New(dbpool)
-	err := cltrdb.InitDB(ctx, dbpool)
+	err := db.InitDB(ctx, dbpool, definition.Name()+testDBSuffix, definition)
 	if err != nil {
-		log.Error().Err(err).Msg("cltrdb.Initdb failed")
+		log.Error().Err(err).Str("db-definition", definition.Name()).Msg("Initializing DB failed")
 		closedb()
-		t.Fatalf("failed to initialize collator db")
+		t.Fatalf("failed to initialize '%s' db", definition.Name())
 	}
-	return db, dbpool, closedb
+	return dbpool, closedb
 }

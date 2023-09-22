@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
@@ -33,7 +33,7 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
-	db := kprdb.New(srv.dbpool)
+	db := database.New(srv.dbpool)
 
 	epochIDBytes, err := hex.DecodeString(strings.TrimPrefix(string(epochID), "0x"))
 	if err != nil {
@@ -41,7 +41,7 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon 
 		return
 	}
 
-	decryptionKey, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
+	decryptionKey, err := db.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
 		Eon:     int64(eon),
 		EpochID: epochIDBytes,
 	})
@@ -61,7 +61,7 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon 
 
 func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	db := kprdb.New(srv.dbpool)
+	db := database.New(srv.dbpool)
 
 	res := kproapi.Eons{}
 
@@ -126,7 +126,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 	msgs, err := epochkghandler.SendDecryptionKeyShare(
-		ctx, srv.config, kprdb.New(srv.dbpool), int64(requestBody.BlockNumber), identityPreimage,
+		ctx, srv.config, database.New(srv.dbpool), int64(requestBody.BlockNumber), identityPreimage,
 	)
 	if err != nil {
 		if err != nil {

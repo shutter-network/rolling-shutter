@@ -15,15 +15,15 @@ import (
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
+	chainobskprdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -57,10 +57,10 @@ func New(config *Config) service.Service {
 func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
 	cfgAddress := config.GetAddress().String()
-	queries := metadb.New(dbpool)
+	queries := db.New(dbpool)
 	dbAddr, err := queries.GetMeta(ctx, addressKey)
 	if err == pgx.ErrNoRows {
-		return queries.InsertMeta(ctx, metadb.InsertMetaParams{
+		return queries.InsertMeta(ctx, db.InsertMetaParams{
 			Key:   addressKey,
 			Value: cfgAddress,
 		})
@@ -77,13 +77,12 @@ func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) e
 }
 
 func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
+	var err error
 	config := kpr.config
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	kpr.dbpool, err = db.Connect(ctx, runner, config.DatabaseURL, database.Definition.Name())
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	runner.Defer(dbpool.Close)
-	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(config.Ethereum.EthereumURL)
 	if err != nil {
@@ -98,11 +97,11 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	err = kprdb.ValidateKeyperDB(ctx, dbpool)
+	err = kpr.dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
 		return err
 	}
-	err = LinkConfigToDB(ctx, config, dbpool)
+	err = LinkConfigToDB(ctx, config, kpr.dbpool)
 	if err != nil {
 		return err
 	}
@@ -122,7 +121,6 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
 	}
 
-	kpr.dbpool = dbpool
 	kpr.shuttermintClient = shuttermintClient
 	kpr.messageSender = messageSender
 	kpr.l1Client = l1Client
@@ -190,14 +188,14 @@ func (kpr *keyper) handleOnChainChanges(
 // enough keypers have seen a block past the start block of some BatchConfig. We only send messages
 // when the current block we see, could lead to a batch config being started.
 func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
-	q := kprdb.New(tx)
+	q := database.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
 	if err != nil {
 		return err
 	}
 
 	count, err := q.CountBatchConfigsInBlockRange(ctx,
-		kprdb.CountBatchConfigsInBlockRangeParams{
+		database.CountBatchConfigsInBlockRangeParams{
 			StartBlock: lastBlock,
 			EndBlock:   int64(l1BlockNumber),
 		})
@@ -231,7 +229,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	tx pgx.Tx,
 	l1BlockNumber uint64,
 ) error {
-	q := kprdb.New(tx)
+	q := database.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
 	if err == pgx.ErrNoRows {
 		log.Print("no batch config found in tendermint")
@@ -240,7 +238,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 		return err
 	}
 
-	cq := chainobsdb.New(tx)
+	cq := chainobskprdb.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
 		ctx,
 		int64(latestBatchConfig.KeyperConfigIndex)+1,
@@ -324,7 +322,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return err
 		}
 
-		err = fx.SendShutterMessages(ctx, kprdb.New(kpr.dbpool), &kpr.messageSender)
+		err = fx.SendShutterMessages(ctx, database.New(kpr.dbpool), &kpr.messageSender)
 		if err != nil {
 			return err
 		}
@@ -338,12 +336,12 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 
 func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 	for {
-		eonPublicKeys, err := kprdb.New(kpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
+		eonPublicKeys, err := database.New(kpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
 		if err != nil {
 			return err
 		}
 		for _, eonPublicKey := range eonPublicKeys {
-			_, exists := kprdb.GetKeyperIndex(kpr.config.GetAddress(), eonPublicKey.Keypers)
+			_, exists := database.GetKeyperIndex(kpr.config.GetAddress(), eonPublicKey.Keypers)
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}

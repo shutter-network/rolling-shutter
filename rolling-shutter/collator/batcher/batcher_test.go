@@ -9,7 +9,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -97,7 +97,7 @@ func TestConfirmTransactionsIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, 5, len(txs), "should have exactly one tx: %+v", txs)
 	for nonce := 0; nonce < 5; nonce++ {
-		assert.Equal(t, cltrdb.TxstatusCommitted, txs[nonce].Status, "expected tx to have status committed: %+v", txs[nonce])
+		assert.Equal(t, database.TxstatusCommitted, txs[nonce].Status, "expected tx to have status committed: %+v", txs[nonce])
 	}
 }
 
@@ -191,8 +191,8 @@ func TestOpenNextBatchIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, len(txs), 2)
 
-	assert.Equal(t, txs[0].Status, cltrdb.TxstatusCommitted)
-	assert.Equal(t, txs[1].Status, cltrdb.TxstatusRejected)
+	assert.Equal(t, txs[0].Status, database.TxstatusCommitted)
+	assert.Equal(t, txs[1].Status, database.TxstatusRejected)
 }
 
 // TestDecryptionTrigger tests that closing a batch
@@ -246,13 +246,13 @@ func TestDecryptionTriggerInsertOrderingIntegration(t *testing.T) {
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
 
-	trigger1 := cltrdb.InsertTriggerParams{
+	trigger1 := database.InsertTriggerParams{
 		EpochID:       identitypreimage.Uint64ToIdentityPreimage(2).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{1, 0}).Bytes(),
 		L1BlockNumber: 666,
 	}
 
-	trigger2 := cltrdb.InsertTriggerParams{
+	trigger2 := database.InsertTriggerParams{
 		EpochID:       identitypreimage.Uint64ToIdentityPreimage(1).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{0, 1}).Bytes(),
 		L1BlockNumber: 42,
@@ -271,14 +271,14 @@ func TestDecryptionTriggerInsertOrderingIntegration(t *testing.T) {
 
 	// ordering is by insert order,
 	// independent of the epochid or l1blocknumber
-	assert.DeepEqual(t, cltrdb.DecryptionTrigger{
+	assert.DeepEqual(t, database.DecryptionTrigger{
 		EpochID:       trigger2.EpochID,
 		ID:            1,
 		BatchHash:     trigger2.BatchHash,
 		L1BlockNumber: trigger2.L1BlockNumber,
 	}, triggers[0])
 
-	assert.DeepEqual(t, cltrdb.DecryptionTrigger{
+	assert.DeepEqual(t, database.DecryptionTrigger{
 		EpochID:       trigger1.EpochID,
 		ID:            2,
 		BatchHash:     trigger1.BatchHash,
