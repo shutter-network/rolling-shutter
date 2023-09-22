@@ -41,23 +41,42 @@ func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) (
 }
 
 type ChainObserver struct {
-	contracts *deployment.Contracts
-	dbpool    *pgxpool.Pool
+	contracts     *deployment.Contracts
+	dbpool        *pgxpool.Pool
+	eventHandlers map[reflect.Type]EventHandlerFunc
+}
+
+func MakeHandler[T any](handler EventHandlerFuncGeneric[T]) EventHandlerFunc {
+	anyHandler := func(ctx context.Context, tx pgx.Tx, anyEvent any) error {
+		event, ok := anyEvent.(T)
+		if !ok {
+			// TODO better error message
+			return errors.New("type mismatch")
+		}
+		return handler(ctx, tx, event)
+	}
+	return anyHandler
 }
 
 func New(contracts *deployment.Contracts, dbpool *pgxpool.Pool) *ChainObserver {
-	return &ChainObserver{contracts: contracts, dbpool: dbpool}
+	return &ChainObserver{contracts: contracts, dbpool: dbpool, eventHandlers: make(map[reflect.Type]EventHandlerFunc)}
 }
 
-func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*eventsyncer.EventType) error {
+func (chainobs *ChainObserver) Observe(ctx context.Context, events map[*eventsyncer.EventType]EventHandlerFunc) error {
 	db := chainobsdb.New(chainobs.dbpool)
 	eventSyncProgress, err := db.GetEventSyncProgress(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get last synced event from db")
 	}
 
+	eventTypes := []*eventsyncer.EventType{}
+	for eventType, handler := range events {
+		eventTypes = append(eventTypes, eventType)
+		chainobs.eventHandlers[eventType.Type] = handler
+	}
+
 	var fromBlock, fromLogIndex uint64
-	if len(eventTypes) == 0 {
+	if len(events) == 0 {
 		return errors.New("no events to observe")
 	}
 
@@ -105,34 +124,27 @@ func (chainobs *ChainObserver) Observe(ctx context.Context, eventTypes []*events
 	return errorgroup.Wait()
 }
 
-type newKeyperConfig struct {
-	contract.KeypersConfigsListNewConfig
-	addrs []common.Address
-}
+type (
+	EventHandlerFunc               func(context.Context, pgx.Tx, any) error
+	EventHandlerFuncGeneric[T any] func(context.Context, pgx.Tx, T) error
+)
 
-type newCollatorConfig struct {
-	contract.CollatorConfigsListNewConfig
-	addrs []common.Address
-}
-
-func (chainobs *ChainObserver) amendEvent(
-	ctx context.Context, event interface{},
-) (interface{}, error) {
-	switch event := event.(type) {
-	case contract.KeypersConfigsListNewConfig:
-		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.KeyperSetIndex)
-		if err != nil {
-			return nil, err
-		}
-		return newKeyperConfig{KeypersConfigsListNewConfig: event, addrs: addrs}, nil
-	case contract.CollatorConfigsListNewConfig:
-		addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.CollatorSetIndex)
-		if err != nil {
-			return nil, err
-		}
-		return newCollatorConfig{CollatorConfigsListNewConfig: event, addrs: addrs}, nil
+func (chainobs *ChainObserver) handleEvent(
+	ctx context.Context, tx pgx.Tx, event interface{},
+) error {
+	// FIXME indirect etc?
+	eventType := reflect.TypeOf(event)
+	handler, ok := chainobs.eventHandlers[eventType]
+	if !ok {
+		log.Info().Str("event-type", reflect.TypeOf(event).String()).Interface("event", event).
+			Msg("ignoring unknown event")
+		return nil
 	}
-	return event, nil
+	err := handler(ctx, tx, event)
+	if err != nil {
+		log.Error().Err(err).Str("event", eventType.Name()).Msg("error during handler invocation")
+	}
+	return nil
 }
 
 // handleEventSyncUpdate handles events and advances the sync state, but rolls back any db updates
@@ -140,16 +152,9 @@ func (chainobs *ChainObserver) amendEvent(
 func (chainobs *ChainObserver) handleEventSyncUpdate(
 	ctx context.Context, eventSyncUpdate eventsyncer.EventSyncUpdate,
 ) error {
-	var err error
-	eventSyncUpdate.Event, err = chainobs.amendEvent(ctx, eventSyncUpdate.Event)
-	if err != nil {
-		return err
-	}
 	return chainobs.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := chainobsdb.New(tx)
-
 		if eventSyncUpdate.Event != nil {
-			if err := chainobs.handleEvent(ctx, db, eventSyncUpdate.Event); err != nil {
+			if err := chainobs.handleEvent(ctx, tx, eventSyncUpdate.Event); err != nil {
 				return err
 			}
 		}
@@ -163,6 +168,7 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 			nextBlockNumber = eventSyncUpdate.BlockNumber
 			nextLogIndex = eventSyncUpdate.LogIndex + 1
 		}
+		db := chainobsdb.New(tx)
 		if err := db.UpdateEventSyncProgress(ctx, chainobsdb.UpdateEventSyncProgressParams{
 			NextBlockNumber: int32(nextBlockNumber),
 			NextLogIndex:    int32(nextLogIndex),
@@ -173,25 +179,13 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 	})
 }
 
-func (chainobs *ChainObserver) handleEvent(
-	ctx context.Context, db *chainobsdb.Queries, event interface{},
-) error {
-	var err error
-	switch event := event.(type) {
-	case newKeyperConfig:
-		err = chainobs.handleKeypersConfigsListNewConfigEvent(ctx, db, event)
-	case newCollatorConfig:
-		err = chainobs.handleCollatorConfigsListNewConfigEvent(ctx, db, event)
-	default:
-		log.Info().Str("event-type", reflect.TypeOf(event).String()).Interface("event", event).
-			Msg("ignoring unknown event")
-	}
-	return err
-}
-
 func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
-	ctx context.Context, db *chainobsdb.Queries, event newKeyperConfig,
+	ctx context.Context, tx pgx.Tx, event contract.KeypersConfigsListNewConfig,
 ) error {
+	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.KeyperSetIndex)
+	if err != nil {
+		return err
+	}
 	log.Info().
 		Uint64("block-number", event.Raw.BlockNumber).
 		Uint64("keyper-config-index", event.KeyperConfigIndex).
@@ -203,10 +197,11 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 			"activation block number %d from config contract would overflow int64",
 			event.ActivationBlockNumber)
 	}
-	err := db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
+	db := chainobsdb.New(tx)
+	err = db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(event.KeyperConfigIndex),
 		ActivationBlockNumber: int64(event.ActivationBlockNumber),
-		Keypers:               shdb.EncodeAddresses(event.addrs),
+		Keypers:               shdb.EncodeAddresses(addrs),
 		Threshold:             int32(event.Threshold),
 	})
 	if err != nil {
@@ -215,9 +210,14 @@ func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
 	return nil
 }
 
+// TODO move in separate handler
 func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
-	ctx context.Context, db *chainobsdb.Queries, event newCollatorConfig,
+	ctx context.Context, db *chainobsdb.Queries, event contract.CollatorConfigsListNewConfig,
 ) error {
+	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.CollatorSetIndex)
+	if err != nil {
+		return err
+	}
 	log.Info().
 		Uint64("block-number", event.Raw.BlockNumber).
 		Uint64("collator-config-index", event.CollatorConfigIndex).
@@ -229,12 +229,12 @@ func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
 			event.ActivationBlockNumber,
 		)
 	}
-	if len(event.addrs) > 1 {
-		return errors.Errorf("got multiple collators from collator addrs set contract: %s", event.addrs)
-	} else if len(event.addrs) == 1 {
+	if len(addrs) > 1 {
+		return errors.Errorf("got multiple collators from collator addrs set contract: %s", addrs)
+	} else if len(addrs) == 1 {
 		err := db.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 			ActivationBlockNumber: int64(event.ActivationBlockNumber),
-			Collator:              shdb.EncodeAddress(event.addrs[0]),
+			Collator:              shdb.EncodeAddress(addrs[0]),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert collator into db")

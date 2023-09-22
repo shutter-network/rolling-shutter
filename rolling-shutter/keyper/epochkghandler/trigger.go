@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -73,9 +72,11 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	}
 	metricsEpochKGDectyptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
+	_, err := epochid.BytesToEpochID(msg.EpochID)
 	if err != nil {
 		return nil, err
 	}
-	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), epochID)
+	// TODO get rid of this handler completely
+	// keySharesMsg := ConstructDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), epochID)
+	return nil, nil
 }

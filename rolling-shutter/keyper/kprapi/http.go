@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
@@ -129,9 +130,19 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 	}
 
 	ctx := r.Context()
-	msgs, err := epochkghandler.SendDecryptionKeyShare(
-		ctx, srv.config, kprdb.New(srv.dbpool), int64(requestBody.BlockNumber), epochID,
-	)
+	db := kprdb.New(srv.dbpool)
+	eon, err := db.GetEonForBlockNumber(ctx, int64(requestBody.BlockNumber))
+	if err != nil {
+		err = errors.Wrapf(err, "failed to get eon for block %d from db", requestBody.BlockNumber)
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	trigger := &epochkghandler.DecryptionTrigger{
+		Eon:      eon,
+		EpochIDs: []epochid.EpochID{epochID},
+	}
+	msg, err := epochkghandler.ConstructDecryptionKeyShare(ctx, srv.config, db, trigger)
 	if err != nil {
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())
@@ -139,11 +150,8 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	for _, msg := range msgs {
-		if err := srv.p2p.SendMessage(ctx, msg); err != nil {
-			log.Info().Err(err).Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
-				Msg("failed to send message")
-			continue
-		}
+	if err := srv.p2p.SendMessage(ctx, msg); err != nil {
+		log.Info().Err(err).Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
+			Msg("failed to send message")
 	}
 }

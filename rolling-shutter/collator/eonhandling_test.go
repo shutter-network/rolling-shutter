@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
@@ -144,6 +146,9 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	epoch1 := epochid.Uint64ToEpochID(1)
 	epoch1000 := epochid.Uint64ToEpochID(1000)
 	epoch2000 := epochid.Uint64ToEpochID(2000)
+
+	eonPubKeyTest := tkgBefore.EonPublicKey(epoch1000)
+	panic(errors.Errorf("%s", hexutil.Encode(eonPubKeyTest.Marshal())))
 
 	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(epoch1).GobEncode()
 	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(epoch1000).GobEncode()

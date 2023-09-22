@@ -39,6 +39,8 @@ type EventType struct {
 	ABI             abi.ABI
 	Name            string
 	Type            reflect.Type
+	SQLCreate       string
+	SQLQueries      string
 }
 
 // logChannelItem is what is put on the (internal) channel of found logs. It can either contain a

@@ -24,6 +24,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -35,6 +36,9 @@ import (
 )
 
 type keyper struct {
+	trigger chan broker.Event[*epochkghandler.DecryptionTrigger]
+	// TODO don't save the whole thing here
+	opts              *options
 	config            *Config
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
@@ -47,8 +51,12 @@ type keyper struct {
 	metricsServer    *metricsserver.MetricsServer
 }
 
-func New(config *Config) service.Service {
-	return &keyper{config: config}
+func New(config *Config, options ...Option) service.Service {
+	opts := newDefaultOptions()
+	for _, option := range options {
+		option(opts)
+	}
+	return &keyper{config: config, trigger: opts.trigger}
 }
 
 // LinkConfigToDB ensures that we use a database compatible with the given config. On first use
@@ -76,6 +84,8 @@ func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) e
 	return nil
 }
 
+// XXX we need access to the p2p and the db
+// from the outside
 func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	config := kpr.config
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
@@ -138,8 +148,19 @@ func (kpr *keyper) setupP2PHandler() {
 	kpr.p2p.AddMessageHandler(
 		epochkghandler.NewDecryptionKeyHandler(kpr.config, kpr.dbpool),
 		epochkghandler.NewDecryptionKeyShareHandler(kpr.config, kpr.dbpool),
-		epochkghandler.NewDecryptionTriggerHandler(kpr.config, kpr.dbpool),
 		epochkghandler.NewEonPublicKeyHandler(kpr.config, kpr.dbpool),
+
+		// TODO factor this out, this is the rollup keyper mechanism.
+		// here we need:
+		//  - DB to get the collator for the block number.
+		//    --> the "collator" concept should be exclusive to the rollup keyper,
+		//        so we should not have to expose the internal db here
+
+		//  - P2P to register the very handler here (AddMessageHandler).
+		//    the p2p should be somehow available from the outside.
+		//    Also the concept of DecryptionTrigger p2p messages shouldn't
+		//    be known in the common keyper
+		epochkghandler.NewDecryptionTriggerHandler(kpr.config, kpr.dbpool),
 	)
 }
 
@@ -149,6 +170,7 @@ func (kpr *keyper) getServices() []service.Service {
 		service.ServiceFn{Fn: kpr.operateShuttermint},
 		service.ServiceFn{Fn: kpr.broadcastEonPublicKeys},
 		service.ServiceFn{Fn: kpr.handleContractEvents},
+		service.ServiceFn{Fn: kpr.listenDecryptionTriggers},
 	}
 
 	if kpr.config.HTTPEnabled {
@@ -161,6 +183,7 @@ func (kpr *keyper) getServices() []service.Service {
 }
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
+	// TODO here also pass in the handlers?
 	events := []*eventsyncer.EventType{
 		kpr.contracts.KeypersConfigsListNewConfig,
 		kpr.contracts.CollatorConfigsListNewConfig,
@@ -333,6 +356,44 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 			return ctx.Err()
 		case <-time.After(2 * time.Second):
 		}
+	}
+}
+
+// FIXME name
+func (kpr *keyper) listenDecryptionTriggers(ctx context.Context) error {
+	// the sender has to do this before
+	// eon, err := db.GetEonForBlockNumber(ctx, blockNumber)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to get eon for block %d from db", blockNumber)
+	// }
+
+	for {
+		select {
+		case triggerEvent, ok := <-kpr.trigger:
+			if !ok {
+				return nil
+			}
+			keySharesMsg, err := epochkghandler.ConstructDecryptionKeyShare(
+				ctx,
+				kpr.config,
+				kprdb.New(kpr.dbpool),
+				triggerEvent.Value,
+			)
+			if err != nil {
+				// FIXME how to handle
+				continue
+			}
+
+			// TODO retry options
+			if err := kpr.p2p.SendMessage(ctx, keySharesMsg); err != nil {
+				// FIXME how to handle?
+				continue
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		return nil
+
 	}
 }
 
