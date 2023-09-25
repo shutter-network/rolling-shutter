@@ -75,23 +75,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-0-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-0-sentry:
-    image: snapshutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-0-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-1-validator:
@@ -107,23 +90,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-1-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-1-sentry:
-    image: snapshutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-1-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-2-validator:
@@ -139,23 +105,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-2-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-2-sentry:
-    image: snapshutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-2-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-3-validator:
@@ -171,23 +120,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-3-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-3-sentry:
-    image: snapshutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-3-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-seed:
@@ -242,13 +174,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       geth:
         condition: service_healthy
@@ -267,13 +199,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       geth:
         condition: service_healthy
@@ -295,7 +227,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -321,7 +253,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -347,7 +279,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -371,7 +303,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
