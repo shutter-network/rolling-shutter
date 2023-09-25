@@ -24,6 +24,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
+	"golang.org/x/exp/slices"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
@@ -140,11 +141,12 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	switch config.Role {
 	case VALIDATOR: // standard validator mode, network exposed
 		tendermintCfg.P2P.PexReactor = true
+		tendermintCfg.Mode = cfg.ModeValidator
 		tendermintCfg.P2P.AddrBookStrict = true
 	case ISOLATEDVALIDATOR: // validator mode behind a sentry node
 		tendermintCfg.P2P.PexReactor = false
 		tendermintCfg.P2P.AddrBookStrict = false
-	case SENTRY:
+	case SENTRY: // even though "sentry" nodes are documented, there is no special mode
 		tendermintCfg.P2P.PexReactor = true
 		tendermintCfg.P2P.AddrBookStrict = false
 	case SEED:
@@ -237,7 +239,7 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 			log.Info().Str("path", genFile).Msg("Generated genesis file")
 		}
 	}
-
+	
 	nodeKeyFile := tendermintConfig.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
 		log.Info().Str("path", nodeKeyFile).Msg("Found node key")
