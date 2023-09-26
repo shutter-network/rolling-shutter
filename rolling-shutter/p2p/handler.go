@@ -84,7 +84,7 @@ func New(config *Config) (*P2PHandler, error) {
 			cfg.BootstrapPeers = append(cfg.BootstrapPeers, *ai)
 		}
 	}
-	if len(cfg.BootstrapPeers) < 1 {
+	if len(cfg.BootstrapPeers) < 1 && !cfg.IsBootstrapNode {
 		return nil, errors.New("no bootstrap peers configured")
 	}
 
