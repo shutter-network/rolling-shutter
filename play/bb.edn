@@ -36,7 +36,7 @@
       (Long/valueOf (or (System/getenv s) default)))
 
     (def num-keypers (long-from-env "PLAY_NUM_KEYPERS" "3"))
-    (def num-bootstrappers 1)
+    (def num-bootstrappers (long-from-env "PLAY_NUM_BOOTSTRAPPERS" "1"))
 
     (def windows? (babashka.core/windows?))
     (def no-color? windows?)
