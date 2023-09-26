@@ -16,7 +16,8 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	obscollator "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/collator"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -54,7 +55,11 @@ type keyper struct {
 func New(config *Config, options ...Option) service.Service {
 	opts := newDefaultOptions()
 	for _, option := range options {
-		option(opts)
+		err := option(opts)
+		if err != nil {
+			// TODO should we panic here?
+			panic(err)
+		}
 	}
 	return &keyper{config: config, trigger: opts.trigger}
 }
@@ -84,8 +89,6 @@ func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) e
 	return nil
 }
 
-// XXX we need access to the p2p and the db
-// from the outside
 func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	config := kpr.config
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
@@ -183,10 +186,15 @@ func (kpr *keyper) getServices() []service.Service {
 }
 
 func (kpr *keyper) handleContractEvents(ctx context.Context) error {
-	// TODO here also pass in the handlers?
-	events := []*eventsyncer.EventType{
-		kpr.contracts.KeypersConfigsListNewConfig,
-		kpr.contracts.CollatorConfigsListNewConfig,
+	kprHandler := &obskeyper.Handler{
+		KeyperContract: kpr.contracts.Keypers,
+	}
+	cltHandler := &obscollator.Handler{
+		CollatorContract: kpr.contracts.Collators,
+	}
+	events := map[*eventsyncer.EventType]chainobserver.EventHandlerFunc{
+		kpr.contracts.KeypersConfigsListNewConfig:  chainobserver.MakeHandler(kprHandler.HandleKeypersConfigsListNewConfigEvent),
+		kpr.contracts.CollatorConfigsListNewConfig: chainobserver.MakeHandler(cltHandler.HandleCollatorConfigsListNewConfigEvent),
 	}
 	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
@@ -263,7 +271,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 		return err
 	}
 
-	cq := chainobsdb.New(tx)
+	cq := obskeyper.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
 		ctx,
 		int64(latestBatchConfig.KeyperConfigIndex)+1,

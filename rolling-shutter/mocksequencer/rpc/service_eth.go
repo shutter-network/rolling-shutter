@@ -86,6 +86,7 @@ func (s *EthService) ChainId() *hexutil.Big {
 	return (*hexutil.Big)(s.processor.ChainID())
 }
 
+// eth_getBlockByNumber
 func (s *EthService) GetBlockByNumber(_ context.Context, blockNumber ethrpc.BlockNumber, _ bool) (map[string]interface{}, error) {
 	var result map[string]interface{}
 	s.processor.Mux.RLock()

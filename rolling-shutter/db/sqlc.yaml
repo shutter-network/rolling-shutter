@@ -1,79 +1,91 @@
-version: 1
-packages:
-  - path: "kprdb"
-    name: "kprdb"
-    schema: ["kprdb/schema.sql"]
-    queries: ["kprdb/query.sql"]
+version: "2"
+sql:
+  - schema: ["kprdb/sql/schema.sql"]
+    queries: ["kprdb/sql/query.sql"]
     engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
+    gen:
+      go:
+        package: "kprdb"
+        out: "kprdb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
 
-  - path: "cltrdb"
-    name: "cltrdb"
-    schema: ["cltrdb/schema.sql"]
-    queries: ["cltrdb/query.sql"]
+  - schema: ["cltrdb/sql/schema.sql"]
+    queries: ["cltrdb/sql/query.sql"]
     engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
+    gen:
+      go:
+        package: "cltrdb"
+        out: "cltrdb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
 
-  - path: "chainobsdb/impl/keyper"
-    name: "chainobsdb"
-    schema:
-      [
-        "chainobsdb/components/sync/schema.sql",
-        "chainobsdb/components/keyper/schema.sql",
-      ]
-    queries:
-      [
-        "chainobsdb/components/sync/query.sql",
-        "chainobsdb/components/keyper/query.sql",
-      ]
+  - schema: ["chainobsdb/sql/sync/schema.sql"]
+    queries: ["chainobsdb/sql/sync/query.sql"]
     engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
+    gen:
+      go:
+        package: "chainobsdb"
+        out: "chainobsdb/sync"
+        sql_package: "pgx/v4"
+        output_batch_file_name: "batch.sqlc.gen.go"
+        output_querier_file_name: "querier.sqlc.gen.go"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
+  - schema: ["chainobsdb/sql/keyper/schema.sql"]
+    queries: ["chainobsdb/sql/keyper/query.sql"]
+    engine: "postgresql"
+    gen:
+      go:
+        package: "chainobsdb"
+        out: "chainobsdb/keyper"
+        sql_package: "pgx/v4"
+        output_batch_file_name: "batch.sqlc.gen.go"
+        output_querier_file_name: "querier.sqlc.gen.go"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
+  - schema: ["chainobsdb/sql/collator/schema.sql"]
+    queries: ["chainobsdb/sql/collator/query.sql"]
+    engine: "postgresql"
+    gen:
+      go:
+        package: "chainobsdb"
+        out: "chainobsdb/collator"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
+        emit_prepared_queries: true
+        emit_exported_queries: true
+        emit_interface: true
+        emit_db_tags: true
 
-  - path: "chainobsdb/impl/collator"
-    name: "chainobsdb"
-    schema:
-      [
-        "chainobsdb/components/sync/schema.sql",
-        "chainobsdb/components/keyper/schema.sql",
-        "chainobsdb/components/collator/schema.sql",
-      ]
-    queries:
-      [
-        "chainobsdb/components/sync/query.sql",
-        "chainobsdb/components/keyper/query.sql",
-        "chainobsdb/components/collator/query.sql",
-      ]
+  - schema: ["metadb/sql/schema.sql"]
+    queries: ["metadb/sql/query.sql"]
     engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
+    gen:
+      go:
+        package: "metadb"
+        out: "metadb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
 
-  - path: "metadb"
-    name: "metadb"
-    schema: ["metadb/schema.sql"]
-    queries: ["metadb/query.sql"]
+  - schema: ["snpdb/sql/schema.sql"]
+    queries: ["snpdb/sql/query.sql"]
     engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
-
-  - path: "snpdb"
-    name: "snpdb"
-    schema: ["snpdb/schema.sql"]
-    queries: ["snpdb/query.sql"]
-    engine: "postgresql"
-    sql_package: "pgx/v4"
-    output_db_file_name: "db.sqlc.gen.go"
-    output_models_file_name: "models.sqlc.gen.go"
-    output_files_suffix: "c.gen"
+    gen:
+      go:
+        package: "snpdb"
+        out: "snpdb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"

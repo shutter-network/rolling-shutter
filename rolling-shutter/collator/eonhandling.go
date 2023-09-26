@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -35,7 +35,7 @@ func ensureNoIntegerOverflowsInEonPublicKey(key *p2pmsg.EonPublicKey) error {
 // matches the chainobsdb.KeyperSet stored in the database. It returns an error if there is a
 // mismatch.
 func ensureEonPublicKeyMatchesKeyperSet(
-	keyperSet chainobsdb.KeyperSet,
+	keyperSet obskeyper.KeyperSet,
 	key *p2pmsg.EonPublicKey,
 ) error {
 	activationBlock := int64(key.ActivationBlock)
@@ -98,10 +98,10 @@ func (handler *eonPublicKeyHandler) ValidateMessage(
 	// because of that.
 	// In practice however, this won't play a role since the DKG of the keypers takes
 	// place later in wall-time
-	var keyperSet chainobsdb.KeyperSet
+	var keyperSet obskeyper.KeyperSet
 	if err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		var err error
-		keyperSet, err = chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		keyperSet, err = obskeyper.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		return err
@@ -128,7 +128,7 @@ func (handler *eonPublicKeyHandler) HandleMessage(
 		var err error
 
 		db := cltrdb.New(tx)
-		keyperSet, err := chainobsdb.New(tx).GetKeyperSetByKeyperConfigIndex(
+		keyperSet, err := obskeyper.New(tx).GetKeyperSetByKeyperConfigIndex(
 			ctx, int64(key.KeyperConfigIndex),
 		)
 		if err != nil {

@@ -16,7 +16,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -132,9 +132,11 @@ func (snkpr *snapshotkeyper) getServices() []service.Service {
 }
 
 func (snkpr *snapshotkeyper) handleContractEvents(ctx context.Context) error {
-	events := []*eventsyncer.EventType{
-		snkpr.contracts.KeypersConfigsListNewConfig,
-		snkpr.contracts.CollatorConfigsListNewConfig,
+	kprHandler := &obskeyper.Handler{
+		KeyperContract: snkpr.contracts.Keypers,
+	}
+	events := map[*eventsyncer.EventType]chainobserver.EventHandlerFunc{
+		snkpr.contracts.KeypersConfigsListNewConfig: chainobserver.MakeHandler(kprHandler.HandleKeypersConfigsListNewConfigEvent),
 	}
 	return chainobserver.New(snkpr.contracts, snkpr.dbpool).Observe(ctx, events)
 }
@@ -207,7 +209,7 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return err
 	}
 
-	cq := chainobsdb.New(tx)
+	cq := obskeyper.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
 		ctx,
 		int64(latestBatchConfig.KeyperConfigIndex)+1,

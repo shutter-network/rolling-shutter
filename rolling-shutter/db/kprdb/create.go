@@ -19,7 +19,13 @@ import (
 var schemaVersion = db.MustFindSchemaVersion("kprdb")
 
 func initDB(ctx context.Context, tx pgx.Tx) error {
-	err := db.Create(ctx, tx, []string{"kprdb", "chainobsdb", "metadb"})
+	dbSchemas := []string{
+		"kprdb",
+		"chainobsdb/keyper",
+		"chainobsdb/sync",
+		"metadb",
+	}
+	err := db.Create(ctx, tx, dbSchemas)
 	if err != nil {
 		return err
 	}

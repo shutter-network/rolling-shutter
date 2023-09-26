@@ -26,6 +26,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/l2client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
@@ -265,8 +266,12 @@ func (c *collator) handleDatabaseNotifications(ctx context.Context) error {
 }
 
 func (c *collator) handleContractEvents(ctx context.Context) error {
-	events := []*eventsyncer.EventType{
-		c.contracts.KeypersConfigsListNewConfig,
+	kprHandler := &obskeyper.Handler{
+		KeyperContract: c.contracts.Keypers,
+	}
+	// FIXME why doesn't the collator listen for the collator contract?
+	events := map[*eventsyncer.EventType]chainobserver.EventHandlerFunc{
+		c.contracts.KeypersConfigsListNewConfig: chainobserver.MakeHandler(kprHandler.HandleKeypersConfigsListNewConfigEvent),
 	}
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }

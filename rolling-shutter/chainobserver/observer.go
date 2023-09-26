@@ -2,7 +2,6 @@ package chainobserver
 
 import (
 	"context"
-	"math"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,15 +14,14 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/sync"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 const finalityOffset = 3
 
-func retryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) ([]common.Address, error) {
+func RetryGetAddrs(ctx context.Context, addrsSeq *contract.AddrsSeq, n uint64) ([]common.Address, error) {
 	callOpts := &bind.CallOpts{
 		Pending: false,
 		// We call for the current height instead of the height at which the event was emitted,
@@ -177,68 +175,4 @@ func (chainobs *ChainObserver) handleEventSyncUpdate(
 		}
 		return nil
 	})
-}
-
-func (chainobs *ChainObserver) handleKeypersConfigsListNewConfigEvent(
-	ctx context.Context, tx pgx.Tx, event contract.KeypersConfigsListNewConfig,
-) error {
-	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Keypers, event.KeyperSetIndex)
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Uint64("block-number", event.Raw.BlockNumber).
-		Uint64("keyper-config-index", event.KeyperConfigIndex).
-		Uint64("activation-block-number", event.ActivationBlockNumber).
-		Msg("handling NewConfig event from keypers config contract")
-
-	if event.ActivationBlockNumber > math.MaxInt64 {
-		return errors.Errorf(
-			"activation block number %d from config contract would overflow int64",
-			event.ActivationBlockNumber)
-	}
-	db := chainobsdb.New(tx)
-	err = db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(event.KeyperConfigIndex),
-		ActivationBlockNumber: int64(event.ActivationBlockNumber),
-		Keypers:               shdb.EncodeAddresses(addrs),
-		Threshold:             int32(event.Threshold),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to insert keyper set into db")
-	}
-	return nil
-}
-
-// TODO move in separate handler
-func (chainobs *ChainObserver) handleCollatorConfigsListNewConfigEvent(
-	ctx context.Context, db *chainobsdb.Queries, event contract.CollatorConfigsListNewConfig,
-) error {
-	addrs, err := retryGetAddrs(ctx, chainobs.contracts.Collators, event.CollatorSetIndex)
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Uint64("block-number", event.Raw.BlockNumber).
-		Uint64("collator-config-index", event.CollatorConfigIndex).
-		Uint64("activation-block-number", event.ActivationBlockNumber).
-		Msg("handling NewConfig event from collator config contract")
-	if event.ActivationBlockNumber > math.MaxInt64 {
-		return errors.Errorf(
-			"activation block number %d from config contract would overflow int64",
-			event.ActivationBlockNumber,
-		)
-	}
-	if len(addrs) > 1 {
-		return errors.Errorf("got multiple collators from collator addrs set contract: %s", addrs)
-	} else if len(addrs) == 1 {
-		err := db.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
-			ActivationBlockNumber: int64(event.ActivationBlockNumber),
-			Collator:              shdb.EncodeAddress(addrs[0]),
-		})
-		if err != nil {
-			return errors.Wrapf(err, "failed to insert collator into db")
-		}
-	}
-	return nil
 }

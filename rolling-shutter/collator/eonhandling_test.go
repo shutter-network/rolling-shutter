@@ -13,7 +13,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
+	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"

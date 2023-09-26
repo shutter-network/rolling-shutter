@@ -17,7 +17,14 @@ import (
 var schemaVersion = db.MustFindSchemaVersion("cltrdb")
 
 func initDB(ctx context.Context, tx pgx.Tx) error {
-	err := db.Create(ctx, tx, []string{"cltrdb", "chainobsdb", "metadb"})
+	dbSchemas := []string{
+		"cltrdb",
+		"chainobsdb/collator",
+		"chainobsdb/keyper",
+		"chainobsdb/sync",
+		"metadb",
+	}
+	err := db.Create(ctx, tx, dbSchemas)
 	if err != nil {
 		return err
 	}
