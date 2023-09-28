@@ -20,6 +20,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -82,6 +83,9 @@ func (st *ShuttermintState) Load(ctx context.Context, queries *database.Queries)
 		return err
 	}
 	st.isKeyper = numBatchConfigs > 0 // XXX need to look
+	if st.isKeyper {
+		keypermetrics.MetricsKeyperIsKeyper.Set(1)
+	}
 	err = st.loadEncryptionKeys(ctx, queries)
 	if err != nil {
 		return err
@@ -110,6 +114,8 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *database.Queri
 		if err != nil {
 			return err
 		}
+
+		keypermetrics.MetricsKeyperCurrentEon.Set(float64(keyperEon.Eon))
 
 		batchConfig, err := queries.GetBatchConfig(ctx, int32(keyperEon.KeyperConfigIndex))
 		if err != nil {
@@ -261,6 +267,7 @@ func (st *ShuttermintState) handleBatchConfig(
 		if err != nil {
 			return err
 		}
+		keypermetrics.MetricsKeyperIsKeyper.Set(1)
 	}
 	keypers := []string{}
 	for _, k := range e.Keypers {
@@ -305,6 +312,7 @@ func (st *ShuttermintState) handleEonStarted(
 	if err != nil {
 		return err
 	}
+
 	batchConfig, err := queries.GetBatchConfig(ctx, int32(e.KeyperConfigIndex))
 	if err != nil {
 		return err
@@ -323,6 +331,8 @@ func (st *ShuttermintState) handleEonStarted(
 	if err != nil {
 		return nil
 	}
+
+	keypermetrics.MetricsKeyperCurrentEon.Set(float64(e.Eon))
 
 	lastCommittedHeight, err := queries.GetLastCommittedHeight(ctx)
 	if err != nil {

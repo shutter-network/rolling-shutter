@@ -20,6 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -118,6 +119,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	if kpr.config.Metrics.Enabled {
 		epochkghandler.InitMetrics()
+		keypermetrics.InitMetrics()
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
 	}
 
@@ -310,6 +312,7 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		keypermetrics.MetricsKeyperCurrentBlockL1.Set(float64(l1BlockNumber))
 
 		err = smobserver.SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
 		if err != nil {
