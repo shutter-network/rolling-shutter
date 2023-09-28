@@ -14,19 +14,16 @@ import (
 	"github.com/tendermint/tendermint/rpc/client"
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
-	obscollator "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/collator"
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -36,38 +33,46 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-type keyper struct {
-	trigger chan broker.Event[*epochkghandler.DecryptionTrigger]
-	// TODO don't save the whole thing here
-	opts              *options
-	config            *Config
+type KeyperCore struct {
+	P2P *p2p.P2PHandler
+
+	trigger <-chan *broker.Event[*epochkghandler.DecryptionTrigger]
+	opts    *options
+	config  *kprconfig.Config
+
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
 	l1Client          *ethclient.Client
-	contracts         *deployment.Contracts
 
 	shuttermintState *smobserver.ShuttermintState
-	p2p              *p2p.P2PHandler
 	metricsServer    *metricsserver.MetricsServer
 }
 
-func New(config *Config, options ...Option) service.Service {
+// TODO get rid of the config and use options instead
+func New(
+	config *kprconfig.Config,
+	trigger <-chan *broker.Event[*epochkghandler.DecryptionTrigger],
+	options ...Option,
+) (*KeyperCore, error) {
 	opts := newDefaultOptions()
 	for _, option := range options {
 		err := option(opts)
 		if err != nil {
-			// TODO should we panic here?
-			panic(err)
+			return nil, err
 		}
 	}
-	return &keyper{config: config, trigger: opts.trigger}
+	err := validateOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	return &KeyperCore{config: config, trigger: trigger}, nil
 }
 
 // LinkConfigToDB ensures that we use a database compatible with the given config. On first use
 // it stores the config's ethereum address into the database. On subsequent uses it compares the
 // stored value and raises an error if it doesn't match.
-func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) error {
+func LinkConfigToDB(ctx context.Context, config *kprconfig.Config, dbpool *pgxpool.Pool) error {
 	const addressKey = "ethereum address"
 	cfgAddress := config.GetAddress().String()
 	queries := metadb.New(dbpool)
@@ -89,7 +94,7 @@ func LinkConfigToDB(ctx context.Context, config *Config, dbpool *pgxpool.Pool) e
 	return nil
 }
 
-func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
+func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 	config := kpr.config
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
 	if err != nil {
@@ -98,19 +103,10 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(dbpool.Close)
 	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
 
-	l1Client, err := ethclient.Dial(config.Ethereum.EthereumURL)
+	l1Client, err := ethclient.Dial(config.EthereumURL)
 	if err != nil {
 		return err
 	}
-	l2Client, err := ethclient.Dial(config.Ethereum.ContractsURL)
-	if err != nil {
-		return err
-	}
-	contracts, err := deployment.NewContracts(l2Client, config.Ethereum.DeploymentDir)
-	if err != nil {
-		return err
-	}
-
 	err = kprdb.ValidateKeyperDB(ctx, dbpool)
 	if err != nil {
 		return err
@@ -123,7 +119,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
+	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.EthereumPrivateKey.Key)
 
 	p2pHandler, err := p2p.New(config.P2P)
 	if err != nil {
@@ -139,45 +135,30 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.shuttermintClient = shuttermintClient
 	kpr.messageSender = messageSender
 	kpr.l1Client = l1Client
-	kpr.contracts = contracts
 	kpr.shuttermintState = smobserver.NewShuttermintState(config)
-	kpr.p2p = p2pHandler
+	kpr.P2P = p2pHandler
 
 	kpr.setupP2PHandler()
 	return runner.StartService(kpr.getServices()...)
 }
 
-func (kpr *keyper) setupP2PHandler() {
-	kpr.p2p.AddMessageHandler(
+func (kpr *KeyperCore) setupP2PHandler() {
+	kpr.P2P.AddMessageHandler(
 		epochkghandler.NewDecryptionKeyHandler(kpr.config, kpr.dbpool),
 		epochkghandler.NewDecryptionKeyShareHandler(kpr.config, kpr.dbpool),
 		epochkghandler.NewEonPublicKeyHandler(kpr.config, kpr.dbpool),
-
-		// TODO factor this out, this is the rollup keyper mechanism.
-		// here we need:
-		//  - DB to get the collator for the block number.
-		//    --> the "collator" concept should be exclusive to the rollup keyper,
-		//        so we should not have to expose the internal db here
-
-		//  - P2P to register the very handler here (AddMessageHandler).
-		//    the p2p should be somehow available from the outside.
-		//    Also the concept of DecryptionTrigger p2p messages shouldn't
-		//    be known in the common keyper
-		epochkghandler.NewDecryptionTriggerHandler(kpr.config, kpr.dbpool),
 	)
 }
 
-func (kpr *keyper) getServices() []service.Service {
+func (kpr *KeyperCore) getServices() []service.Service {
 	services := []service.Service{
-		kpr.p2p,
+		kpr.P2P,
 		service.ServiceFn{Fn: kpr.operateShuttermint},
-		service.ServiceFn{Fn: kpr.broadcastEonPublicKeys},
-		service.ServiceFn{Fn: kpr.handleContractEvents},
+		service.ServiceFn{Fn: kpr.handleNewEonPublicKeys},
 		service.ServiceFn{Fn: kpr.listenDecryptionTriggers},
 	}
-
 	if kpr.config.HTTPEnabled {
-		services = append(services, kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.p2p))
+		services = append(services, kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.P2P))
 	}
 	if kpr.config.Metrics.Enabled {
 		services = append(services, kpr.metricsServer)
@@ -185,21 +166,7 @@ func (kpr *keyper) getServices() []service.Service {
 	return services
 }
 
-func (kpr *keyper) handleContractEvents(ctx context.Context) error {
-	kprHandler := &obskeyper.Handler{
-		KeyperContract: kpr.contracts.Keypers,
-	}
-	cltHandler := &obscollator.Handler{
-		CollatorContract: kpr.contracts.Collators,
-	}
-	events := map[*eventsyncer.EventType]chainobserver.EventHandlerFunc{
-		kpr.contracts.KeypersConfigsListNewConfig:  chainobserver.MakeHandler(kprHandler.HandleKeypersConfigsListNewConfigEvent),
-		kpr.contracts.CollatorConfigsListNewConfig: chainobserver.MakeHandler(cltHandler.HandleCollatorConfigsListNewConfigEvent),
-	}
-	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
-}
-
-func (kpr *keyper) handleOnChainChanges(
+func (kpr *KeyperCore) handleOnChainChanges(
 	ctx context.Context,
 	tx pgx.Tx,
 	l1BlockNumber uint64,
@@ -220,7 +187,7 @@ func (kpr *keyper) handleOnChainChanges(
 // NewBlockSeen messages to the shuttermint chain, so that the chain can start new batch configs if
 // enough keypers have seen a block past the start block of some BatchConfig. We only send messages
 // when the current block we see, could lead to a batch config being started.
-func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
+func (kpr *KeyperCore) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
 	q := kprdb.New(tx)
 	lastBlock, err := q.GetLastBlockSeen(ctx)
 	if err != nil {
@@ -257,10 +224,10 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 }
 
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
-func (kpr *keyper) handleOnChainKeyperSetChanges(
+func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 	ctx context.Context,
 	tx pgx.Tx,
-	l1BlockNumber uint64,
+	blockNumber uint64,
 ) error {
 	q := kprdb.New(tx)
 	latestBatchConfig, err := q.GetLatestBatchConfig(ctx)
@@ -298,9 +265,9 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	}
 	// We *MUST* check if the l1BlockNumber is smaller than the activationBlockNumber since both are uint64 and therefore subtraction can never result in negative numbers.
 	// This means that if we missed the activationBlockNumber we will never submit the config.
-	if l1BlockNumber < activationBlockNumber && activationBlockNumber-l1BlockNumber > kpr.config.Shuttermint.DKGStartBlockDelta {
+	if blockNumber < activationBlockNumber && activationBlockNumber-blockNumber > kpr.config.Shuttermint.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
-			Uint64("l1-block-number", l1BlockNumber).
+			Uint64("l1-block-number", blockNumber).
 			Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
 			Msg("not yet submitting config")
 		return nil
@@ -316,7 +283,7 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 		return err
 	}
 	log.Info().Interface("keyper-set", keyperSet).
-		Uint64("l1-block-number", l1BlockNumber).
+		Uint64("l1-block-number", blockNumber).
 		Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
 		Msg("have a new config to be scheduled")
 	batchConfigMsg := shmsg.NewBatchConfig(
@@ -337,7 +304,9 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	return nil
 }
 
-func (kpr *keyper) operateShuttermint(ctx context.Context) error {
+// TODO we need a better block syncing mechanism!
+// Also this is doing too much work synchronously.
+func (kpr *KeyperCore) operateShuttermint(ctx context.Context) error {
 	for {
 		l1BlockNumber, err := retry.FunctionCall(ctx, kpr.l1Client.BlockNumber)
 		if err != nil {
@@ -367,25 +336,43 @@ func (kpr *keyper) operateShuttermint(ctx context.Context) error {
 	}
 }
 
-// FIXME name
-func (kpr *keyper) listenDecryptionTriggers(ctx context.Context) error {
-	// the sender has to do this before
-	// eon, err := db.GetEonForBlockNumber(ctx, blockNumber)
-	// if err != nil {
-	// 	return nil, errors.Wrapf(err, "failed to get eon for block %d from db", blockNumber)
-	// }
+func (kpr *KeyperCore) getEonForBlockNumber(ctx context.Context, blockNumber uint64) (kprdb.Eon, error) {
+	var (
+		eon kprdb.Eon
+		err error
+	)
+	db := kprdb.New(kpr.dbpool)
+	block, err := medley.Uint64ToInt64Safe(blockNumber)
+	if err != nil {
+		return eon, errors.Wrap(err, "invalid blocknumber")
+	}
+	eon, err = db.GetEonForBlockNumber(ctx, block)
+	// TODO wrap error
+	return eon, err
+}
 
+// FIXME name
+func (kpr *KeyperCore) listenDecryptionTriggers(ctx context.Context) error {
 	for {
 		select {
 		case triggerEvent, ok := <-kpr.trigger:
 			if !ok {
 				return nil
 			}
+			// TODO expose publicly?
+			// epochkghandler.metricsEpochKGDectyptionTriggersReceived.Inc()
+			trigger := triggerEvent.Value
+			eon, err := kpr.getEonForBlockNumber(ctx, trigger.BlockNumber)
+			if err != nil {
+				// FIXME how to handle
+				continue
+			}
 			keySharesMsg, err := epochkghandler.ConstructDecryptionKeyShare(
 				ctx,
 				kpr.config,
 				kprdb.New(kpr.dbpool),
-				triggerEvent.Value,
+				eon,
+				trigger.EpochIDs,
 			)
 			if err != nil {
 				// FIXME how to handle
@@ -393,7 +380,7 @@ func (kpr *keyper) listenDecryptionTriggers(ctx context.Context) error {
 			}
 
 			// TODO retry options
-			if err := kpr.p2p.SendMessage(ctx, keySharesMsg); err != nil {
+			if err := kpr.P2P.SendMessage(ctx, keySharesMsg); err != nil {
 				// FIXME how to handle?
 				continue
 			}
@@ -405,7 +392,18 @@ func (kpr *keyper) listenDecryptionTriggers(ctx context.Context) error {
 	}
 }
 
-func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
+type EonPublicKey struct {
+	PublicKey         []byte
+	ActivationBlock   uint64
+	KeyperConfigIndex uint64
+	Eon               uint64
+}
+
+// TODO this mechanism could be different as well!
+// Not all implementations will expect the keys to be broadcasted
+// on the p2pnetwork.
+// I think it should be default in any case, and can be turned off with an option
+func (kpr *KeyperCore) handleNewEonPublicKeys(ctx context.Context) error {
 	for {
 		eonPublicKeys, err := kprdb.New(kpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
 		if err != nil {
@@ -416,21 +414,34 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 			if !exists {
 				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
 			}
-			msg, err := p2pmsg.NewSignedEonPublicKey(
-				kpr.config.InstanceID,
-				eonPublicKey.EonPublicKey,
-				uint64(eonPublicKey.ActivationBlockNumber),
-				uint64(eonPublicKey.KeyperConfigIndex),
-				uint64(eonPublicKey.Eon),
-				kpr.config.Ethereum.PrivateKey.Key,
-			)
+			// FIXME careful with returning errors, since this function is registered as a Service.
+			// This will shut down the whole keyper
+			activationBlock, err := medley.Int64ToUint64Safe(eonPublicKey.ActivationBlockNumber)
 			if err != nil {
-				return errors.Wrap(err, "error while signing EonPublicKey")
+				return errors.Wrap(err, "failed safe int cast")
 			}
-
-			err = kpr.p2p.SendMessage(ctx, msg)
+			keyperIndex, err := medley.Int32ToUint64Safe(eonPublicKey.KeyperConfigIndex)
 			if err != nil {
-				return errors.Wrap(err, "error while broadcasting EonPublicKey")
+				return errors.Wrap(err, "failed safe int cast")
+			}
+			eon, err := medley.Int64ToUint64Safe(eonPublicKey.Eon)
+			if err != nil {
+				return errors.Wrap(err, "failed safe int cast")
+			}
+			eonPubKey := EonPublicKey{
+				PublicKey:         eonPublicKey.EonPublicKey,
+				ActivationBlock:   activationBlock,
+				KeyperConfigIndex: keyperIndex,
+				Eon:               eon,
+			}
+			_ = eonPubKey
+			if kpr.opts.broadcastEonPubKey {
+				err := kpr.broadcastEonPublicKey(ctx, eonPubKey)
+				return errors.Wrap(err, "failed to broadcast eon public key")
+			}
+			if kpr.opts.eonPubkeyHandler != nil {
+				err := kpr.opts.eonPubkeyHandler(ctx, eonPubKey)
+				return errors.Wrap(err, "failed to handle eon public key")
 			}
 		}
 		select {
@@ -439,4 +450,24 @@ func (kpr *keyper) broadcastEonPublicKeys(ctx context.Context) error {
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+func (kpr *KeyperCore) broadcastEonPublicKey(ctx context.Context, eonPubKey EonPublicKey) error {
+	msg, err := p2pmsg.NewSignedEonPublicKey(
+		kpr.config.InstanceID,
+		eonPubKey.PublicKey,
+		eonPubKey.ActivationBlock,
+		eonPubKey.KeyperConfigIndex,
+		eonPubKey.Eon,
+		kpr.config.EthereumPrivateKey.Key,
+	)
+	if err != nil {
+		return errors.Wrap(err, "error while signing EonPublicKey")
+	}
+
+	err = kpr.P2P.SendMessage(ctx, msg)
+	if err != nil {
+		return errors.Wrap(err, "error while broadcasting EonPublicKey")
+	}
+	return nil
 }

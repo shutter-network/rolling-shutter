@@ -14,8 +14,8 @@ SELECT next_block_number, next_log_index FROM event_sync_progress LIMIT 1
 `
 
 type GetEventSyncProgressRow struct {
-	NextBlockNumber int32
-	NextLogIndex    int32
+	NextBlockNumber int32 `db:"next_block_number"`
+	NextLogIndex    int32 `db:"next_log_index"`
 }
 
 func (q *Queries) GetEventSyncProgress(ctx context.Context) (GetEventSyncProgressRow, error) {
@@ -45,8 +45,8 @@ ON CONFLICT (id) DO UPDATE
 `
 
 type UpdateEventSyncProgressParams struct {
-	NextBlockNumber int32
-	NextLogIndex    int32
+	NextBlockNumber int32 `db:"next_block_number"`
+	NextLogIndex    int32 `db:"next_log_index"`
 }
 
 func (q *Queries) UpdateEventSyncProgress(ctx context.Context, arg UpdateEventSyncProgressParams) error {

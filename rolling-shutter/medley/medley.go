@@ -215,3 +215,10 @@ func Int64ToUint64Safe(i int64) (uint64, error) {
 	}
 	return uint64(i), nil
 }
+
+func Int32ToUint64Safe(i int32) (uint64, error) {
+	if i < 0 {
+		return 0, errors.New("uint32 can't be negative")
+	}
+	return uint64(i), nil
+}

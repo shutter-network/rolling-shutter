@@ -1,25 +1,20 @@
-package keyper
+package rollup
 
 import (
 	"crypto/ed25519"
-	"crypto/rand"
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
-var (
-	_ configuration.Config = &ShuttermintConfig{}
-	_ configuration.Config = &Config{}
-)
+var _ configuration.Config = &Config{}
 
 func NewConfig() *Config {
 	c := &Config{}
@@ -30,7 +25,7 @@ func NewConfig() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Ethereum = configuration.NewEthnodeConfig()
-	c.Shuttermint = NewShuttermintConfig()
+	c.Shuttermint = kprconfig.NewShuttermintConfig()
 	c.Metrics = metricsserver.NewConfig()
 }
 
@@ -43,7 +38,7 @@ type Config struct {
 
 	P2P         *p2p.Config
 	Ethereum    *configuration.EthnodeConfig
-	Shuttermint *ShuttermintConfig
+	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
 }
 
@@ -98,65 +93,5 @@ func (c *Config) SetExampleValues() error {
 }
 
 func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
-	return 0, nil
-}
-
-func NewShuttermintConfig() *ShuttermintConfig {
-	c := &ShuttermintConfig{}
-	c.Init()
-	return c
-}
-
-type ShuttermintConfig struct {
-	ShuttermintURL     string
-	ValidatorPublicKey *keys.Ed25519Public `shconfig:",required"`
-	EncryptionKey      *keys.ECDSAPrivate  `shconfig:",required"`
-	DKGPhaseLength     int64               // in shuttermint blocks
-	DKGStartBlockDelta uint64
-}
-
-func (c *ShuttermintConfig) Init() {
-	c.ValidatorPublicKey = &keys.Ed25519Public{}
-	c.EncryptionKey = &keys.ECDSAPrivate{}
-}
-
-func (c *ShuttermintConfig) Name() string {
-	return "shuttermint"
-}
-
-func (c *ShuttermintConfig) Validate() error {
-	if c.DKGPhaseLength < 0 {
-		return errors.New("DKGPhaseLength can't be negative")
-	}
-	return nil
-}
-
-func (c *ShuttermintConfig) SetDefaultValues() error {
-	c.ShuttermintURL = "http://localhost:26657"
-	c.DKGPhaseLength = 30
-	c.DKGStartBlockDelta = 200
-	return nil
-}
-
-func (c *ShuttermintConfig) SetExampleValues() error {
-	err := c.SetDefaultValues()
-	if err != nil {
-		return err
-	}
-
-	valPriv, err := keys.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		return err
-	}
-
-	c.EncryptionKey, err = keys.GenerateECDSAKey(rand.Reader)
-	if err != nil {
-		return err
-	}
-	c.ValidatorPublicKey = valPriv.Public().(*keys.Ed25519Public)
-	return nil
-}
-
-func (c ShuttermintConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 	return 0, nil
 }

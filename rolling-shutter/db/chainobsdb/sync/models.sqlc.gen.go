@@ -7,7 +7,7 @@ package chainobsdb
 import ()
 
 type EventSyncProgress struct {
-	ID              bool
-	NextBlockNumber int32
-	NextLogIndex    int32
+	ID              bool  `db:"id"`
+	NextBlockNumber int32 `db:"next_block_number"`
+	NextLogIndex    int32 `db:"next_log_index"`
 }

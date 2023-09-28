@@ -7,8 +7,8 @@ package chainobsdb
 import ()
 
 type KeyperSet struct {
-	KeyperConfigIndex     int64
-	ActivationBlockNumber int64
-	Keypers               []string
-	Threshold             int32
+	KeyperConfigIndex     int64    `db:"keyper_config_index"`
+	ActivationBlockNumber int64    `db:"activation_block_number"`
+	Keypers               []string `db:"keypers"`
+	Threshold             int32    `db:"threshold"`
 }

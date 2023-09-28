@@ -5,7 +5,7 @@ import (
 
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/impl/rollup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
 )

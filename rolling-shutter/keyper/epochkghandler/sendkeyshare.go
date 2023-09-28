@@ -20,22 +20,23 @@ type Config interface {
 }
 
 type DecryptionTrigger struct {
-	Eon      kprdb.Eon
-	EpochIDs []epochid.EpochID
+	BlockNumber uint64
+	EpochIDs    []epochid.EpochID
 }
 
 func ConstructDecryptionKeyShare(
 	ctx context.Context,
 	config Config,
 	db *kprdb.Queries,
-	trigger *DecryptionTrigger,
+	eon kprdb.Eon,
+	epochIDs []epochid.EpochID,
 ) (*p2pmsg.DecryptionKeyShares, error) {
-	if len(trigger.EpochIDs) == 0 {
+	if len(epochIDs) == 0 {
 		return nil, errors.New("cannot generate empty decryption key share")
 	}
-	batchConfig, err := db.GetBatchConfig(ctx, int32(trigger.Eon.KeyperConfigIndex))
+	batchConfig, err := db.GetBatchConfig(ctx, int32(eon.KeyperConfigIndex))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get config %d from db", trigger.Eon.KeyperConfigIndex)
+		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.KeyperConfigIndex)
 	}
 
 	// get our keyper index (and check that we in fact are a keyper)
@@ -55,8 +56,8 @@ func ConstructDecryptionKeyShare(
 	// check if we already computed (and therefore most likely sent) our key share
 	// XXX this only works when we sent the share for exactly one epoch.
 	shareExists, err := db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
-		Eon:         trigger.Eon.Eon,
-		EpochID:     trigger.EpochIDs[0].Bytes(),
+		Eon:         eon.Eon,
+		EpochID:     epochIDs[0].Bytes(),
 		KeyperIndex: keyperIndex,
 	})
 	if err != nil {
@@ -67,12 +68,12 @@ func ConstructDecryptionKeyShare(
 	}
 
 	// fetch dkg result from db
-	dkgResultDB, err := db.GetDKGResult(ctx, trigger.Eon.Eon)
+	dkgResultDB, err := db.GetDKGResult(ctx, eon.Eon)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", trigger.Eon.Eon)
+		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon.Eon)
 	}
 	if !dkgResultDB.Success {
-		log.Info().Int64("eon", trigger.Eon.Eon).Msg("ignoring decryption trigger: eon key generation failed")
+		log.Info().Int64("eon", eon.Eon).Msg("ignoring decryption trigger: eon key generation failed")
 		return nil, nil
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -84,7 +85,7 @@ func ConstructDecryptionKeyShare(
 	// compute the key share
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 
-	for _, epochID := range trigger.EpochIDs {
+	for _, epochID := range epochIDs {
 		share := epochKG.ComputeEpochSecretKeyShare(epochID)
 
 		shares = append(shares, &p2pmsg.KeyShare{
@@ -93,9 +94,10 @@ func ConstructDecryptionKeyShare(
 		})
 	}
 
+	// TODO safe typecase
 	msg := &p2pmsg.DecryptionKeyShares{
 		InstanceID:  config.GetInstanceID(),
-		Eon:         uint64(trigger.Eon.Eon),
+		Eon:         uint64(eon.Eon),
 		KeyperIndex: uint64(keyperIndex),
 		Shares:      shares,
 	}

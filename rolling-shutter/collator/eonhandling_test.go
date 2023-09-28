@@ -7,13 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/pkg/errors"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
-	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/collator"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
@@ -54,7 +52,7 @@ type setupEonKeysParams struct {
 func setupEonKeys(
 	ctx context.Context,
 	t *testing.T,
-	dbtx chainobsdb.DBTX,
+	dbtx obskeyper.DBTX,
 	params setupEonKeysParams,
 ) []keyper {
 	t.Helper()
@@ -88,8 +86,8 @@ func setupEonKeys(
 		keyperSet = append(keyperSet, k.address)
 	}
 
-	db := chainobsdb.New(dbtx)
-	err := db.InsertKeyperSet(ctx, chainobsdb.InsertKeyperSetParams{
+	db := obskeyper.New(dbtx)
+	err := db.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(params.keyperConfigIndex),
 		Keypers:               keyperSet,
 		ActivationBlockNumber: int64(params.activationBlock),
@@ -146,9 +144,6 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	epoch1 := epochid.Uint64ToEpochID(1)
 	epoch1000 := epochid.Uint64ToEpochID(1000)
 	epoch2000 := epochid.Uint64ToEpochID(2000)
-
-	eonPubKeyTest := tkgBefore.EonPublicKey(epoch1000)
-	panic(errors.Errorf("%s", hexutil.Encode(eonPubKeyTest.Marshal())))
 
 	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(epoch1).GobEncode()
 	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(epoch1000).GobEncode()

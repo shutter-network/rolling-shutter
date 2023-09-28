@@ -11,7 +11,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/impl/rollup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -37,8 +37,11 @@ func main(config *keyper.Config) error {
 		Str("address", config.GetAddress().Hex()).
 		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting keyper")
-
-	return service.RunWithSighandler(context.Background(), keyper.New(config))
+	kpr, err := keyper.New(config)
+	if err != nil {
+		return err
+	}
+	return service.RunWithSighandler(context.Background(), kpr)
 }
 
 func initDB(config *keyper.Config) error {

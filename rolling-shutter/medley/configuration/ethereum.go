@@ -18,9 +18,9 @@ func NewEthnodeConfig() *EthnodeConfig {
 
 type EthnodeConfig struct {
 	PrivateKey    *keys.ECDSAPrivate `shconfig:",required"`
+	EthereumURL   string             `                     comment:"The layer 1 JSON RPC endpoint"`
 	ContractsURL  string             `                     comment:"The JSON RPC endpoint where the contracts are accessible"`
 	DeploymentDir string             `                     comment:"Contract source directory"`
-	EthereumURL   string             `                     comment:"The layer 1 JSON RPC endpoint"`
 }
 
 func (c *EthnodeConfig) Init() {
