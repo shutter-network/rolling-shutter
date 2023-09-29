@@ -365,7 +365,7 @@ func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, e
 
 	collator, err := proc.Collators.Find(tx.L1BlockNumber())
 	if err != nil {
-		err := errors.Wrap(err, "collator validation failed")
+		err := errors.Wrapf(err, "no collator registered for block-number %d", tx.L1BlockNumber())
 		return sender, rpcerrors.TransactionRejected(err)
 	}
 	sender, err = proc.Signer.Sender(tx)
@@ -434,8 +434,27 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	return nil
 }
 
-func (proc *Sequencer) SubmitBatch(ctx context.Context, batchTx *txtypes.Transaction) (string, error) {
+func logBatchTx(batchTx *txtypes.Transaction) {
+	log.Info().
+		Uint64("l1-block-number", batchTx.L1BlockNumber()).
+		Bytes("decryption key", batchTx.DecryptionKey()).
+		Uint64("batch-index", batchTx.BatchIndex()).
+		Uint64("nonce", batchTx.Nonce()).
+		Interface("timestamp", batchTx.Timestamp()).
+		Interface("num-transactions", len(batchTx.Transactions())).
+		Msg("received submitted batch")
+	log.Debug().
+		Interface("num-transactions", batchTx.Transactions()).
+		Msg("received encrypted shutter transactions in batch")
+}
+
+func (proc *Sequencer) SubmitBatch(
+	ctx context.Context,
+	batchTx *txtypes.Transaction,
+) (string, error) {
 	var gasPool core.GasPool
+
+	logBatchTx(batchTx)
 
 	proc.Mux.Lock()
 	defer proc.Mux.Unlock()

@@ -340,19 +340,19 @@ func (me *MockEthServer) respondRawTx(mess *jsonrpcMessage) (int, error) {
 		return 0, errors.Wrap(err, "can't decode incoming tx bytes")
 	}
 
-	var tx txtypes.Transaction
+	tx := &txtypes.Transaction{}
 	err = tx.UnmarshalBinary(txBytes)
 	if err != nil {
 		return 0, errors.Wrap(err, "can't unmarshael incoming bytes to transaction")
 	}
-	me.txs[tx.Hash().Hex()] = &tx
+	me.txs[tx.Hash().Hex()] = tx
 
 	newHooks := make([]txHookFunc, 0)
 	for _, f := range me.hooks {
 		// true return value means
 		// the function should be removed
 		// from the actions
-		if !f(me, &tx) {
+		if !f(me, tx) {
 			newHooks = append(newHooks, f)
 		}
 	}

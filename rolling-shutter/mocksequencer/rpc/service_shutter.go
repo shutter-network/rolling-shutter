@@ -67,8 +67,11 @@ func (s *ShutterService) GetTransactionByHash(hash common.Hash) (*txtypes.Transa
 	return rpcTx, nil
 }
 
-func (s *ShutterService) SubmitBatch(ctx context.Context, batchTransaction string) (string, error) {
-	var tx txtypes.Transaction
+func (s *ShutterService) SubmitBatch(
+	ctx context.Context,
+	batchTransaction string,
+) (string, error) {
+	tx := &txtypes.Transaction{}
 
 	txBytes, err := hexutil.Decode(batchTransaction)
 	if err != nil {
@@ -81,5 +84,5 @@ func (s *ShutterService) SubmitBatch(ctx context.Context, batchTransaction strin
 		err := errors.Wrap(err, "can't unmarshal incoming bytes to transaction")
 		return "", rpcerrors.ParseError(err)
 	}
-	return s.processor.SubmitBatch(ctx, &tx)
+	return s.processor.SubmitBatch(ctx, tx)
 }

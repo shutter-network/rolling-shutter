@@ -122,7 +122,19 @@ func (submitter *Submitter) createBatchTx(
 	if err != nil {
 		return err
 	}
-	logger.Info().Int("num-tx", len(txs)).Msg("created batchtx")
+	// 2023/09/28 18:28:44.250838 INF [batchsubmission.go:125] created batchtx and inserted in db
+	// 	batch-tx={
+	// 	"BatchIndex":1,
+	// 	"ChainID":42,
+	// 	"DecryptionKey":"DPHFVpuf9G4GmTtv9gtrXruBYLbqRUajvqhc8PUEtOsBIK/7sbKg8YW1WsveibxLRGgkVYaa70fQdxTnaxukMg==",
+	// 	"L1BlockNumber":59,
+	// 	"Timestamp":1695911324,
+	// 	"Transactions":[],
+	// 	"r":null,
+	// 	"s":null,
+	// 	"v":null
+	// } epoch=1 num-shutter-tx=0
+	logger.Info().Interface("batch-tx", batchTx).Int("num-shutter-tx", len(txs)).Msg("created batchtx and inserted in db")
 	return nil
 }
 
@@ -153,7 +165,9 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 
 	_, err = submitter.sequencer.SubmitBatchData(ctx, unsubmitted.Marshaled)
 	log.Info().Uint64("epoch-id", epoch.Uint64()).Err(err).Msg("submitted batch data")
-
+	if err != nil {
+		time.Sleep(time.Second * 5)
+	}
 	return err
 }
 
