@@ -289,7 +289,7 @@
    :depends [build -p2pnode-subcommands]
    :task (mapv play/generate-config -p2pnode-subcommands)}
 
-;; --------------------------------------
+  ;; --------------------------------------
   ;; -- collator
 
   -collator-subcommand (play/collator-subcommand)
@@ -420,8 +420,8 @@
   -deploy-conf
   {:doc "Generate a deploy config"
    :depends [-keypers -collator]
-   ; FIXME keypers is now a list of lists, where
-   ; the first list is the initially deployed keyper set
+   ;; FIXME keypers is now a list of lists, where
+   ;; the first list is the initially deployed keyper set
    :task (let [conf {:keypers [-keypers]
                      :collator -collator
                      :fundValue "100"}
@@ -490,4 +490,9 @@
                                                          (play/mocksequencer-subcommand)
                                                          -collator-subcommand])]
              (fs/delete-if-exists cfgfile)))}
+
+  upgrade-dependencies
+  {:doc "Upgrade dependencies"
+   :task (clojure "-M:outdated --upgrade")}
+
   ci-gen sht.play/ci-gen}}
