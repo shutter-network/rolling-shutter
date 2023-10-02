@@ -51,15 +51,15 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: go get -d ./...
       - save_cache:
-          key: go-mod-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - ~/go/pkg/
       - restore_cache:
           keys:
-            - rs-build-<< parameters.go-version >>-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -90,7 +90,7 @@ jobs:
       - store_test_results:
           path: report
       - save_cache:
-          key: rs-build-<< parameters.go-version >>-v3-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
 
@@ -186,7 +186,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v6-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
             - rs-lint-v13-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
