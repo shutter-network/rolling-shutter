@@ -42,13 +42,13 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.21.0
+      - image: cimg/go:1.21.1
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
   go-integration:
     docker:
-      - image: cimg/go:1.21.0
+      - image: cimg/go:1.21.1
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"

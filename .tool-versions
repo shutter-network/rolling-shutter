@@ -2,7 +2,7 @@ babashka 1.3.182
 binaryen 114
 circleci 0.1.28811
 clojure 1.11.1.1386
-golang 1.21.0
+golang 1.21.1
 golangci-lint 1.54.1
 java temurin-17.0.5+8
 nodejs 18.17.0
