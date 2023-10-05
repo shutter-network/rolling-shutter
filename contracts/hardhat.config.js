@@ -141,9 +141,17 @@ module.exports = {
   },
   networks: {
     hardhat: {
+      chainId: 1,
       mining: {
         auto: true,
         interval: 1500,
+      },
+      forking: {
+        url: `https://mainnet.infura.io/v3/${process.env.HARDHAT_INFURA_KEY}`,
+        blockNumber: 17143817,
+        httpHeaders: {
+          Origin: 'localhost:3000', // infura allowlists requests by origin
+        },
       },
     },
     gnosis: {
