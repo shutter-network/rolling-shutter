@@ -11,5 +11,5 @@ pre-commit 3.3.3
 protoc 22.3
 shfmt 3.7.0
 solidity 0.8.9
-sqlc 1.19.1
+sqlc 1.22.0
 tinygo 0.29.0

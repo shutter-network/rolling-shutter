@@ -60,7 +60,7 @@ install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-ge
 install-npm: ../contracts/node_modules/.mark-npm-install
 
 ${GOPATH}/bin/sqlc:
-	${GO} install github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.1
+	${GO} install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.22.0
 install-sqlc: ${GOPATH}/bin/sqlc
 
 
