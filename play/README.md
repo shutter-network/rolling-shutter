@@ -16,6 +16,12 @@ export ROLLING_SHUTTER_BOOTSTRAP_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db041
 export ROLLING_SHUTTER_CHAIN_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
 ```
 
+## prepare psql (via docker)
+
+```
+docker run --rm -it -e POSTGRES_USER=$(whoami) -e POSTGRES_PASSWORD=password -e POSTGRES_DB=testdb -v /tmp:/tmp --net=host -v /tmp/projectdir:/home/circleci/project -v /tmp/datadir:/var/lib/postgresql/data cimg/postgres:13.9
+```
+
 ## keyper only test setup
 
 1. bb init; bb chain
