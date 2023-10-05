@@ -211,7 +211,10 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		if err != nil {
 			return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
 		}
-		log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
+		log.Info().
+			Str("path", validatorPubKeyPath).
+			Str("validatorPublicKey", validatorPublicKeyHex).
+			Msg("Saved private validator publickey")
 
 		// genesis file
 		genFile := tendermintConfig.GenesisFile()

@@ -59,7 +59,10 @@ func (tkg *TestKeyGenerator) EonKeysForEpoch(epochID epochid.EpochID) *EonKeys {
 	return res
 }
 
-func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
+func (tkg *TestKeyGenerator) EonPublicKeyShare(
+	epochID epochid.EpochID,
+	keyperIndex uint64,
+) *shcrypto.EonPublicKeyShare {
 	tkg.t.Helper()
 	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonPublicKeyShare
 }
@@ -69,12 +72,18 @@ func (tkg *TestKeyGenerator) EonPublicKey(epochID epochid.EpochID) *shcrypto.Eon
 	return tkg.EonKeysForEpoch(epochID).publicKey
 }
 
-func (tkg *TestKeyGenerator) EonSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
+func (tkg *TestKeyGenerator) EonSecretKeyShare(
+	epochID epochid.EpochID,
+	keyperIndex uint64,
+) *shcrypto.EonSecretKeyShare {
 	tkg.t.Helper()
 	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonSecretKeyShare
 }
 
-func (tkg *TestKeyGenerator) EpochSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
+func (tkg *TestKeyGenerator) EpochSecretKeyShare(
+	epochID epochid.EpochID,
+	keyperIndex uint64,
+) *shcrypto.EpochSecretKeyShare {
 	tkg.t.Helper()
 	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].ComputeEpochSecretKeyShare(epochID)
 }

@@ -57,7 +57,10 @@ func (s *EthService) Name() string {
 	return "eth"
 }
 
-func (s *EthService) GetTransactionCount(address common.Address, blockNrOrHash ethrpc.BlockNumberOrHash) (*hexutil.Uint64, error) {
+func (s *EthService) GetTransactionCount(
+	address common.Address,
+	blockNrOrHash ethrpc.BlockNumberOrHash,
+) (*hexutil.Uint64, error) {
 	s.processor.Mux.RLock()
 	defer s.processor.Mux.RUnlock()
 	block, err := s.processor.GetBlock(blockNrOrHash)
@@ -86,7 +89,11 @@ func (s *EthService) ChainId() *hexutil.Big {
 	return (*hexutil.Big)(s.processor.ChainID())
 }
 
-func (s *EthService) GetBlockByNumber(_ context.Context, blockNumber ethrpc.BlockNumber, _ bool) (map[string]interface{}, error) {
+func (s *EthService) GetBlockByNumber(
+	_ context.Context,
+	blockNumber ethrpc.BlockNumber,
+	_ bool,
+) (map[string]interface{}, error) {
 	var result map[string]interface{}
 	s.processor.Mux.RLock()
 	defer s.processor.Mux.RUnlock()

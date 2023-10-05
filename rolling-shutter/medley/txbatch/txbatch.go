@@ -54,7 +54,13 @@ func (txbatch *TXBatch) WaitMined(ctx context.Context) ([]*types.Receipt, error)
 		}
 		res = append(res, receipt)
 		if receipt.Status != 1 {
-			err = medley.GetRevertReason(ctx, txbatch.Ethclient, crypto.PubkeyToAddress(txbatch.key.PublicKey), tx, receipt.BlockNumber)
+			err = medley.GetRevertReason(
+				ctx,
+				txbatch.Ethclient,
+				crypto.PubkeyToAddress(txbatch.key.PublicKey),
+				tx,
+				receipt.BlockNumber,
+			)
 			fmt.Print("\n")
 			log.Info().Err(err).Str("hash", tx.Hash().Hex()).Int("index", i).
 				Msg("transaction reverted")
@@ -71,7 +77,11 @@ func (txbatch *TXBatch) WaitMined(ctx context.Context) ([]*types.Receipt, error)
 }
 
 // InitTransactOpts initializes the transact options struct.
-func InitTransactOpts(ctx context.Context, client *ethclient.Client, key *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
+func InitTransactOpts(
+	ctx context.Context,
+	client *ethclient.Client,
+	key *ecdsa.PrivateKey,
+) (*bind.TransactOpts, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, err

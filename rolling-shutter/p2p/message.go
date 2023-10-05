@@ -20,7 +20,10 @@ func UnmarshalPubsubMessage(msg *pubsub.Message) (p2pmsg.Message, *p2pmsg.TraceC
 
 	err = unmshl.Validate()
 	if err != nil {
-		return nil, traceContext, errors.Wrap(err, fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()))
+		return nil, traceContext, errors.Wrap(
+			err,
+			fmt.Sprintf("verification failed <%s>", reflect.TypeOf(unmshl).String()),
+		)
 	}
 	return unmshl, traceContext, nil
 }

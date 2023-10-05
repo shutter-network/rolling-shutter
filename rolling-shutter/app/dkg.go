@@ -40,7 +40,11 @@ func (dkg *DKGInstance) RegisterPolyEvalMsg(msg PolyEval) error {
 		}
 		_, ok := dkg.PolyEvalsSeen[SenderReceiverPair{sender, receiver}]
 		if ok {
-			return errors.Errorf("polynomial evaluation from keyper %s for receiver %s already present", sender.Hex(), receiver.Hex())
+			return errors.Errorf(
+				"polynomial evaluation from keyper %s for receiver %s already present",
+				sender.Hex(),
+				receiver.Hex(),
+			)
 		}
 	}
 

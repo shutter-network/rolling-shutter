@@ -36,7 +36,11 @@ func (*DecryptionKeyShareHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
 	keyShare := msg.(*p2pmsg.DecryptionKeyShares)
 	if keyShare.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
+		return false, errors.Errorf(
+			"instance ID mismatch (want=%d, have=%d)",
+			handler.config.GetInstanceID(),
+			keyShare.GetInstanceID(),
+		)
 	}
 	if keyShare.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
@@ -78,7 +82,10 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 	return true, nil
 }
 
-func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (handler *DecryptionKeyShareHandler) HandleMessage(
+	ctx context.Context,
+	m p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	metricsEpochKGDecryptionKeySharesReceived.Inc()
 	msg := m.(*p2pmsg.DecryptionKeyShares)
 	// Insert the share into the db. We assume that it's valid as it already passed the libp2p

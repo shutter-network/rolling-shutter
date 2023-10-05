@@ -97,7 +97,13 @@ func TestConfirmTransactionsIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, 5, len(txs), "should have exactly one tx: %+v", txs)
 	for nonce := 0; nonce < 5; nonce++ {
-		assert.Equal(t, cltrdb.TxstatusCommitted, txs[nonce].Status, "expected tx to have status committed: %+v", txs[nonce])
+		assert.Equal(
+			t,
+			cltrdb.TxstatusCommitted,
+			txs[nonce].Status,
+			"expected tx to have status committed: %+v",
+			txs[nonce],
+		)
 	}
 }
 

@@ -29,7 +29,11 @@ func (s *AdminService) Name() string {
 func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, error) {
 	var err error
 	defer func() {
-		log.Info().Err(err).Str("address", address).Uint64("l1-blocknumber", l1BlockNumber).Msg("admin method AddCollator called")
+		log.Info().
+			Err(err).
+			Str("address", address).
+			Uint64("l1-blocknumber", l1BlockNumber).
+			Msg("admin method AddCollator called")
 	}()
 
 	collator, err := encoding.StringToAddress(address)
