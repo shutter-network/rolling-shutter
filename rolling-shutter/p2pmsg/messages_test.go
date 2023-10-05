@@ -13,7 +13,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
-func marshalUnmarshalMessage[M Message](t *testing.T, message M, traceContext *TraceContext) (M, *TraceContext) { //nolint:thelper
+func marshalUnmarshalMessage[M Message]( //nolint:thelper
+	t *testing.T,
+	message M,
+	traceContext *TraceContext,
+) (M, *TraceContext) {
 	var (
 		err        error
 		ok         bool

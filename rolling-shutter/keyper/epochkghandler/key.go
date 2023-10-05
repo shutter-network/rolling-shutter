@@ -33,7 +33,11 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
 	key := msg.(*p2pmsg.DecryptionKey)
 	if key.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+		return false, errors.Errorf(
+			"instance ID mismatch (want=%d, have=%d)",
+			handler.config.GetInstanceID(),
+			key.GetInstanceID(),
+		)
 	}
 	if _, err := epochid.BytesToEpochID(key.EpochID); err != nil {
 		return false, errors.Wrapf(err, "invalid epoch id")

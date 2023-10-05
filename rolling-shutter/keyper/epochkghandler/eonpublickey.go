@@ -25,7 +25,11 @@ func (*EonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
 	key := msg.(*p2pmsg.EonPublicKey)
 	if key.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+		return false, errors.Errorf(
+			"instance ID mismatch (want=%d, have=%d)",
+			handler.config.GetInstanceID(),
+			key.GetInstanceID(),
+		)
 	}
 	return true, nil
 }

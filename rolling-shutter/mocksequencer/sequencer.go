@@ -116,7 +116,12 @@ func (b *BlockData) GetNonce(a common.Address) uint64 {
 	return nonce
 }
 
-func CreateNextBlockData(baseFee *big.Int, gasLimit uint64, feeBeneficiary common.Address, previous *BlockData) *BlockData {
+func CreateNextBlockData(
+	baseFee *big.Int,
+	gasLimit uint64,
+	feeBeneficiary common.Address,
+	previous *BlockData,
+) *BlockData {
 	gasPool := core.GasPool(gasLimit)
 	bd := &BlockData{
 		mux:            sync.Mutex{},
@@ -404,7 +409,11 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	}
 
 	shutterTxStr, _ := tx.MarshalJSON()
-	log.Ctx(ctx).Info().Str("signer", sender.Hex()).RawJSON("transaction", shutterTxStr).Msg("received shutter transaction")
+	log.Ctx(ctx).
+		Info().
+		Str("signer", sender.Hex()).
+		RawJSON("transaction", shutterTxStr).
+		Msg("received shutter transaction")
 
 	if tx.L1BlockNumber() != batchL1BlockNumber {
 		return errors.New("l1-block-number mismatch")

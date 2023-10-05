@@ -73,7 +73,13 @@ type EventSyncer struct {
 // New creates a new event syncer. It will look for events starting at a certain block number and
 // log index. The types of events to filter for are specified as a set of EventTypes. The finality
 // offset is the number of blocks we trail behind the current block to be safe from reorgs.
-func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, fromBlock uint64, fromLogIndex uint64) *EventSyncer {
+func New(
+	client *ethclient.Client,
+	finalityOffset uint64,
+	events []*EventType,
+	fromBlock uint64,
+	fromLogIndex uint64,
+) *EventSyncer {
 	return &EventSyncer{
 		Client:         client,
 		FinalityOffset: finalityOffset,
@@ -219,7 +225,12 @@ func (s *EventSyncer) syncAllInRange(ctx context.Context, fromBlock uint64, toBl
 }
 
 // syncSingleInRange returns the events matching the given type in the given block range.
-func (s *EventSyncer) syncSingleInRange(ctx context.Context, event *EventType, fromBlock uint64, toBlock uint64) ([]logChannelItem, error) {
+func (s *EventSyncer) syncSingleInRange(
+	ctx context.Context,
+	event *EventType,
+	fromBlock uint64,
+	toBlock uint64,
+) ([]logChannelItem, error) {
 	topic := event.ABI.Events[event.Name].ID
 	query := ethereum.FilterQuery{
 		BlockHash: nil,

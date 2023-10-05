@@ -33,7 +33,11 @@ func (*DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
 	trigger := msg.(*p2pmsg.DecryptionTrigger)
 	if trigger.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), trigger.GetInstanceID())
+		return false, errors.Errorf(
+			"instance ID mismatch (want=%d, have=%d)",
+			handler.config.GetInstanceID(),
+			trigger.GetInstanceID(),
+		)
 	}
 	if _, err := epochid.BytesToEpochID(trigger.EpochID); err != nil {
 		return false, errors.Wrapf(err, "invalid epoch id")
@@ -53,12 +57,20 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 
 	collator, err := shdb.DecodeAddress(chainCollator.Collator)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while converting collator from string to address: %s", chainCollator.Collator)
+		return false, errors.Wrapf(
+			err,
+			"error while converting collator from string to address: %s",
+			chainCollator.Collator,
+		)
 	}
 
 	signatureValid, err := p2pmsg.VerifySignature(trigger, collator)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %x", trigger.EpochID)
+		return false, errors.Wrapf(
+			err,
+			"error while verifying decryption trigger signature for epoch: %x",
+			trigger.EpochID,
+		)
 	}
 	if !signatureValid {
 		return false, errors.Errorf("decryption trigger signature invalid for epoch: %x", trigger.EpochID)
@@ -66,7 +78,10 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 	return signatureValid, nil
 }
 
-func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (handler *DecryptionTriggerHandler) HandleMessage(
+	ctx context.Context,
+	m p2pmsg.Message,
+) ([]p2pmsg.Message, error) {
 	msg, ok := m.(*p2pmsg.DecryptionTrigger)
 	if !ok {
 		return nil, errors.New("Message type assertion mismatch")

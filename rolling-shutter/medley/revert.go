@@ -15,7 +15,13 @@ import (
 // Adapted from https://ethereum.stackexchange.com/a/80766
 
 // GetRevertReason returns the reason for a failed transaction.
-func GetRevertReason(ctx context.Context, b ethereum.ContractCaller, from common.Address, tx *types.Transaction, blockNum *big.Int) error {
+func GetRevertReason(
+	ctx context.Context,
+	b ethereum.ContractCaller,
+	from common.Address,
+	tx *types.Transaction,
+	blockNum *big.Int,
+) error {
 	msg := ethereum.CallMsg{
 		From:     from,
 		To:       tx.To(),

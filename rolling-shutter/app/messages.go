@@ -28,7 +28,11 @@ func validateAddress(address []byte) (common.Address, error) {
 // ParsePolyEvalMsg converts a shmsg.PolyEvalMsg to an app.PolyEvalMsg.
 func ParsePolyEvalMsg(msg *shmsg.PolyEval, sender common.Address) (*PolyEval, error) {
 	if len(msg.Receivers) != len(msg.EncryptedEvals) {
-		return nil, errors.Errorf("number of receivers %d does not match number of evals %d", len(msg.Receivers), len(msg.EncryptedEvals))
+		return nil, errors.Errorf(
+			"number of receivers %d does not match number of evals %d",
+			len(msg.Receivers),
+			len(msg.EncryptedEvals),
+		)
 	}
 
 	receivers := []common.Address{}
@@ -95,7 +99,11 @@ func ParseAccusationMsg(msg *shmsg.Accusation, sender common.Address) (*Accusati
 // ParseApologyMsg converts a shmsg.ApologyMsg to an app.ApologyMsg.
 func ParseApologyMsg(msg *shmsg.Apology, sender common.Address) (*Apology, error) {
 	if len(msg.Accusers) != len(msg.PolyEvals) {
-		return nil, errors.Errorf("number of accusers %d and apology evals %d not equal", len(msg.Accusers), len(msg.PolyEvals))
+		return nil, errors.Errorf(
+			"number of accusers %d and apology evals %d not equal",
+			len(msg.Accusers),
+			len(msg.PolyEvals),
+		)
 	}
 
 	accusers := []common.Address{}

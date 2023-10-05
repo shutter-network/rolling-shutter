@@ -522,7 +522,10 @@ func (app *ShutterApp) handlePolyEvalMsg(msg *shmsg.PolyEval, sender common.Addr
 	}
 }
 
-func (app *ShutterApp) handlePolyCommitmentMsg(msg *shmsg.PolyCommitment, sender common.Address) abcitypes.ResponseDeliverTx {
+func (app *ShutterApp) handlePolyCommitmentMsg(
+	msg *shmsg.PolyCommitment,
+	sender common.Address,
+) abcitypes.ResponseDeliverTx {
 	appMsg, err := ParsePolyCommitmentMsg(msg, sender)
 	if err != nil {
 		msg := fmt.Sprintf("Error: Failed to parse PolyCommitment message: %+v", err)
@@ -717,7 +720,8 @@ func (app *ShutterApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 				}.MakeABCIEvent())
 			}
 		}
-		if config.Started && !config.ValidatorsUpdated && app.countCheckedInKeypers(config.Keypers) >= numRequiredTransitionValidators(config) {
+		if config.Started && !config.ValidatorsUpdated &&
+			app.countCheckedInKeypers(config.Keypers) >= numRequiredTransitionValidators(config) {
 			config.ValidatorsUpdated = true
 		}
 	}

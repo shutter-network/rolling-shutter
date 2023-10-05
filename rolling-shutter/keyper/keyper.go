@@ -267,7 +267,8 @@ func (kpr *keyper) handleOnChainKeyperSetChanges(
 	}
 	// We *MUST* check if the l1BlockNumber is smaller than the activationBlockNumber since both are uint64 and therefore subtraction can never result in negative numbers.
 	// This means that if we missed the activationBlockNumber we will never submit the config.
-	if l1BlockNumber < activationBlockNumber && activationBlockNumber-l1BlockNumber > kpr.config.Shuttermint.DKGStartBlockDelta {
+	if l1BlockNumber < activationBlockNumber &&
+		activationBlockNumber-l1BlockNumber > kpr.config.Shuttermint.DKGStartBlockDelta {
 		log.Info().Interface("keyper-set", keyperSet).
 			Uint64("l1-block-number", l1BlockNumber).
 			Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
