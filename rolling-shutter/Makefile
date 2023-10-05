@@ -69,7 +69,7 @@ ${GOPATH}/bin/go-enum:
 install-go-enum: ${GOPATH}/bin/go-enum
 
 ${GOPATH}/bin/abigen:
-	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.10.26
+	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.12.0
 install-abigen: ${GOPATH}/bin/abigen
 
 
