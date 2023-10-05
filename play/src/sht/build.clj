@@ -98,6 +98,16 @@
   [{:keys [num-keypers]}]
   (mapv run-keyper (range num-keypers)))
 
+(defn run-external-command
+  [n]
+  (let [external (play/external-command n)]
+    {:run :process/run
+     :process/id (keyword "keyper-external")
+     :process/cmd (str (System/getenv "BB_EXTERNAL_COMMAND"))
+     :process/opts (:process/opts external)
+     :process/port (:process/p2p-port external)
+     :process/port-timeout 3000}))
+
 (defn run-p2pnode
   [n]
   (let [p2pnode (play/p2pnode-subcommand n)]

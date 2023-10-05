@@ -219,6 +219,28 @@
                               "EthereumURL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)
                               "ContractsURL" (format "http://127.0.0.1:%d/" contracts-rpc-port)}}))
 
+;; -- external-command
+(defn external-command
+  [n]
+  (let [p2p-port (dec (+ keyper-base-port n))
+        work-dir (or (System/getenv "BB_EXTERNAL_WD")
+                     (System/getenv "PWD"))
+        ]
+    #:process{:cmd 'external-cmd
+              :p2p-port p2p-port
+              :opts {:dir work-dir
+                     :extra-env {
+                 "KPR_P2P_PORT" p2p-port
+                 "KPR_DKG_PHASE_LENGTH" 8
+                 "KPR_DKG_START_BLOCK_DELTA" 5
+                 "KPR_LISTEN_ADDRESSES" (format "/ip4/127.0.0.1/tcp/%d" p2p-port)
+                 "KPR_ENVIRONMENT" "local"
+                 "KPR_HTTP_LISTEN_ADDRESS" (format ":%d" (+ 24000 n))
+                 "KPR_ETHEREUM_URL" (format "http://127.0.0.1:%d/" ethereum-rpc-port)
+                 "KPR_CONTRACTS_URL" (format "http://127.0.0.1:%d/" contracts-rpc-port)}}
+              }
+    ))
+
 ;; -- mocknode-subcommand
 (defn mocknode-subcommand
   []
