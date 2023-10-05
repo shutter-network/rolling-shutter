@@ -3,6 +3,7 @@ package collator
 import (
 	"context"
 	"encoding/json"
+	"github.com/rs/cors"
 	"net/http"
 	"os"
 	"time"
@@ -190,6 +191,17 @@ func (c *collator) setupRouter() *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
+	// Add CORS middleware with desired options
+	corsMiddleware := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // allows all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	})
+	router.Use(corsMiddleware.Handler)
+
 	router.Mount("/v1", http.StripPrefix("/v1", c.setupAPIRouter(swagger)))
 	apiJSON, _ := json.Marshal(swagger)
 	router.Get("/api.json", func(w http.ResponseWriter, r *http.Request) {
