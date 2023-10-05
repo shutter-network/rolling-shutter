@@ -44,8 +44,8 @@ func (*DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
 	trigger := msg.(*p2pmsg.DecryptionTrigger)
-	if trigger.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), trigger.GetInstanceID())
+	if trigger.GetInstanceID() != handler.config.InstanceID {
+		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, trigger.GetInstanceID())
 	}
 	if _, err := epochid.BytesToEpochID(trigger.EpochID); err != nil {
 		return false, errors.Wrapf(err, "invalid epoch id")

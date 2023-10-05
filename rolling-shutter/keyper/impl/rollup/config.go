@@ -1,13 +1,10 @@
 package rollup
 
 import (
-	"crypto/ed25519"
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -46,34 +43,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (c *Config) GetAddress() common.Address {
-	return c.Ethereum.PrivateKey.EthereumAddress()
-}
-
-func (c *Config) GetDKGPhaseLength() *dkgphase.PhaseLength {
-	return dkgphase.NewConstantPhaseLength(c.Shuttermint.DKGPhaseLength)
-}
-
-func (c *Config) GetValidatorPublicKey() ed25519.PublicKey {
-	return c.Shuttermint.ValidatorPublicKey.Key
-}
-
-func (c *Config) GetEncryptionKey() *ecies.PrivateKey {
-	// OPTIM this could be cached, but it is only used for
-	// 		eon DKG (rarely) and does not do any computation
-	return ecies.ImportECDSA(c.Shuttermint.EncryptionKey.Key)
-}
-
-func (c *Config) GetInstanceID() uint64 {
-	return c.InstanceID
-}
-
 func (c *Config) Name() string {
 	return "keyper"
-}
-
-func (c *Config) GetHTTPListenAddress() string {
-	return c.HTTPListenAddress
 }
 
 func (c *Config) SetDefaultValues() error {
@@ -94,4 +65,8 @@ func (c *Config) SetExampleValues() error {
 
 func (c Config) TOMLWriteHeader(_ io.Writer) (int, error) {
 	return 0, nil
+}
+
+func (c *Config) GetAddress() common.Address {
+	return c.Ethereum.PrivateKey.EthereumAddress()
 }

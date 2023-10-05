@@ -11,11 +11,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/impl/snapshot"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshotkeyper"
 )
 
 func Cmd() *cobra.Command {
@@ -41,7 +40,11 @@ func main(config *keyper.Config) error {
 		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting snapshotkeyper")
 
-	return service.RunWithSighandler(context.Background(), snapshotkeyper.New(config))
+	kpr, err := keyper.New(config)
+	if err != nil {
+		return err
+	}
+	return service.RunWithSighandler(context.Background())
 }
 
 func initDB(config *keyper.Config) error {

@@ -40,7 +40,7 @@ type NextEpoch struct {
 
 // Transaction defines model for Transaction.
 type Transaction struct {
-	EncryptedTx []byte `json:"encrypted_tx"`
+	EncryptedTx string `json:"encrypted_tx"`
 	Epoch       []byte `json:"epoch"`
 }
 

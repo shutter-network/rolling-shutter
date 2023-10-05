@@ -1,4 +1,4 @@
-package rollup
+package snapshot
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
-	rollupkeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/impl/rollup/"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
@@ -23,12 +22,12 @@ type Keyper struct {
 	core      *keyper.KeyperCore
 	contracts *deployment.Contracts
 	dbpool    *pgxpool.Pool
-	config    *rollupkeyper.Config
+	config    *Config
 
 	trigger chan<- *broker.Event[*epochkghandler.DecryptionTrigger]
 }
 
-func New(c *rollupkeyper.Config) (*Keyper, error) {
+func New(c *Config) (*Keyper, error) {
 	decrTrigChan := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 	coreConfig := &kprconfig.Config{
 		InstanceID:         c.InstanceID,
