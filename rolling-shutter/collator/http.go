@@ -3,6 +3,7 @@ package collator
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"net/http"
 
 	"github.com/jackc/pgx/v4"
@@ -52,12 +53,20 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, "Invalid format for SubmitTransaction")
 		return
 	}
+
+	bytesTx, err := hexutil.Decode(x.EncryptedTx)
+	if err != nil {
+		log.Info().Err(err).Msg("=========FAILED============")
+		sendError(w, http.StatusBadRequest, "Error converting hex to bytes")
+		return
+	}
+
 	ctx := r.Context()
 
 	hash := sha3.New256()
 	fmt.Fprintf(hash, "%d\n", len(x.Epoch))
 	hash.Write(x.Epoch)
-	hash.Write(x.EncryptedTx)
+	hash.Write(bytesTx)
 	txid := hash.Sum(nil)
 
 	// NOTE: We still have to decide how the caller can query for tx
@@ -70,7 +79,7 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	// during inclusion in the batch, e.g. because of nonce mismatch
 	// or lack of funds
 
-	err := srv.c.batcher.EnqueueTx(ctx, x.EncryptedTx)
+	err = srv.c.batcher.EnqueueTx(ctx, bytesTx)
 	if err != nil {
 		log.Error().Err(err).Msg("Error in SubmitTransaction")
 		sendError(w, http.StatusConflict, err.Error())

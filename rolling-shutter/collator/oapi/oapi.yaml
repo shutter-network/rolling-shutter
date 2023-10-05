@@ -97,7 +97,7 @@ components:
           format: byte
         encrypted_tx:
           type: string
-          format: byte
+          format: string
     TransactionId:
       type: object
       required:

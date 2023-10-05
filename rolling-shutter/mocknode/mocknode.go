@@ -153,7 +153,7 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 			httpResponse, err = m.collatorClient.SubmitTransaction(
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
-					EncryptedTx: encryptedTx,
+					EncryptedTx: string(encryptedTx),
 					Epoch:       epochID.Bytes(),
 				})
 			if err != nil {
