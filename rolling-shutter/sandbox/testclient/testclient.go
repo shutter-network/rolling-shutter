@@ -113,7 +113,7 @@ func main() {
 	log.Info().Str("version", shversion.Version()).Msg("starting testclient")
 
 	var cl client.Client
-	cl, err := http.New("http://localhost:26657")
+	cl, err := http.New("http://localhost:26657", "/websocket")
 	if err != nil {
 		panic(err)
 	}

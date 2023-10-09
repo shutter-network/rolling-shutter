@@ -9,9 +9,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	abciclient "github.com/tendermint/tendermint/abci/client"
 	cfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/node"
+	"github.com/tendermint/tendermint/p2p"
+	"github.com/tendermint/tendermint/privval"
+	"github.com/tendermint/tendermint/proxy"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
@@ -61,24 +63,27 @@ func (as *appService) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to create tendermint logger")
 	}
 
-	nodeid, err := as.config.LoadNodeKeyID()
-	if err != nil {
-		return err
-	}
-	log.Info().Str("node-id", string(nodeid)).Msg("loaded node-id")
-
 	shapp, err := app.LoadShutterAppFromFile(
 		filepath.Join(as.config.DBDir(), "shutter.gob"),
 	)
 	if err != nil {
 		return err
 	}
+	nodeKey, err := p2p.LoadNodeKey(as.config.NodeKeyFile())
+	if err != nil {
+		return err
+	}
+	log.Info().Str("node-id", string(nodeKey.ID())).Msg("loaded node-id")
 
-	tmNode, err := node.New(
+	tmNode, err := node.NewNode(
 		as.config,
+		privval.LoadFilePV(as.config.PrivValidatorKeyFile(), as.config.PrivValidatorStateFile()),
+		nodeKey,
+		proxy.NewLocalClientCreator(&shapp),
+		node.DefaultGenesisDocProviderFunc(as.config),
+		node.DefaultDBProvider,
+		node.DefaultMetricsProvider(as.config.Instrumentation),
 		logger,
-		abciclient.NewLocalCreator(&shapp),
-		nil,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new Tendermint node")

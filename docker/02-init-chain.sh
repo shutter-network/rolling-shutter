@@ -60,15 +60,15 @@ for num in 0 1 2 3; do
     sentry_node=$(cat data/${sentry_cmd}/config/node_key.json.id)@${sentry_cmd}:${TM_P2P_PORT}
 
     # set seed node for sentry
-    ${BB} sed -i "/^persistent-peers =/c\persistent-peers = \"${seed_node}\"" data/${sentry_cmd}/config/config.toml
+    ${BB} sed -i "/^persistent_peers =/c\persistent_peers = \"${seed_node}\"" data/${sentry_cmd}/config/config.toml
     # set validator node for sentry
-    ${BB} sed -i "/^private-peer-ids =/c\private-peer-ids = \"${validator_id}\"" data/${sentry_cmd}/config/config.toml
-    ${BB} sed -i "/^unconditional-peer-ids =/c\unconditional-peer-ids = \"${validator_id}\"" data/${sentry_cmd}/config/config.toml
-    ${BB} sed -i "/^external-address =/c\external-address = \"${sentry_cmd}:${TM_P2P_PORT}\"" data/${sentry_cmd}/config/config.toml
+    ${BB} sed -i "/^private_peer_ids =/c\private_peer_ids = \"${validator_id}\"" data/${sentry_cmd}/config/config.toml
+    ${BB} sed -i "/^unconditional_peer_ids =/c\unconditional_peer_ids = \"${validator_id}\"" data/${sentry_cmd}/config/config.toml
+    ${BB} sed -i "/^external_address =/c\external_address = \"${sentry_cmd}:${TM_P2P_PORT}\"" data/${sentry_cmd}/config/config.toml
 
     # set sentry node for validator
-    ${BB} sed -i "/^persistent-peers =/c\persistent-peers = \"${sentry_node}\"" data/${validator_cmd}/config/config.toml
-    ${BB} sed -i "/^external-address =/c\external-address = \"${validator_cmd}:${TM_P2P_PORT}\"" data/${validator_cmd}/config/config.toml
+    ${BB} sed -i "/^persistent_peers =/c\persistent_peers = \"${sentry_node}\"" data/${validator_cmd}/config/config.toml
+    ${BB} sed -i "/^external_address =/c\external_address = \"${validator_cmd}:${TM_P2P_PORT}\"" data/${validator_cmd}/config/config.toml
 done
 
 $DC stop -t 30

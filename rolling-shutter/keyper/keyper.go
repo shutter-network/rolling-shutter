@@ -106,7 +106,7 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	shuttermintClient, err := tmhttp.New(config.Shuttermint.ShuttermintURL)
+	shuttermintClient, err := tmhttp.New(config.Shuttermint.ShuttermintURL, "/websocket")
 	if err != nil {
 		return err
 	}

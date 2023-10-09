@@ -273,6 +273,25 @@ func (app *ShutterApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 	return abcitypes.ResponseBeginBlock{Events: events}
 }
 
+func (app *ShutterApp) PrepareProposal(req abcitypes.RequestPrepareProposal) abcitypes.ResponsePrepareProposal {
+	txs := make([][]byte, 0, len(req.Txs))
+	var totalBytes int64
+	for _, tx := range req.Txs {
+		totalBytes += int64(len(tx))
+		if totalBytes > req.MaxTxBytes {
+			break
+		}
+		txs = append(txs, tx)
+	}
+	return abcitypes.ResponsePrepareProposal{Txs: txs}
+}
+
+func (app *ShutterApp) ProcessProposal(_ abcitypes.RequestProcessProposal) abcitypes.ResponseProcessProposal {
+	return abcitypes.ResponseProcessProposal{
+		Status: abcitypes.ResponseProcessProposal_ACCEPT,
+	}
+}
+
 // decodeTx decodes the given transaction.  It's kind of strange that we have do URL decode the
 // message outselves instead of tendermint doing it for us.
 func (ShutterApp) decodeTx(tx []byte) (signer common.Address, msg *shmsg.MessageWithNonce, err error) {
