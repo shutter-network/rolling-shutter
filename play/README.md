@@ -73,13 +73,6 @@ manually:
 BB_EXTERNAL_WD="$(pwd)" BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" clojure -M:test keyper-dkg-external
 ```
 
-If you obtained a `sht-standalone.jar` you can run the same (without the need to
-install clojure), by calling
-
-```
-BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" java -jar sht-standalone.jar -M:test keyper-dkg-external
-```
-
 ### Parameters in the environment
 
 You can find the test system parameters in the environment of the
@@ -105,3 +98,21 @@ Here you see, that the keyper implementation under tests, should use port
 `23102` for its `p2p` connection, the ethereum node is running at
 `http://127.0.0.1:8545/` etc. Not all of these may be relevant to your
 implementation.
+
+### Self contained testrunner
+
+It is possible to compile the testrunner into a self contained `.jar` file, by
+running
+
+```
+clojure -T:build
+```
+
+If you have such a `sht-standalone.jar` you can run the above test (without the
+need to install clojure), by calling
+
+```
+BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" java -jar sht-standalone.jar -M:test keyper-dkg-external
+```
+
+(The `circleci` integration tests make use of this.)
