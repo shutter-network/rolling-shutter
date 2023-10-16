@@ -340,6 +340,7 @@
   {:depends []
    :task (play/mocknode-subcommand)}
 
+
   genconfig:mock
   {:doc "Generate mocknode config"
    :depends [build -mocknode-subcommand]
@@ -351,6 +352,11 @@
   -mocksequencer-subcommand
   {:depends []
    :task (play/mocksequencer-subcommand)}
+
+  ; init:seqdb
+  ; {:doc "Initialize the mocksequencer database"
+  ;  :depends [build genconfig:mocksequencer]
+  ;  :task (mapv play/initdb genconfig:mocksequencer)}
 
   genconfig:mocksequencer
   {:doc "Generate mocksequencer config"

@@ -83,6 +83,11 @@ func NewBatcher(ctx context.Context, cfg *config.Config, dbpool *pgxpool.Pool) (
 	if err != nil {
 		return nil, err
 	}
+	// TODO somewhere, wait until the sequencer is
+	// ready and the error "batch production has not started yet"
+	// won't be returned anymore by:
+	// l2client.GetBatchIndex(ctx, rc.client)
+
 	return newBatcherFromClients(ctx, cfg, dbpool, l1EthClient, l2Client)
 }
 
@@ -165,6 +170,16 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 		return ErrBatchAlreadyExists
 	} else if l2batchIndex < nextBatchIndex-1 {
 		// need to wait for the sequencer to produce the block
+		// FIXME after successfully submitting a batch with transaction, the nextBatchIndex
+		// is +2 the batch-index.
+		// a manual call to evm_mine resolves this, but investigate why this happens
+		//
+		// Problem:
+		// - we submitted a batch with tx during batch 69, for producing batch 70
+		// - this should call evm_mine in the sequencer and progress the batch-index to 70
+		// - the l2-batch index here still is 69 (why? because of delays, or because the
+		// sequencer didn't update to 70?)
+		// - the nextBatchIndex is 71 (since we already submitted 70, is this right?)
 		log.Info().Uint64("batch-index", l2batchIndex).Uint64("next-batch-index", nextBatchIndex).
 			Msg("wait for sequencer")
 		return ErrWaitForSequencer
@@ -233,6 +248,8 @@ func (btchr *Batcher) applyTransactions(
 			} else {
 				newStatus = cltrdb.TxstatusRejected
 			}
+			log.Info().Err(err).Str("status", string(newStatus)).
+				Msg("applied transaction")
 			err = db.SetTransactionStatus(ctx, cltrdb.SetTransactionStatusParams{
 				TxHash: txs[i].TxHash,
 				Status: newStatus,
@@ -350,8 +367,19 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	tx := &txtypes.Transaction{}
 	err = tx.UnmarshalBinary(txBytes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to unmarshal encrypted transaction")
 	}
+
+	log.Info().
+		Uint64("nonce", tx.Gas()).
+		// Uint64("gas-price", tx.GasPrice()).
+		// Uint64("gas-fee-cap", tx.GasFeeCap()).
+		// Uint64("gas-tip-cap", tx.GasTipCap()).
+		Uint64("nonce", tx.Nonce()).
+		Uint64("l1-block-number", tx.L1BlockNumber()).
+		Uint64("batch-index", tx.BatchIndex()).
+		Bytes("encrypted-payload", tx.EncryptedPayload()).
+		Msg("received new transaction, enqueueing")
 
 	err = btchr.earlyValidateTx(tx)
 	if err != nil {
@@ -363,6 +391,9 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	if err != nil {
 		return err
 	}
+	log.Info().
+		Str("sender", account.Hex()).
+		Msg("recovered sender address for encrypted transaction")
 
 	btchr.mux.Lock()
 	defer btchr.mux.Unlock()
@@ -386,6 +417,10 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	} else if tx.BatchIndex() >= nextBatchIndex+uint64(btchr.config.BatchIndexAcceptenceInterval) {
 		return ErrBatchIndexTooFarInFuture
 	}
+	log.Info().
+		Uint64("tx-batch-index", tx.BatchIndex()).
+		Uint64("next-batch-index", nextBatchIndex).
+		Msg("encrypted transaction's batch index can be queued")
 
 	txInNextBatch := btchr.nextBatchChainState != nil && tx.BatchIndex() == nextBatchIndex
 

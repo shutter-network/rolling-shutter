@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
@@ -64,6 +63,7 @@ func (handler *decryptionKeyHandler) HandleMessage(
 	if err != nil {
 		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
 	}
+	// FIXME this seems to happen multiple times for the same epoch.
 	log.Info().Str("epoch-id", epochID.Hex()).Msg("inserted decryption key to database")
 	return []p2pmsg.Message{}, nil
 }

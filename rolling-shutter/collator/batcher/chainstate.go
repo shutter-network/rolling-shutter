@@ -70,6 +70,7 @@ func (chst *ChainState) CanApplyTx(tx *txtypes.Transaction, txSizeInBytes uint64
 		return ErrAccountNotInitialized
 	}
 
+	// FIXME this fails
 	if tx.Nonce() != chst.nonces[account] {
 		return ErrNonceMismatch
 	}

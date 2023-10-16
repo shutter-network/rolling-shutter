@@ -11,9 +11,8 @@ import (
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	txtypes "github.com/shutter-network/txtypes/types"
-
 	"github.com/shutter-network/shutter/shlib/shcrypto"
+	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
@@ -153,8 +152,9 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 			httpResponse, err = m.collatorClient.SubmitTransaction(
 				ctx,
 				client.SubmitTransactionJSONRequestBody{
+					// FIXME proper encoding
 					EncryptedTx: string(encryptedTx),
-					Epoch:       epochID.Bytes(),
+					Epoch:       string(epochID.Bytes()),
 				})
 			if err != nil {
 				return err

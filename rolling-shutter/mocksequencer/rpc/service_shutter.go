@@ -2,69 +2,61 @@ package rpc
 
 import (
 	"context"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	txtypes "github.com/shutter-network/txtypes/types"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 type ShutterService struct {
-	processor *mocksequencer.Sequencer
+	processor             Sequencer
+	batchProductionActive bool
 }
 
-var _ mocksequencer.RPCService = (*ShutterService)(nil)
+// var _ mocksequencer.RPCService = (*ShutterService)(nil)
 
-func (s *ShutterService) InjectProcessor(p *mocksequencer.Sequencer) {
+func (s *ShutterService) InjectProcessor(p Sequencer) {
 	s.processor = p
+	s.batchProductionActive = s.processor.Active()
 }
 
 func (s *ShutterService) Name() string {
 	return "shutter"
 }
 
-func (s *ShutterService) BatchIndex() hexutil.Uint64 {
-	return hexutil.Uint64(s.processor.BatchIndex)
+func (s *ShutterService) BatchIndex(ctx context.Context) (hexutil.Uint64, error) {
+	// Caching is fine here, since currently it won't become inactice again.
+	if !s.batchProductionActive {
+		s.batchProductionActive = s.processor.Active()
+		// TODO how can we define a new rpc error number?
+		return 0, errors.New("batch production has not started yet")
+	}
+	idx, err := s.processor.BatchIndex(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return hexutil.Uint64(idx), nil
 }
 
 func (s *ShutterService) GetTransactionByHash(hash common.Hash) (*txtypes.TransactionData, error) {
-	s.processor.Mux.RLock()
-	defer s.processor.Mux.RUnlock()
-
-	txID, ok := s.processor.Txs[hash]
-	if !ok {
-		// ETH JSON RPC returns "null" when not found
-		return nil, nil
-	}
-	blockHash := ethrpc.BlockNumberOrHash{BlockHash: &txID.BlockHash}
-	b, err := s.processor.GetBlock(blockHash)
-	if err != nil {
-		// this shouldn't happen
-		return nil, rpcerrors.ExtractRPCError(err)
-	}
-	tx := b.Transactions[txID.Index]
-
-	rpcTx := tx.TransactionData()
-
-	if b.Hash != (common.Hash{}) {
-		rpcTx.BlockHash = &b.Hash
-		rpcTx.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(b.Number))
-		index := uint64(txID.Index)
-		rpcTx.TransactionIndex = (*hexutil.Uint64)(&index)
-
-		//nolint:godox //this is not worth an issue at the moment
-		// TODO(ezdac) passing this as well would be nice,
-		// but it is not required due to the already passed decrypted tx.Payload
-		//
-		// This would require us to save the decryption key
-		// result.DecryptionKey = (*hexutil.Bytes)(&decryptionKey)
-	}
-	return rpcTx, nil
+	// s.processor.RLock()
+	// defer s.processor.RUnlock()
+	//
+	// txID, ok := s.processor.GetTransaction(hash)
+	// if !ok {
+	// 	// ETH JSON RPC returns "null" when not found
+	// 	return nil, nil
+	// }
+	// blockHash := ethrpc.BlockNumberOrHash{BlockHash: &txID.BlockHash}
+	//
+	// // rpcTx := tx.TransactionData()
+	//
+	// return rpcTx, nil
+	// TODO
+	return nil, nil
 }
 
 func (s *ShutterService) SubmitBatch(

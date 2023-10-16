@@ -2,155 +2,29 @@ package mocksequencer
 
 import (
 	"context"
-	"encoding/binary"
+	"encoding/json"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
+	coretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 	txtypes "github.com/shutter-network/txtypes/types"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/encoding"
 	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
-
-const (
-	BaseFee  = 22000
-	GasLimit = 2200000000
-)
-
-var coinbase = common.HexToAddress("0x0000000000000000000000000000000000000000")
-
-type BlockData struct {
-	mux            sync.Mutex
-	Hash           common.Hash
-	BaseFee        *big.Int
-	GasLimit       uint64
-	Number         uint64
-	Transactions   txtypes.Transactions
-	Nonces         map[common.Address]uint64
-	Balances       map[common.Address]*big.Int
-	gasPool        *core.GasPool
-	feeBeneficiary common.Address
-}
-
-func (b *BlockData) ApplyTx(tx *txtypes.Transaction, sender common.Address) error {
-	b.mux.Lock()
-	defer b.mux.Unlock()
-
-	//nolint:godox
-	// TODO nil checks
-
-	receiver := *tx.To()
-	nonce := b.GetNonce(sender)
-	if tx.Nonce() != nonce {
-		err := errors.New("nonce mismatch for payload transaction")
-		return rpcerrors.TransactionRejected(err)
-	}
-	balance := b.GetBalance(sender)
-
-	// deductable from the sender's account
-	gasCost := batch.CalculateGasCost(tx, b.BaseFee)
-	// add to the gasBeneficiary's account (collator)
-	priorityFee := batch.CalculatePriorityFee(tx, b.BaseFee)
-
-	if balance.Cmp(gasCost) == -1 {
-		err := errors.New("insufficient funds for gas fee")
-		return rpcerrors.TransactionRejected(err)
-	}
-
-	err := b.gasPool.SubGas(tx.Gas())
-	if err != nil {
-		return rpcerrors.TransactionRejected(core.ErrGasLimitReached)
-	}
-
-	// if this didn't error, the transaction has
-	// to be committed to the block now
-	gbBalance := b.GetBalance(b.feeBeneficiary)
-	receiverBalance := b.GetBalance(receiver)
-
-	balance = big.NewInt(0).Sub(balance, gasCost)
-	gbBalance = big.NewInt(0).Add(gbBalance, priorityFee)
-
-	// transfer the value of the transaction
-	balance = big.NewInt(0).Sub(balance, tx.Value())
-	receiverBalance = big.NewInt(0).Add(receiverBalance, tx.Value())
-
-	b.SetBalance(b.feeBeneficiary, gbBalance)
-	b.SetBalance(sender, balance)
-	b.SetBalance(receiver, receiverBalance)
-	b.SetNonce(sender, nonce+1)
-	b.Transactions = append(b.Transactions, tx)
-	return nil
-}
-
-func (b *BlockData) SetBalance(a common.Address, balance *big.Int) {
-	b.Balances[a] = balance
-}
-
-func (b *BlockData) GetBalance(a common.Address) *big.Int {
-	balance, ok := b.Balances[a]
-	if !ok {
-		return big.NewInt(0)
-	}
-	return balance
-}
-
-func (b *BlockData) SetNonce(a common.Address, nonce uint64) {
-	b.Nonces[a] = nonce
-}
-
-func (b *BlockData) GetNonce(a common.Address) uint64 {
-	nonce := b.Nonces[a]
-	return nonce
-}
-
-func CreateNextBlockData(baseFee *big.Int, gasLimit uint64, feeBeneficiary common.Address, previous *BlockData) *BlockData {
-	gasPool := core.GasPool(gasLimit)
-	bd := &BlockData{
-		mux:            sync.Mutex{},
-		Hash:           common.Hash{},
-		BaseFee:        baseFee,
-		GasLimit:       gasLimit,
-		Number:         0,
-		Transactions:   []*txtypes.Transaction{},
-		Nonces:         map[common.Address]uint64{},
-		Balances:       map[common.Address]*big.Int{},
-		gasPool:        &gasPool,
-		feeBeneficiary: feeBeneficiary,
-	}
-
-	d := crypto.NewKeccakState()
-	if previous != nil {
-		// copy the maps
-		for addr, nonce := range previous.Nonces {
-			bd.Nonces[addr] = nonce
-		}
-		for addr, balance := range previous.Balances {
-			bd.Balances[addr] = balance
-		}
-		bd.Number = previous.Number + 1
-		d.Write(previous.Hash[:])
-	}
-	// block-hash is simply the keccak256 of
-	// the byte representation of the block-number
-	buf := make([]byte, binary.MaxVarintLen64)
-	_ = binary.PutUvarint(buf, bd.Number)
-	d.Write(buf)
-	_, _ = d.Read(bd.Hash[:])
-	return bd
-}
 
 type activationBlockMap[T any] struct {
 	mux sync.RWMutex
@@ -206,23 +80,80 @@ func (a *activationBlockMap[T]) Find(block uint64) (T, error) {
 	return foundVal, nil
 }
 
+func New(
+	config *Config,
+) service.Service {
+	// TODO query from the node
+	sequencer := &Sequencer{
+		URL:              config.HTTPListenAddress,
+		Collators:        newActivationBlockMap[common.Address](),
+		EonKeys:          newActivationBlockMap[[]byte](),
+		Mux:              sync.RWMutex{},
+		l1BlockNumber:    0,
+		Config:           config,
+		sentTransactions: make(map[*common.Hash]bool),
+	}
+	return sequencer
+}
+
 type Sequencer struct {
-	URL         string
-	Collators   *activationBlockMap[common.Address]
-	EonKeys     *activationBlockMap[[]byte]
-	ChainConfig *encoding.ChainConfig
+	Mux       sync.RWMutex
+	dbpool    *pgxpool.Pool
+	contracts *deployment.Contracts
+	p2p       *p2p.P2PHandler
 
-	LatestBlock common.Hash
-	Blocks      map[common.Hash]*BlockData
-	Txs         map[common.Hash]TransactionIdentifier
-	BatchIndex  uint64
-	Signer      txtypes.Signer
+	Config           *Config
+	URL              string
+	Collators        *activationBlockMap[common.Address]
+	EonKeys          *activationBlockMap[[]byte]
+	Signer           txtypes.Signer
+	sentTransactions map[*common.Hash]bool
 
-	Mux               sync.RWMutex
-	l1BlockNumber     uint64
-	l1RPCURL          string
-	l1PollInterval    time.Duration
-	maxBlockDeviation uint64
+	L2BackendRPC    *ethrpc.Client
+	L2BackendClient *ethclient.Client
+
+	lastSequencerBatchSubmitted time.Time
+	active                      bool
+	l1BlockNumber               uint64
+}
+
+func (proc *Sequencer) Start(ctx context.Context, runner service.Runner) error {
+	var err error
+
+	// TODO we need to define / init the mocksequencer db?
+	// At least the play scripts should consider this
+	dbpool, err := pgxpool.Connect(ctx, proc.Config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
+	}
+	runner.Defer(dbpool.Close)
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
+	proc.dbpool = dbpool
+
+	// proc.p2p, err = p2p.New(proc.Config.P2P)
+	// if err != nil {
+	// 	return err
+	// }
+
+	proc.L2BackendRPC, err = ethrpc.Dial(proc.Config.L2BackendURL.String())
+	if err != nil {
+		return errors.Wrap(err, "couldn't connect to L2 backend")
+	}
+	proc.L2BackendClient = ethclient.NewClient(proc.L2BackendRPC)
+
+	contracts, err := deployment.NewContracts(proc.L2BackendClient, proc.Config.DeploymentDir)
+	if err != nil {
+		return err
+	}
+	proc.contracts = contracts
+
+	chainID, err := proc.L2BackendClient.ChainID(ctx)
+	if err != nil {
+		return err
+	}
+	proc.Signer = txtypes.NewLondonSigner(chainID)
+
+	return runner.StartService(proc.getServices()...)
 }
 
 type TransactionIdentifier struct {
@@ -230,135 +161,56 @@ type TransactionIdentifier struct {
 	Index     int
 }
 
-func New(
-	chainID *big.Int,
-	sequencerURL string,
-	l1RPCURL string,
-	l1PollInterval time.Duration,
-	maxBlockDeviation uint64,
-) *Sequencer {
-	sequencer := &Sequencer{
-		URL:       sequencerURL,
-		Collators: newActivationBlockMap[common.Address](),
-		EonKeys:   newActivationBlockMap[[]byte](),
-		ChainConfig: &encoding.ChainConfig{
-			ChainID:      chainID,
-			ShutterBlock: &big.Int{},
-		},
-		LatestBlock:       common.Hash{},
-		Blocks:            make(map[common.Hash]*BlockData),
-		Txs:               map[common.Hash]TransactionIdentifier{},
-		BatchIndex:        0,
-		Signer:            txtypes.NewLondonSigner(chainID),
-		Mux:               sync.RWMutex{},
-		l1BlockNumber:     0,
-		l1RPCURL:          l1RPCURL,
-		l1PollInterval:    l1PollInterval,
-		maxBlockDeviation: maxBlockDeviation,
-	}
-	blockData := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, coinbase, nil)
-	sequencer.setLatestBlock(blockData)
-	return sequencer
+func (proc *Sequencer) RUnlock() {
+	proc.Mux.RUnlock()
 }
 
-func (proc *Sequencer) ChainID() *big.Int {
-	return proc.ChainConfig.ChainID
+func (proc *Sequencer) RLock() {
+	proc.Mux.RLock()
 }
 
-func (proc *Sequencer) RunBackgroundTasks(ctx context.Context) <-chan error {
-	errChan := make(chan error, 1)
-	setError := func(err error) <-chan error {
-		errChan <- err
-		close(errChan)
-		return errChan
-	}
-
-	ticker := time.NewTicker(proc.l1PollInterval)
-	l1Client, err := ethclient.DialContext(ctx, proc.l1RPCURL)
-	if err != nil {
-		return setError(errors.Wrap(err, "error connecting to layer 1 JSON RPC endpoint"))
-	}
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				setError(ctx.Err())
-				return
-			case <-ticker.C:
-				newBlockNumber, err := l1Client.BlockNumber(ctx)
-				if err != nil {
-					setError(errors.Wrap(err, "error retrieving block-number from layer 1 RPC"))
-					return
-				}
-				proc.Mux.Lock()
-				if newBlockNumber > proc.l1BlockNumber {
-					proc.l1BlockNumber = newBlockNumber
-					log.Debug().Int("l1-block-number", int(newBlockNumber)).Msg("updated state from layer 1 node")
-				} else if newBlockNumber < proc.l1BlockNumber {
-					log.Warn().Int("new-l1-block-number", int(newBlockNumber)).
-						Int("cached-l1-block-number", int(proc.l1BlockNumber)).
-						Msg("l1 cache inconsistency")
-				}
-				proc.Mux.Unlock()
-			}
-		}
-	}()
-	return errChan
+func (proc *Sequencer) ChainID(ctx context.Context) (*big.Int, error) {
+	return proc.L2BackendClient.ChainID(ctx)
 }
 
-func (proc *Sequencer) GetBlock(blockNrOrHash ethrpc.BlockNumberOrHash) (block *BlockData, err error) {
-	if blockNrOrHash.BlockHash != nil {
-		var ok bool
-		block, ok = proc.Blocks[*blockNrOrHash.BlockHash]
-		if !ok {
-			return nil, errors.New("block not found")
-		}
-	} else if blockNrOrHash.BlockNumber != nil {
-		var ok bool
-		// only possible for "latest" (-1) currently
-		if *blockNrOrHash.BlockNumber != ethrpc.LatestBlockNumber {
-			return nil, errors.New("provided block number argument currently not supported")
-		}
-		block, ok = proc.Blocks[proc.LatestBlock]
-		if !ok {
-			return nil, errors.New("block not found")
-		}
-	} else {
-		err := errors.New("block argument invalid")
-		return nil, rpcerrors.ParseError(err)
-	}
-	return block, nil
+func (proc *Sequencer) Active() bool {
+	proc.RLock()
+	defer proc.RUnlock()
+	return proc.active
 }
 
-// setNextBlock sets the provided block-data as the next
-// latest-block and persist the data in the internal
-// datastructures for later retrieval.
-// The Sequencer write-lock has to held during this operation,
-// when there is potential concurrent access.
-func (proc *Sequencer) setLatestBlock(b *BlockData) {
-	proc.Blocks[b.Hash] = b
-	// make the transactions locateable by hash
-	for i, tx := range b.Transactions {
-		log.Info().Msg("added transaction")
-		proc.Txs[tx.Hash()] = TransactionIdentifier{BlockHash: b.Hash, Index: i}
-	}
-	proc.LatestBlock = b.Hash
+func (proc *Sequencer) BatchIndex(ctx context.Context) (uint64, error) {
+	return proc.L2BackendClient.BlockNumber(ctx)
 }
 
-func (proc *Sequencer) validateBatch(tx *txtypes.Transaction) (common.Address, error) {
+func (proc *Sequencer) validateBatch(ctx context.Context, tx *txtypes.Transaction) (common.Address, error) {
 	var sender common.Address
 	if tx.Type() != txtypes.BatchTxType {
 		err := errors.New("unexpected transaction type")
 		return sender, rpcerrors.ParseError(err)
 	}
+	chainId, err := proc.ChainID(ctx)
+	if err != nil {
+		err := errors.New("internal error, can't query backend chain-id")
+		return sender, rpcerrors.ParseError(err)
+	}
 
-	if tx.ChainId().Cmp(proc.ChainID()) != 0 {
+	if tx.Type() != txtypes.BatchTxType {
+		err := errors.New("unexpected transaction type")
+		return sender, rpcerrors.ParseError(err)
+	}
+
+	if tx.ChainId().Cmp(chainId) != 0 {
 		err := errors.New("chain-id mismatch")
 		return sender, rpcerrors.TransactionRejected(err)
 	}
 
-	if proc.BatchIndex != tx.BatchIndex()-1 {
+	batchIndex, err := proc.BatchIndex(ctx)
+	if err != nil {
+		err := errors.New("internal error, can't query backend block-number")
+		return sender, rpcerrors.ParseError(err)
+	}
+	if batchIndex != tx.BatchIndex()-1 {
 		err := errors.New("incorrect batch-index for next batch")
 		return sender, rpcerrors.TransactionRejected(err)
 	}
@@ -387,7 +239,6 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	batchIndex, batchL1BlockNumber uint64,
 	txBytes []byte,
 	epochSecretKey *shcrypto.EpochSecretKey,
-	pendingBlock *BlockData,
 ) error {
 	var tx txtypes.Transaction
 	err := tx.UnmarshalBinary(txBytes)
@@ -404,16 +255,25 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	}
 
 	shutterTxStr, _ := tx.MarshalJSON()
-	log.Ctx(ctx).Info().Str("signer", sender.Hex()).RawJSON("transaction", shutterTxStr).Msg("received shutter transaction")
+	log.Info().
+		Str("signer", sender.Hex()).
+		RawJSON("transaction", shutterTxStr).
+		Msg("received shutter transaction")
 
-	if tx.L1BlockNumber() != batchL1BlockNumber {
-		return errors.New("l1-block-number mismatch")
-	}
+	// NOTE: for the  proof-of-concept, remove this check.
+	// this is because we don't implemented the l1-lookahead
+	// yet, that would allow to infer the l1 block number
+	// for future batches as well
+	// if tx.L1BlockNumber() != batchL1BlockNumber {
+	// 	return errors.New("l1-block-number mismatch")
+	// }
+	_ = batchL1BlockNumber
 
 	if tx.BatchIndex() != batchIndex {
 		return errors.New("batch-index mismatch")
 	}
 
+	// FIXME {"level":"error","process":"Collator","replica":0,"message":"2023/10/13 13:48:32.996837 INF [        notify.go:63] error calling handler function error=\"invalid shutter transaction in batch: couldn't decrypt payload: can't unmarshal message: bn256: coordinate exceeds modulus\" signal=new_batchtx"}
 	payload, err := decryptPayload(tx.EncryptedPayload(), epochSecretKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't decrypt payload")
@@ -426,12 +286,99 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	}
 	shutterTx.Payload = payload
 	shutterTxWithPayload := txtypes.NewTx(shutterTx)
-
-	err = pendingBlock.ApplyTx(shutterTxWithPayload, sender)
+	err = proc.ForwardTxToL2Backend(ctx, shutterTxWithPayload, &sender)
 	if err != nil {
 		return errors.Wrap(err, "couldn't apply transaction")
 	}
 	return nil
+}
+
+func (proc *Sequencer) SendTransaction(
+	ctx context.Context,
+	tx *coretypes.Transaction,
+	from *common.Address,
+) (*common.Hash, error) {
+	var txHash *common.Hash
+	txJSON := encoding.ToTransactionJSON(tx, from)
+	mshTx, _ := json.Marshal(txJSON)
+	log.Info().RawJSON("transaction", mshTx).Msg("sending transaction to backend")
+	err := proc.L2BackendRPC.CallContext(ctx, txHash, "eth_sendTransaction", txJSON)
+	return txHash, err
+}
+
+func (proc *Sequencer) ForwardTxToL2Backend(
+	ctx context.Context,
+	tx *txtypes.Transaction,
+	sender *common.Address,
+) error {
+	decrTx := &coretypes.DynamicFeeTx{
+		ChainID:   tx.ChainId(),
+		Nonce:     tx.Nonce(),
+		GasTipCap: tx.GasTipCap(),
+		GasFeeCap: tx.GasFeeCap(),
+		Gas:       tx.Gas(),
+		To:        tx.To(),
+		Value:     tx.Value(),
+		Data:      tx.Data(),
+	}
+
+	newTx := coretypes.NewTx(decrTx)
+	err := proc.ImpersonateAccount(ctx, sender)
+	if err != nil {
+		log.Error().Err(err).Msg("error during 'impersonate'")
+	}
+	txHash, sendErr := proc.SendTransaction(ctx, newTx, sender)
+	if sendErr == nil {
+		proc.sentTransactions[txHash] = true
+	}
+	err = proc.StopImpersonateAccount(ctx, sender)
+	if err != nil {
+		log.Error().Err(err).Msg("error during 'stop impersonate'")
+	}
+	return sendErr
+}
+
+func (proc *Sequencer) ImpersonateAccount(ctx context.Context, account *common.Address) error {
+	return proc.L2BackendRPC.CallContext(ctx, nil, "hardhat_impersonateAccount", account.Hex())
+}
+
+func (proc *Sequencer) StopImpersonateAccount(ctx context.Context, account *common.Address) error {
+	return proc.L2BackendRPC.CallContext(ctx, nil, "hardhat_stopImpersonatingAccount", account.Hex())
+}
+
+func (proc *Sequencer) DisableAutomine(ctx context.Context) error {
+	// TODO enable the reverse order, so that we can also enable it again
+
+	// TODO --> we can't pass a bool as result since it is no pointer.
+	// figure out how to set the bool result, maybe with raw-Json?
+	// proc.L2BackendRPC.CallContext(ctx, status, "hardhat_getAutomine")
+	err := proc.L2BackendRPC.CallContext(ctx, nil, "evm_setAutomine", false)
+	if err != nil {
+		return err
+	}
+	err = proc.L2BackendRPC.CallContext(ctx, nil, "evm_setAutomine", false)
+	if err != nil {
+		return err
+	}
+
+	err = proc.L2BackendRPC.CallContext(ctx, nil, "evm_setIntervalMining", 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (proc *Sequencer) MineBlock(ctx context.Context) error {
+	err := proc.L2BackendRPC.CallContext(ctx, nil, "evm_mine")
+	if err != nil {
+		return errors.Wrap(err, "error during 'evm_mine' call")
+	}
+	log.Info().Msg("mined block")
+	return nil
+}
+
+func (proc *Sequencer) SetCollator(address common.Address, activationBlock uint64) {
+	proc.Collators.Set(address, activationBlock)
 }
 
 func logBatchTx(batchTx *txtypes.Transaction) {
@@ -452,8 +399,6 @@ func (proc *Sequencer) SubmitBatch(
 	ctx context.Context,
 	batchTx *txtypes.Transaction,
 ) (string, error) {
-	var gasPool core.GasPool
-
 	logBatchTx(batchTx)
 
 	proc.Mux.Lock()
@@ -463,28 +408,26 @@ func (proc *Sequencer) SubmitBatch(
 		return "", errors.New("missing argument: batch-transaction")
 	}
 
-	collator, err := proc.validateBatch(batchTx)
+	collator, err := proc.validateBatch(ctx, batchTx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to validate batch")
 	}
 
 	// marshal to JSON just for logging output
 	txStr, err2 := batchTx.MarshalJSON()
-	if err2 != nil {
-		panic(err2)
+	if err2 == nil {
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
+		} else {
+			log.Ctx(ctx).Info().RawJSON("transaction", txStr).Msg("received batch tx")
+		}
 	}
-
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
 		return "", err
 	}
 
+	// TODO query
 	currentL1Block := proc.l1BlockNumber
-	latestBlock, ok := proc.Blocks[proc.LatestBlock]
-	if !ok {
-		err := errors.New("latest block is not initialized")
-		return "", rpcerrors.InternalServerError(err)
-	}
 
 	// calculate l1-block-number deviation between collator and sequencer:
 	// delta = batch-l1-blocknumber - sequencer-l1-block-number
@@ -493,7 +436,7 @@ func (proc *Sequencer) SubmitBatch(
 		new(big.Int).SetUint64(currentL1Block),
 	)
 
-	allowedL1DeviationBig := new(big.Int).SetUint64(proc.maxBlockDeviation)
+	allowedL1DeviationBig := new(big.Int).SetUint64(proc.Config.MaxBlockDeviation)
 	if l1BlockDeviation.CmpAbs(allowedL1DeviationBig) == 1 {
 		// the deviation between batch-tx's l1-block-number and sequencer's
 		// known l1-block-number is greater than allowed:
@@ -501,17 +444,14 @@ func (proc *Sequencer) SubmitBatch(
 		log.Error().
 			Uint64("batchtx-l1-blocknum", batchTx.L1BlockNumber()).
 			Uint64("current-l1-blocknum", currentL1Block).
-			Uint64("max-block-deviation", proc.maxBlockDeviation).
+			Uint64("max-block-deviation", proc.Config.MaxBlockDeviation).
 			Msg("rejecting batchtx (block number deviation)")
 		err := errors.Errorf(
 			"the 'L1BlockNumber' deviates more than the allowed %d blocks",
-			proc.maxBlockDeviation,
+			proc.Config.MaxBlockDeviation,
 		)
 		return "", rpcerrors.TransactionRejected(err)
 	}
-
-	pendingBlock := CreateNextBlockData(big.NewInt(BaseFee), GasLimit, collator, latestBlock)
-	gasPool.AddGas(GasLimit)
 
 	epochSecretKey := &shcrypto.EpochSecretKey{}
 	err = epochSecretKey.GobDecode(batchTx.DecryptionKey())
@@ -520,6 +460,8 @@ func (proc *Sequencer) SubmitBatch(
 		return "", rpcerrors.TransactionRejected(err)
 	}
 
+	proc.lastSequencerBatchSubmitted = time.Now()
+
 	for _, shutterTx := range batchTx.Transactions() {
 		err := proc.ProcessEncryptedTx(
 			ctx,
@@ -527,7 +469,6 @@ func (proc *Sequencer) SubmitBatch(
 			batchTx.L1BlockNumber(),
 			shutterTx,
 			epochSecretKey,
-			pendingBlock,
 		)
 		if err != nil {
 			// those are conditions that the collator can check,
@@ -538,12 +479,13 @@ func (proc *Sequencer) SubmitBatch(
 		log.Info().Msg("successfully applied shutter-tx")
 	}
 
-	// commit the "state change"
-	proc.BatchIndex = batchTx.BatchIndex()
-	proc.setLatestBlock(pendingBlock)
+	log.Info().Str("signer", collator.Hex()).RawJSON("transaction", txStr).Msg("included batch transaction")
 
-	log.Ctx(ctx).Info().Str("signer", collator.Hex()).RawJSON("transaction", txStr).Msg("included batch transaction")
-	log.Ctx(ctx).Info().Str("batch", hexutil.EncodeUint64(proc.BatchIndex)).Msg("started new batch")
+	err = proc.MineBlock(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "couldn't propose batch")
+	}
+	log.Info().Uint64("batch-index", batchTx.BatchIndex()).Msg("started new batch")
 
 	return batchTx.Hash().Hex(), nil
 }

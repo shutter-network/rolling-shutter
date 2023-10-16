@@ -189,10 +189,12 @@ func NewFixtures(ctx context.Context, numSenders int, serveHTTP bool) (*Fixtures
 			return fx.L1Service.listenAndServe(errctx)
 		})
 		errgrp.Go(func() error {
+			// TODO instead of the eth-service,
+			// proxy to hardhat node
 			return fx.Sequencer.ListenAndServe(
 				errctx,
 				&rpc.AdminService{},
-				&rpc.EthService{},
+				// &rpc.EthService{},
 				&rpc.ShutterService{},
 			)
 		})

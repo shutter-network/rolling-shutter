@@ -2,21 +2,19 @@ package mocksequencer
 
 import (
 	"context"
-	"math/big"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/metadb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/rpc"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func Cmd() *cobra.Command {
@@ -29,51 +27,44 @@ func Cmd() *cobra.Command {
 		),
 		command.WithGenerateConfigSubcommand(),
 	)
+	builder.AddInitDBCommand(initDB)
 	return builder.Command()
 }
 
 func main(config *mocksequencer.Config) error {
-	if config.Debug {
-		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	log.Info().
+		Str("version", shversion.Version()).
+		Msg("starting mocksequencer")
+
+	return service.RunWithSighandler(context.Background(), mocksequencer.New(config))
+}
+
+func initDB(config *mocksequencer.Config) error {
+	ctx := context.Background()
+
+	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to database")
 	}
+	defer dbpool.Close()
 
-	log.Info().Msgf("Starting mock sequencer version %s", shversion.Version())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-termChan
-		log.Info().Str("signal", sig.String()).Msg("Received signal, shutting down")
-		cancel()
-	}()
-
-	l1PollInterval := time.Duration(config.EthereumPollInterval) * time.Second
-	sequencer := mocksequencer.New(
-		new(big.Int).SetUint64(config.ChainID),
-		config.HTTPListenAddress,
-		config.EthereumURL,
-		l1PollInterval,
-		config.MaxBlockDeviation,
-	)
-
-	services := []mocksequencer.RPCService{
-		&rpc.EthService{},
-		&rpc.ShutterService{},
-	}
-	if config.Admin {
-		services = append(services, &rpc.AdminService{})
-	}
-	log.Info().Str("listen-on", config.HTTPListenAddress).Msg("Serving JSON-RPC")
-	err := sequencer.ListenAndServe(
-		ctx,
-		services...,
-	)
-	if err == context.Canceled {
-		log.Info().Msg("Bye.")
+	// Re-use the keyper DB
+	// TODO check wether this does work OOtB
+	// XXX can't we simply connect to the collator db and read
+	// only? then we don't have to oberve the chain
+	err = kprdb.ValidateKeyperDB(ctx, dbpool)
+	if err == nil {
+		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
 		return nil
+	} else if errors.Is(err, metadb.ErrSchemaMismatch) {
+		return err
 	}
-	return err
+
+	// initialize the db
+	err = kprdb.InitDB(ctx, dbpool)
+	if err != nil {
+		return err
+	}
+	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database initialized")
+	return nil
 }

@@ -122,18 +122,6 @@ func (submitter *Submitter) createBatchTx(
 	if err != nil {
 		return err
 	}
-	// 2023/09/28 18:28:44.250838 INF [batchsubmission.go:125] created batchtx and inserted in db
-	// 	batch-tx={
-	// 	"BatchIndex":1,
-	// 	"ChainID":42,
-	// 	"DecryptionKey":"DPHFVpuf9G4GmTtv9gtrXruBYLbqRUajvqhc8PUEtOsBIK/7sbKg8YW1WsveibxLRGgkVYaa70fQdxTnaxukMg==",
-	// 	"L1BlockNumber":59,
-	// 	"Timestamp":1695911324,
-	// 	"Transactions":[],
-	// 	"r":null,
-	// 	"s":null,
-	// 	"v":null
-	// } epoch=1 num-shutter-tx=0
 	logger.Info().Interface("batch-tx", batchTx).Int("num-shutter-tx", len(txs)).Msg("created batchtx and inserted in db")
 	return nil
 }
@@ -152,19 +140,30 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 	if err != nil {
 		return err
 	}
+	// XXX is this expected to be +1 the processed batch???
 	l2BatchIndex, err := submitter.l2Client.GetBatchIndex(ctx)
 	if err != nil {
 		return err
 	}
 
+	// XXX why is this called here? to keep the "state-machine"
+	// running?
+	// -> this calls the submitBatch
 	defer submitter.collator.signals.newDecryptionKey()
 
+	// This will set the batch submitted,
+	// since the batch index did progress to this batch
 	if epoch.Uint64() <= l2BatchIndex {
 		return db.SetBatchSubmitted(ctx)
 	}
 
+	// otherwise we submit the batch
 	_, err = submitter.sequencer.SubmitBatchData(ctx, unsubmitted.Marshaled)
-	log.Info().Uint64("epoch-id", epoch.Uint64()).Err(err).Msg("submitted batch data")
+	log.Info().
+		Uint64("epoch-id", epoch.Uint64()).
+		Uint64("batch-index", l2BatchIndex).
+		Err(err).
+		Msg("submitted batch data")
 	if err != nil {
 		time.Sleep(time.Second * 5)
 	}
@@ -175,15 +174,24 @@ func (submitter *Submitter) submitBatch(ctx context.Context) error {
 	db := cltrdb.New(submitter.dbpool)
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	if err == nil {
+		// FIXME this happens for every epoch, although it was already
+		// submitted
 		log.Info().
 			Hex("unsubmitted-epoch", unsubmitted.EpochID).
 			Msg("still have an unsubmitted batch")
+		// -> this calls the submitBatchTxToSequencer,
+		// and if the blocknumber now progressed, will mark the batch
+		// submitted, return
+		// early and trigger this submitBatch again
 		submitter.collator.signals.newBatchTx()
 		return nil
 	} else if err != pgx.ErrNoRows {
 		return err
 	}
 
+	// XXX can this be lagging?
+	// then we should check wether the batch was already submitted,
+	// and trigger the function again
 	l2BatchIndex, err := submitter.l2Client.GetBatchIndex(ctx)
 	if err != nil {
 		return err

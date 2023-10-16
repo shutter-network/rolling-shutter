@@ -3,10 +3,11 @@ package collator
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/sha3"
 
@@ -36,16 +37,58 @@ func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
 
 func (srv *server) GetNextEpoch(w http.ResponseWriter, req *http.Request) {
 	db := cltrdb.New(srv.c.dbpool)
+	// TODO the get-next batch method should also
+	// take a delta, that will infer the epoch (easy)
+	// as well as the corresponding l1-block-number
+	// by calculating the estimated l1 block at the offset batch
+	//  (harder)
 	epoch, _, err := batchhandler.GetNextBatch(req.Context(), db)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err.Error())
 	}
+
+	batchOffset := 4
+	// inefficient, but for this poc okay.
+	// calculate a batch in the near future so that we don't miss it
+	for i := 0; i < batchOffset; i++ {
+		epoch, err = batchhandler.ComputeNextEpochID(epoch)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, err.Error())
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(oapi.NextEpoch{
-		Id: epoch.Bytes(),
+		Id:    epoch.Bytes(),
+		Batch: epoch.Uint64(),
+		// NOTE: for this proof-of-concept, the check in the mocksequencer
+		// is disabled, this means we just have to
+		// use the block-number for the current collator.
+		// We'll only have 1 collator with start-block at 0,
+		// so this is ok.
+		L1BlockNumber: 0,
 	})
 }
 
+// transaction={
+// "batchIndex":"0x1c",
+// "chainId":"0x1",
+// "decryptionKey":"0x0b0ea77e9515f14d1639ea8c0c144b2ce23de11f0e699c7ad9fe6075c81c1a1814ff468980d90a62408befdfc223c234f79c1405b60efe97127991d7a28a0832",
+// "from":null,
+// "gas":null,
+// "gasPrice":null,
+// "hash":"0x196c6bf217baab42631c7e88e18cfa1c9224bc9d47fcca1d2ce57d7674ad0fba",
+// "input":null,
+// "l1BlockNumber":"0x105989c",
+// "nonce":null,
+// "r":"0x8e41fc3d7e37a5e2d4ff4a9264e568b4202740ce0dc559842716fe8e66d84362",
+// "s":"0x243cebd4f25d2decfb3ab396548f5a92f980146ef0f4b6ef7ab9d8af650cbb23",
+// "timestamp":"0x651fd38b",
+// "to":null,
+// "type":"0x5a",
+// "v":"0x1",
+// "value":null
+// }
 func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 	// FIXME undefined
 	var x oapi.SubmitTransactionJSONBody
@@ -56,16 +99,25 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 
 	bytesTx, err := hexutil.Decode(x.EncryptedTx)
 	if err != nil {
+		err = errors.Wrap(err, "failed to decode encrypted-tx")
 		log.Info().Err(err).Msg("=========FAILED============")
-		sendError(w, http.StatusBadRequest, "Error converting hex to bytes")
+		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	ctx := r.Context()
 
+	epoch, err := hexutil.Decode(x.Epoch)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode epoch")
+		log.Info().Err(err).Msg("=========FAILED============")
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	hash := sha3.New256()
-	fmt.Fprintf(hash, "%d\n", len(x.Epoch))
-	hash.Write(x.Epoch)
+	fmt.Fprintf(hash, "%d\n", len(epoch))
+	hash.Write(epoch)
 	hash.Write(bytesTx)
 	txid := hash.Sum(nil)
 
@@ -81,6 +133,7 @@ func (srv *server) SubmitTransaction(w http.ResponseWriter, r *http.Request) {
 
 	err = srv.c.batcher.EnqueueTx(ctx, bytesTx)
 	if err != nil {
+		err = errors.Wrap(err, "could not enqueue encrypted transaction")
 		log.Error().Err(err).Msg("Error in SubmitTransaction")
 		sendError(w, http.StatusConflict, err.Error())
 		return

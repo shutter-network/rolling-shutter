@@ -1,24 +1,18 @@
 package rpc
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/encoding"
-	rpcerrors "github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/errors"
 )
 
 type AdminService struct {
-	processor *mocksequencer.Sequencer
+	processor Sequencer
 }
 
-var _ mocksequencer.RPCService = (*AdminService)(nil)
+var _ RPCService = (*AdminService)(nil)
 
-func (s *AdminService) InjectProcessor(p *mocksequencer.Sequencer) {
+func (s *AdminService) InjectProcessor(p Sequencer) {
 	s.processor = p
 }
 
@@ -36,45 +30,6 @@ func (s *AdminService) AddCollator(address string, l1BlockNumber uint64) (int, e
 	if err != nil {
 		return 0, err
 	}
-	s.processor.Collators.Set(collator, l1BlockNumber)
-	return 1, nil
-}
-
-func (s *AdminService) SetNonce(address common.Address, nonce *hexutil.Uint64) (int, error) {
-	s.processor.Mux.Lock()
-	defer s.processor.Mux.Unlock()
-
-	blockHash := ethrpc.BlockNumberOrHash{BlockHash: &s.processor.LatestBlock}
-	b, err := s.processor.GetBlock(blockHash)
-	if err != nil {
-		// this shouldn't happen
-		return 0, rpcerrors.ExtractRPCError(err)
-	}
-
-	b.SetNonce(address, uint64(*nonce))
-	return 1, nil
-}
-
-func (s *AdminService) SetBalance(address common.Address, balance *hexutil.Big) (int, error) {
-	s.processor.Mux.Lock()
-	defer s.processor.Mux.Unlock()
-
-	blockHash := ethrpc.BlockNumberOrHash{BlockHash: &s.processor.LatestBlock}
-	b, err := s.processor.GetBlock(blockHash)
-	if err != nil {
-		// this shouldn't happen
-		return 0, rpcerrors.ExtractRPCError(err)
-	}
-	b.SetBalance(address, balance.ToInt())
-	return 1, nil
-}
-
-func (s *AdminService) AddEonKey(eonKey string, l1BlockNumber uint64) (int, error) {
-	eonKeyBytes, err := hexutil.Decode(eonKey)
-	if err != nil {
-		err = errors.Wrap(err, "eon key could not be decoded")
-		return 0, err
-	}
-	s.processor.EonKeys.Set(eonKeyBytes, l1BlockNumber)
+	s.processor.SetCollator(collator, l1BlockNumber)
 	return 1, nil
 }

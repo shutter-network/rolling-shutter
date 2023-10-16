@@ -35,13 +35,15 @@ type Error struct {
 
 // NextEpoch defines model for NextEpoch.
 type NextEpoch struct {
-	Id []byte `json:"id"`
+	Batch         uint64 `json:"batch"`
+	Id            []byte `json:"id"`
+	L1BlockNumber uint64 `json:"l1BlockNumber"`
 }
 
 // Transaction defines model for Transaction.
 type Transaction struct {
 	EncryptedTx string `json:"encrypted_tx"`
-	Epoch       []byte `json:"epoch"`
+	Epoch       string `json:"epoch"`
 }
 
 // TransactionId defines model for TransactionId.

@@ -20,7 +20,6 @@ func New() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Ethereum = configuration.NewEthnodeConfig()
-	c.EpochDuration = &enctime.Duration{}
 }
 
 type Config struct {

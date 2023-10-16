@@ -18,7 +18,7 @@
 ;; use the "layer 1" ethereum node for the contracts
 (def ^:private contracts-rpc-port ethereum-rpc-port)
 (def ^:private sequencer-rpc-port 8555)
-(def ^:private default-loglevel "debug")
+(def ^:private default-loglevel "info")
 
 (def ^:dynamic *cwd* (str (fs/normalize (fs/absolutize "."))))
 
@@ -265,7 +265,9 @@
                :loglevel nil
                :cfgfile "mocksequencer.toml"
                :listening-port sequencer-rpc-port
-               :toml-edits {"EthereumURL" (format "http://localhost:%d" ethereum-rpc-port)
+               :toml-edits {
+                            "DatabaseURL" (format "postgres:///collator")
+                            "EthereumURL" (format "http://localhost:%d" ethereum-rpc-port)
                             "ContractsURL" (format "http://localhost:%d" contracts-rpc-port)
                             "HTTPListenAddress" (format ":%d" sequencer-rpc-port)}})
 

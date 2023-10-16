@@ -94,7 +94,7 @@ components:
       properties:
         epoch:
           type: string
-          format: byte
+          format: string
         encrypted_tx:
           type: string
           format: string
@@ -110,10 +110,18 @@ components:
       type: object
       required:
         - id
+        - batch
+        - l1BlockNumber
       properties:
         id:
           type: string
           format: byte
+        batch:
+          type: integer
+          format: uint64
+        l1BlockNumber:
+          type: integer
+          format: uint64
     Eon:
       type: object
       required:

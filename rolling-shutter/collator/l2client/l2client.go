@@ -23,7 +23,6 @@ func GetBatchIndex(ctx context.Context, l2Client *rpc.Client) (uint64, error) {
 		log.Debug().Err(err).Str("result", result).Msg("polling batch-index from sequencer")
 		return result, err
 	}
-
 	result, err := retry.FunctionCall(ctx, f)
 	if err != nil {
 		return blockNumber, errors.Wrapf(err, "can't retrieve batch-index from sequencer")
