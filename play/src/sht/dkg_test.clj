@@ -507,13 +507,60 @@
                    {:check :keyper/ordered-eons-match
                     :keyper/num keyper
                     :keyper/ordered-eons [1201 1202]}])]})
+
+(defn test-keypers-dkg-with-external
+  [{:keys [num-keypers] :as conf}]
+  {:test/id :keyper-dkg-external
+   :test/conf conf
+   :test/description "distributed key generation with external keyper should work"
+   :test/steps [{:run :init/init
+                 :init/conf conf}
+                (for [keyper (range num-keypers 1)]
+                  {:check :keyper/meta-inf
+                   :keyper-num keyper})
+
+                (build/run-chain)
+                (build/run-node conf)
+                (build/run-p2pnodes conf)
+                (mapv build/run-keyper (range (- num-keypers 1)))
+                (build/run-external-command num-keypers)
+
+                {:run :process/run
+                 :process/id :boot
+                 :process/cmd '[bb boot]
+                 :process/wait true}
+
+                {:check :loop/until
+                 :loop/description "eon should exist for all keypers"
+                 :loop/timeout-ms (* 60 1000)
+                 :loop/checks (for [keyper (range (- num-keypers 1))]
+                                {:check :keyper/eon-exists
+                                 :keyper/num keyper
+                                 :keyper/eon 1})}
+
+                {:check :loop/until
+                 :loop/description "all keypers should succeed with the dkg process"
+                 :loop/timeout-ms (* 60 1000)
+                 :loop/checks (for [keyper (range (- num-keypers 1))]
+                                {:check :keyper/dkg-success
+                                 :keyper/eon 1
+                                 :keyper/num keyper})}
+
+                (for [keyper (range (- num-keypers 1))]
+                  [{:check :keyper/non-zero-activation-block
+                    :keyper/num keyper}
+                   {:check :keyper/ordered-eons-match
+                    :keyper/num keyper
+                    :keyper/ordered-eons [1]}])]})
+
 (defn generate-tests
   []
   (concat
    [(test-change-keyper-set)]
    (for [conf [{:num-keypers 3, :num-bootstrappers 2, :threshold 2}]
          f [test-keypers-dkg-generation
-            test-dkg-keypers-join-late]]
+            test-dkg-keypers-join-late
+            test-keypers-dkg-with-external]]
      (f conf))))
 
 (def tests (delay (generate-tests)))

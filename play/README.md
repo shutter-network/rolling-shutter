@@ -16,6 +16,12 @@ export ROLLING_SHUTTER_BOOTSTRAP_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db041
 export ROLLING_SHUTTER_CHAIN_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
 ```
 
+## prepare psql (via docker)
+
+```
+docker run --rm -it -e POSTGRES_USER=$(whoami) -e POSTGRES_PASSWORD=password -e POSTGRES_DB=testdb -v /tmp:/tmp --net=host -v /tmp/projectdir:/home/circleci/project -v /tmp/datadir:/var/lib/postgresql/data cimg/postgres:13.9
+```
+
 ## keyper only test setup
 
 1. bb init; bb chain
@@ -49,3 +55,64 @@ Run `bb test-system`.
 
 Run `bb nitro` to start an arbitrum nitro test setup. This requires docker and
 docker-compose to be installed.
+
+## Running third party clients in a test
+
+There is an example test task `keyper-dkg-external`, that shows how a third
+party client can be addressed.
+
+Instead of three `keyper` instances, it starts only two and one external
+executable. That external executable can be defined with `BB_EXTERNAL_COMMAND`.
+For convenience, there is also the optional `BB_EXTERNAL_WD`, to manipulate the
+working directory of the external call.
+
+As an example, here is how one of the three original test keypers can be called
+manually:
+
+```
+BB_EXTERNAL_WD="$(pwd)" BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" clojure -M:test keyper-dkg-external
+```
+
+### Parameters in the environment
+
+You can find the test system parameters in the environment of the
+`BB_EXTERNAL_COMMAND`, e.g.:
+
+```
+# run "/bin/sh -c env" as external command to dump the environment:
+BB_EXTERNAL_COMMAND="/bin/sh -c env" clojure -M:test keyper-dkg-external
+...
+# find the values in the test log:
+cat work/keyper-dkg-external/logs/keyper-external-*|grep KPR
+KPR_P2P_PORT=23102
+KPR_DKG_PHASE_LENGTH=8
+KPR_ENVIRONMENT=local
+KPR_ETHEREUM_URL=http://127.0.0.1:8545/
+KPR_DKG_START_BLOCK_DELTA=5
+KPR_HTTP_LISTEN_ADDRESS=:24003
+KPR_CONTRACTS_URL=http://127.0.0.1:8545/
+KPR_LISTEN_ADDRESSES=/ip4/127.0.0.1/tcp/23102
+```
+
+Here you see, that the keyper implementation under tests, should use port
+`23102` for its `p2p` connection, the ethereum node is running at
+`http://127.0.0.1:8545/` etc. Not all of these may be relevant to your
+implementation.
+
+### Self contained testrunner
+
+It is possible to compile the testrunner into a self contained `.jar` file, by
+running
+
+```
+clojure -T:build
+```
+
+If you have such a `sht-standalone.jar` you can run the above test (without the
+need to install clojure), by calling
+
+```
+BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" java -jar sht-standalone.jar -M:test keyper-dkg-external
+```
+
+(The `circleci` integration tests make use of this.)
