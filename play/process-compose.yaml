@@ -1,0 +1,118 @@
+version: "0.5"
+
+environment:
+  # - 'HARDHAT_INFURA_KEY="7288d2a3ed854a279c71b4bcd1c5dce6"'
+  # - 'ROLLING_SHUTTER_LOGLEVEL="info"'
+  # - 'ROLLING_SHUTTER_TESTDB_URL="postgresql://localhost:5432/postgres"'
+  # - "ROLLING_SHUTTER_ROOT=${PWD}/.."
+  # - "ROLLING_SHUTTER_BOOTSTRAP_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad"
+  # - "ROLLING_SHUTTER_CHAIN_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e"
+  - "PG_USER=postgres"
+  - "NOCOLOR=1"
+log_location: process-run/logs/output.log
+log_level: debug
+log_configuration:
+  no_color: true
+
+processes:
+  # "pg_isready", "-d", "db_prod"]
+  Postgres:
+    command: "pg_ctl -D process-run/db/ -l logfile start"
+    is_daemon: true
+    shutdown:
+      command: "pg_ctl -D process-run/db/ stop"
+      timeout_seconds: 10 # default 10
+      signal: 15 # default 15, but only if command is not defined or empty
+    readiness_probe:
+      exec:
+        command: "pg_isready"
+      initial_delay_seconds: 5
+      period_seconds: 30
+      timeout_seconds: 60
+      success_threshold: 1
+      failure_threshold: 2
+  Init:
+    command: "bb init"
+    depends_on:
+      Postgres:
+        condition: process_healthy
+  Chain:
+    command: "bb chain"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+  Node:
+    command: "bb node"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+    readiness_probe:
+      exec:
+        command: >
+          curl -sSf -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" --data-raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[], "id": 1}'
+      initial_delay_seconds: 20
+      period_seconds: 10
+      timeout_seconds: 30
+      success_threshold: 1
+      failure_threshold: 5
+  BootChain:
+    command: "bb boot"
+    depends_on:
+      Sequencer:
+        condition: process_healthy
+  Sequencer:
+    command: "bb sequencer"
+    readiness_probe:
+      exec:
+        command: >
+          curl -sSf -X POST http://127.0.0.1:8555 -H "Content-Type: application/json" --data-raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[], "id": 1}'
+      initial_delay_seconds: 30
+      period_seconds: 10
+      timeout_seconds: 30
+      success_threshold: 1
+      failure_threshold: 5
+    depends_on:
+      Node:
+        condition: process_healthy
+  SequencerAddCollator:
+    command: "bash add-collator.sh"
+    depends_on:
+      Sequencer:
+        condition: process_healthy
+  Bootnode:
+    command: "bb p2p 0"
+    depends_on:
+      Node:
+        condition: process_healthy
+  Collator:
+    command: "bb collator"
+    depends_on:
+      Sequencer:
+        condition: process_healthy
+  Keyper-0:
+    command: "bb k 0"
+    depends_on:
+      Sequencer:
+        condition: process_healthy
+  Keyper-1:
+    command: "bb k 1"
+    depends_on:
+      # Node:
+      #   condition: process_healthy
+      # Postgres:
+      #   condition: process_healthy
+      # Collator:
+      #   condition: process_started
+      Sequencer:
+        condition: process_healthy
+  Keyper-2:
+    command: "bb k 2"
+    depends_on:
+      # Node:
+      #   condition: process_healthy
+      # Postgres:
+      #   condition: process_healthy
+      # Collator:
+      #   condition: process_started
+      Sequencer:
+        condition: process_healthy
