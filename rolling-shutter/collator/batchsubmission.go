@@ -158,6 +158,7 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 	}
 
 	// otherwise we submit the batch
+	// FIXME method handler crashed
 	_, err = submitter.sequencer.SubmitBatchData(ctx, unsubmitted.Marshaled)
 	log.Info().
 		Uint64("epoch-id", epoch.Uint64()).

@@ -77,19 +77,25 @@ func (proc *Sequencer) pollTransactionReceipts(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			proc.RLock()
+			deleteHashes := []common.Hash{}
+			proc.sentTransactionsLock.RLock()
 			for hsh := range proc.sentTransactions {
-				rcpt, err := client.TransactionReceipt(ctx, *hsh)
+				rcpt, err := client.TransactionReceipt(ctx, hsh)
 				if err != nil {
 					log.Warn().Err(err).Msg("error while polling transaction receipt")
 				}
 				if rcpt != nil {
 					rcptJSON, _ := json.Marshal(rcpt)
 					log.Info().Str("transaction-hash", hsh.Hex()).RawJSON("receipt", rcptJSON).Msg("got transaction receipt")
-					delete(proc.sentTransactions, hsh)
+					deleteHashes = append(deleteHashes, hsh)
 				}
 			}
-			proc.RUnlock()
+			proc.sentTransactionsLock.RUnlock()
+			proc.sentTransactionsLock.Lock()
+			for _, hsh := range deleteHashes {
+				delete(proc.sentTransactions, hsh)
+			}
+			proc.sentTransactionsLock.Unlock()
 		}
 	}
 }

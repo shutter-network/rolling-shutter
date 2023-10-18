@@ -14,6 +14,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 	txtypes "github.com/shutter-network/txtypes/types"
@@ -85,13 +86,14 @@ func New(
 ) service.Service {
 	// TODO query from the node
 	sequencer := &Sequencer{
-		URL:              config.HTTPListenAddress,
-		Collators:        newActivationBlockMap[common.Address](),
-		EonKeys:          newActivationBlockMap[[]byte](),
-		Mux:              sync.RWMutex{},
-		l1BlockNumber:    0,
-		Config:           config,
-		sentTransactions: make(map[*common.Hash]bool),
+		URL:                  config.HTTPListenAddress,
+		Collators:            newActivationBlockMap[common.Address](),
+		EonKeys:              newActivationBlockMap[[]byte](),
+		Mux:                  sync.RWMutex{},
+		l1BlockNumber:        0,
+		Config:               config,
+		sentTransactions:     make(map[common.Hash]bool),
+		sentTransactionsLock: sync.RWMutex{},
 	}
 	return sequencer
 }
@@ -102,12 +104,13 @@ type Sequencer struct {
 	contracts *deployment.Contracts
 	p2p       *p2p.P2PHandler
 
-	Config           *Config
-	URL              string
-	Collators        *activationBlockMap[common.Address]
-	EonKeys          *activationBlockMap[[]byte]
-	Signer           txtypes.Signer
-	sentTransactions map[*common.Hash]bool
+	Config               *Config
+	URL                  string
+	Collators            *activationBlockMap[common.Address]
+	EonKeys              *activationBlockMap[[]byte]
+	Signer               txtypes.Signer
+	sentTransactions     map[common.Hash]bool
+	sentTransactionsLock sync.RWMutex
 
 	L2BackendRPC    *ethrpc.Client
 	L2BackendClient *ethclient.Client
@@ -254,11 +257,7 @@ func (proc *Sequencer) ProcessEncryptedTx(
 		return errors.New("sender not recoverable")
 	}
 
-	shutterTxStr, _ := tx.MarshalJSON()
-	log.Info().
-		Str("signer", sender.Hex()).
-		RawJSON("transaction", shutterTxStr).
-		Msg("received shutter transaction")
+	logEncryptedShutterTx(&tx)
 
 	// NOTE: for the  proof-of-concept, remove this check.
 	// this is because we don't implemented the l1-lookahead
@@ -273,7 +272,6 @@ func (proc *Sequencer) ProcessEncryptedTx(
 		return errors.New("batch-index mismatch")
 	}
 
-	// FIXME {"level":"error","process":"Collator","replica":0,"message":"2023/10/13 13:48:32.996837 INF [        notify.go:63] error calling handler function error=\"invalid shutter transaction in batch: couldn't decrypt payload: can't unmarshal message: bn256: coordinate exceeds modulus\" signal=new_batchtx"}
 	payload, err := decryptPayload(tx.EncryptedPayload(), epochSecretKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't decrypt payload")
@@ -286,6 +284,7 @@ func (proc *Sequencer) ProcessEncryptedTx(
 	}
 	shutterTx.Payload = payload
 	shutterTxWithPayload := txtypes.NewTx(shutterTx)
+	logDecryptedShutterTx(shutterTxWithPayload, shutterTx.Payload)
 	err = proc.ForwardTxToL2Backend(ctx, shutterTxWithPayload, &sender)
 	if err != nil {
 		return errors.Wrap(err, "couldn't apply transaction")
@@ -302,7 +301,7 @@ func (proc *Sequencer) SendTransaction(
 	txJSON := encoding.ToTransactionJSON(tx, from)
 	mshTx, _ := json.Marshal(txJSON)
 	log.Info().RawJSON("transaction", mshTx).Msg("sending transaction to backend")
-	err := proc.L2BackendRPC.CallContext(ctx, txHash, "eth_sendTransaction", txJSON)
+	err := proc.L2BackendRPC.CallContext(ctx, &txHash, "eth_sendTransaction", txJSON)
 	return txHash, err
 }
 
@@ -328,8 +327,12 @@ func (proc *Sequencer) ForwardTxToL2Backend(
 		log.Error().Err(err).Msg("error during 'impersonate'")
 	}
 	txHash, sendErr := proc.SendTransaction(ctx, newTx, sender)
+	// XXX somewhere here the handler once crashed,
+	// during receiving the first transaction
 	if sendErr == nil {
-		proc.sentTransactions[txHash] = true
+		proc.sentTransactionsLock.Lock()
+		proc.sentTransactions[*txHash] = true
+		proc.sentTransactionsLock.Unlock()
 	}
 	err = proc.StopImpersonateAccount(ctx, sender)
 	if err != nil {
@@ -395,6 +398,36 @@ func logBatchTx(batchTx *txtypes.Transaction) {
 		Msg("received encrypted shutter transactions in batch")
 }
 
+func logEncryptedShutterTx(tx *txtypes.Transaction) {
+	log.Info().
+		Uint64("chain-id", tx.ChainId().Uint64()).
+		Uint64("nonce", tx.Nonce()).
+		Uint64("gas-tip-cap", tx.GasTipCap().Uint64()).
+		Uint64("gas-fee-cap", tx.GasFeeCap().Uint64()).
+		Uint64("gas", tx.Gas()).
+		Uint64("l1-block-number", tx.L1BlockNumber()).
+		Uint64("batch-index", tx.BatchIndex()).
+		Str("encrypted-payload", common.Bytes2Hex(tx.EncryptedPayload())).
+		Msg("received encrypted shutter transaction")
+}
+
+func logDecryptedShutterTx(tx *txtypes.Transaction, payload *txtypes.ShutterPayload) {
+	payloadEvent := zerolog.Dict().
+		Str("to", payload.To.Hex()).
+		Str("data", common.Bytes2Hex(payload.Data)).
+		Str("value", payload.Value.String())
+	log.Info().
+		Uint64("chain-id", tx.ChainId().Uint64()).
+		Uint64("nonce", tx.Nonce()).
+		Uint64("gas-tip-cap", tx.GasTipCap().Uint64()).
+		Uint64("gas-fee-cap", tx.GasFeeCap().Uint64()).
+		Uint64("gas", tx.Gas()).
+		Uint64("l1-block-number", tx.L1BlockNumber()).
+		Uint64("batch-index", tx.BatchIndex()).
+		Dict("decrypted-payload", payloadEvent).
+		Msg("successfully decrypted shutter transaction")
+}
+
 func (proc *Sequencer) SubmitBatch(
 	ctx context.Context,
 	batchTx *txtypes.Transaction,
@@ -417,9 +450,9 @@ func (proc *Sequencer) SubmitBatch(
 	txStr, err2 := batchTx.MarshalJSON()
 	if err2 == nil {
 		if err != nil {
-			log.Ctx(ctx).Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
+			log.Error().Err(err).RawJSON("transaction", txStr).Msg("received invalid batch transaction")
 		} else {
-			log.Ctx(ctx).Info().RawJSON("transaction", txStr).Msg("received batch tx")
+			log.Info().RawJSON("transaction", txStr).Msg("received batch tx")
 		}
 	}
 	if err != nil {

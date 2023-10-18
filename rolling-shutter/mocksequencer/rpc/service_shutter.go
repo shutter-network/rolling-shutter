@@ -59,6 +59,8 @@ func (s *ShutterService) GetTransactionByHash(hash common.Hash) (*txtypes.Transa
 	return nil, nil
 }
 
+// FIXME this seemed to have crashed.
+// How to find out when?
 func (s *ShutterService) SubmitBatch(
 	ctx context.Context,
 	batchTransaction string,
