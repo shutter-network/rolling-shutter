@@ -84,7 +84,7 @@ install-oapi-codegen: ${GOPATH}/bin/oapi-codegen
 
 # non code generation tools
 install-golangci-lint:
-	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 
 install-gofumpt:
 	${GO} install mvdan.cc/gofumpt@latest
