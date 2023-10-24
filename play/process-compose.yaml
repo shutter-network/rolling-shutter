@@ -1,0 +1,26 @@
+version: "0.5"
+
+environment:
+  - "PG_USER=postgres"
+  - "NOCOLOR=1"
+log_location: work/run/output.log
+log_level: debug
+log_configuration:
+  no_color: true
+
+processes:
+  Postgres:
+    command: "pg_ctl -D work/db/ -l work/db/logfile start"
+    is_daemon: true
+    shutdown:
+      command: "pg_ctl -D work/db/ stop"
+      timeout_seconds: 10 # default 10
+      signal: 15 # default 15, but only if command is not defined or empty
+    readiness_probe:
+      exec:
+        command: "pg_isready"
+      initial_delay_seconds: 5
+      period_seconds: 30
+      timeout_seconds: 60
+      success_threshold: 1
+      failure_threshold: 2
