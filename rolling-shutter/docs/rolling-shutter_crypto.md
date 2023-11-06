@@ -5,7 +5,8 @@ CLI tool to access crypto functions
 ### Synopsis
 
 This command provides utility functions to manually encrypt messages with an eon
-key, decrypt them with a decryption key, and check that a decryption key is correct.
+key, decrypt them with a decryption key, and check that a decryption key is correct. It also hosts
+a tool to generate and run crypto tests in a JSON formatted collection.
 
 ### Options
 
@@ -27,5 +28,7 @@ key, decrypt them with a decryption key, and check that a decryption key is corr
 * [rolling-shutter crypto aggregate](rolling-shutter_crypto_aggregate.md)	 - Aggregate key shares to construct a decryption key
 * [rolling-shutter crypto decrypt](rolling-shutter_crypto_decrypt.md)	 - Decrypt the message given as positional argument
 * [rolling-shutter crypto encrypt](rolling-shutter_crypto_encrypt.md)	 - Encrypt the message given as positional argument
+* [rolling-shutter crypto jsontests](rolling-shutter_crypto_jsontests.md)	 - Use testdata in json format to test crypto implementations
+* [rolling-shutter crypto testdata](rolling-shutter_crypto_testdata.md)	 - Generate testdata in json format to test crypto implementations
 * [rolling-shutter crypto verify-key](rolling-shutter_crypto_verify-key.md)	 - Check that the decryption key given as positional argument is correct
 
