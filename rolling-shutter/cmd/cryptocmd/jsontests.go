@@ -38,10 +38,10 @@ func GenerateTestdata() *cobra.Command {
 			}
 
 			enc := &testEncoder{
-				w: w,
-				e: 1,
-				d: 1,
-				v: 1,
+				w:         w,
+				etCounter: 1,
+				dtCounter: 1,
+				vtCounter: 1,
 			}
 			enc.start()
 			CreateJSONTests(*enc)
@@ -72,25 +72,25 @@ func RunJSONTests() *cobra.Command {
 }
 
 type testEncoder struct {
-	w io.Writer
-	i int
-	e int
-	d int
-	v int
+	w         io.Writer
+	idCounter int
+	etCounter int
+	dtCounter int
+	vtCounter int
 }
 
 func (enc *testEncoder) addTest(tc *testCase) {
-	tc.ID = fmt.Sprint(enc.i)
+	tc.ID = fmt.Sprint(enc.idCounter)
 	switch tc.TestType {
-	case ENCRYPTION:
-		tc.Name = fmt.Sprintf("%s %d", ENCRYPTION, enc.e)
-		enc.e++
-	case DECRYPTION:
-		tc.Name = fmt.Sprintf("%s %d", DECRYPTION, enc.d)
-		enc.d++
-	case VERIFICATION:
-		tc.Name = fmt.Sprintf("%s %d", VERIFICATION, enc.v)
-		enc.v++
+	case encryption:
+		tc.Name = fmt.Sprintf("%s %d", encryption, enc.etCounter)
+		enc.etCounter++
+	case decryption:
+		tc.Name = fmt.Sprintf("%s %d", decryption, enc.dtCounter)
+		enc.dtCounter++
+	case verification:
+		tc.Name = fmt.Sprintf("%s %d", verification, enc.vtCounter)
+		enc.vtCounter++
 	default:
 		panic(fmt.Errorf("unknown test type"))
 	}
@@ -102,16 +102,22 @@ func (enc *testEncoder) addTest(tc *testCase) {
 	}
 
 	var buf bytes.Buffer
-	if enc.i > 0 {
-		buf.WriteString(",\n")
+	if enc.idCounter > 0 {
+		if _, err := buf.WriteString(",\n"); err != nil {
+			panic(err)
+		}
 	}
-	buf.WriteString(indent)
-	buf.Write(encoded)
+	if _, err := buf.WriteString(indent); err != nil {
+		panic(err)
+	}
+	if _, err := buf.Write(encoded); err != nil {
+		panic(err)
+	}
 	if _, err := buf.WriteTo(enc.w); err != nil {
 		panic(err)
 	}
 
-	enc.i++
+	enc.idCounter++
 }
 
 func (enc *testEncoder) start() {
@@ -149,11 +155,11 @@ func (tc *testCase) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch tc.TestType {
-	case ENCRYPTION:
+	case encryption:
 		tc.Test = new(encryptionTest)
-	case DECRYPTION:
+	case decryption:
 		tc.Test = new(decryptionTest)
-	case VERIFICATION:
+	case verification:
 		tc.Test = new(verificationTest)
 	default:
 		return fmt.Errorf("invalid test type %q", tc.Test)
@@ -169,9 +175,9 @@ func (tc *testCase) UnmarshalJSON(b []byte) error {
 }
 
 const (
-	ENCRYPTION   = "encryption"
-	DECRYPTION   = "decryption"
-	VERIFICATION = "verification"
+	encryption   = "encryption"
+	decryption   = "decryption"
+	verification = "verification"
 )
 
 type encryptionTest struct {
@@ -234,11 +240,11 @@ func ReadTestcases(filename string) []error {
 }
 
 const (
-	RANDOM       = "random"
-	FIXED        = "fixed"
-	TAMPERED     = "tampered"
-	VERIFYING    = "verifying"
-	NONVERIFYING = "nonverifying"
+	random       = "random"
+	fixed        = "fixed"
+	tampered     = "tampered"
+	verifying    = "verifying"
+	nonVerifying = "nonverifying"
 )
 
 var testSpecs = []struct {
@@ -249,62 +255,62 @@ var testSpecs = []struct {
 	{
 		"A zero byte message.",
 		make([]byte, 0),
-		RANDOM,
+		random,
 	},
 	{
 		"A 1 byte message.",
 		make([]byte, 1),
-		RANDOM,
+		random,
 	},
 	{
 		"A 31 byte message.",
 		make([]byte, 31),
-		RANDOM,
+		random,
 	},
 	{
 		"A 32 byte message.",
 		make([]byte, 32),
-		RANDOM,
+		random,
 	},
 	{
 		"A 33 byte message.",
 		make([]byte, 33),
-		RANDOM,
+		random,
 	},
 	{
 		"A 319 byte message.",
 		make([]byte, 319),
-		RANDOM,
+		random,
 	},
 	{
 		"A 320 byte message.",
 		make([]byte, 320),
-		RANDOM,
+		random,
 	},
 	{
 		"A 321 byte message.",
 		make([]byte, 321),
-		RANDOM,
+		random,
 	},
 	{
 		"The message 'A message'",
 		[]byte("A message"),
-		FIXED,
-	}, /*
-		{
-			"An illegal modification of the encrypted message 'A message'",
-			[]byte("A message"),
-			TAMPERED,
-		},*/
+		fixed,
+	},
+	/*{
+		"An illegal modification of the encrypted message 'A message'",
+		[]byte("A message"),
+		tampered,
+	},*/
 	{
 		"Verification of a random 32 byte epochID",
 		make([]byte, 32),
-		VERIFYING,
+		verifying,
 	},
 	{
 		"A failed verification",
 		make([]byte, 32),
-		NONVERIFYING,
+		nonVerifying,
 	},
 }
 
@@ -315,9 +321,9 @@ func CreateJSONTests(enc testEncoder) {
 		testSpec := testSpecs[i]
 
 		switch testSpec.style {
-		case RANDOM, FIXED:
+		case random, fixed:
 
-			if testSpec.style == RANDOM {
+			if testSpec.style == random {
 				_, err = rand.Read(testSpec.payload)
 			}
 			if err != nil {
@@ -330,7 +336,7 @@ func CreateJSONTests(enc testEncoder) {
 			testcase := testCase{
 				testCaseMeta: testCaseMeta{
 					Description: testSpec.description,
-					TestType:    ENCRYPTION,
+					TestType:    encryption,
 				},
 				Test: et,
 			}
@@ -343,7 +349,7 @@ func CreateJSONTests(enc testEncoder) {
 			testcase = testCase{
 				testCaseMeta: testCaseMeta{
 					Description: testSpec.description,
-					TestType:    DECRYPTION,
+					TestType:    decryption,
 				},
 				Test: &dt,
 			}
@@ -353,7 +359,7 @@ func CreateJSONTests(enc testEncoder) {
 			}
 			enc.addTest(&testcase)
 
-		case TAMPERED:
+		case tampered:
 			et, err := createEncryptionTest(keygen, testSpec.payload)
 			if err != nil {
 				panic(err)
@@ -365,7 +371,7 @@ func CreateJSONTests(enc testEncoder) {
 			testcase := testCase{
 				testCaseMeta: testCaseMeta{
 					Description: testSpec.description,
-					TestType:    DECRYPTION,
+					TestType:    decryption,
 				},
 				Test: &dt,
 			}
@@ -373,10 +379,10 @@ func CreateJSONTests(enc testEncoder) {
 				panic(err)
 			}
 			enc.addTest(&testcase)
-		case VERIFYING, NONVERIFYING:
+		case verifying, nonVerifying:
 			var err error
 			var vt verificationTest
-			if testSpec.style == VERIFYING {
+			if testSpec.style == verifying {
 				vt, err = createVerificationTest(keygen, testSpec.payload)
 			} else {
 				vt, err = createFailedVerificationTest(keygen, testSpec.payload)
@@ -387,7 +393,7 @@ func CreateJSONTests(enc testEncoder) {
 			testcase := testCase{
 				testCaseMeta: testCaseMeta{
 					Description: testSpec.description,
-					TestType:    VERIFICATION,
+					TestType:    verification,
 				},
 				Test: &vt,
 			}
