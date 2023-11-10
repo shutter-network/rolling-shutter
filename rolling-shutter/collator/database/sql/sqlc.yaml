@@ -5,7 +5,7 @@ sql:
     engine: "postgresql"
     gen:
       go:
-        package: "db"
+        package: "database"
         out: "../"
         sql_package: "pgx/v4"
         output_db_file_name: "db.sqlc.gen.go"
