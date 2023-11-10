@@ -4,6 +4,7 @@ package epochkg
 
 import (
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -24,8 +25,8 @@ type EpochKG struct {
 	PublicKey       *shcrypto.EonPublicKey
 	PublicKeyShares []*shcrypto.EonPublicKeyShare
 
-	SecretShares map[*identitypreimage.IdentityPreimage][]*EpochSecretKeyShare
-	SecretKeys   map[*identitypreimage.IdentityPreimage]*shcrypto.EpochSecretKey
+	SecretShares map[string][]*EpochSecretKeyShare
+	SecretKeys   map[string]*shcrypto.EpochSecretKey
 }
 
 type EpochSecretKeyShare struct {
@@ -45,8 +46,8 @@ func NewEpochKG(puredkgResult *puredkg.Result) *EpochKG {
 		PublicKey:       puredkgResult.PublicKey,
 		PublicKeyShares: puredkgResult.PublicKeyShares,
 
-		SecretShares: make(map[*identitypreimage.IdentityPreimage][]*EpochSecretKeyShare),
-		SecretKeys:   make(map[*identitypreimage.IdentityPreimage]*shcrypto.EpochSecretKey),
+		SecretShares: make(map[string][]*EpochSecretKeyShare),
+		SecretKeys:   make(map[string]*shcrypto.EpochSecretKey),
 	}
 }
 
@@ -66,7 +67,8 @@ func (epochkg *EpochKG) computeEpochSecretKey(shares []*EpochSecretKeyShare) (*s
 }
 
 func (epochkg *EpochKG) addEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	shares := epochkg.SecretShares[&share.IdentityPreimage]
+	shares := epochkg.SecretShares[share.IdentityPreimage.String()]
+	log.Info().Interface("a", shares).Msg("test")
 	for _, s := range shares {
 		if s.Sender == share.Sender {
 			return errors.Errorf(
@@ -77,18 +79,18 @@ func (epochkg *EpochKG) addEpochSecretKeyShare(share *EpochSecretKeyShare) error
 	}
 	shares = append(shares, share)
 	if len(shares) != int(epochkg.Threshold) {
-		epochkg.SecretShares[&share.IdentityPreimage] = shares
+		epochkg.SecretShares[share.IdentityPreimage.String()] = shares
 		return nil
 	}
 
 	secretKey, err := epochkg.computeEpochSecretKey(shares)
-	delete(epochkg.SecretShares, &share.IdentityPreimage)
-	epochkg.SecretKeys[&share.IdentityPreimage] = secretKey // may be nil in the error case
+	delete(epochkg.SecretShares, share.IdentityPreimage.String())
+	epochkg.SecretKeys[share.IdentityPreimage.String()] = secretKey // may be nil in the error case
 	return err
 }
 
 func (epochkg *EpochKG) HandleEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	if _, ok := epochkg.SecretKeys[&share.IdentityPreimage]; ok {
+	if _, ok := epochkg.SecretKeys[share.IdentityPreimage.String()]; ok {
 		// We already have the key for this epoch
 		return nil
 	}

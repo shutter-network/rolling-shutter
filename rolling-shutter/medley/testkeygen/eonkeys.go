@@ -16,8 +16,10 @@ type KeyperKeyShares struct {
 }
 
 // ComputeEpochSecretKeyShare computes the secret key share for the given epoch.
-func (kks *KeyperKeyShares) ComputeEpochSecretKeyShare(identitypreimage identitypreimage.IdentityPreimage) *shcrypto.EpochSecretKeyShare {
-	epochIDG1 := shcrypto.ComputeEpochID(identitypreimage.Bytes())
+func (kks *KeyperKeyShares) ComputeEpochSecretKeyShare(
+	identityPreimage identitypreimage.IdentityPreimage,
+) *shcrypto.EpochSecretKeyShare {
+	epochIDG1 := shcrypto.ComputeEpochID(identityPreimage.Bytes())
 	return shcrypto.ComputeEpochSecretKeyShare(kks.eonSecretKeyShare, epochIDG1)
 }
 

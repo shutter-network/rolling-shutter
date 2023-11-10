@@ -51,8 +51,7 @@ func (e IdentityPreimage) Hex() string {
 }
 
 func (e IdentityPreimage) String() string {
-	s := string(e)
-	return s[2:6] + ".." + s[len(s)-4:]
+	return string(e[:])
 }
 
 func Equal(a, b IdentityPreimage) bool {

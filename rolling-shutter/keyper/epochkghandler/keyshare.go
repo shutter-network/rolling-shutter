@@ -121,7 +121,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	if err != nil {
 		return nil, err
 	}
-	decryptionKey, ok := epochKG.SecretKeys[&identityPreimage]
+	decryptionKey, ok := epochKG.SecretKeys[identityPreimage.String()]
 	if !ok {
 		numShares := uint64(len(epochKG.SecretShares))
 		if numShares < pureDKGResult.Threshold {

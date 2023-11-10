@@ -34,7 +34,9 @@ type ChainState struct {
 	identityPreimage identitypreimage.IdentityPreimage
 }
 
-func NewChainState(signer txtypes.Signer, baseFee *big.Int, blockGasLimit uint64, identityPreimage identitypreimage.IdentityPreimage) *ChainState {
+func NewChainState(signer txtypes.Signer, baseFee *big.Int, blockGasLimit uint64,
+	identityPreimage identitypreimage.IdentityPreimage,
+) *ChainState {
 	return &ChainState{
 		balances:         make(map[common.Address]*big.Int),
 		nonces:           make(map[common.Address]uint64),
