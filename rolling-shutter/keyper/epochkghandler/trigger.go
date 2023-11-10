@@ -11,7 +11,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -34,9 +34,6 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 	trigger := msg.(*p2pmsg.DecryptionTrigger)
 	if trigger.GetInstanceID() != handler.config.GetInstanceID() {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), trigger.GetInstanceID())
-	}
-	if _, err := epochid.BytesToEpochID(trigger.EpochID); err != nil {
-		return false, errors.Wrapf(err, "invalid epoch id")
 	}
 
 	blk := trigger.BlockNumber
@@ -73,9 +70,6 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	}
 	metricsEpochKGDectyptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
-	if err != nil {
-		return nil, err
-	}
-	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), epochID)
+	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.EpochID)
+	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), identityPreimage)
 }

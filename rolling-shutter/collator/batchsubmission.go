@@ -15,7 +15,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/client"
 )
 
@@ -66,23 +66,23 @@ func NewSubmitter(
 func (submitter *Submitter) createBatchTx(
 	ctx context.Context,
 	db *cltrdb.Queries,
-	epoch epochid.EpochID,
+	identityPreimage identitypreimage.IdentityPreimage,
 ) error {
-	decryptionKey, err := db.GetDecryptionKey(ctx, epoch.Bytes())
+	decryptionKey, err := db.GetDecryptionKey(ctx, identityPreimage.Bytes())
 	if err == pgx.ErrNoRows {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	logger := log.With().Uint64("epoch", epoch.Uint64()).Logger()
+	logger := log.With().Uint64("epoch", identityPreimage.Uint64()).Logger()
 	defer func() {
 		if err != nil {
 			logger.Error().Err(err).Msg("could not create batchtx")
 		}
 	}()
 
-	txs, err := db.GetCommittedTransactionsByEpoch(ctx, epoch.Bytes())
+	txs, err := db.GetCommittedTransactionsByEpoch(ctx, identityPreimage.Bytes())
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (submitter *Submitter) createBatchTx(
 	batchTx := txtypes.BatchTx{
 		ChainID:       submitter.signer.ChainID(),
 		DecryptionKey: decryptionKey.DecryptionKey,
-		BatchIndex:    epoch.Uint64(),
+		BatchIndex:    identityPreimage.Uint64(),
 		L1BlockNumber: l1blocknum,
 		Timestamp:     big.NewInt(time.Now().Unix()),
 		Transactions:  transactions,
@@ -116,7 +116,7 @@ func (submitter *Submitter) createBatchTx(
 		return err
 	}
 	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
-		EpochID:   epoch.Bytes(),
+		EpochID:   identityPreimage.Bytes(),
 		Marshaled: txbytes,
 	})
 	if err != nil {
@@ -136,10 +136,7 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 	} else if err != nil {
 		return err
 	}
-	epoch, err := epochid.BytesToEpochID(unsubmitted.EpochID)
-	if err != nil {
-		return err
-	}
+	identityPreimage := identitypreimage.BytesToIdentityPreimage(unsubmitted.EpochID)
 	l2BatchIndex, err := submitter.l2Client.GetBatchIndex(ctx)
 	if err != nil {
 		return err
@@ -147,12 +144,12 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 
 	defer submitter.collator.signals.newDecryptionKey()
 
-	if epoch.Uint64() <= l2BatchIndex {
+	if identityPreimage.Uint64() <= l2BatchIndex {
 		return db.SetBatchSubmitted(ctx)
 	}
 
 	_, err = submitter.sequencer.SubmitBatchData(ctx, unsubmitted.Marshaled)
-	log.Info().Uint64("epoch-id", epoch.Uint64()).Err(err).Msg("submitted batch data")
+	log.Info().Uint64("epoch-id", identityPreimage.Uint64()).Err(err).Msg("submitted batch data")
 
 	return err
 }
@@ -174,6 +171,6 @@ func (submitter *Submitter) submitBatch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	epochIDToSubmit := epochid.Uint64ToEpochID(l2BatchIndex + 1)
-	return submitter.createBatchTx(ctx, db, epochIDToSubmit)
+	identityPreimageToSubmit := identitypreimage.Uint64ToIdentityPreimage(l2BatchIndex + 1)
+	return submitter.createBatchTx(ctx, db, identityPreimageToSubmit)
 }

@@ -10,7 +10,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
 
@@ -34,8 +34,8 @@ func TestServerDecryption(t *testing.T) {
 	assert.NilError(t, err)
 
 	nextBatchIndex := currentBatchIndex + 1
-	epochID := epochid.Uint64ToEpochID(nextBatchIndex)
-	epochSecretKey, err := fixtures.KeyEnvironment.EpochSecretKey(epochID.Bytes())
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(nextBatchIndex)
+	epochSecretKey, err := fixtures.KeyEnvironment.EpochSecretKey(identityPreimage.Bytes())
 	assert.NilError(t, err)
 	l1BlockNumber := uint64(42)
 

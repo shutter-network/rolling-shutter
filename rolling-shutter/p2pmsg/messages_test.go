@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/v3/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
@@ -36,30 +36,30 @@ func marshalUnmarshalMessage[M Message](t *testing.T, message M, traceContext *T
 }
 
 type testConfig struct {
-	epochID     epochid.EpochID
-	blockNumber uint64
-	instanceID  uint64
-	tkg         *testkeygen.TestKeyGenerator
+	identityPreimage identitypreimage.IdentityPreimage
+	blockNumber      uint64
+	instanceID       uint64
+	tkg              *testkeygen.TestKeyGenerator
 }
 
 func defaultTestConfig(t *testing.T) testConfig {
 	t.Helper()
 
-	epochID, _ := epochid.BigToEpochID(common.Big2)
+	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big2)
 	return testConfig{
-		epochID:     epochID,
-		blockNumber: uint64(0),
-		instanceID:  uint64(42),
-		tkg:         testkeygen.NewTestKeyGenerator(t, 1, 1),
+		identityPreimage: identityPreimage,
+		blockNumber:      uint64(0),
+		instanceID:       uint64(42),
+		tkg:              testkeygen.NewTestKeyGenerator(t, 1, 1, false),
 	}
 }
 
 func TestDecryptionKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
-	validSecretKey := cfg.tkg.EpochSecretKey(cfg.epochID).Marshal()
+	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
 
 	orig := &DecryptionKey{
-		EpochID:    cfg.epochID.Bytes(),
+		EpochID:    cfg.identityPreimage.Bytes(),
 		InstanceID: cfg.instanceID,
 		Key:        validSecretKey,
 	}
@@ -79,7 +79,7 @@ func TestDecryptionTrigger(t *testing.T) {
 	privKey, err := ethcrypto.GenerateKey()
 	assert.NilError(t, err)
 
-	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.epochID, cfg.blockNumber, HashByteList(txs), privKey)
+	orig, err := NewSignedDecryptionTrigger(cfg.instanceID, cfg.identityPreimage, cfg.blockNumber, HashByteList(txs), privKey)
 	assert.NilError(t, err)
 	m, tc := marshalUnmarshalMessage(t, orig, nil)
 	assert.Assert(t, tc == nil)
@@ -89,13 +89,13 @@ func TestDecryptionTrigger(t *testing.T) {
 func TestDecryptionKeyShare(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	keyperIndex := uint64(0)
-	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.epochID, keyperIndex).Marshal()
+	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.identityPreimage, keyperIndex).Marshal()
 
 	orig := &DecryptionKeyShares{
 		InstanceID:  cfg.instanceID,
 		KeyperIndex: keyperIndex,
 		Shares: []*KeyShare{{
-			EpochID: cfg.epochID.Bytes(),
+			EpochID: cfg.identityPreimage.Bytes(),
 			Share:   keyshare,
 		}},
 	}
@@ -106,7 +106,7 @@ func TestDecryptionKeyShare(t *testing.T) {
 
 func TestEonPublicKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
-	eonPublicKey := cfg.tkg.EonPublicKey(cfg.epochID).Marshal()
+	eonPublicKey := cfg.tkg.EonPublicKey(cfg.identityPreimage).Marshal()
 	activationBlock := uint64(2)
 
 	privKey, err := ethcrypto.GenerateKey()
@@ -134,9 +134,9 @@ func TestTraceContext(t *testing.T) {
 		TraceState: "tracestate",
 	}
 	cfg := defaultTestConfig(t)
-	validSecretKey := cfg.tkg.EpochSecretKey(cfg.epochID).Marshal()
+	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
 	msg := &DecryptionKey{
-		EpochID:    cfg.epochID.Bytes(),
+		EpochID:    cfg.identityPreimage.Bytes(),
 		InstanceID: cfg.instanceID,
 		Key:        validSecretKey,
 	}

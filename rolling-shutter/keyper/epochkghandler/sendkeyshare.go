@@ -9,7 +9,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -24,9 +24,9 @@ func SendDecryptionKeyShare(
 	config Config,
 	db *kprdb.Queries,
 	blockNumber int64,
-	epochIDs ...epochid.EpochID,
+	identityPreimages ...identitypreimage.IdentityPreimage,
 ) ([]p2pmsg.Message, error) {
-	if len(epochIDs) == 0 {
+	if len(identityPreimages) == 0 {
 		return nil, errors.New("cannot generate empty decryption key share")
 	}
 	eon, err := db.GetEonForBlockNumber(ctx, blockNumber)
@@ -56,7 +56,7 @@ func SendDecryptionKeyShare(
 	// XXX this only works when we sent the share for exactly one epoch.
 	shareExists, err := db.ExistsDecryptionKeyShare(ctx, kprdb.ExistsDecryptionKeyShareParams{
 		Eon:         eon.Eon,
-		EpochID:     epochIDs[0].Bytes(),
+		EpochID:     identityPreimages[0].Bytes(),
 		KeyperIndex: keyperIndex,
 	})
 	if err != nil {
@@ -84,11 +84,11 @@ func SendDecryptionKeyShare(
 	// compute the key share
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 
-	for _, epochID := range epochIDs {
-		share := epochKG.ComputeEpochSecretKeyShare(epochID)
+	for _, identityPreimage := range identityPreimages {
+		share := epochKG.ComputeEpochSecretKeyShare(identityPreimage)
 
 		shares = append(shares, &p2pmsg.KeyShare{
-			EpochID: epochID.Bytes(),
+			EpochID: identityPreimage.Bytes(),
 			Share:   share.Marshal(),
 		})
 	}

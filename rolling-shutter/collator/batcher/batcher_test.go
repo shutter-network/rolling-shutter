@@ -10,18 +10,18 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 func DefaultTestParams() TestParams {
 	return TestParams{
-		GasLimit:       uint64(210000),
-		BaseFee:        big.NewInt(1),
-		InitialBalance: big.NewInt(1000000),
-		TxGasTipCap:    big.NewInt(1),
-		TxGasFeeCap:    big.NewInt(2),
-		InitialEpochID: epochid.Uint64ToEpochID(2000),
+		GasLimit:                uint64(210000),
+		BaseFee:                 big.NewInt(1),
+		InitialBalance:          big.NewInt(1000000),
+		TxGasTipCap:             big.NewInt(1),
+		TxGasFeeCap:             big.NewInt(2),
+		InitialIdentityPreimage: identitypreimage.Uint64ToIdentityPreimage(2000),
 	}
 }
 
@@ -32,7 +32,7 @@ func TestRejectBadTransactionsIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
-	nextBatchIndex := int(fixtures.Params.InitialEpochID.Uint64())
+	nextBatchIndex := int(fixtures.Params.InitialIdentityPreimage.Uint64())
 	batchIndexAcceptenceInterval := int(fixtures.Config.BatchIndexAcceptenceInterval)
 	t.Run("Future", func(t *testing.T) {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex+batchIndexAcceptenceInterval, 0, 22000)
@@ -72,7 +72,7 @@ func TestRejectTxNotEnoughFundsIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
-	nextBatchIndex := int(fixtures.Params.InitialEpochID.Uint64())
+	nextBatchIndex := int(fixtures.Params.InitialIdentityPreimage.Uint64())
 	tx, _ := fixtures.MakeTx(t, 1, nextBatchIndex, 0, 22000)
 	err := fixtures.Batcher.EnqueueTx(ctx, tx)
 	assert.Error(t, err, ErrCannotPayGasFee.Error())
@@ -85,7 +85,7 @@ func TestConfirmTransactionsIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	fixtures := Setup(ctx, t, DefaultTestParams())
-	nextBatchIndex := int(fixtures.Params.InitialEpochID.Uint64())
+	nextBatchIndex := int(fixtures.Params.InitialIdentityPreimage.Uint64())
 
 	for nonce := 0; nonce < 5; nonce++ {
 		tx, _ := fixtures.MakeTx(t, 0, nextBatchIndex, nonce, 22000)
@@ -93,7 +93,7 @@ func TestConfirmTransactionsIntegration(t *testing.T) {
 		assert.NilError(t, err)
 	}
 
-	txs, err := fixtures.DB.GetTransactionsByEpoch(ctx, fixtures.Params.InitialEpochID.Bytes())
+	txs, err := fixtures.DB.GetTransactionsByEpoch(ctx, fixtures.Params.InitialIdentityPreimage.Bytes())
 	assert.NilError(t, err)
 	assert.Equal(t, 5, len(txs), "should have exactly one tx: %+v", txs)
 	for nonce := 0; nonce < 5; nonce++ {
@@ -120,7 +120,7 @@ func TestCloseBatchIntegration(t *testing.T) {
 		assert.Check(t, fixtures.Batcher.nextBatchChainState == nil, "nextBatchChainState field initialized")
 		nextBatchEpoch, _, err := batchhandler.GetNextBatch(ctx, fixtures.DB)
 		assert.NilError(t, err)
-		assert.Equal(t, nextBatchEpoch.Uint64(), fixtures.Params.InitialEpochID.Uint64()+1)
+		assert.Equal(t, nextBatchEpoch.Uint64(), fixtures.Params.InitialIdentityPreimage.Uint64()+1)
 	})
 
 	t.Run("initChainStateWaitForSequencer", func(t *testing.T) {
@@ -129,13 +129,13 @@ func TestCloseBatchIntegration(t *testing.T) {
 	})
 
 	t.Run("batchAlreadyExists", func(t *testing.T) {
-		fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialEpochID.Uint64() + 1)
+		fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialIdentityPreimage.Uint64() + 1)
 		err = fixtures.Batcher.initChainState(ctx)
 		assert.Error(t, err, ErrBatchAlreadyExists.Error())
 	})
 
 	t.Run("initChainStateSetsNextBatchChainState", func(t *testing.T) {
-		fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialEpochID.Uint64())
+		fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialIdentityPreimage.Uint64())
 		err = fixtures.Batcher.initChainState(ctx)
 		assert.NilError(t, err)
 		assert.Check(t, fixtures.Batcher.nextBatchChainState != nil, "nextBatchChainState field not initialized")
@@ -160,7 +160,7 @@ func TestOpenNextBatch(t *testing.T) {
 	assert.NilError(t, err)
 	nextBatchIndex := nextBatchEpoch.Uint64()
 
-	assert.Equal(t, nextBatchIndex, fixtures.Params.InitialEpochID.Uint64()+1)
+	assert.Equal(t, nextBatchIndex, fixtures.Params.InitialIdentityPreimage.Uint64()+1)
 	// we should now be able to enqueue transactions. The batcher however doesn't have
 	// information about the current nonce and the balances, so we're able to enqueue
 	// transactions that later will be rejected when the l2 chain builds a new block.
@@ -174,12 +174,12 @@ func TestOpenNextBatch(t *testing.T) {
 	err = fixtures.Batcher.EnqueueTx(ctx, tx2)
 	assert.NilError(t, err)
 
-	txs, err := fixtures.DB.GetNonRejectedTransactionsByEpoch(ctx, epochid.Uint64ToEpochID(nextBatchIndex).Bytes())
+	txs, err := fixtures.DB.GetNonRejectedTransactionsByEpoch(ctx, identitypreimage.Uint64ToIdentityPreimage(nextBatchIndex).Bytes())
 	assert.NilError(t, err)
 	assert.Equal(t, len(txs), 2)
 
 	// so, now let's let the l2 chain build a new block
-	fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialEpochID.Uint64())
+	fixtures.EthL2Server.SetBatchIndex(fixtures.Params.InitialIdentityPreimage.Uint64())
 
 	tx3, _ := fixtures.MakeTx(t, 2, int(nextBatchIndex), 0, 22000)
 	err = fixtures.Batcher.EnqueueTx(ctx, tx3)
@@ -187,7 +187,7 @@ func TestOpenNextBatch(t *testing.T) {
 
 	assert.Check(t, fixtures.Batcher.nextBatchChainState != nil, "nextBatchChainState field not initialized")
 
-	txs, err = fixtures.DB.GetTransactionsByEpoch(ctx, epochid.Uint64ToEpochID(nextBatchIndex).Bytes())
+	txs, err = fixtures.DB.GetTransactionsByEpoch(ctx, identitypreimage.Uint64ToIdentityPreimage(nextBatchIndex).Bytes())
 	assert.NilError(t, err)
 	assert.Equal(t, len(txs), 2)
 
@@ -210,7 +210,7 @@ func TestDecryptionTriggerGeneratedIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	nextBatchIndex := nextBatchEpoch.Uint64()
 
-	assert.Equal(t, nextBatchIndex, fixtures.Params.InitialEpochID.Uint64())
+	assert.Equal(t, nextBatchIndex, fixtures.Params.InitialIdentityPreimage.Uint64())
 
 	tx, txHash := fixtures.MakeTx(t, 0, int(nextBatchIndex), 0, 22000)
 	err = fixtures.Batcher.EnqueueTx(ctx, tx)
@@ -247,13 +247,13 @@ func TestDecryptionTriggerInsertOrderingIntegration(t *testing.T) {
 	fixtures := Setup(ctx, t, DefaultTestParams())
 
 	trigger1 := cltrdb.InsertTriggerParams{
-		EpochID:       epochid.Uint64ToEpochID(2).Bytes(),
+		EpochID:       identitypreimage.Uint64ToIdentityPreimage(2).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{1, 0}).Bytes(),
 		L1BlockNumber: 666,
 	}
 
 	trigger2 := cltrdb.InsertTriggerParams{
-		EpochID:       epochid.Uint64ToEpochID(1).Bytes(),
+		EpochID:       identitypreimage.Uint64ToIdentityPreimage(1).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{0, 1}).Bytes(),
 		L1BlockNumber: 42,
 	}

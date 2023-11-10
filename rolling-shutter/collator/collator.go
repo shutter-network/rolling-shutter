@@ -27,8 +27,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -271,13 +271,13 @@ func (c *collator) handleContractEvents(ctx context.Context) error {
 	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }
 
-func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, error) {
-	var nextEpochID epochid.EpochID
+func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (identitypreimage.IdentityPreimage, error) {
+	var nextIdentityPreimage identitypreimage.IdentityPreimage
 	b, err := db.GetNextBatch(ctx)
 	if err != nil {
-		return nextEpochID, err
+		return nextIdentityPreimage, err
 	}
-	return epochid.BytesToEpochID(b.EpochID)
+	return identitypreimage.BytesToIdentityPreimage(b.EpochID), nil
 }
 
 func (c *collator) getUnsentDecryptionTriggers(
@@ -299,13 +299,10 @@ func (c *collator) getUnsentDecryptionTriggers(
 	}
 	trigMsgs := make([]*p2pmsg.DecryptionTrigger, len(triggers))
 	for i, trig := range triggers {
-		epochID, err := epochid.BytesToEpochID(trig.EpochID)
-		if err != nil {
-			return nil, err
-		}
+		identityPreimage := identitypreimage.BytesToIdentityPreimage(trig.EpochID)
 		trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(
 			cfg.InstanceID,
-			epochID,
+			identityPreimage,
 			uint64(trig.L1BlockNumber),
 			trig.BatchHash,
 			cfg.Ethereum.PrivateKey.Key,

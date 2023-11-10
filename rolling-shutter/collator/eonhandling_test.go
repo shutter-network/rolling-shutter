@@ -15,7 +15,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -138,16 +138,16 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	db, dbpool, closedb := testdb.NewCollatorTestDB(ctx, t)
 	defer closedb()
 	testConfig := newTestConfig(t)
-	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2)
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
+	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
+	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
 
-	epoch1 := epochid.Uint64ToEpochID(1)
-	epoch1000 := epochid.Uint64ToEpochID(1000)
-	epoch2000 := epochid.Uint64ToEpochID(2000)
+	identityPreimage1 := identitypreimage.Uint64ToIdentityPreimage(1)
+	identityPreimage1000 := identitypreimage.Uint64ToIdentityPreimage(1000)
+	identityPreimage2000 := identitypreimage.Uint64ToIdentityPreimage(2000)
 
-	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(epoch1).GobEncode()
-	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(epoch1000).GobEncode()
-	eonPubKey, _ = tkg.EonPublicKey(epoch2000).GobEncode()
+	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(identityPreimage1).GobEncode()
+	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(identityPreimage1000).GobEncode()
+	eonPubKey, _ = tkg.EonPublicKey(identityPreimage2000).GobEncode()
 
 	kpr1, _ := ethcrypto.GenerateKey()
 	kpr2, _ := ethcrypto.GenerateKey()

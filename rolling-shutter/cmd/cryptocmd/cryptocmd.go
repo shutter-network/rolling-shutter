@@ -11,7 +11,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 var (
@@ -223,12 +223,12 @@ func parseEonKey(f string) (*shcrypto.EonPublicKey, error) {
 	return eonKey, err
 }
 
-func parseEpochID(f string) (epochid.EpochID, error) {
+func parseEpochID(f string) (identitypreimage.IdentityPreimage, error) {
 	epochIDBytes, err := parseHex(f)
 	if err != nil {
-		return epochid.EpochID{}, err
+		return identitypreimage.IdentityPreimage{}, err
 	}
-	return epochid.BytesToEpochID(epochIDBytes)
+	return identitypreimage.BytesToIdentityPreimage(epochIDBytes), nil
 }
 
 func parseSigma(f string) (shcrypto.Block, error) {

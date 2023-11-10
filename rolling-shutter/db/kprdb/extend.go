@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
@@ -29,20 +29,18 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 }
 
 func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.DecryptionKey) error {
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
-	if err != nil {
-		return err
-	}
+	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.EpochID)
+
 	tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
 		Eon:           int64(msg.Eon),
-		EpochID:       epochID.Bytes(),
+		EpochID:       identityPreimage.Bytes(),
 		DecryptionKey: msg.Key,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to insert decryption key for epoch %s", epochID)
+		return errors.Wrapf(err, "failed to insert decryption key for epoch %s", identityPreimage)
 	}
 	if tag.RowsAffected() == 0 {
-		log.Info().Str("epoch-id", epochID.Hex()).
+		log.Info().Str("epoch-id", identityPreimage.Hex()).
 			Msg("attempted to insert decryption key in db, but it already exists")
 	}
 	return nil

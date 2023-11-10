@@ -9,7 +9,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
@@ -25,25 +25,25 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	defer closedb()
 
 	eon := config.GetEon()
-	epochID := epochid.Uint64ToEpochID(50)
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
 	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
-	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
+	encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
 
 	// send a decryption key and check that it gets inserted
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKey{
 		InstanceID: config.GetInstanceID(),
 		Eon:        eon,
-		EpochID:    epochID.Bytes(),
+		EpochID:    identityPreimage.Bytes(),
 		Key:        encodedDecryptionKey,
 	})
 	assert.Check(t, len(msgs) == 0)
 	key, err := db.GetDecryptionKey(ctx, kprdb.GetDecryptionKeyParams{
 		Eon:     int64(eon),
-		EpochID: epochID.Bytes(),
+		EpochID: identityPreimage.Bytes(),
 	})
 	assert.NilError(t, err)
 	assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKey))
@@ -60,10 +60,10 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
-	epochID, _ := epochid.BigToEpochID(common.Big0)
-	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
+	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
+	wrongIdentityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big1)
 	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
-	secretKey := tkg.EpochSecretKey(epochID).Marshal()
+	secretKey := tkg.EpochSecretKey(identityPreimage).Marshal()
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
 	tests := []struct {
@@ -77,7 +77,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
-				EpochID:    epochID.Bytes(),
+				EpochID:    identityPreimage.Bytes(),
 				Key:        secretKey,
 			},
 		},
@@ -87,7 +87,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
-				EpochID:    wrongEpochID.Bytes(),
+				EpochID:    wrongIdentityPreimage.Bytes(),
 				Key:        secretKey,
 			},
 		},
@@ -97,7 +97,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			msg: &p2pmsg.DecryptionKey{
 				InstanceID: config.GetInstanceID() + 1,
 				Eon:        eon,
-				EpochID:    epochID.Bytes(),
+				EpochID:    identityPreimage.Bytes(),
 				Key:        secretKey,
 			},
 		},

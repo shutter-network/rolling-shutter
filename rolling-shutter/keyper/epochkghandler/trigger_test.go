@@ -12,7 +12,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
@@ -29,7 +29,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	db, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID := epochid.Uint64ToEpochID(50)
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
 	initializeEon(ctx, t, dbpool, keyperIndex)
@@ -37,7 +37,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	// send decryption key share when first trigger is received
 	trigger, err := p2pmsg.NewSignedDecryptionTrigger(
 		config.GetInstanceID(),
-		epochID,
+		identityPreimage,
 		0,
 		make([]byte, 32),
 		config.GetCollatorKey(),
@@ -46,7 +46,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, trigger)
 	share, err := db.GetDecryptionKeyShare(ctx, kprdb.GetDecryptionKeyShareParams{
 		Eon:         int64(config.GetEon()),
-		EpochID:     epochID.Bytes(),
+		EpochID:     identityPreimage.Bytes(),
 		KeyperIndex: int64(keyperIndex),
 	})
 	assert.NilError(t, err)
@@ -58,7 +58,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.DeepEqual(t, msg.GetShares(),
 		[]*p2pmsg.KeyShare{
 			{
-				EpochID: epochID.Bytes(),
+				EpochID: identityPreimage.Bytes(),
 				Share:   share.DecryptionKeyShare,
 			},
 		},
@@ -91,9 +91,9 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 	// Make a db with collator 1 from a certain block and collator 2 afterwards
 	activationBlk1 := uint64(0)
-	epochID1, _ := epochid.BigToEpochID(common.Big0)
+	identityPreimage1, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
 	activationBlk2 := uint64(123)
-	epochID2, _ := epochid.BigToEpochID(common.Big1)
+	identityPreimage2, _ := identitypreimage.BigToIdentityPreimage(common.Big1)
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)
@@ -109,59 +109,59 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	tests := []struct {
-		name        string
-		valid       bool
-		instanceID  uint64
-		epochID     epochid.EpochID
-		blockNumber uint64
-		privKey     *ecdsa.PrivateKey
+		name             string
+		valid            bool
+		instanceID       uint64
+		identityPreimage identitypreimage.IdentityPreimage
+		blockNumber      uint64
+		privKey          *ecdsa.PrivateKey
 	}{
 		{
-			name:        "valid trigger collator 1",
-			valid:       true,
-			instanceID:  config.GetInstanceID(),
-			epochID:     epochID1,
-			blockNumber: activationBlk1,
-			privKey:     collatorKey1,
+			name:             "valid trigger collator 1",
+			valid:            true,
+			instanceID:       config.GetInstanceID(),
+			identityPreimage: identityPreimage1,
+			blockNumber:      activationBlk1,
+			privKey:          collatorKey1,
 		},
 		{
-			name:        "valid trigger collator 2",
-			valid:       true,
-			instanceID:  config.GetInstanceID(),
-			epochID:     epochID2,
-			blockNumber: activationBlk2,
-			privKey:     collatorKey2,
+			name:             "valid trigger collator 2",
+			valid:            true,
+			instanceID:       config.GetInstanceID(),
+			identityPreimage: identityPreimage2,
+			blockNumber:      activationBlk2,
+			privKey:          collatorKey2,
 		},
 		{
-			name:        "invalid trigger wrong collator 1",
-			valid:       false,
-			instanceID:  config.GetInstanceID(),
-			epochID:     epochID2,
-			blockNumber: activationBlk2,
-			privKey:     collatorKey1,
+			name:             "invalid trigger wrong collator 1",
+			valid:            false,
+			instanceID:       config.GetInstanceID(),
+			identityPreimage: identityPreimage2,
+			blockNumber:      activationBlk2,
+			privKey:          collatorKey1,
 		},
 		{
-			name:        "invalid trigger wrong collator 2",
-			valid:       false,
-			instanceID:  config.GetInstanceID(),
-			epochID:     epochID1,
-			blockNumber: activationBlk1,
-			privKey:     collatorKey2,
+			name:             "invalid trigger wrong collator 2",
+			valid:            false,
+			instanceID:       config.GetInstanceID(),
+			identityPreimage: identityPreimage1,
+			blockNumber:      activationBlk1,
+			privKey:          collatorKey2,
 		},
 		{
-			name:        "invalid trigger wrong instanceID",
-			valid:       false,
-			instanceID:  config.GetInstanceID() + 1,
-			epochID:     epochID1,
-			blockNumber: activationBlk1,
-			privKey:     collatorKey1,
+			name:             "invalid trigger wrong instanceID",
+			valid:            false,
+			instanceID:       config.GetInstanceID() + 1,
+			identityPreimage: identityPreimage1,
+			blockNumber:      activationBlk1,
+			privKey:          collatorKey1,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			msg, err := p2pmsg.NewSignedDecryptionTrigger(
 				tc.instanceID,
-				tc.epochID,
+				tc.identityPreimage,
 				tc.blockNumber,
 				[]byte{},
 				tc.privKey,

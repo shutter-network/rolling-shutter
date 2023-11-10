@@ -9,7 +9,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shtest"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 func Results(t *testing.T) []*puredkg.Result {
@@ -79,13 +79,13 @@ func TestEpochKG(t *testing.T) {
 		kgs = append(kgs, NewEpochKG(r))
 	}
 
-	epoch, _ := epochid.BytesToEpochID([]byte{50})
+	identityPreimage := identitypreimage.BytesToIdentityPreimage([]byte{50})
 	for sender, kg := range kgs {
 		share := EpochSecretKeyShare{
-			Eon:    kg.Eon,
-			Epoch:  epoch,
-			Sender: uint64(sender),
-			Share:  kg.ComputeEpochSecretKeyShare(epoch),
+			Eon:              kg.Eon,
+			IdentityPreimage: identityPreimage,
+			Sender:           uint64(sender),
+			Share:            kg.ComputeEpochSecretKeyShare(identityPreimage),
 		}
 		for _, k := range kgs {
 			err := k.HandleEpochSecretKeyShare(&share)
@@ -95,12 +95,12 @@ func TestEpochKG(t *testing.T) {
 
 	// every EpochKG should end up with the same key
 	for _, kg := range kgs {
-		_, ok := kg.SecretShares[epoch]
+		_, ok := kg.SecretShares[&identityPreimage]
 		assert.Assert(t, !ok)
-		key, ok := kg.SecretKeys[epoch]
+		key, ok := kg.SecretKeys[&identityPreimage]
 		assert.Assert(t, ok)
 		assert.Assert(t, key != nil)
-		assert.DeepEqual(t, kgs[0].SecretKeys[epoch], key)
+		assert.DeepEqual(t, kgs[0].SecretKeys[&identityPreimage], key)
 	}
 
 	shtest.EnsureGobable(t, kgs[0], new(EpochKG))

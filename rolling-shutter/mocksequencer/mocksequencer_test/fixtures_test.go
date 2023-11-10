@@ -16,7 +16,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocknode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/mocksequencer/client"
@@ -67,9 +67,9 @@ func (fx *Fixtures) MakeShutterTx(
 			Value: big.NewInt(123456789),
 		}
 	}
-	epochID := epochid.Uint64ToEpochID(batchIndex)
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(batchIndex)
 
-	encryptedPayload, err := mocknode.EncryptShutterPayload(payload, epochID, fx.KeyEnvironment.EonPublicKey())
+	encryptedPayload, err := mocknode.EncryptShutterPayload(payload, identityPreimage, fx.KeyEnvironment.EonPublicKey())
 	if err != nil {
 		return nil, err
 	}

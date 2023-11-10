@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
@@ -23,12 +23,12 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	_, dbpool, closedb := testdb.NewKeyperTestDB(ctx, t)
 	defer closedb()
 
-	epochID := epochid.Uint64ToEpochID(50)
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
 	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
-	encodedDecryptionKey := tkg.EpochSecretKey(epochID).Marshal()
+	encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
 
 	// threshold is two, so no outgoing message after first input
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeyShares{
@@ -36,8 +36,8 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		Eon:         config.GetEon(),
 		KeyperIndex: 0,
 		Shares: []*p2pmsg.KeyShare{{
-			EpochID: epochID.Bytes(),
-			Share:   tkg.EpochSecretKeyShare(epochID, 0).Marshal(),
+			EpochID: identityPreimage.Bytes(),
+			Share:   tkg.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
 		}},
 	})
 	assert.Check(t, len(msgs) == 0)
@@ -49,15 +49,15 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 		Eon:         config.GetEon(),
 		KeyperIndex: 2,
 		Shares: []*p2pmsg.KeyShare{{
-			EpochID: epochID.Bytes(),
-			Share:   tkg.EpochSecretKeyShare(epochID, 2).Marshal(),
+			EpochID: identityPreimage.Bytes(),
+			Share:   tkg.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
 		}},
 	})
 	assert.Assert(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKey)
 	assert.Check(t, ok)
 	assert.Check(t, msg.InstanceID == config.GetInstanceID())
-	assert.Check(t, bytes.Equal(msg.EpochID, epochID.Bytes()))
+	assert.Check(t, bytes.Equal(msg.EpochID, identityPreimage.Bytes()))
 	assert.Check(t, bytes.Equal(msg.Key, encodedDecryptionKey))
 }
 
@@ -72,10 +72,10 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
-	epochID, _ := epochid.BigToEpochID(common.Big0)
-	wrongEpochID, _ := epochid.BigToEpochID(common.Big1)
+	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
+	wrongIdentityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big1)
 	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
-	keyshare := tkg.EpochSecretKeyShare(epochID, keyperIndex).Marshal()
+	keyshare := tkg.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal()
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 
 	tests := []struct {
@@ -92,7 +92,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: epochID.Bytes(),
+						EpochID: identityPreimage.Bytes(),
 						Share:   keyshare,
 					},
 				},
@@ -107,7 +107,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: wrongEpochID.Bytes(),
+						EpochID: wrongIdentityPreimage.Bytes(),
 						Share:   keyshare,
 					},
 				},
@@ -122,7 +122,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: epochID.Bytes(),
+						EpochID: identityPreimage.Bytes(),
 						Share:   keyshare,
 					},
 				},
@@ -137,7 +137,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex + 1,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: epochID.Bytes(),
+						EpochID: identityPreimage.Bytes(),
 						Share:   keyshare,
 					},
 				},

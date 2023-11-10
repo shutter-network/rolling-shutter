@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/snpdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -127,10 +127,7 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 	if err != nil {
 		return err
 	}
-	convEpoch, err := epochid.BytesToEpochID(epochID)
-	if err != nil {
-		return err
-	}
+	identityPreimage := identitypreimage.BytesToIdentityPreimage(epochID)
 	// First check if the key is already in the database.
 	decryptionKey, err := snp.db.GetDecryptionKey(ctx, epochID)
 	if err == nil {
@@ -141,7 +138,7 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 	}
 	trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(
 		snp.Config.InstanceID,
-		convEpoch,
+		identityPreimage,
 		blockNumber,
 		zeroTXHash,
 		snp.Config.Ethereum.PrivateKey.Key,

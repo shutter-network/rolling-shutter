@@ -9,7 +9,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -48,7 +48,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	go func() { _ = newDecryptionTriggerLoop() }()
 
 	trigger := cltrdb.InsertTriggerParams{
-		EpochID:       epochid.Uint64ToEpochID(3).Bytes(),
+		EpochID:       identitypreimage.Uint64ToIdentityPreimage(3).Bytes(),
 		BatchHash:     common.BytesToHash([]byte{0, 1}).Bytes(),
 		L1BlockNumber: 42,
 	}

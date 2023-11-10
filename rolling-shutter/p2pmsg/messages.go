@@ -11,7 +11,7 @@ import (
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprtopics"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/trace"
 )
 
@@ -76,8 +76,8 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	epochID, _ := epochid.BytesToEpochID(trigger.EpochID)
-	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", epochID.String())
+	identityPreimage := identitypreimage.BytesToIdentityPreimage(trigger.EpochID)
+	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", identityPreimage.String())
 }
 
 func (*DecryptionTrigger) Topic() string {

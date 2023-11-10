@@ -8,7 +8,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 type (
@@ -24,15 +24,15 @@ type EpochKG struct {
 	PublicKey       *shcrypto.EonPublicKey
 	PublicKeyShares []*shcrypto.EonPublicKeyShare
 
-	SecretShares map[epochid.EpochID][]*EpochSecretKeyShare
-	SecretKeys   map[epochid.EpochID]*shcrypto.EpochSecretKey
+	SecretShares map[*identitypreimage.IdentityPreimage][]*EpochSecretKeyShare
+	SecretKeys   map[*identitypreimage.IdentityPreimage]*shcrypto.EpochSecretKey
 }
 
 type EpochSecretKeyShare struct {
-	Eon    uint64
-	Epoch  epochid.EpochID
-	Sender KeyperIndex
-	Share  *shcrypto.EpochSecretKeyShare
+	Eon              uint64
+	IdentityPreimage identitypreimage.IdentityPreimage
+	Sender           KeyperIndex
+	Share            *shcrypto.EpochSecretKeyShare
 }
 
 func NewEpochKG(puredkgResult *puredkg.Result) *EpochKG {
@@ -45,13 +45,13 @@ func NewEpochKG(puredkgResult *puredkg.Result) *EpochKG {
 		PublicKey:       puredkgResult.PublicKey,
 		PublicKeyShares: puredkgResult.PublicKeyShares,
 
-		SecretShares: make(map[epochid.EpochID][]*EpochSecretKeyShare),
-		SecretKeys:   make(map[epochid.EpochID]*shcrypto.EpochSecretKey),
+		SecretShares: make(map[*identitypreimage.IdentityPreimage][]*EpochSecretKeyShare),
+		SecretKeys:   make(map[*identitypreimage.IdentityPreimage]*shcrypto.EpochSecretKey),
 	}
 }
 
-func (epochkg *EpochKG) ComputeEpochSecretKeyShare(epoch epochid.EpochID) *shcrypto.EpochSecretKeyShare {
-	epochID := shcrypto.ComputeEpochID(epoch.Bytes())
+func (epochkg *EpochKG) ComputeEpochSecretKeyShare(identityPreimage identitypreimage.IdentityPreimage) *shcrypto.EpochSecretKeyShare {
+	epochID := shcrypto.ComputeEpochID(identityPreimage.Bytes())
 	return shcrypto.ComputeEpochSecretKeyShare(epochkg.SecretKeyShare, epochID)
 }
 
@@ -66,33 +66,33 @@ func (epochkg *EpochKG) computeEpochSecretKey(shares []*EpochSecretKeyShare) (*s
 }
 
 func (epochkg *EpochKG) addEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	shares := epochkg.SecretShares[share.Epoch]
+	shares := epochkg.SecretShares[&share.IdentityPreimage]
 	for _, s := range shares {
 		if s.Sender == share.Sender {
 			return errors.Errorf(
 				"already have EpochSecretKeyShare from sender %d for epoch %d",
 				share.Sender,
-				share.Epoch)
+				share.IdentityPreimage)
 		}
 	}
 	shares = append(shares, share)
 	if len(shares) != int(epochkg.Threshold) {
-		epochkg.SecretShares[share.Epoch] = shares
+		epochkg.SecretShares[&share.IdentityPreimage] = shares
 		return nil
 	}
 
 	secretKey, err := epochkg.computeEpochSecretKey(shares)
-	delete(epochkg.SecretShares, share.Epoch)
-	epochkg.SecretKeys[share.Epoch] = secretKey // may be nil in the error case
+	delete(epochkg.SecretShares, &share.IdentityPreimage)
+	epochkg.SecretKeys[&share.IdentityPreimage] = secretKey // may be nil in the error case
 	return err
 }
 
 func (epochkg *EpochKG) HandleEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	if _, ok := epochkg.SecretKeys[share.Epoch]; ok {
+	if _, ok := epochkg.SecretKeys[&share.IdentityPreimage]; ok {
 		// We already have the key for this epoch
 		return nil
 	}
-	epochID := shcrypto.ComputeEpochID(share.Epoch.Bytes())
+	epochID := shcrypto.ComputeEpochID(share.IdentityPreimage.Bytes())
 	if !shcrypto.VerifyEpochSecretKeyShare(
 		share.Share,
 		epochkg.PublicKeyShares[share.Sender],
@@ -101,7 +101,7 @@ func (epochkg *EpochKG) HandleEpochSecretKeyShare(share *EpochSecretKeyShare) er
 		return errors.Errorf(
 			"cannot verify epoch secret key share from sender %d for epoch %d",
 			share.Sender,
-			share.Epoch)
+			share.IdentityPreimage)
 	}
 	err := epochkg.addEpochSecretKeyShare(share)
 	if err != nil {

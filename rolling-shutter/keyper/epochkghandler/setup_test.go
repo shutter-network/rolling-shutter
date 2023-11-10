@@ -17,7 +17,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/chainobsdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -73,11 +73,11 @@ func initializeEon(
 	})
 	assert.NilError(t, err)
 
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2)
+	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
-	epochID, _ := epochid.BigToEpochID(common.Big0)
+	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
 	for i := uint64(0); i < tkg.NumKeypers; i++ {
-		share := tkg.EonPublicKeyShare(epochID, i)
+		share := tkg.EonPublicKeyShare(identityPreimage, i)
 		publicKeyShares = append(publicKeyShares, share)
 	}
 	dkgResult := puredkg.Result{
@@ -85,8 +85,8 @@ func initializeEon(
 		NumKeypers:      tkg.NumKeypers,
 		Threshold:       tkg.Threshold,
 		Keyper:          keyperIndex,
-		SecretKeyShare:  tkg.EonSecretKeyShare(epochID, keyperIndex),
-		PublicKey:       tkg.EonPublicKey(epochID),
+		SecretKeyShare:  tkg.EonSecretKeyShare(identityPreimage, keyperIndex),
+		PublicKey:       tkg.EonPublicKey(identityPreimage),
 		PublicKeyShares: publicKeyShares,
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
