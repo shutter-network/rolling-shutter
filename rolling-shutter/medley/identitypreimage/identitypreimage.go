@@ -39,7 +39,9 @@ func (e IdentityPreimage) Hex() string {
 }
 
 func (e IdentityPreimage) String() string {
-	s := common.Hash(e).String()
+	var hash common.Hash
+	hash.SetBytes(e.Bytes())
+	s := hash.String()
 	return s[2:6] + ".." + s[len(s)-4:]
 }
 
