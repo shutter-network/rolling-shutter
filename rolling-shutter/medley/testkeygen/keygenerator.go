@@ -23,17 +23,17 @@ type TestKeyGenerator struct {
 
 func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64, infiniteInterval bool) *TestKeyGenerator {
 	t.Helper()
-	generator := &TestKeyGenerator{
+	eonInterval := 100
+	if infiniteInterval {
+		eonInterval = 0 // 0 stands for infinity
+	}
+	return &TestKeyGenerator{
 		t:           t,
-		eonInterval: 100, // 0 stands for infinity
+		eonInterval: uint64(eonInterval),
 		eonKeyGen:   make(map[uint64]*EonKeys),
 		NumKeypers:  numKeypers,
 		Threshold:   threshold,
 	}
-	if infiniteInterval {
-		generator.eonInterval = 0
-	}
-	return generator
 }
 
 // getEonIndex computes the index of the EON key to be used for the given identityPreimage. We generate a new
