@@ -11,7 +11,7 @@ import (
 )
 
 // ComputeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-func ComputeNextEpochID(identityPreimage identitypreimage.IdentityPreimage) (identitypreimage.IdentityPreimage, error) {
+func ComputeNextEpochID(identityPreimage identitypreimage.IdentityPreimage) identitypreimage.IdentityPreimage {
 	n := identityPreimage.Big()
 	return identitypreimage.BigToIdentityPreimage(n.Add(n, common.Big1))
 }
@@ -23,7 +23,7 @@ func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (identitypreimage.Ide
 		// There should already be an epochID in the database so not finding a row is an error
 		return identitypreimage.IdentityPreimage{}, 0, err
 	}
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(b.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(b.EpochID)
 	if b.L1BlockNumber < 0 {
 		return identitypreimage.IdentityPreimage{}, 0, errors.Errorf("negative l1 block number in db")
 	}

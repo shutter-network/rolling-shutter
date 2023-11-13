@@ -127,7 +127,7 @@ func (snp *Snapshot) handleDecryptionKeyRequest(ctx context.Context, epochID []b
 	if err != nil {
 		return err
 	}
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(epochID)
+	identityPreimage := identitypreimage.IdentityPreimage(epochID)
 	// First check if the key is already in the database.
 	decryptionKey, err := snp.db.GetDecryptionKey(ctx, epochID)
 	if err == nil {

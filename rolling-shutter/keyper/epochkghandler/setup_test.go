@@ -75,7 +75,7 @@ func initializeEon(
 
 	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
-	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
+	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	for i := uint64(0); i < tkg.NumKeypers; i++ {
 		share := tkg.EonPublicKeyShare(identityPreimage, i)
 		publicKeyShares = append(publicKeyShares, share)

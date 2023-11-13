@@ -122,7 +122,7 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(epochIDBytes)
+	identityPreimage := identitypreimage.IdentityPreimage(epochIDBytes)
 
 	ctx := r.Context()
 	msgs, err := epochkghandler.SendDecryptionKeyShare(

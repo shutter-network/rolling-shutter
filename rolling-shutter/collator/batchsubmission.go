@@ -136,7 +136,7 @@ func (submitter *Submitter) submitBatchTxToSequencer(ctx context.Context) error 
 	} else if err != nil {
 		return err
 	}
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(unsubmitted.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(unsubmitted.EpochID)
 	l2BatchIndex, err := submitter.l2Client.GetBatchIndex(ctx)
 	if err != nil {
 		return err

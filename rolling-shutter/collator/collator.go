@@ -277,7 +277,7 @@ func getNextEpochID(ctx context.Context, db *cltrdb.Queries) (identitypreimage.I
 	if err != nil {
 		return nextIdentityPreimage, err
 	}
-	return identitypreimage.BytesToIdentityPreimage(b.EpochID), nil
+	return identitypreimage.IdentityPreimage(b.EpochID), nil
 }
 
 func (c *collator) getUnsentDecryptionTriggers(
@@ -299,7 +299,7 @@ func (c *collator) getUnsentDecryptionTriggers(
 	}
 	trigMsgs := make([]*p2pmsg.DecryptionTrigger, len(triggers))
 	for i, trig := range triggers {
-		identityPreimage := identitypreimage.BytesToIdentityPreimage(trig.EpochID)
+		identityPreimage := identitypreimage.IdentityPreimage(trig.EpochID)
 		trigMsg, err := p2pmsg.NewSignedDecryptionTrigger(
 			cfg.InstanceID,
 			identityPreimage,

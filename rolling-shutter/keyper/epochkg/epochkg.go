@@ -4,7 +4,6 @@ package epochkg
 
 import (
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -67,8 +66,7 @@ func (epochkg *EpochKG) computeEpochSecretKey(shares []*EpochSecretKeyShare) (*s
 }
 
 func (epochkg *EpochKG) addEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	shares := epochkg.SecretShares[share.IdentityPreimage.String()]
-	log.Info().Interface("a", shares).Msg("test")
+	shares := epochkg.SecretShares[share.IdentityPreimage.Hex()]
 	for _, s := range shares {
 		if s.Sender == share.Sender {
 			return errors.Errorf(
@@ -79,18 +77,18 @@ func (epochkg *EpochKG) addEpochSecretKeyShare(share *EpochSecretKeyShare) error
 	}
 	shares = append(shares, share)
 	if len(shares) != int(epochkg.Threshold) {
-		epochkg.SecretShares[share.IdentityPreimage.String()] = shares
+		epochkg.SecretShares[share.IdentityPreimage.Hex()] = shares
 		return nil
 	}
 
 	secretKey, err := epochkg.computeEpochSecretKey(shares)
-	delete(epochkg.SecretShares, share.IdentityPreimage.String())
-	epochkg.SecretKeys[share.IdentityPreimage.String()] = secretKey // may be nil in the error case
+	delete(epochkg.SecretShares, share.IdentityPreimage.Hex())
+	epochkg.SecretKeys[share.IdentityPreimage.Hex()] = secretKey // may be nil in the error case
 	return err
 }
 
 func (epochkg *EpochKG) HandleEpochSecretKeyShare(share *EpochSecretKeyShare) error {
-	if _, ok := epochkg.SecretKeys[share.IdentityPreimage.String()]; ok {
+	if _, ok := epochkg.SecretKeys[share.IdentityPreimage.Hex()]; ok {
 		// We already have the key for this epoch
 		return nil
 	}

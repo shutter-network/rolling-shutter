@@ -29,7 +29,7 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 }
 
 func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.DecryptionKey) error {
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 
 	tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
 		Eon:           int64(msg.Eon),

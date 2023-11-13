@@ -79,7 +79,7 @@ func TestEpochKG(t *testing.T) {
 		kgs = append(kgs, NewEpochKG(r))
 	}
 
-	identityPreimage := identitypreimage.BytesToIdentityPreimage([]byte{50})
+	identityPreimage := identitypreimage.IdentityPreimage([]byte{50})
 	for sender, kg := range kgs {
 		share := EpochSecretKeyShare{
 			Eon:              kg.Eon,
@@ -95,12 +95,12 @@ func TestEpochKG(t *testing.T) {
 
 	// every EpochKG should end up with the same key
 	for _, kg := range kgs {
-		_, ok := kg.SecretShares[identityPreimage.String()]
+		_, ok := kg.SecretShares[identityPreimage.Hex()]
 		assert.Assert(t, !ok)
-		key, ok := kg.SecretKeys[identityPreimage.String()]
+		key, ok := kg.SecretKeys[identityPreimage.Hex()]
 		assert.Assert(t, ok)
 		assert.Assert(t, key != nil)
-		assert.DeepEqual(t, kgs[0].SecretKeys[identityPreimage.String()], key)
+		assert.DeepEqual(t, kgs[0].SecretKeys[identityPreimage.Hex()], key)
 	}
 
 	shtest.EnsureGobable(t, kgs[0], new(EpochKG))

@@ -228,7 +228,7 @@ func parseEpochID(f string) (identitypreimage.IdentityPreimage, error) {
 	if err != nil {
 		return identitypreimage.IdentityPreimage{}, err
 	}
-	return identitypreimage.BytesToIdentityPreimage(epochIDBytes), nil
+	return identitypreimage.IdentityPreimage(epochIDBytes), nil
 }
 
 func parseSigma(f string) (shcrypto.Block, error) {

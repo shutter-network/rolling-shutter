@@ -70,6 +70,6 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	}
 	metricsEpochKGDectyptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), identityPreimage)
 }

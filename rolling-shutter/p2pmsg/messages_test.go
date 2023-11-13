@@ -45,7 +45,7 @@ type testConfig struct {
 func defaultTestConfig(t *testing.T) testConfig {
 	t.Helper()
 
-	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big2)
+	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big2)
 	return testConfig{
 		identityPreimage: identityPreimage,
 		blockNumber:      uint64(0),

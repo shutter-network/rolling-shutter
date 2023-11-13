@@ -140,12 +140,9 @@ func (m *MockNode) sendTransactions(ctx context.Context) error {
 				continue
 			}
 
-			identityPreimage, err := identitypreimage.BigToIdentityPreimage(
+			identityPreimage := identitypreimage.BigToIdentityPreimage(
 				new(big.Int).SetBytes(nextEpochResponse.JSON200.Id),
 			)
-			if err != nil {
-				log.Error().Msg("error converting epoch-id")
-			}
 			_, encryptedTx, err := encryptRandomMessage(identityPreimage, m.eonPublicKey)
 			if err != nil {
 				return err

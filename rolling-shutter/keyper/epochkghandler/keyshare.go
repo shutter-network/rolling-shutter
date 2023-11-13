@@ -88,7 +88,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// Check that we don't know the decryption key yet
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.GetShares()[0].EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(msg.GetShares()[0].EpochID)
 
 	keyExists, err := db.ExistsDecryptionKey(ctx, kprdb.ExistsDecryptionKeyParams{
 		Eon:     int64(msg.Eon),
@@ -121,7 +121,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	if err != nil {
 		return nil, err
 	}
-	decryptionKey, ok := epochKG.SecretKeys[identityPreimage.String()]
+	decryptionKey, ok := epochKG.SecretKeys[identityPreimage.Hex()]
 	if !ok {
 		numShares := uint64(len(epochKG.SecretShares))
 		if numShares < pureDKGResult.Threshold {
@@ -166,7 +166,7 @@ func (handler *DecryptionKeyShareHandler) aggregateDecryptionKeySharesFromDB(
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 	// For simplicity, we aggregate shares even if we don't have enough of them yet.
 	for _, share := range shares {
-		identityPreimage := identitypreimage.BytesToIdentityPreimage(share.EpochID)
+		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
 
 		shareDecoded, err := shdb.DecodeEpochSecretKeyShare(share.DecryptionKeyShare)
 		if err != nil {

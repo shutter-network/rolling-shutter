@@ -292,10 +292,7 @@ func (btchr *Batcher) closeBatchImpl(
 		return err
 	}
 
-	newEpoch, err := batchhandler.ComputeNextEpochID(nextBatchEpochID)
-	if err != nil {
-		return err
-	}
+	newEpoch := batchhandler.ComputeNextEpochID(nextBatchEpochID)
 
 	return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
 		EpochID:       newEpoch.Bytes(),

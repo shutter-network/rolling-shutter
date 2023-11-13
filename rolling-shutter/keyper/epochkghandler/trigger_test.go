@@ -91,9 +91,9 @@ func TestTriggerValidatorIntegration(t *testing.T) {
 
 	// Make a db with collator 1 from a certain block and collator 2 afterwards
 	activationBlk1 := uint64(0)
-	identityPreimage1, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
+	identityPreimage1 := identitypreimage.BigToIdentityPreimage(common.Big0)
 	activationBlk2 := uint64(123)
-	identityPreimage2, _ := identitypreimage.BigToIdentityPreimage(common.Big1)
+	identityPreimage2 := identitypreimage.BigToIdentityPreimage(common.Big1)
 	assert.NilError(t, err)
 	collator1 := shdb.EncodeAddress(collatorAddress1)
 	collator2 := shdb.EncodeAddress(collatorAddress2)

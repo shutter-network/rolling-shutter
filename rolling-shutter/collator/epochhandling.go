@@ -48,7 +48,7 @@ func (handler *decryptionKeyHandler) HandleMessage(
 	m p2pmsg.Message,
 ) ([]p2pmsg.Message, error) {
 	msg := m.(*p2pmsg.DecryptionKey)
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(msg.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
@@ -82,7 +82,7 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
-	identityPreimage := identitypreimage.BytesToIdentityPreimage(key.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(key.EpochID)
 
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)

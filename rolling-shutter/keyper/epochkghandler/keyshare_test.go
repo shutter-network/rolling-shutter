@@ -72,8 +72,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
-	identityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big0)
-	wrongIdentityPreimage, _ := identitypreimage.BigToIdentityPreimage(common.Big1)
+	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
+	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
 	tkg := initializeEon(ctx, t, dbpool, keyperIndex)
 	keyshare := tkg.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal()
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
