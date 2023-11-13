@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 type IdentityPreimage []byte
@@ -14,8 +14,9 @@ func BigToIdentityPreimage(n *big.Int) IdentityPreimage {
 	return IdentityPreimage(n.Bytes())
 }
 
-func HexToIdentityPreimage(n string) IdentityPreimage {
-	return IdentityPreimage(common.FromHex(n))
+func HexToIdentityPreimage(n string) (IdentityPreimage, error) {
+	b, err := hexutil.Decode(n)
+	return IdentityPreimage(b), err
 }
 
 func Uint64ToIdentityPreimage(n uint64) IdentityPreimage {
@@ -35,13 +36,14 @@ func (e IdentityPreimage) Uint64() uint64 {
 }
 
 func (e IdentityPreimage) Hex() string {
-	return common.Bytes2Hex([]byte(e))
+	return hexutil.Encode(e)
 }
 
 func (e IdentityPreimage) String() string {
-	var hash common.Hash
-	hash.SetBytes(e.Bytes())
-	s := hash.String()
+	s := e.Hex()
+	if len(s) < 10 {
+		return s[2:]
+	}
 	return s[2:6] + ".." + s[len(s)-4:]
 }
 
