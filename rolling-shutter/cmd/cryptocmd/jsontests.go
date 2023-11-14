@@ -44,7 +44,7 @@ func GenerateTestdata() *cobra.Command {
 				vtCounter: 1,
 			}
 			enc.start()
-			CreateJSONTests(*enc)
+			createJSONTests(*enc)
 
 			enc.flush()
 			return nil
@@ -61,7 +61,7 @@ func RunJSONTests() *cobra.Command {
 		Short: "Use testdata in json format to test crypto implementations",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			errs := ReadTestcases(filename)
+			errs := readTestcases(filename)
 
 			return errs[0]
 		},
@@ -201,7 +201,7 @@ type verificationTest struct {
 	Expected       bool                    `json:"expected"`
 }
 
-func ReadTestcases(filename string) []error {
+func readTestcases(filename string) []error {
 	var testcases []*testCase
 
 	f, err := os.OpenFile(filename, os.O_RDONLY, 0o600)
@@ -314,7 +314,7 @@ var testSpecs = []struct {
 	},
 }
 
-func CreateJSONTests(enc testEncoder) {
+func createJSONTests(enc testEncoder) {
 	keygen := testkeygen.NewKeyGenerator(12, 10)
 	var err error
 	for i := range testSpecs {
