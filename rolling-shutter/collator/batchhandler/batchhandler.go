@@ -7,29 +7,26 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 // ComputeNextEpochID takes an epoch id as parameter and returns the id of the epoch following it.
-func ComputeNextEpochID(epochID epochid.EpochID) (epochid.EpochID, error) {
-	n := epochID.Big()
-	return epochid.BigToEpochID(n.Add(n, common.Big1))
+func ComputeNextEpochID(identityPreimage identitypreimage.IdentityPreimage) identitypreimage.IdentityPreimage {
+	n := identityPreimage.Big()
+	return identitypreimage.BigToIdentityPreimage(n.Add(n, common.Big1))
 }
 
 // GetNextBatch gets the epochID and block number that will be used in the next batch.
-func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (epochid.EpochID, uint64, error) {
+func GetNextBatch(ctx context.Context, db *cltrdb.Queries) (identitypreimage.IdentityPreimage, uint64, error) {
 	b, err := db.GetNextBatch(ctx)
 	if err != nil {
 		// There should already be an epochID in the database so not finding a row is an error
-		return epochid.EpochID{}, 0, err
+		return identitypreimage.IdentityPreimage{}, 0, err
 	}
-	epochID, err := epochid.BytesToEpochID(b.EpochID)
-	if err != nil {
-		return epochid.EpochID{}, 0, err
-	}
+	identityPreimage := identitypreimage.IdentityPreimage(b.EpochID)
 	if b.L1BlockNumber < 0 {
-		return epochid.EpochID{}, 0, errors.Errorf("negative l1 block number in db")
+		return identitypreimage.IdentityPreimage{}, 0, errors.Errorf("negative l1 block number in db")
 	}
 	l1BlockNumber := uint64(b.L1BlockNumber)
-	return epochID, l1BlockNumber, nil
+	return identityPreimage, l1BlockNumber, nil
 }

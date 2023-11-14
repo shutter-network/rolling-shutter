@@ -11,7 +11,6 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -34,9 +33,6 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	key := msg.(*p2pmsg.DecryptionKey)
 	if key.GetInstanceID() != handler.config.GetInstanceID() {
 		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
-	}
-	if _, err := epochid.BytesToEpochID(key.EpochID); err != nil {
-		return false, errors.Wrapf(err, "invalid epoch id")
 	}
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)

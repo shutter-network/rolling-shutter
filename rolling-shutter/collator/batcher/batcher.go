@@ -17,7 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
@@ -90,30 +90,30 @@ func NewBatcher(ctx context.Context, cfg *config.Config, dbpool *pgxpool.Pool) (
 func (btchr *Batcher) initializeNextBatch(
 	ctx context.Context,
 	db *cltrdb.Queries,
-) (epochid.EpochID, uint64, error) {
+) (identitypreimage.IdentityPreimage, uint64, error) {
 	var (
-		nextEpochID   epochid.EpochID
-		l1BlockNumber uint64
-		err           error
+		nextIdentityPreimage identitypreimage.IdentityPreimage
+		l1BlockNumber        uint64
+		err                  error
 	)
 	l1BlockNumber, err = btchr.l1EthClient.BlockNumber(ctx)
 	if err != nil {
-		return nextEpochID, l1BlockNumber, err
+		return nextIdentityPreimage, l1BlockNumber, err
 	}
 	if l1BlockNumber > math.MaxInt64 {
-		return nextEpochID, l1BlockNumber, errors.Errorf("block number too big: %d", l1BlockNumber)
+		return nextIdentityPreimage, l1BlockNumber, errors.Errorf("block number too big: %d", l1BlockNumber)
 	}
 
 	l2batchIndex, err := btchr.l2Client.GetBatchIndex(ctx)
 	if err != nil {
-		return nextEpochID, l1BlockNumber, err
+		return nextIdentityPreimage, l1BlockNumber, err
 	}
-	nextEpochID = epochid.Uint64ToEpochID(l2batchIndex + 1)
+	nextIdentityPreimage = identitypreimage.Uint64ToIdentityPreimage(l2batchIndex + 1)
 	err = db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
-		EpochID:       nextEpochID.Bytes(),
+		EpochID:       nextIdentityPreimage.Bytes(),
 		L1BlockNumber: int64(l1BlockNumber),
 	})
-	return nextEpochID, l1BlockNumber, err
+	return nextIdentityPreimage, l1BlockNumber, err
 }
 
 // earlyValidateTx validates a transaction for some basic properties.
@@ -186,14 +186,14 @@ func (btchr *Batcher) initChainState(ctx context.Context) error {
 		btchr.nextBatchChainState = nil
 		return err
 	}
-	log.Info().Uint64("batch-index", btchr.nextBatchChainState.epochID.Uint64()).
+	log.Info().Uint64("batch-index", btchr.nextBatchChainState.identityPreimage.Uint64()).
 		Msg("loaded chain state")
 	return nil
 }
 
 // loadAndApplyTransactions loads transactions from the database for the current batch.
 func (btchr *Batcher) loadAndApplyTransactions(ctx context.Context, db *cltrdb.Queries) error {
-	txs, err := db.GetNonRejectedTransactionsByEpoch(ctx, btchr.nextBatchChainState.epochID.Bytes())
+	txs, err := db.GetNonRejectedTransactionsByEpoch(ctx, btchr.nextBatchChainState.identityPreimage.Bytes())
 	if err != nil {
 		return err
 	}
@@ -292,10 +292,7 @@ func (btchr *Batcher) closeBatchImpl(
 		return err
 	}
 
-	newEpoch, err := batchhandler.ComputeNextEpochID(nextBatchEpochID)
-	if err != nil {
-		return err
-	}
+	newEpoch := batchhandler.ComputeNextEpochID(nextBatchEpochID)
 
 	return db.SetNextBatch(ctx, cltrdb.SetNextBatchParams{
 		EpochID:       newEpoch.Bytes(),
@@ -406,10 +403,10 @@ func (btchr *Batcher) EnqueueTx(ctx context.Context, txBytes []byte) error {
 	}
 
 	err = btchr.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
-		epochID := epochid.Uint64ToEpochID(tx.BatchIndex()).Bytes()
+		identityPreimage := identitypreimage.Uint64ToIdentityPreimage(tx.BatchIndex()).Bytes()
 		return cltrdb.New(dbtx).InsertTx(ctx, cltrdb.InsertTxParams{
 			TxHash:  tx.Hash().Bytes(),
-			EpochID: epochID,
+			EpochID: identityPreimage,
 			TxBytes: txBytes,
 			Status:  txstatus,
 		})

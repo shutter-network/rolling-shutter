@@ -8,18 +8,18 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 )
 
 func main() {
-	keygen := testkeygen.NewTestKeyGenerator(&testing.T{}, 3, 2)
+	keygen := testkeygen.NewTestKeyGenerator(&testing.T{}, 3, 2, false)
 
 	var prevEonPublicKey *shcrypto.EonPublicKey
 	for i := uint64(0); i < 200; i++ {
-		epochID := epochid.Uint64ToEpochID(i)
-		eonPublicKey := keygen.EonPublicKey(epochID)
-		decryptionKey := keygen.EpochSecretKey(epochID)
+		identityPreimage := identitypreimage.Uint64ToIdentityPreimage(i)
+		eonPublicKey := keygen.EonPublicKey(identityPreimage)
+		decryptionKey := keygen.EpochSecretKey(identityPreimage)
 
 		if prevEonPublicKey == nil || !bytes.Equal(eonPublicKey.Marshal(), prevEonPublicKey.Marshal()) {
 			if prevEonPublicKey != nil {
@@ -30,6 +30,6 @@ func main() {
 		}
 		prevEonPublicKey = eonPublicKey
 
-		fmt.Printf("%X | %X\n", epochID.Bytes(), decryptionKey.Marshal())
+		fmt.Printf("%X | %X\n", identityPreimage.Bytes(), decryptionKey.Marshal())
 	}
 }

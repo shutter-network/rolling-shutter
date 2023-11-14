@@ -6,7 +6,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 // KeyperKeyShares holds the public and private key shares of a single keyper.
@@ -16,8 +16,10 @@ type KeyperKeyShares struct {
 }
 
 // ComputeEpochSecretKeyShare computes the secret key share for the given epoch.
-func (kks *KeyperKeyShares) ComputeEpochSecretKeyShare(epochID epochid.EpochID) *shcrypto.EpochSecretKeyShare {
-	epochIDG1 := shcrypto.ComputeEpochID(epochID.Bytes())
+func (kks *KeyperKeyShares) ComputeEpochSecretKeyShare(
+	identityPreimage identitypreimage.IdentityPreimage,
+) *shcrypto.EpochSecretKeyShare {
+	epochIDG1 := shcrypto.ComputeEpochID(identityPreimage.Bytes())
 	return shcrypto.ComputeEpochSecretKeyShare(kks.eonSecretKeyShare, epochIDG1)
 }
 
@@ -66,22 +68,22 @@ func NewEonKeys(random io.Reader, numKeypers uint64, threshold uint64) (*EonKeys
 }
 
 func (eonkeys *EonKeys) getEpochSecretKeyShares(
-	epochID epochid.EpochID,
+	identityPreimage identitypreimage.IdentityPreimage,
 	keyperIndices []int,
 ) []*shcrypto.EpochSecretKeyShare {
 	res := make([]*shcrypto.EpochSecretKeyShare, 0, len(keyperIndices))
 	for _, i := range keyperIndices {
-		res = append(res, eonkeys.keyperShares[i].ComputeEpochSecretKeyShare(epochID))
+		res = append(res, eonkeys.keyperShares[i].ComputeEpochSecretKeyShare(identityPreimage))
 	}
 	return res
 }
 
-func (eonkeys *EonKeys) EpochSecretKey(epochID epochid.EpochID) (*shcrypto.EpochSecretKey, error) {
+func (eonkeys *EonKeys) EpochSecretKey(identityPreimage identitypreimage.IdentityPreimage) (*shcrypto.EpochSecretKey, error) {
 	keyperIndices := []int{}
 	for i := uint64(0); i < eonkeys.Threshold; i++ {
 		keyperIndices = append(keyperIndices, int(i))
 	}
-	epochSecretKeyShares := eonkeys.getEpochSecretKeyShares(epochID, keyperIndices)
+	epochSecretKeyShares := eonkeys.getEpochSecretKeyShares(identityPreimage, keyperIndices)
 	return shcrypto.ComputeEpochSecretKey(
 		keyperIndices,
 		epochSecretKeyShares,

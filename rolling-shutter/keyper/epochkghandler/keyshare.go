@@ -14,7 +14,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -60,9 +60,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 		return false, errors.New("decryption key share must have exactly one share")
 	}
 	for _, share := range keyShare.GetShares() {
-		if _, err = epochid.BytesToEpochID(share.EpochID); err != nil {
-			return false, errors.Wrap(err, "invalid epoch id")
-		}
+
 		epochSecretKeyShare, err := share.GetEpochSecretKeyShare()
 		if err != nil {
 			return false, err
@@ -90,16 +88,14 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// Check that we don't know the decryption key yet
-	epochID, err := epochid.BytesToEpochID(msg.GetShares()[0].EpochID)
-	if err != nil {
-		return nil, err
-	}
+	identityPreimage := identitypreimage.IdentityPreimage(msg.GetShares()[0].EpochID)
+
 	keyExists, err := db.ExistsDecryptionKey(ctx, kprdb.ExistsDecryptionKeyParams{
 		Eon:     int64(msg.Eon),
-		EpochID: epochID.Bytes(),
+		EpochID: identityPreimage.Bytes(),
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query decryption key for epoch %s", epochID)
+		return nil, errors.Wrapf(err, "failed to query decryption key for epoch %s", identityPreimage)
 	}
 	if keyExists {
 		return nil, nil
@@ -121,11 +117,11 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// aggregate epoch secret key
-	epochKG, err := handler.aggregateDecryptionKeySharesFromDB(ctx, pureDKGResult, epochID)
+	epochKG, err := handler.aggregateDecryptionKeySharesFromDB(ctx, pureDKGResult, identityPreimage)
 	if err != nil {
 		return nil, err
 	}
-	decryptionKey, ok := epochKG.SecretKeys[epochID]
+	decryptionKey, ok := epochKG.SecretKeys[identityPreimage.Hex()]
 	if !ok {
 		numShares := uint64(len(epochKG.SecretShares))
 		if numShares < pureDKGResult.Threshold {
@@ -134,13 +130,13 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		}
 		return nil, errors.Errorf(
 			"failed to generate decryption key for epoch %s even though we have enough shares",
-			epochID,
+			identityPreimage,
 		)
 	}
 	message := &p2pmsg.DecryptionKey{
 		InstanceID: handler.config.GetInstanceID(),
 		Eon:        msg.Eon,
-		EpochID:    epochID.Bytes(),
+		EpochID:    identityPreimage.Bytes(),
 		Key:        decryptionKey.Marshal(),
 	}
 	err = db.InsertDecryptionKeyMsg(ctx, message)
@@ -148,7 +144,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		return nil, err
 	}
 	metricsEpochKGDecryptionKeysGenerated.Inc()
-	log.Info().Str("epoch-id", epochID.Hex()).Str("message", message.LogInfo()).
+	log.Info().Str("epoch-id", identityPreimage.Hex()).Str("message", message.LogInfo()).
 		Msg("broadcasting decryption key")
 	return []p2pmsg.Message{message}, nil
 }
@@ -156,38 +152,36 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 func (handler *DecryptionKeyShareHandler) aggregateDecryptionKeySharesFromDB(
 	ctx context.Context,
 	pureDKGResult *puredkg.Result,
-	epochID epochid.EpochID,
+	identityPreimage identitypreimage.IdentityPreimage,
 ) (*epochkg.EpochKG, error) {
 	db := kprdb.New(handler.dbpool)
 	shares, err := db.SelectDecryptionKeyShares(ctx, kprdb.SelectDecryptionKeySharesParams{
 		Eon:     int64(pureDKGResult.Eon),
-		EpochID: epochID.Bytes(),
+		EpochID: identityPreimage.Bytes(),
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get decryption key shares for epoch %s from db", epochID)
+		return nil, errors.Wrapf(err, "failed to get decryption key shares for epoch %s from db", identityPreimage)
 	}
 
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
 	// For simplicity, we aggregate shares even if we don't have enough of them yet.
 	for _, share := range shares {
-		epochID, err := epochid.BytesToEpochID(share.EpochID)
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid epoch id in db")
-		}
+		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
+
 		shareDecoded, err := shdb.DecodeEpochSecretKeyShare(share.DecryptionKeyShare)
 		if err != nil {
-			log.Warn().Str("epoch-id", epochID.Hex()).Int64("keyper-index", share.KeyperIndex).
+			log.Warn().Str("epoch-id", identityPreimage.Hex()).Int64("keyper-index", share.KeyperIndex).
 				Msg("invalid decryption key share in DB")
 			continue
 		}
 		err = epochKG.HandleEpochSecretKeyShare(&epochkg.EpochSecretKeyShare{
-			Eon:    pureDKGResult.Eon,
-			Epoch:  epochID,
-			Sender: uint64(share.KeyperIndex),
-			Share:  shareDecoded,
+			Eon:              pureDKGResult.Eon,
+			IdentityPreimage: identityPreimage,
+			Sender:           uint64(share.KeyperIndex),
+			Share:            shareDecoded,
 		})
 		if err != nil {
-			log.Info().Str("epoch-id", epochID.Hex()).Int64("keyper-index", share.KeyperIndex).
+			log.Info().Str("epoch-id", identityPreimage.Hex()).Int64("keyper-index", share.KeyperIndex).
 				Msg("failed to process decryption key share")
 			continue
 		}

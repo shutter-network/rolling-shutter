@@ -18,7 +18,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 const (
@@ -49,10 +49,10 @@ func (bb *BlockBuilder) genTx() error {
 		return errors.Wrap(err, "failed to generate random sigma")
 	}
 
-	epochID := epochid.Uint64ToEpochID(uint64(len(bb.cleartextTransactions)))
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(uint64(len(bb.cleartextTransactions)))
 	msg := shcrypto.Encrypt(cleartextTx,
 		bb.eonkeys.publicKey,
-		shcrypto.ComputeEpochID(epochID.Bytes()),
+		shcrypto.ComputeEpochID(identityPreimage.Bytes()),
 		sigma)
 
 	bb.cleartextTransactions = append(bb.cleartextTransactions, cleartextTx)
@@ -78,14 +78,14 @@ func NewBlockBuilder() (*BlockBuilder, error) {
 }
 
 // BenchmarkKeyperComputeSecretShares benchmarks the work the keyper has to do to generate the
-// secret shares for one block, where each transaction is encrypted for a different epochid.
+// secret shares for one block, where each transaction is encrypted for a different identityPreimage.
 func BenchmarkKeyperComputeSecretShares(b *testing.B) {
 	ek, err := NewEonKeys(random, numKeypers, threshold)
 	assert.NilError(b, err)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < transactionsPerBlock; i++ {
-			ek.keyperShares[0].ComputeEpochSecretKeyShare(epochid.Uint64ToEpochID(uint64(i)))
+			ek.keyperShares[0].ComputeEpochSecretKeyShare(identitypreimage.Uint64ToIdentityPreimage(uint64(i)))
 		}
 	}
 }
@@ -100,7 +100,7 @@ func BenchmarkSecretKeyGeneration(b *testing.B) {
 		keyperIndices = append(keyperIndices, int(i))
 	}
 
-	shares := ek.getEpochSecretKeyShares(epochid.Uint64ToEpochID(55), keyperIndices)
+	shares := ek.getEpochSecretKeyShares(identitypreimage.Uint64ToIdentityPreimage(55), keyperIndices)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		_, err := shcrypto.ComputeEpochSecretKey(
@@ -138,7 +138,7 @@ func BenchmarkFullBlock(b *testing.B) {
 
 	shares := [][]*shcrypto.EpochSecretKeyShare{}
 	for i := 0; i < len(bb.encryptedTransactions); i++ {
-		shares = append(shares, bb.eonkeys.getEpochSecretKeyShares(epochid.Uint64ToEpochID(uint64(i)), keyperIndices))
+		shares = append(shares, bb.eonkeys.getEpochSecretKeyShares(identitypreimage.Uint64ToIdentityPreimage(uint64(i)), keyperIndices))
 	}
 
 	b.ResetTimer()

@@ -12,7 +12,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/kprdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -122,15 +122,11 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	epochID, err := epochid.BytesToEpochID(epochIDBytes)
-	if err != nil {
-		sendError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+	identityPreimage := identitypreimage.IdentityPreimage(epochIDBytes)
 
 	ctx := r.Context()
 	msgs, err := epochkghandler.SendDecryptionKeyShare(
-		ctx, srv.config, kprdb.New(srv.dbpool), int64(requestBody.BlockNumber), epochID,
+		ctx, srv.config, kprdb.New(srv.dbpool), int64(requestBody.BlockNumber), identityPreimage,
 	)
 	if err != nil {
 		if err != nil {

@@ -22,7 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 )
 
@@ -95,12 +95,12 @@ func newTestConfig(t *testing.T) *config.Config {
 }
 
 type TestParams struct {
-	GasLimit       uint64
-	InitialBalance *big.Int
-	BaseFee        *big.Int
-	TxGasTipCap    *big.Int
-	TxGasFeeCap    *big.Int
-	InitialEpochID epochid.EpochID
+	GasLimit                uint64
+	InitialBalance          *big.Int
+	BaseFee                 *big.Int
+	TxGasTipCap             *big.Int
+	TxGasFeeCap             *big.Int
+	InitialIdentityPreimage identitypreimage.IdentityPreimage
 }
 
 type Fixture struct {
@@ -135,7 +135,7 @@ func Setup(ctx context.Context, t *testing.T, params TestParams) *Fixture {
 	ethL2 := sequencer.RunMockEthServer(t)
 	t.Cleanup(ethL2.Teardown)
 	cfg.SequencerURL = ethL2.URL
-	ethL2.SetBatchIndex(params.InitialEpochID.Uint64() - 1)
+	ethL2.SetBatchIndex(params.InitialIdentityPreimage.Uint64() - 1)
 
 	db, dbpool, dbteardown := testdb.NewCollatorTestDB(ctx, t)
 	t.Cleanup(dbteardown)

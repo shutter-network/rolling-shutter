@@ -8,7 +8,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batchhandler/batch"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 var (
@@ -23,26 +23,28 @@ var (
 // decide if transactions will be included into the next block. The collator creates a new
 // ChainState object for each block and calls ApplyTx for each transaction that it wants to apply.
 type ChainState struct {
-	balances        map[common.Address]*big.Int
-	nonces          map[common.Address]uint64
-	gasUsed         uint64
-	sizeInBytes     uint64
-	numTransactions uint64
-	signer          txtypes.Signer
-	baseFee         *big.Int
-	blockGasLimit   uint64
-	epochID         epochid.EpochID
+	balances         map[common.Address]*big.Int
+	nonces           map[common.Address]uint64
+	gasUsed          uint64
+	sizeInBytes      uint64
+	numTransactions  uint64
+	signer           txtypes.Signer
+	baseFee          *big.Int
+	blockGasLimit    uint64
+	identityPreimage identitypreimage.IdentityPreimage
 }
 
-func NewChainState(signer txtypes.Signer, baseFee *big.Int, blockGasLimit uint64, epochID epochid.EpochID) *ChainState {
+func NewChainState(signer txtypes.Signer, baseFee *big.Int, blockGasLimit uint64,
+	identityPreimage identitypreimage.IdentityPreimage,
+) *ChainState {
 	return &ChainState{
-		balances:      make(map[common.Address]*big.Int),
-		nonces:        make(map[common.Address]uint64),
-		gasUsed:       0,
-		signer:        signer,
-		baseFee:       baseFee,
-		blockGasLimit: blockGasLimit,
-		epochID:       epochID,
+		balances:         make(map[common.Address]*big.Int),
+		nonces:           make(map[common.Address]uint64),
+		gasUsed:          0,
+		signer:           signer,
+		baseFee:          baseFee,
+		blockGasLimit:    blockGasLimit,
+		identityPreimage: identityPreimage,
 	}
 }
 

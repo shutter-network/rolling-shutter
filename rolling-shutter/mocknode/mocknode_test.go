@@ -9,7 +9,7 @@ import (
 	txtypes "github.com/shutter-network/txtypes/types"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 func TestSaltedEncryption(t *testing.T) {
@@ -24,14 +24,14 @@ func TestSaltedEncryption(t *testing.T) {
 	payloadBytes, err := payload.Encode()
 	assert.NilError(t, err)
 
-	epoch := epochid.Uint64ToEpochID(0)
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(0)
 
 	_, eonPublicKey, err := computeEonKeys(42)
 	assert.NilError(t, err)
 
-	enc1, err := EncryptMessage(payloadBytes, epoch, eonPublicKey)
+	enc1, err := EncryptMessage(payloadBytes, identityPreimage, eonPublicKey)
 	assert.NilError(t, err)
-	enc2, err := EncryptMessage(payloadBytes, epoch, eonPublicKey)
+	enc2, err := EncryptMessage(payloadBytes, identityPreimage, eonPublicKey)
 	assert.NilError(t, err)
 	assert.Assert(t, !gocmp.Equal(enc1, enc2))
 }

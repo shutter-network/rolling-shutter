@@ -16,7 +16,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/batcher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -48,23 +48,20 @@ func (handler *decryptionKeyHandler) HandleMessage(
 	m p2pmsg.Message,
 ) ([]p2pmsg.Message, error) {
 	msg := m.(*p2pmsg.DecryptionKey)
-	epochID, err := epochid.BytesToEpochID(msg.EpochID)
-	if err != nil {
-		return nil, err
-	}
+	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 
-	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		_, err := db.InsertDecryptionKey(ctx, cltrdb.InsertDecryptionKeyParams{
-			EpochID:       epochID.Bytes(),
+			EpochID:       identityPreimage.Bytes(),
 			DecryptionKey: msg.Key,
 		})
 		return err
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", epochID)
+		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", identityPreimage)
 	}
-	log.Info().Str("epoch-id", epochID.Hex()).Msg("inserted decryption key to database")
+	log.Info().Str("epoch-id", identityPreimage.Hex()).Msg("inserted decryption key to database")
 	return []p2pmsg.Message{}, nil
 }
 
@@ -85,12 +82,9 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 	if key.Eon > math.MaxInt64 {
 		return false, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
-	epochID, err := epochid.BytesToEpochID(key.EpochID)
-	if err != nil {
-		return false, errors.Wrapf(err, "invalid epoch id")
-	}
+	identityPreimage := identitypreimage.IdentityPreimage(key.EpochID)
 
-	err = handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := cltrdb.New(tx)
 		eonPub, err := db.GetEonPublicKey(ctx, int64(key.Eon))
 		if err != nil {
@@ -111,12 +105,12 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 		return false, err
 	}
 
-	ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, &eonPublicKey, epochID.Bytes())
+	ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, &eonPublicKey, identityPreimage.Bytes())
 	if err != nil {
 		return false, err
 	}
 	if !ok {
-		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
+		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", identityPreimage)
 	}
 	return true, nil
 }

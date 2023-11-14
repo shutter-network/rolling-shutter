@@ -8,7 +8,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 // TestKeyGenerator is a helper tool to generate secret and public eon and epoch keys and key
@@ -21,31 +21,35 @@ type TestKeyGenerator struct {
 	Threshold   uint64
 }
 
-func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64) *TestKeyGenerator {
+func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64, infiniteInterval bool) *TestKeyGenerator {
 	t.Helper()
+	eonInterval := 100
+	if infiniteInterval {
+		eonInterval = 0 // 0 stands for infinity
+	}
 	return &TestKeyGenerator{
 		t:           t,
-		eonInterval: 100, // 0 stands for infinity
+		eonInterval: uint64(eonInterval),
 		eonKeyGen:   make(map[uint64]*EonKeys),
 		NumKeypers:  numKeypers,
 		Threshold:   threshold,
 	}
 }
 
-// getEonIndex computes the index of the EON key to be used for the given epochID. We generate a new
+// getEonIndex computes the index of the EON key to be used for the given identityPreimage. We generate a new
 // eon key every eonInterval epochs.
-func (tkg *TestKeyGenerator) getEonIndex(epochID epochid.EpochID) uint64 {
+func (tkg *TestKeyGenerator) getEonIndex(identityPreimage identitypreimage.IdentityPreimage) uint64 {
 	if tkg.eonInterval == 0 {
 		return 0
 	}
 
-	return epochID.Big().Uint64() / tkg.eonInterval
+	return identityPreimage.Big().Uint64() / tkg.eonInterval
 }
 
-func (tkg *TestKeyGenerator) EonKeysForEpoch(epochID epochid.EpochID) *EonKeys {
+func (tkg *TestKeyGenerator) EonKeysForEpoch(identityPreimage identitypreimage.IdentityPreimage) *EonKeys {
 	tkg.t.Helper()
 	var err error
-	eonIndex := tkg.getEonIndex(epochID)
+	eonIndex := tkg.getEonIndex(identityPreimage)
 	res, ok := tkg.eonKeyGen[eonIndex]
 	if !ok {
 		res, err = NewEonKeys(
@@ -59,29 +63,35 @@ func (tkg *TestKeyGenerator) EonKeysForEpoch(epochID epochid.EpochID) *EonKeys {
 	return res
 }
 
-func (tkg *TestKeyGenerator) EonPublicKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
+func (tkg *TestKeyGenerator) EonPublicKeyShare(identityPreimage identitypreimage.IdentityPreimage,
+	keyperIndex uint64,
+) *shcrypto.EonPublicKeyShare {
 	tkg.t.Helper()
-	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonPublicKeyShare
+	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].eonPublicKeyShare
 }
 
-func (tkg *TestKeyGenerator) EonPublicKey(epochID epochid.EpochID) *shcrypto.EonPublicKey {
+func (tkg *TestKeyGenerator) EonPublicKey(identityPreimage identitypreimage.IdentityPreimage) *shcrypto.EonPublicKey {
 	tkg.t.Helper()
-	return tkg.EonKeysForEpoch(epochID).publicKey
+	return tkg.EonKeysForEpoch(identityPreimage).publicKey
 }
 
-func (tkg *TestKeyGenerator) EonSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
+func (tkg *TestKeyGenerator) EonSecretKeyShare(identityPreimage identitypreimage.IdentityPreimage,
+	keyperIndex uint64,
+) *shcrypto.EonSecretKeyShare {
 	tkg.t.Helper()
-	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonSecretKeyShare
+	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].eonSecretKeyShare
 }
 
-func (tkg *TestKeyGenerator) EpochSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
+func (tkg *TestKeyGenerator) EpochSecretKeyShare(identityPreimage identitypreimage.IdentityPreimage,
+	keyperIndex uint64,
+) *shcrypto.EpochSecretKeyShare {
 	tkg.t.Helper()
-	return tkg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].ComputeEpochSecretKeyShare(epochID)
+	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].ComputeEpochSecretKeyShare(identityPreimage)
 }
 
-func (tkg *TestKeyGenerator) EpochSecretKey(epochID epochid.EpochID) *shcrypto.EpochSecretKey {
+func (tkg *TestKeyGenerator) EpochSecretKey(identityPreimage identitypreimage.IdentityPreimage) *shcrypto.EpochSecretKey {
 	tkg.t.Helper()
-	epochSecretKey, err := tkg.EonKeysForEpoch(epochID).EpochSecretKey(epochID)
+	epochSecretKey, err := tkg.EonKeysForEpoch(identityPreimage).EpochSecretKey(identityPreimage)
 	assert.NilError(tkg.t, err)
 	return epochSecretKey
 }

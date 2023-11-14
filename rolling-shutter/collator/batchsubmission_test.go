@@ -8,7 +8,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/db/cltrdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testdb"
 )
 
@@ -27,9 +27,9 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	assert.Equal(t, err, pgx.ErrNoRows)
 
 	// Insert a batchtx
-	epoch := epochid.Uint64ToEpochID(1).Bytes()
+	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(1).Bytes()
 	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
-		EpochID:   epoch,
+		EpochID:   identityPreimage,
 		Marshaled: []byte{1, 2, 3},
 	})
 	assert.NilError(t, err)
@@ -38,14 +38,14 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	unsubmitted, err := db.GetUnsubmittedBatchTx(ctx)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, unsubmitted, cltrdb.Batchtx{
-		EpochID:   epoch,
+		EpochID:   identityPreimage,
 		Marshaled: []byte{1, 2, 3},
 	})
 
-	epoch2 := epochid.Uint64ToEpochID(2).Bytes()
+	identityPreimage2 := identitypreimage.Uint64ToIdentityPreimage(2).Bytes()
 	// We should not be able to add a second batchtx
 	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
-		EpochID:   epoch2,
+		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})
 	assert.ErrorContains(t, err, "duplicate key")
@@ -59,7 +59,7 @@ func TestDBSubmissionIntegration(t *testing.T) {
 
 	// We should now be able to add a second batchtx
 	err = db.InsertBatchTx(ctx, cltrdb.InsertBatchTxParams{
-		EpochID:   epoch2,
+		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})
 	assert.NilError(t, err)
@@ -68,7 +68,7 @@ func TestDBSubmissionIntegration(t *testing.T) {
 	unsubmitted, err = db.GetUnsubmittedBatchTx(ctx)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, unsubmitted, cltrdb.Batchtx{
-		EpochID:   epoch2,
+		EpochID:   identityPreimage2,
 		Marshaled: []byte{1, 2, 3, 4},
 	})
 }
