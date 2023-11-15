@@ -18,7 +18,7 @@ func init() {
 	testlog.Setup()
 }
 
-func TestServerDecryption(t *testing.T) {
+func TestServerDecryptionIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

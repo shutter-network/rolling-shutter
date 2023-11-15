@@ -29,6 +29,9 @@ func newTestConfig(t *testing.T) *config.Config {
 }
 
 func TestMockEthIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	cfg := newTestConfig(t)
 	eth := RunMockEthServer(t)
 	defer eth.Teardown()
