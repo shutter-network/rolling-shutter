@@ -142,9 +142,9 @@ func TestCloseBatchIntegration(t *testing.T) {
 	})
 }
 
-// TestOpenNextBatch checks that we're able to enqueue transactions for the next batch even though
+// TestOpenNextBatchIntegration checks that we're able to enqueue transactions for the next batch even though
 // the l2 chain hasn't processed the last block.
-func TestOpenNextBatch(t *testing.T) {
+func TestOpenNextBatchIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
