@@ -180,6 +180,7 @@ jobs:
 
   rs-lint:
     executor: go
+    resource_class: medium+
     working_directory: ~/src/rolling-shutter
     steps:
       - checkout:
