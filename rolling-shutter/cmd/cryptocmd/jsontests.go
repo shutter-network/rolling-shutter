@@ -15,7 +15,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 )
 
@@ -181,11 +181,11 @@ const (
 )
 
 type encryptionTest struct {
-	Message      hexutil.Bytes              `json:"message"`
-	EonPublicKey *shcrypto.EonPublicKey     `json:"eon_public_key"`
-	EpochID      epochid.EpochID            `json:"epoch_id"`
-	Sigma        shcrypto.Block             `json:"sigma"`
-	Expected     *shcrypto.EncryptedMessage `json:"expected"`
+	Message      hexutil.Bytes                     `json:"message"`
+	EonPublicKey *shcrypto.EonPublicKey            `json:"eon_public_key"`
+	EpochID      identitypreimage.IdentityPreimage `json:"epoch_id"`
+	Sigma        shcrypto.Block                    `json:"sigma"`
+	Expected     *shcrypto.EncryptedMessage        `json:"expected"`
 }
 
 type decryptionTest struct {
@@ -195,10 +195,10 @@ type decryptionTest struct {
 }
 
 type verificationTest struct {
-	EpochSecretKey shcrypto.EpochSecretKey `json:"epoch_secret_key"`
-	EonPublicKey   shcrypto.EonPublicKey   `json:"eon_public_key"`
-	EpochID        epochid.EpochID         `json:"epoch_id"`
-	Expected       bool                    `json:"expected"`
+	EpochSecretKey shcrypto.EpochSecretKey           `json:"epoch_secret_key"`
+	EonPublicKey   shcrypto.EonPublicKey             `json:"eon_public_key"`
+	EpochID        identitypreimage.IdentityPreimage `json:"epoch_id"`
+	Expected       bool                              `json:"expected"`
 }
 
 func readTestcases(filename string) []error {
@@ -591,8 +591,8 @@ func testMarshalingRoundtrip(tc *testCase) error {
 	if !bytes.Equal(marshaled, roundtrip) {
 		println(len(marshaled))
 		println(len(roundtrip))
-		println("m:", string(marshaled))
-		println("u:", string(roundtrip))
+		println("before:", string(marshaled))
+		println("after:", string(roundtrip))
 		return errors.New("roundtrip marshaling failed")
 	}
 	return nil

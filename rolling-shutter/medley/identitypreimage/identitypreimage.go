@@ -50,3 +50,13 @@ func (e IdentityPreimage) String() string {
 func Equal(a, b IdentityPreimage) bool {
 	return bytes.Equal(a.Bytes(), b.Bytes())
 }
+
+func (e IdentityPreimage) MarshalText() ([]byte, error) { //nolint:unparam
+	return []byte(e.Hex()), nil
+}
+
+func (e *IdentityPreimage) UnmarshalText(input []byte) error {
+	val, err := HexToIdentityPreimage(string(input))
+	*e = val.Bytes()
+	return err
+}

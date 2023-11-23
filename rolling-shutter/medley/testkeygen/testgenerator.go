@@ -5,7 +5,7 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/epochid"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
 
 // KeyGenerator is a helper tool to generate secret and public eon and epoch keys and key
@@ -28,7 +28,7 @@ func NewKeyGenerator(numKeypers uint64, threshold uint64) *KeyGenerator {
 
 // getEonIndex computes the index of the EON key to be used for the given epochID. We generate a new
 // eon key every eonInterval epochs.
-func (kg *KeyGenerator) getEonIndex(epochID epochid.EpochID) uint64 {
+func (kg *KeyGenerator) getEonIndex(epochID identitypreimage.IdentityPreimage) uint64 {
 	if kg.eonInterval == 0 {
 		return 0
 	}
@@ -36,7 +36,7 @@ func (kg *KeyGenerator) getEonIndex(epochID epochid.EpochID) uint64 {
 	return epochID.Big().Uint64() / kg.eonInterval
 }
 
-func (kg *KeyGenerator) EonKeysForEpoch(epochID epochid.EpochID) *EonKeys {
+func (kg *KeyGenerator) EonKeysForEpoch(epochID identitypreimage.IdentityPreimage) *EonKeys {
 	eonIndex := kg.getEonIndex(epochID)
 	res, ok := kg.eonKeyGen[eonIndex]
 	var err error
@@ -54,23 +54,23 @@ func (kg *KeyGenerator) EonKeysForEpoch(epochID epochid.EpochID) *EonKeys {
 	return res
 }
 
-func (kg *KeyGenerator) EonPublicKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
+func (kg *KeyGenerator) EonPublicKeyShare(epochID identitypreimage.IdentityPreimage, keyperIndex uint64) *shcrypto.EonPublicKeyShare {
 	return kg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonPublicKeyShare
 }
 
-func (kg *KeyGenerator) EonPublicKey(epochID epochid.EpochID) *shcrypto.EonPublicKey {
+func (kg *KeyGenerator) EonPublicKey(epochID identitypreimage.IdentityPreimage) *shcrypto.EonPublicKey {
 	return kg.EonKeysForEpoch(epochID).publicKey
 }
 
-func (kg *KeyGenerator) EonSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
+func (kg *KeyGenerator) EonSecretKeyShare(epochID identitypreimage.IdentityPreimage, keyperIndex uint64) *shcrypto.EonSecretKeyShare {
 	return kg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].eonSecretKeyShare
 }
 
-func (kg *KeyGenerator) EpochSecretKeyShare(epochID epochid.EpochID, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
+func (kg *KeyGenerator) EpochSecretKeyShare(epochID identitypreimage.IdentityPreimage, keyperIndex uint64) *shcrypto.EpochSecretKeyShare {
 	return kg.EonKeysForEpoch(epochID).keyperShares[keyperIndex].ComputeEpochSecretKeyShare(epochID)
 }
 
-func (kg *KeyGenerator) EpochSecretKey(epochID epochid.EpochID) *shcrypto.EpochSecretKey {
+func (kg *KeyGenerator) EpochSecretKey(epochID identitypreimage.IdentityPreimage) *shcrypto.EpochSecretKey {
 	epochSecretKey, err := kg.EonKeysForEpoch(epochID).EpochSecretKey(epochID)
 	if err != nil {
 		panic(err)
@@ -78,16 +78,13 @@ func (kg *KeyGenerator) EpochSecretKey(epochID epochid.EpochID) *shcrypto.EpochS
 	return epochSecretKey
 }
 
-func (kg *KeyGenerator) RandomEpochID(epochbytes []byte) epochid.EpochID {
+func (kg *KeyGenerator) RandomEpochID(epochbytes []byte) identitypreimage.IdentityPreimage {
 	_, err := rand.Read(epochbytes)
 	if err != nil {
 		panic(err)
 	}
 
-	epochID, err := epochid.BytesToEpochID(epochbytes)
-	if err != nil {
-		panic(err)
-	}
+	epochID := identitypreimage.IdentityPreimage(epochbytes)
 	return epochID
 }
 
