@@ -297,11 +297,11 @@ var testSpecs = []struct {
 		[]byte("A message"),
 		fixed,
 	},
-	/*{
+	{
 		"An illegal modification of the encrypted message 'A message'",
 		[]byte("A message"),
 		tampered,
-	},*/
+	},
 	{
 		"Verification of a random 32 byte epochID",
 		make([]byte, 32),
