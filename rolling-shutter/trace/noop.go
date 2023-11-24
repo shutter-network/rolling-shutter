@@ -5,7 +5,6 @@ import (
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/aggregation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -36,11 +35,11 @@ func (NoopMetricsExporter) Temporality(metric.InstrumentKind) metricdata.Tempora
 	return metricdata.DeltaTemporality
 }
 
-func (NoopMetricsExporter) Aggregation(metric.InstrumentKind) aggregation.Aggregation {
-	return aggregation.Drop{}
+func (NoopMetricsExporter) Aggregation(metric.InstrumentKind) metric.Aggregation {
+	return metric.AggregationDrop{}
 }
 
-func (NoopMetricsExporter) Export(context.Context, metricdata.ResourceMetrics) error {
+func (NoopMetricsExporter) Export(context.Context, *metricdata.ResourceMetrics) error {
 	return nil
 }
 

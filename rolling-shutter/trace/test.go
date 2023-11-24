@@ -30,7 +30,7 @@ func SetupTestTracing(t *testing.T) (context.Context, error) {
 		assert.NilError(t, err)
 	})
 
-	// HACK this is a little bit ugly:
+	// HACK:this is a little bit ugly:
 	// we have to poll the global until it is set
 	for !IsEnabled() {
 		select {
