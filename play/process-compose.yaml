@@ -10,10 +10,10 @@ log_configuration:
 
 processes:
   Postgres:
-    command: "pg_ctl -D work/db/ -l work/db/logfile start"
+    command: "pg_ctl -D work/run/db/ -l work/run/db/logfile start"
     is_daemon: true
     shutdown:
-      command: "pg_ctl -D work/db/ stop"
+      command: "pg_ctl -D work/run/db/ stop"
       timeout_seconds: 10 # default 10
       signal: 15 # default 15, but only if command is not defined or empty
     readiness_probe:

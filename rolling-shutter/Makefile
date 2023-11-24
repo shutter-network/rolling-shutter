@@ -53,9 +53,9 @@ install-tools: install-codegen-tools install-golangci-lint install-cobra install
 # code generation tools: pin version
 install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-go-enum
 
-../contracts/node_modules/.mark-npm-install: ../contracts/package.json ../contracts/package-lock.json
-	cd ../contracts && npm install
-	@touch ../contracts/node_modules/.mark-npm-install
+../contracts/node_modules/.mark-yarn-install: ../contracts/package.json
+	cd ../contracts && yarn install
+	@touch ../contracts/node_modules/.mark-yarn-install
 
 install-npm: ../contracts/node_modules/.mark-npm-install
 
@@ -69,7 +69,7 @@ ${GOPATH}/bin/go-enum:
 install-go-enum: ${GOPATH}/bin/go-enum
 
 ${GOPATH}/bin/abigen:
-	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.12.0
+	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.13.5
 install-abigen: ${GOPATH}/bin/abigen
 
 

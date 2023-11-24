@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.9;
+pragma solidity =0.8.22;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -27,7 +27,7 @@ contract EonKeyStorage is Ownable {
     }
     Key[] public keys;
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         bytes memory empty;
         _insertKey(type(uint64).min, empty, 1);
         _insertKey(type(uint64).max, empty, 0);

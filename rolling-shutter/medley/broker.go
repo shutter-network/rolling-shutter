@@ -47,7 +47,9 @@ func StartNewBroker[T any](nonBlocking bool) *Broker[T] {
 	// this is started in the background,
 	// without being handled by an errorgroup.
 	// this goroutine could be hanging in the backround
-	// indefinitely
+	// indefinitely.
+	// This is why the sender to the Publish channel has to
+	// handle an eventual context done.
 	go func() {
 		publish := b.Publish
 		for {

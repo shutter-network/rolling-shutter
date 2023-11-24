@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.9;
+pragma solidity =0.8.22;
 
 import "./AddrsSeq.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -20,7 +20,7 @@ contract CollatorConfigsList is Ownable {
         uint64 collatorConfigIndex
     );
 
-    constructor(AddrsSeq _addrsSeq) {
+    constructor(AddrsSeq _addrsSeq) Ownable(msg.sender) {
         addrsSeq = _addrsSeq;
         require(
             addrsSeq.countNth(0) == 0,

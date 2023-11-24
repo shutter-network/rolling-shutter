@@ -13,7 +13,8 @@ async function fund(addresses, bankSigner, fundValue = "1000") {
   }
 
   // TODO errorhandling?
-  const value = ethers.utils.parseEther(fundValue);
+  // FIXME: probably deprecated
+  const value = ethers.utils.units.parseEther(fundValue);
   console.log(
     "fund: funding %s adresses with %s eth",
     addresses.length,
@@ -23,7 +24,7 @@ async function fund(addresses, bankSigner, fundValue = "1000") {
   const txs = [];
   for (const a of addresses) {
     const balance = await ethers.provider.getBalance(a);
-    const weiFund = ethers.utils.parseEther(fundValue);
+    const weiFund = ethers.utils.units.parseEther(fundValue);
     if (balance.gt(BigNumber.from(weiFund))) {
       console.log(a + " already funded");
       continue;

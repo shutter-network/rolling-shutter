@@ -187,17 +187,17 @@
   (go-install "godoc" "golang.org/x/tools/cmd/godoc@latest")
 
   contracts:install
-  {:doc "Run npm install in contracts directory"
+  {:doc "Run yarn install in contracts directory"
    :task (let [node-modules (format "%s/node_modules" contracts-dir)
-               marker-file (format "%s/.mark-npm-install" node-modules)
+               marker-file (format "%s/.mark-yarn-install" node-modules)
                marker-exists? (fs/exists? marker-file)
                anchor (if marker-exists? marker-file node-modules)]
            ;; we use the marker file instead of node_modules as anchor to speedup the build, since
            ;; node_modules is rather large
            (when (seq (fs/modified-since anchor
                                          [(format "%s/package.json" contracts-dir)
-                                          (format "%s/package-lock.json" contracts-dir)]))
-             (run-process ["npm" "install"] {:dir contracts-dir})
+                                          ]))
+             (run-process ["yarn" "install"] {:dir contracts-dir})
              (if marker-exists?
                (fs/set-last-modified-time marker-file (System/currentTimeMillis))))
            (when-not marker-exists?

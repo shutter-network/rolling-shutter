@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.22;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -23,7 +23,7 @@ contract AddrsSeq is Ownable {
     event Appended(uint64 n);
     AddrSet[] private seq;
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         _pushEmptyList();
     }
 
