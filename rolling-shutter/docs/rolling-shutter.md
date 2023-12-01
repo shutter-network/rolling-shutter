@@ -21,6 +21,7 @@ A collection of commands to run and interact with Rolling Shutter nodes
 * [rolling-shutter keyper](rolling-shutter_keyper.md)	 - Run a Shutter keyper node
 * [rolling-shutter mocknode](rolling-shutter_mocknode.md)	 - Run a Shutter mock node
 * [rolling-shutter mocksequencer](rolling-shutter_mocksequencer.md)	 - Run a Shutter mock sequencer
+* [rolling-shutter optimismkeyper](rolling-shutter_optimismkeyper.md)	 - Run a Shutter optimism keyper node
 * [rolling-shutter p2pnode](rolling-shutter_p2pnode.md)	 - Run a Shutter p2p bootstrap node
 * [rolling-shutter proxy](rolling-shutter_proxy.md)	 - Run a Ethereum JSON RPC proxy
 * [rolling-shutter snapshot](rolling-shutter_snapshot.md)	 - Run the Snapshot Hub communication module
