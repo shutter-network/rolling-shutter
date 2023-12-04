@@ -189,43 +189,44 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 			Msg("Generated private validator")
 	}
 
-	validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
-	validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
-	err = os.WriteFile(validatorPubKeyPath, []byte(validatorPublicKeyHex), 0o644)
-	if err != nil {
-		return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
-	}
-	log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
-
-	// genesis file
-	genFile := tendermintConfig.GenesisFile()
-	if tmos.FileExists(genFile) {
-		log.Info().Str("path", genFile).Msg("Found genesis file")
-	} else {
-		appStateBytes, err := amino.NewCodec().MarshalJSONIndent(appState, "", "    ")
+		validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
+		validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
+		err = os.WriteFile(validatorPubKeyPath, []byte(validatorPublicKeyHex), 0o644)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Could not write to %s", validatorPubKeyPath)
 		}
-		genDoc := types.GenesisDoc{
-			ChainID:         fmt.Sprintf("shutter-test-chain-%v", tmrand.Str(6)),
-			GenesisTime:     time.Now(),
-			ConsensusParams: types.DefaultConsensusParams(),
-			AppState:        appStateBytes,
-		}
-		pubKey, err := pv.GetPubKey()
-		if err != nil {
-			return errors.Wrap(err, "can't get pubkey")
-		}
-		genDoc.Validators = []types.GenesisValidator{{
-			Address: pubKey.Address(),
-			PubKey:  pubKey,
-			Power:   10,
-		}}
+		log.Info().Str("path", validatorPubKeyPath).Str("validatorPublicKey", validatorPublicKeyHex).Msg("Saved private validator publickey")
 
-		if err := genDoc.SaveAs(genFile); err != nil {
-			return err
+		// genesis file
+		genFile := tendermintConfig.GenesisFile()
+		if tmos.FileExists(genFile) {
+			log.Info().Str("path", genFile).Msg("Found genesis file")
+		} else {
+			appStateBytes, err := amino.NewCodec().MarshalJSONIndent(appState, "", "    ")
+			if err != nil {
+				return err
+			}
+			genDoc := types.GenesisDoc{
+				ChainID:         fmt.Sprintf("shutter-test-chain-%v", tmrand.Str(6)),
+				GenesisTime:     time.Now(),
+				ConsensusParams: types.DefaultConsensusParams(),
+				AppState:        appStateBytes,
+			}
+			pubKey, err := pv.GetPubKey()
+			if err != nil {
+				return errors.Wrap(err, "can't get pubkey")
+			}
+			genDoc.Validators = []types.GenesisValidator{{
+				Address: pubKey.Address(),
+				PubKey:  pubKey,
+				Power:   10,
+			}}
+
+			if err := genDoc.SaveAs(genFile); err != nil {
+				return err
+			}
+			log.Info().Str("path", genFile).Msg("Generated genesis file")
 		}
-		log.Info().Str("path", genFile).Msg("Generated genesis file")
 	}
 
 	nodeKeyFile := tendermintConfig.NodeKeyFile()
