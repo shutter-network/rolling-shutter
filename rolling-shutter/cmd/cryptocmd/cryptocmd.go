@@ -20,6 +20,7 @@ var (
 	epochIDFlag       string
 	sigmaFlag         string
 	threshold         uint64
+	filename          string
 )
 
 func Cmd() *cobra.Command {
@@ -27,12 +28,15 @@ func Cmd() *cobra.Command {
 		Use:   "crypto",
 		Short: "CLI tool to access crypto functions",
 		Long: `This command provides utility functions to manually encrypt messages with an eon
-key, decrypt them with a decryption key, and check that a decryption key is correct.`,
+key, decrypt them with a decryption key, and check that a decryption key is correct. It also hosts
+a tool to generate and run crypto tests in a JSON formatted collection.`,
 	}
 	cmd.AddCommand(encryptCmd())
 	cmd.AddCommand(decryptCmd())
 	cmd.AddCommand(verifyKeyCmd())
 	cmd.AddCommand(aggregateCmd())
+	cmd.AddCommand(GenerateTestdata())
+	cmd.AddCommand(RunJSONTests())
 	return cmd
 }
 

@@ -7,7 +7,7 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - rs-generate-v18-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+            - rs-generate-v19-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
       - install-asdf
       - run:
           name: "Install asdf plugins"
@@ -33,7 +33,7 @@ jobs:
             find ./docs -name '*.md' -delete
       - run: make generate
       - save_cache:
-          key: rs-generate-v18-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          key: rs-generate-v19-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
           paths:
             - "~/go/pkg/mod"
             - "~/.cache/go-build"
@@ -51,10 +51,10 @@ jobs:
           path: ~/src
       - restore_cache:
           keys:
-            - go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+            - go-mod-v8-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
       - run: go get -d ./...
       - save_cache:
-          key: go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: go-mod-v8-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - ~/go/pkg/
       - restore_cache:
@@ -90,7 +90,7 @@ jobs:
       - store_test_results:
           path: report
       - save_cache:
-          key: rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-build-<< parameters.go-version >>-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
 
@@ -200,7 +200,7 @@ jobs:
       - run: |
           make lint-changes
       - save_cache:
-          key: rs-lint-v13-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          key: rs-lint-v14-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
             - "~/.cache/go-build"
             - "~/.cache/golangci-lint"
