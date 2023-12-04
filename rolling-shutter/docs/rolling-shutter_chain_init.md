@@ -16,7 +16,7 @@ rolling-shutter chain init [flags]
       --index int                keyper index
       --initial-eon uint         initial eon
       --listen-address string    tendermint RPC listen address (default "tcp://127.0.0.1:26657")
-      --role string              tendermint node role (validator, sentry, seed) (default "validator")
+      --role string              tendermint node role (validator, isolated-validator, sentry, seed) (default "validator")
       --root string              root directory
 ```
 
