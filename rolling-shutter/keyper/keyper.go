@@ -265,7 +265,6 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 	} else if err != nil {
 		return err
 	}
-
 	cq := obskeyper.New(tx)
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
 		ctx,

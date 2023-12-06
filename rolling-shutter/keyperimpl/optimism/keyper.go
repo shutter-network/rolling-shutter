@@ -3,8 +3,6 @@ package optimism
 import (
 	"context"
 
-	shopclient "github.com/ethereum-optimism/optimism/shutter-node/client"
-	shopevent "github.com/ethereum-optimism/optimism/shutter-node/client/event"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -13,6 +11,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/config"
+	shopclient "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync"
+	shopevent "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/rollup/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
@@ -85,7 +85,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(kpr.core, l2Client)
 }
 
-func (kpr *Keyper) newBlock(ev *shopevent.NewLatestBlock) error {
+func (kpr *Keyper) newBlock(ev *shopevent.LatestBlock) error {
 	log.Info().
 		Int64("number", ev.Number.Int64()).
 		Str("hash", ev.BlockHash.Hex()).
@@ -104,7 +104,7 @@ func (kpr *Keyper) newBlock(ev *shopevent.NewLatestBlock) error {
 	return nil
 }
 
-func (kpr *Keyper) newKeyperSet(ev *shopevent.NewKeyperSetAdded) error {
+func (kpr *Keyper) newKeyperSet(ev *shopevent.KeyperSet) error {
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
 		Msg("new keyper set added")
