@@ -133,7 +133,10 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 
 	// set up according to the network role: https://docs.tendermint.com/v0.34/tendermint-core/validators.html
 	switch config.Role {
-	case VALIDATOR:
+	case VALIDATOR: // standard validator mode, network exposed
+		tendermintCfg.P2P.PexReactor = true
+		tendermintCfg.P2P.AddrBookStrict = true
+	case ISOLATEDVALIDATOR: // validator mode behind a sentry node
 		tendermintCfg.P2P.PexReactor = false
 		tendermintCfg.P2P.AddrBookStrict = false
 	case "sentry":
