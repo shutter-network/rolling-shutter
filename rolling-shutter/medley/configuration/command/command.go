@@ -48,7 +48,7 @@ func newCommandBuilder(name string) *commandBuilderConfig {
 	}
 }
 
-func newConfigForFunc[T configuration.Config](fn ConfigurableFunc[T]) T {
+func NewConfigForFunc[T configuration.Config](fn ConfigurableFunc[T]) T {
 	typ := reflect.TypeOf(fn).In(0).Elem()
 	nw, ok := reflect.New(typ).Interface().(T)
 	if !ok {
@@ -66,7 +66,7 @@ func Build[T configuration.Config](
 	main ConfigurableFunc[T],
 	options ...Option,
 ) *CommandBuilder[T] {
-	cfg := newConfigForFunc(main)
+	cfg := NewConfigForFunc(main)
 	cfg.Init()
 	builder := newCommandBuilder(strings.ToLower(cfg.Name()))
 	for _, opt := range options {
@@ -84,7 +84,7 @@ func Build[T configuration.Config](
 		Long:  builder.longUsage,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := newConfigForFunc(main)
+			cfg := NewConfigForFunc(main)
 			cfg.Init()
 			v := viper.GetViper()
 			v.SetFs(builder.filesystem)
@@ -107,7 +107,7 @@ func Build[T configuration.Config](
 			Short: fmt.Sprintf("Generate a '%s' configuration file", builder.name),
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cfg := newConfigForFunc(main)
+				cfg := NewConfigForFunc(main)
 				cfg.Init()
 				err := configuration.SetExampleValuesRecursive(cfg)
 				if err != nil {
@@ -130,7 +130,7 @@ func Build[T configuration.Config](
 			Short: fmt.Sprintf("Dump a '%s' configuration file, based on given config and env vars", builder.name),
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cfg := newConfigForFunc(main)
+				cfg := NewConfigForFunc(main)
 				cfg.Init()
 				v := viper.GetViper()
 				v.SetFs(builder.filesystem)
@@ -157,30 +157,53 @@ func Build[T configuration.Config](
 	return cb
 }
 
+type CobraRunE func(cmd *cobra.Command, args []string) error
+
+// AddInitDBCommand attaches an additional subcommand
+// 'initdb' to the command initially built by the Build method.
+// The initDB function argument is structured in the same way than the "main"
+// function passed in to the Build method.
+func (cb *CommandBuilder[T]) AddFunctionSubcommand(
+	fnc ConfigurableFunc[T],
+	use, short string,
+	args cobra.PositionalArgs,
+) {
+	cb.cobraCommand.AddCommand(&cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  args,
+		RunE:  cb.WrapFuncParseConfig(fnc),
+	})
+}
+
+func (cb *CommandBuilder[T]) WrapFuncParseConfig(fnc ConfigurableFunc[T]) CobraRunE {
+	return func(cmd *cobra.Command, args []string) error {
+		cfg := NewConfigForFunc(fnc)
+		cfg.Init()
+		v := viper.GetViper()
+		v.SetFs(cb.builderConfig.filesystem)
+		err := ParseCLI(v, cmd, cfg)
+		if err != nil {
+			return errors.WithMessage(err, "Please check your configuration")
+		}
+		log.Debug().
+			Interface("config", cfg).
+			Msg("got config")
+		return fnc(cfg)
+	}
+}
+
 // AddInitDBCommand attaches an additional subcommand
 // 'initdb' to the command initially built by the Build method.
 // The initDB function argument is structured in the same way than the "main"
 // function passed in to the Build method.
 func (cb *CommandBuilder[T]) AddInitDBCommand(initDB ConfigurableFunc[T]) {
-	cb.cobraCommand.AddCommand(&cobra.Command{
-		Use:   "initdb",
-		Short: fmt.Sprintf("Initialize the database of the '%s'", cb.builderConfig.name),
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := newConfigForFunc(initDB)
-			cfg.Init()
-			v := viper.GetViper()
-			v.SetFs(cb.builderConfig.filesystem)
-			err := ParseCLI(v, cmd, cfg)
-			if err != nil {
-				return errors.WithMessage(err, "Please check your configuration")
-			}
-			log.Debug().
-				Interface("config", cfg).
-				Msg("got config")
-			return initDB(cfg)
-		},
-	})
+	cb.AddFunctionSubcommand(
+		initDB,
+		"initdb",
+		fmt.Sprintf("Initialize the database of the '%s'", cb.builderConfig.name),
+		cobra.NoArgs,
+	)
 }
 
 func (cb *CommandBuilder[_]) Command() *cobra.Command {

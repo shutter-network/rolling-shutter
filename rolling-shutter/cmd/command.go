@@ -24,6 +24,7 @@ func Subcommands() []*cobra.Command {
 		chain.Cmd(),
 		collator.Cmd(),
 		optimism.Cmd(),
+		optimism.OPBootstrapCmd(),
 		rollupkeyper.Cmd(),
 		mocknode.Cmd(),
 		snapshot.Cmd(),
