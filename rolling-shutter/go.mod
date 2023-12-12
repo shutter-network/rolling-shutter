@@ -31,7 +31,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/zerolog v1.28.0
-	github.com/shutter-network/shop-contracts v0.0.0-20231207133930-c9acef7fbf8e
+	github.com/shutter-network/shop-contracts v0.0.0-20231220085304-80b8977d0bca
 	github.com/shutter-network/shutter/shlib v0.1.13
 	github.com/shutter-network/txtypes v0.1.0
 	github.com/spf13/afero v1.8.2
