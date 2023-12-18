@@ -99,7 +99,10 @@ install-asdf-plugins:
 	../tools/asdf-install-plugins.sh
 
 install-asdf: install-asdf-plugins
-	asdf install
+	# Various packages installed by asdf internally also use make and don't like if an external make has already
+	# tinkered with then environment.
+	# Therefore we unset MAKELEVEL here.
+	env -u MAKELEVEL asdf install
 
 lint:
 	golangci-lint run --tests
