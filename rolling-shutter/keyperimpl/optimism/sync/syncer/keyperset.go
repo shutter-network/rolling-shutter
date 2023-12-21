@@ -150,7 +150,7 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context) error {
 				)
 				continue
 			}
-			err = s.Handler(newKeyperSet)
+			err = s.Handler(ctx, newKeyperSet)
 			if err != nil {
 				s.Log.Error(
 					"handler for `NewKeyperSet` errored",
