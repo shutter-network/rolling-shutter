@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,12 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/app"
 )
 
-const VALIDATOR = "validator"
+const (
+	VALIDATOR         = "validator"
+	ISOLATEDVALIDATOR = "isolated-validator"
+	SENTRY            = "sentry"
+	SEED              = "seed"
+)
 
 type Config struct {
 	RootDir       string   `mapstructure:"root"`
@@ -65,7 +71,7 @@ func initCmd() *cobra.Command {
 	cmd.PersistentFlags().Float64("blocktime", 1.0, "block time in seconds")
 	cmd.PersistentFlags().StringSlice("genesis-keyper", nil, "genesis keyper address")
 	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint RPC listen address")
-	cmd.PersistentFlags().String("role", "validator", "tendermint node role (validator, sentry, seed)")
+	cmd.PersistentFlags().String("role", "validator", "tendermint node role (validator, isolated-validator, sentry, seed)")
 	cmd.PersistentFlags().Uint64("initial-eon", 0, "initial eon")
 	return cmd
 }
@@ -95,7 +101,7 @@ func getArgFromViper[T interface{}](getter func(string) T, name string, required
 func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	keypers := []common.Address{}
 
-	if config.Role == VALIDATOR {
+	if slices.Contains([]string{VALIDATOR, ISOLATEDVALIDATOR}, config.Role) {
 		for _, a := range config.GenesisKeyper {
 			if !common.IsHexAddress(a) {
 				return errors.Errorf("--genesis-keyper argument '%s' is not an address", a)
@@ -130,7 +136,6 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 		return errors.Wrap(err, "error in config file")
 	}
 	cfg.EnsureRoot(tendermintCfg.RootDir)
-
 	// set up according to the network role: https://docs.tendermint.com/v0.34/tendermint-core/validators.html
 	switch config.Role {
 	case VALIDATOR: // standard validator mode, network exposed
@@ -139,10 +144,10 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	case ISOLATEDVALIDATOR: // validator mode behind a sentry node
 		tendermintCfg.P2P.PexReactor = false
 		tendermintCfg.P2P.AddrBookStrict = false
-	case "sentry":
+	case SENTRY:
 		tendermintCfg.P2P.PexReactor = true
 		tendermintCfg.P2P.AddrBookStrict = false
-	case "seed":
+	case SEED:
 		tendermintCfg.P2P.PexReactor = true
 		tendermintCfg.P2P.AddrBookStrict = false
 	default:
@@ -173,24 +178,25 @@ func adjustPort(address string, keyperIndex int) (string, error) {
 
 func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState app.GenesisAppState) error {
 	var err error
-	// private validator
-	privValKeyFile := tendermintConfig.PrivValidatorKeyFile()
-	privValStateFile := tendermintConfig.PrivValidatorStateFile()
-	var pv *privval.FilePV
-	if tmos.FileExists(privValKeyFile) {
-		pv = privval.LoadFilePV(privValKeyFile, privValStateFile)
-		log.Info().
-			Str("privValKeyFile", privValKeyFile).
-			Str("stateFile", privValStateFile).
-			Msg("Found private validator")
-	} else {
-		pv = privval.GenFilePV(privValKeyFile, privValStateFile)
-		pv.Save()
-		log.Info().
-			Str("privValKeyFile", privValKeyFile).
-			Str("stateFile", privValStateFile).
-			Msg("Generated private validator")
-	}
+	if slices.Contains([]string{VALIDATOR, ISOLATEDVALIDATOR, SEED}, config.Role) {
+		// private validator
+		privValKeyFile := tendermintConfig.PrivValidatorKeyFile()
+		privValStateFile := tendermintConfig.PrivValidatorStateFile()
+		var pv *privval.FilePV
+		if tmos.FileExists(privValKeyFile) {
+			pv = privval.LoadFilePV(privValKeyFile, privValStateFile)
+			log.Info().
+				Str("privValKeyFile", privValKeyFile).
+				Str("stateFile", privValStateFile).
+				Msg("Found private validator")
+		} else {
+			pv = privval.GenFilePV(privValKeyFile, privValStateFile)
+			pv.Save()
+			log.Info().
+				Str("privValKeyFile", privValKeyFile).
+				Str("stateFile", privValStateFile).
+				Msg("Generated private validator")
+		}
 
 		validatorPubKeyPath := filepath.Join(tendermintConfig.RootDir, "config", "priv_validator_pubkey.hex")
 		validatorPublicKeyHex := hex.EncodeToString(pv.Key.PubKey.Bytes())
