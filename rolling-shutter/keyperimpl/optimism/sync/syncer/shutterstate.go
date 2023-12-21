@@ -83,8 +83,8 @@ func (s *ShutterStateSyncer) pollIsActive(ctx context.Context) (bool, error) {
 	return !paused, err
 }
 
-func (s *ShutterStateSyncer) handle(ev *event.ShutterState) bool {
-	err := s.Handler(ev)
+func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState) bool {
+	err := s.Handler(ctx, ev)
 	if err != nil {
 		s.Log.Error(
 			"handler for `NewShutterState` errored",
@@ -105,7 +105,7 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 	ev := &event.ShutterState{
 		Active: isActive,
 	}
-	s.handle(ev)
+	s.handle(ctx, ev)
 	for {
 		select {
 		case _, ok := <-s.unpausedCh:
@@ -119,7 +119,7 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 				Active: true,
 			}
 			isActive = ev.Active
-			s.handle(ev)
+			s.handle(ctx, ev)
 		case _, ok := <-s.pausedCh:
 			if !ok {
 				return nil
@@ -131,7 +131,7 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 				Active: false,
 			}
 			isActive = ev.Active
-			s.handle(ev)
+			s.handle(ctx, ev)
 		case <-ctx.Done():
 			return ctx.Err()
 		}

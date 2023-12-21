@@ -3,10 +3,12 @@ package optimism
 import (
 	"context"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -14,12 +16,16 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/database"
 	shopclient "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync"
 	shopevent "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
+
+var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
 type Keyper struct {
 	core   *keyper.KeyperCore
@@ -85,7 +91,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(kpr.core, l2Client)
 }
 
-func (kpr *Keyper) newBlock(ev *shopevent.LatestBlock) error {
+func (kpr *Keyper) newBlock(_ context.Context, ev *shopevent.LatestBlock) error {
 	log.Info().
 		Int64("number", ev.Number.Int64()).
 		Str("hash", ev.BlockHash.Hex()).
@@ -104,13 +110,33 @@ func (kpr *Keyper) newBlock(ev *shopevent.LatestBlock) error {
 	return nil
 }
 
-func (kpr *Keyper) newKeyperSet(ev *shopevent.KeyperSet) error {
+func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) error {
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
 		Msg("new keyper set added")
-	// TODO: set keyper set in the chainobsdb
+	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		db := obskeyper.New(tx)
 
-	return nil
+		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
+		if err != nil {
+			return errors.Wrap(err, ErrParseKeyperSet.Error())
+		}
+		activationBlockNumber, err := medley.Uint64ToInt64Safe(ev.ActivationBlock)
+		if err != nil {
+			return errors.Wrap(err, ErrParseKeyperSet.Error())
+		}
+		threshold, err := medley.Uint64ToInt64Safe(ev.Threshold)
+		if err != nil {
+			return errors.Wrap(err, ErrParseKeyperSet.Error())
+		}
+		// XXX: does this work when the memberset is empty?
+		return db.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
+			KeyperConfigIndex:     keyperConfigIndex,
+			ActivationBlockNumber: activationBlockNumber,
+			Keypers:               shdb.EncodeAddresses(ev.Members),
+			Threshold:             int32(threshold),
+		})
+	})
 }
 
 func (kpr *Keyper) newEonPublicKey(ctx context.Context, pk keyper.EonPublicKey) error {

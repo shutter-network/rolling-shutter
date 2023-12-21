@@ -85,7 +85,7 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 				Eon: newEonKey.Eon,
 				Key: newEonKey.Key,
 			}
-			err := s.Handler(ev)
+			err := s.Handler(ctx, ev)
 			if err != nil {
 				s.Log.Error(
 					"handler for `NewKeyperSet` errored",

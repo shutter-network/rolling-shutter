@@ -52,7 +52,7 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
 				Number:    newHeader.Number,
 				BlockHash: newHeader.Hash(),
 			}
-			err := s.Handler(ev)
+			err := s.Handler(ctx, ev)
 			if err != nil {
 				s.Log.Error(
 					"handler for `NewLatestBlock` errored",

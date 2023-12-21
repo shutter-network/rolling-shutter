@@ -1,8 +1,10 @@
 package event
 
+import "context"
+
 type (
-	KeyperSetHandler    func(*KeyperSet) error
-	EonPublicKeyHandler func(*EonPublicKey) error
-	BlockHandler        func(*LatestBlock) error
-	ShutterStateHandler func(*ShutterState) error
+	KeyperSetHandler    func(context.Context, *KeyperSet) error
+	EonPublicKeyHandler func(context.Context, *EonPublicKey) error
+	BlockHandler        func(context.Context, *LatestBlock) error
+	ShutterStateHandler func(context.Context, *ShutterState) error
 )
