@@ -25,7 +25,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -37,6 +36,7 @@ import (
 
 type snapshotkeyper struct {
 	config            *keyper.Config
+	chainobserver     *chainobserver.ChainObserver
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
@@ -102,6 +102,20 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	snkpr.shuttermintState = smobserver.NewShuttermintState(config)
 	snkpr.p2p = p2pHandler
 
+	snkpr.chainobserver = chainobserver.New(l1Client, snkpr.dbpool)
+	err = snkpr.chainobserver.AddListenEvent(
+		snkpr.contracts.KeypersConfigsListNewConfig,
+	)
+	if err != nil {
+		return err
+	}
+	err = snkpr.chainobserver.AddListenEvent(
+		snkpr.contracts.CollatorConfigsListNewConfig,
+	)
+	if err != nil {
+		return err
+	}
+
 	snkpr.setupP2PHandler()
 	return runner.StartService(snkpr.getServices()...)
 }
@@ -118,9 +132,9 @@ func (snkpr *snapshotkeyper) setupP2PHandler() {
 func (snkpr *snapshotkeyper) getServices() []service.Service {
 	services := []service.Service{
 		snkpr.p2p,
+		snkpr.chainobserver,
 		service.ServiceFn{Fn: snkpr.operateShuttermint},
 		service.ServiceFn{Fn: snkpr.broadcastEonPublicKeys},
-		service.ServiceFn{Fn: snkpr.handleContractEvents},
 	}
 
 	if snkpr.config.HTTPEnabled {
@@ -130,14 +144,6 @@ func (snkpr *snapshotkeyper) getServices() []service.Service {
 		services = append(services, snkpr.metricsServer)
 	}
 	return services
-}
-
-func (snkpr *snapshotkeyper) handleContractEvents(ctx context.Context) error {
-	events := []*eventsyncer.EventType{
-		snkpr.contracts.KeypersConfigsListNewConfig,
-		snkpr.contracts.CollatorConfigsListNewConfig,
-	}
-	return chainobserver.New(snkpr.contracts, snkpr.dbpool).Observe(ctx, events)
 }
 
 func (snkpr *snapshotkeyper) handleOnChainChanges(ctx context.Context, tx pgx.Tx, l1BlockNumber uint64) error {
