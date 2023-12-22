@@ -24,7 +24,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -36,6 +35,7 @@ import (
 
 type keyper struct {
 	config            *Config
+	chainobserver     *chainobserver.ChainObserver
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
 	messageSender     fx.RPCMessageSender
@@ -128,6 +128,20 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.shuttermintState = smobserver.NewShuttermintState(config)
 	kpr.p2p = p2pHandler
 
+	kpr.chainobserver = chainobserver.New(l2Client, kpr.dbpool)
+	err = kpr.chainobserver.AddListenEvent(
+		kpr.contracts.KeypersConfigsListNewConfig,
+	)
+	if err != nil {
+		return err
+	}
+	err = kpr.chainobserver.AddListenEvent(
+		kpr.contracts.CollatorConfigsListNewConfig,
+	)
+	if err != nil {
+		return err
+	}
+
 	kpr.setupP2PHandler()
 	return runner.StartService(kpr.getServices()...)
 }
@@ -144,9 +158,9 @@ func (kpr *keyper) setupP2PHandler() {
 func (kpr *keyper) getServices() []service.Service {
 	services := []service.Service{
 		kpr.p2p,
+		kpr.chainobserver,
 		service.ServiceFn{Fn: kpr.operateShuttermint},
 		service.ServiceFn{Fn: kpr.broadcastEonPublicKeys},
-		service.ServiceFn{Fn: kpr.handleContractEvents},
 	}
 
 	if kpr.config.HTTPEnabled {
@@ -156,14 +170,6 @@ func (kpr *keyper) getServices() []service.Service {
 		services = append(services, kpr.metricsServer)
 	}
 	return services
-}
-
-func (kpr *keyper) handleContractEvents(ctx context.Context) error {
-	events := []*eventsyncer.EventType{
-		kpr.contracts.KeypersConfigsListNewConfig,
-		kpr.contracts.CollatorConfigsListNewConfig,
-	}
-	return chainobserver.New(kpr.contracts, kpr.dbpool).Observe(ctx, events)
 }
 
 func (kpr *keyper) handleOnChainChanges(
