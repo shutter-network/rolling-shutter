@@ -53,8 +53,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	trigger := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 	kpr.trigger = trigger
 
-	// TODO: this will be more generic, since we don't need the contract deployments for
-	// the keyper core
 	ethConfig := configuration.NewEthnodeConfig()
 	ethConfig.EthereumURL = kpr.config.Optimism.JSONRPCURL
 	ethConfig.PrivateKey = kpr.config.Optimism.PrivateKey
@@ -113,6 +111,7 @@ func (kpr *Keyper) newBlock(_ context.Context, ev *shopevent.LatestBlock) error 
 func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) error {
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
+		Uint64("eon", ev.Eon).
 		Msg("new keyper set added")
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := obskeyper.New(tx)
@@ -140,6 +139,10 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) er
 }
 
 func (kpr *Keyper) newEonPublicKey(ctx context.Context, pk keyper.EonPublicKey) error {
+	log.Info().
+		Uint64("eon", pk.Eon).
+		Uint64("activation-block", pk.ActivationBlock).
+		Msg("new eon pk")
 	// TODO: post the public key to the contract
 	return nil
 }
