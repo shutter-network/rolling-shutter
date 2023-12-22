@@ -115,6 +115,9 @@ func (o *options) apply(ctx context.Context, c *ShutterL2Client) error {
 			Handler: o.handlerBlock,
 		}
 	}
+	if o.handlerBlock != nil {
+		c.services = append(c.services, c.uhsync)
+	}
 	return nil
 }
 
