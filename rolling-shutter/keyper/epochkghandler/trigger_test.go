@@ -2,60 +2,77 @@ package epochkghandler
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/assert"
 
-	chainobscolldb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/p2ptest"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+	db := database.New(dbpool)
+
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
 
-	ctx := context.Background()
-	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	t.Cleanup(dbclose)
-	queries := database.New(dbpool)
-
 	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
-	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
-	// send decryption key share when first trigger is received
-	trigger, err := p2pmsg.NewSignedDecryptionTrigger(
-		config.GetInstanceID(),
-		identityPreimage,
-		0,
-		make([]byte, 32),
-		config.GetCollatorKey(),
+	decrTrigChan := make(chan *broker.Event[*DecryptionTrigger])
+
+	messaging, err := p2ptest.NewTestMessaging()
+	assert.NilError(t, err)
+
+	ksh := &KeyShareHandler{
+		InstanceID:    config.GetInstanceID(),
+		KeyperAddress: config.GetAddress(),
+		DBPool:        dbpool,
+		Messaging:     messaging,
+		Trigger:       decrTrigChan,
+	}
+	group := service.RunBackground(
+		ctx,
+		ksh,
 	)
 	assert.NilError(t, err)
-	msgs := p2ptest.MustHandleMessage(t, handler, ctx, trigger)
-	share, err := queries.GetDecryptionKeyShare(ctx, database.GetDecryptionKeyShareParams{
+
+	trig := &DecryptionTrigger{
+		BlockNumber:       42,
+		IdentityPreimages: []identitypreimage.IdentityPreimage{identityPreimage},
+	}
+	decrTrigChan <- broker.NewEvent(trig)
+	decrTrigChan <- broker.NewEvent(trig)
+	close(decrTrigChan)
+	err = group.Wait()
+	assert.NilError(t, err)
+
+	// send decryption key share when first trigger is received
+	share, err := db.GetDecryptionKeyShare(ctx, database.GetDecryptionKeyShareParams{
 		Eon:         int64(config.GetEon()),
 		EpochID:     identityPreimage.Bytes(),
 		KeyperIndex: int64(keyperIndex),
 	})
 	assert.NilError(t, err)
-	assert.Check(t, len(msgs) == 1)
-	msg, ok := msgs[0].(*p2pmsg.DecryptionKeyShares)
+	// although we requested the trigger 2 times, the keyshare should have been
+	// sent only once
+	assert.Check(t, len(messaging.SentMessages) == 1)
+
+	msg, ok := messaging.SentMessages[0].Message.(*p2pmsg.DecryptionKeyShares)
 	assert.Check(t, ok)
-	assert.Check(t, msg.InstanceID == config.GetInstanceID())
-	assert.Check(t, msg.KeyperIndex == keyperIndex)
 	assert.DeepEqual(t, msg.GetShares(),
 		[]*p2pmsg.KeyShare{
 			{
@@ -65,111 +82,4 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		},
 		cmpopts.IgnoreUnexported(p2pmsg.KeyShare{}),
 	)
-
-	// don't send share when trigger is received again
-	msgs = p2ptest.MustHandleMessage(t, handler, ctx, trigger)
-	assert.NilError(t, err)
-	assert.Check(t, len(msgs) == 0)
-}
-
-func TestTriggerValidatorIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	ctx := context.Background()
-	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	t.Cleanup(dbclose)
-
-	var handler p2p.MessageHandler = &DecryptionTriggerHandler{config: config, dbpool: dbpool}
-	collatorKey1, err := ethcrypto.GenerateKey()
-	assert.NilError(t, err)
-	collatorAddress1 := ethcrypto.PubkeyToAddress(collatorKey1.PublicKey)
-
-	collatorKey2, err := ethcrypto.GenerateKey()
-	assert.NilError(t, err)
-	collatorAddress2 := ethcrypto.PubkeyToAddress(collatorKey2.PublicKey)
-
-	// Make a db with collator 1 from a certain block and collator 2 afterwards
-	activationBlk1 := uint64(0)
-	identityPreimage1 := identitypreimage.BigToIdentityPreimage(common.Big0)
-	activationBlk2 := uint64(123)
-	identityPreimage2 := identitypreimage.BigToIdentityPreimage(common.Big1)
-	assert.NilError(t, err)
-	collator1 := shdb.EncodeAddress(collatorAddress1)
-	collator2 := shdb.EncodeAddress(collatorAddress2)
-
-	err = chainobscolldb.New(dbpool).InsertChainCollator(ctx, chainobscolldb.InsertChainCollatorParams{
-		ActivationBlockNumber: int64(activationBlk1),
-		Collator:              collator1,
-	})
-	assert.NilError(t, err)
-	err = chainobscolldb.New(dbpool).InsertChainCollator(ctx, chainobscolldb.InsertChainCollatorParams{
-		ActivationBlockNumber: int64(activationBlk2),
-		Collator:              collator2,
-	})
-	assert.NilError(t, err)
-
-	tests := []struct {
-		name             string
-		valid            bool
-		instanceID       uint64
-		identityPreimage identitypreimage.IdentityPreimage
-		blockNumber      uint64
-		privKey          *ecdsa.PrivateKey
-	}{
-		{
-			name:             "valid trigger collator 1",
-			valid:            true,
-			instanceID:       config.GetInstanceID(),
-			identityPreimage: identityPreimage1,
-			blockNumber:      activationBlk1,
-			privKey:          collatorKey1,
-		},
-		{
-			name:             "valid trigger collator 2",
-			valid:            true,
-			instanceID:       config.GetInstanceID(),
-			identityPreimage: identityPreimage2,
-			blockNumber:      activationBlk2,
-			privKey:          collatorKey2,
-		},
-		{
-			name:             "invalid trigger wrong collator 1",
-			valid:            false,
-			instanceID:       config.GetInstanceID(),
-			identityPreimage: identityPreimage2,
-			blockNumber:      activationBlk2,
-			privKey:          collatorKey1,
-		},
-		{
-			name:             "invalid trigger wrong collator 2",
-			valid:            false,
-			instanceID:       config.GetInstanceID(),
-			identityPreimage: identityPreimage1,
-			blockNumber:      activationBlk1,
-			privKey:          collatorKey2,
-		},
-		{
-			name:             "invalid trigger wrong instanceID",
-			valid:            false,
-			instanceID:       config.GetInstanceID() + 1,
-			identityPreimage: identityPreimage1,
-			blockNumber:      activationBlk1,
-			privKey:          collatorKey1,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			msg, err := p2pmsg.NewSignedDecryptionTrigger(
-				tc.instanceID,
-				tc.identityPreimage,
-				tc.blockNumber,
-				[]byte{},
-				tc.privKey,
-			)
-			assert.NilError(t, err)
-			p2ptest.MustValidateMessageResult(t, tc.valid, handler, ctx, msg)
-		})
-	}
 }

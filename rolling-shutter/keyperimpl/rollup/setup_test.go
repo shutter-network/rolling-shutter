@@ -1,14 +1,26 @@
-package epochkghandler
+package rollup
 
 import (
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
-type TestConfig struct{}
+func init() {
+	var err error
+	config.collatorKey, err = ethcrypto.GenerateKey()
+	if err != nil {
+		panic(errors.Wrap(err, "ethcrypto.GenerateKey failed"))
+	}
+}
+
+type TestConfig struct {
+	collatorKey *ecdsa.PrivateKey
+}
 
 var config = &TestConfig{}
 
@@ -25,7 +37,7 @@ func (TestConfig) GetEon() uint64 {
 }
 
 func (c *TestConfig) GetCollatorKey() *ecdsa.PrivateKey {
-	return nil
+	return config.collatorKey
 }
 
 var _ testsetup.TestConfig = &TestConfig{}

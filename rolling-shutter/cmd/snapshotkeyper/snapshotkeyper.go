@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
@@ -33,7 +32,7 @@ Shuttermint node which have to be started separately in advance.`,
 	return builder.Command()
 }
 
-func main(config *keyper.Config) error {
+func main(config *snapshotkeyper.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Str("address", config.GetAddress().Hex()).
@@ -43,7 +42,7 @@ func main(config *keyper.Config) error {
 	return service.RunWithSighandler(context.Background(), snapshotkeyper.New(config))
 }
 
-func initDB(config *keyper.Config) error {
+func initDB(config *snapshotkeyper.Config) error {
 	ctx := context.Background()
 
 	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)

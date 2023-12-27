@@ -1,11 +1,11 @@
-package keyper_test
+package rollupkeyper_test
 
 import (
 	"testing"
 
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/rollup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
 )

@@ -22,6 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
@@ -35,7 +36,7 @@ import (
 )
 
 type snapshotkeyper struct {
-	config            *keyper.Config
+	config            *kprconfig.Config
 	chainobserver     *chainobserver.ChainObserver
 	dbpool            *pgxpool.Pool
 	shuttermintClient client.Client
@@ -48,8 +49,19 @@ type snapshotkeyper struct {
 	metricsServer    *metricsserver.MetricsServer
 }
 
-func New(config *keyper.Config) service.Service {
-	return &snapshotkeyper{config: config}
+func New(config *Config) service.Service {
+	return &snapshotkeyper{
+		config: &kprconfig.Config{
+			InstanceID:        config.InstanceID,
+			DatabaseURL:       config.DatabaseURL,
+			HTTPEnabled:       config.HTTPEnabled,
+			HTTPListenAddress: config.HTTPListenAddress,
+			P2P:               config.P2P,
+			Shuttermint:       config.Shuttermint,
+			Ethereum:          config.Ethereum,
+			Metrics:           config.Metrics,
+		},
+	}
 }
 
 func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) error {
