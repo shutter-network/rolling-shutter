@@ -29,7 +29,7 @@ type MockNode struct {
 	mux sync.Mutex
 
 	collatorClient *client.Client
-	p2p            *p2p.P2PHandler
+	p2p            *p2p.P2PMessaging
 
 	eonSecretKeyShare *shcrypto.EonSecretKeyShare
 	eonPublicKey      *shcrypto.EonPublicKey

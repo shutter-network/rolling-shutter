@@ -51,7 +51,7 @@ type collator struct {
 	l2Client  *rpc.Client
 	contracts *deployment.Contracts
 	batcher   *batcher.Batcher
-	p2p       *p2p.P2PHandler
+	p2p       *p2p.P2PMessaging
 	dbpool    *pgxpool.Pool
 	submitter *Submitter
 	signals   signals
