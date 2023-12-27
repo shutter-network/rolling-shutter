@@ -68,7 +68,7 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	if !ok {
 		return nil, errors.New("Message type assertion mismatch")
 	}
-	metricsEpochKGDectyptionTriggersReceived.Inc()
+	metricsEpochKGDecryptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
 	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
 	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), identityPreimage)
