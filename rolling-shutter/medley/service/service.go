@@ -62,13 +62,18 @@ func (r *runner) runShutdownFuncs() {
 }
 
 func Run(ctx context.Context, services ...Service) error {
+	group := RunBackground(ctx, services...)
+	return group.Wait()
+}
+
+func RunBackground(ctx context.Context, services ...Service) *errgroup.Group {
 	group, ctx := errgroup.WithContext(ctx)
 	r := runner{group: group, ctx: ctx}
 	group.Go(func() error {
 		return r.StartService(services...)
 	})
 	defer r.runShutdownFuncs()
-	return group.Wait()
+	return group
 }
 
 // notifyTermination creates a context that is canceled, when the process receives SIGINT or
