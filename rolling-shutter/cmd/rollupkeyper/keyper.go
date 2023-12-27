@@ -1,4 +1,4 @@
-package keyper
+package rollupkeyper
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/rollup"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/rollup/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -36,13 +36,12 @@ func main(config *keyper.Config) error {
 		Str("address", config.GetAddress().Hex()).
 		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting keyper")
-
-	return service.RunWithSighandler(context.Background(), keyper.New(config))
+	kpr := keyper.New(config)
+	return service.RunWithSighandler(context.Background(), kpr)
 }
 
 func initDB(cfg *keyper.Config) error {
 	ctx := context.Background()
-
 	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
