@@ -43,7 +43,7 @@ type keyper struct {
 	contracts         *deployment.Contracts
 
 	shuttermintState *smobserver.ShuttermintState
-	p2p              *p2p.P2PHandler
+	p2p              *p2p.P2PMessaging
 	metricsServer    *metricsserver.MetricsServer
 }
 
