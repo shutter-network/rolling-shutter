@@ -157,8 +157,7 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 	kpr.messaging.AddMessageHandler(
 		epochkghandler.NewDecryptionKeyHandler(kpr.config, kpr.dbpool),
 		epochkghandler.NewDecryptionKeyShareHandler(kpr.config, kpr.dbpool),
-		// TODO: why do we need this? It just validates the key message based on the instance id,
-		// but does nothing with it
+		// this is purely used to subscribe to the public key topic for broadcast
 		epochkghandler.NewEonPublicKeyHandler(kpr.config, kpr.dbpool),
 	)
 	kpr.messaging.AddMessageHandler(kpr.opts.messageHandler...)
