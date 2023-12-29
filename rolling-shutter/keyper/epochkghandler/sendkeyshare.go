@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
@@ -39,6 +38,13 @@ func (ksh *KeyShareHandler) getEonForBlockNumber(ctx context.Context, blockNumbe
 	return eon, errors.Wrap(err, "failed to retrieve eon from db")
 }
 
+var (
+	ErrIgnoreDecryptionRequest = errors.New("ignoring decryption request")
+	ErrNotAKeyper              = errors.New("we are not a keyper")
+	ErrEonDKGFailed            = errors.New("eon key generation failed")
+	ErrShareAlreadySent        = errors.New("share exists already")
+)
+
 func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 	ctx context.Context,
 	eon database.Eon,
@@ -63,8 +69,7 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 		}
 	}
 	if keyperIndex == -1 {
-		log.Info().Msg("ignoring decryption trigger: we are not a keyper")
-		return nil, nil
+		return nil, errors.Wrap(ErrNotAKeyper, ErrIgnoreDecryptionRequest.Error())
 	}
 
 	// check if we already computed (and therefore most likely sent) our key share
@@ -78,7 +83,8 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 		return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
 	}
 	if shareExists {
-		return nil, nil // we already sent our share
+		// we already sent our share
+		return nil, errors.Wrap(ErrShareAlreadySent, ErrIgnoreDecryptionRequest.Error())
 	}
 
 	// fetch dkg result from db
@@ -87,8 +93,7 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon.Eon)
 	}
 	if !dkgResultDB.Success {
-		log.Info().Int64("eon", eon.Eon).Msg("ignoring decryption trigger: eon key generation failed")
-		return nil, nil
+		return nil, errors.Wrap(ErrEonDKGFailed, ErrIgnoreDecryptionRequest.Error())
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
