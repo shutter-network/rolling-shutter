@@ -73,7 +73,9 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 	}
 
 	// check if we already computed (and therefore most likely sent) our key share
-	// XXX this only works when we sent the share for exactly one epoch.
+	// FIXME: this only checks for existence of first preimage.
+	// If there are more in the array that haven't been released before,
+	// those will be missed when the first one is present.
 	shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
 		Eon:         eon.Eon,
 		EpochID:     identityPreimages[0].Bytes(),
