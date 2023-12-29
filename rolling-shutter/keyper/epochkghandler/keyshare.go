@@ -15,6 +15,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -94,8 +95,12 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	// those will be missed when the first one is present.
 	identityPreimage := identitypreimage.IdentityPreimage(msg.GetShares()[0].EpochID)
 
+	eon, err := medley.Uint64ToInt64Safe(msg.Eon)
+	if err != nil {
+		return nil, err
+	}
 	keyExists, err := db.ExistsDecryptionKey(ctx, database.ExistsDecryptionKeyParams{
-		Eon:     int64(msg.Eon),
+		Eon:     eon,
 		EpochID: identityPreimage.Bytes(),
 	})
 	if err != nil {
