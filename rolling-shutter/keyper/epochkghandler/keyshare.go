@@ -89,6 +89,9 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// Check that we don't know the decryption key yet
+	// FIXME: this only checks for existence of first preimage.
+	// If there are more in the array that haven't been released before,
+	// those will be missed when the first one is present.
 	identityPreimage := identitypreimage.IdentityPreimage(msg.GetShares()[0].EpochID)
 
 	keyExists, err := db.ExistsDecryptionKey(ctx, database.ExistsDecryptionKeyParams{
