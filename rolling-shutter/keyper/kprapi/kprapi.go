@@ -114,6 +114,7 @@ func (srv *Server) Start(ctx context.Context, runner service.Runner) error { //n
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+		close(srv.trigger)
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	return nil
