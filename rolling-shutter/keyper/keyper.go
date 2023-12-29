@@ -28,7 +28,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
@@ -168,7 +167,7 @@ func (kpr *KeyperCore) getServices() []service.Service {
 	services := []service.Service{
 		kpr.messaging,
 		service.ServiceFn{Fn: kpr.operateShuttermint},
-		service.ServiceFn{Fn: kpr.handleNewEonPublicKeys},
+		newEonPubKeyHandler(kpr),
 	}
 	keyTrigger := kpr.trigger
 	if kpr.config.HTTPEnabled {
@@ -364,94 +363,4 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context) error {
 		case <-time.After(2 * time.Second):
 		}
 	}
-}
-
-func (kpr *KeyperCore) getEonForBlockNumber(ctx context.Context, blockNumber uint64) (database.Eon, error) {
-	var (
-		eon database.Eon
-		err error
-	)
-	db := database.New(kpr.dbpool)
-	block, err := medley.Uint64ToInt64Safe(blockNumber)
-	if err != nil {
-		return eon, errors.Wrap(err, "invalid blocknumber")
-	}
-	eon, err = db.GetEonForBlockNumber(ctx, block)
-	// TODO:wrap error
-	return eon, err
-}
-
-type EonPublicKey struct {
-	PublicKey         []byte
-	ActivationBlock   uint64
-	KeyperConfigIndex uint64
-	Eon               uint64
-}
-
-func (kpr *KeyperCore) handleNewEonPublicKeys(ctx context.Context) error {
-	for {
-		eonPublicKeys, err := database.New(kpr.dbpool).GetAndDeleteEonPublicKeys(ctx)
-		if err != nil {
-			return err
-		}
-		for _, eonPublicKey := range eonPublicKeys {
-			_, exists := database.GetKeyperIndex(kpr.config.GetAddress(), eonPublicKey.Keypers)
-			if !exists {
-				return errors.Errorf("own keyper index not found for Eon=%d", eonPublicKey.Eon)
-			}
-			// FIXME: careful with returning errors, since this function is registered as a Service.
-			// This will shut down the whole keyper
-			activationBlock, err := medley.Int64ToUint64Safe(eonPublicKey.ActivationBlockNumber)
-			if err != nil {
-				return errors.Wrap(err, "failed safe int cast")
-			}
-			keyperIndex, err := medley.Int32ToUint64Safe(eonPublicKey.KeyperConfigIndex)
-			if err != nil {
-				return errors.Wrap(err, "failed safe int cast")
-			}
-			eon, err := medley.Int64ToUint64Safe(eonPublicKey.Eon)
-			if err != nil {
-				return errors.Wrap(err, "failed safe int cast")
-			}
-			eonPubKey := EonPublicKey{
-				PublicKey:         eonPublicKey.EonPublicKey,
-				ActivationBlock:   activationBlock,
-				KeyperConfigIndex: keyperIndex,
-				Eon:               eon,
-			}
-			if kpr.opts.broadcastEonPubKey {
-				err := kpr.broadcastEonPublicKey(ctx, eonPubKey)
-				return errors.Wrap(err, "failed to broadcast eon public key")
-			}
-			if kpr.opts.eonPubkeyHandler != nil {
-				err := kpr.opts.eonPubkeyHandler(ctx, eonPubKey)
-				return errors.Wrap(err, "failed to handle eon public key")
-			}
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
-	}
-}
-
-func (kpr *KeyperCore) broadcastEonPublicKey(ctx context.Context, eonPubKey EonPublicKey) error {
-	msg, err := p2pmsg.NewSignedEonPublicKey(
-		kpr.config.InstanceID,
-		eonPubKey.PublicKey,
-		eonPubKey.ActivationBlock,
-		eonPubKey.KeyperConfigIndex,
-		eonPubKey.Eon,
-		kpr.config.Ethereum.PrivateKey.Key,
-	)
-	if err != nil {
-		return errors.Wrap(err, "error while signing EonPublicKey")
-	}
-
-	err = kpr.messaging.SendMessage(ctx, msg)
-	if err != nil {
-		return errors.Wrap(err, "error while broadcasting EonPublicKey")
-	}
-	return nil
 }
