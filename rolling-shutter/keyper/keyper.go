@@ -22,6 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/channel"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -165,22 +166,30 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (kpr *KeyperCore) getServices() []service.Service {
+	services := []service.Service{
+		kpr.messaging,
+		service.ServiceFn{Fn: kpr.operateShuttermint},
+		service.ServiceFn{Fn: kpr.handleNewEonPublicKeys},
+	}
+	keyTrigger := kpr.trigger
+	if kpr.config.HTTPEnabled {
+		httpServer := kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.messaging)
+		services = append(services, httpServer)
+		// combine two sources of decryption triggers
+		// and spawn the fan-in routine
+		apiDecrTrig := httpServer.GetDecryptionTriggerChannel()
+		fanIn := channel.NewFanInService(kpr.trigger, apiDecrTrig)
+		services = append(services, fanIn)
+		keyTrigger = fanIn.C
+	}
 	keyShareHandler := &epochkghandler.KeyShareHandler{
 		InstanceID:    kpr.config.GetInstanceID(),
 		KeyperAddress: kpr.config.GetAddress(),
 		DBPool:        kpr.dbpool,
 		Messaging:     kpr.messaging,
-		Trigger:       kpr.trigger,
+		Trigger:       keyTrigger,
 	}
-	services := []service.Service{
-		kpr.messaging,
-		keyShareHandler,
-		service.ServiceFn{Fn: kpr.operateShuttermint},
-		service.ServiceFn{Fn: kpr.handleNewEonPublicKeys},
-	}
-	if kpr.config.HTTPEnabled {
-		services = append(services, kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.messaging))
-	}
+	services = append(services, keyShareHandler)
 	if kpr.config.Metrics.Enabled {
 		services = append(services, kpr.metricsServer)
 	}

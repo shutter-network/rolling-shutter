@@ -12,6 +12,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -27,11 +28,11 @@ func sendError(w http.ResponseWriter, code int, message string) {
 	_ = json.NewEncoder(w).Encode(e)
 }
 
-func (srv *server) Ping(w http.ResponseWriter, _ *http.Request) {
+func (srv *Server) Ping(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("pong"))
 }
 
-func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
+func (srv *Server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
 	db := database.New(srv.dbpool)
 
@@ -59,7 +60,7 @@ func (srv *server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon 
 	_ = json.NewEncoder(w).Encode(res)
 }
 
-func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) GetEons(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := database.New(srv.dbpool)
 
@@ -111,7 +112,7 @@ func (srv *server) GetEons(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(res)
 }
 
-func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Request) {
 	var requestBody kproapi.SubmitDecryptionTriggerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid request for SubmitDecryptionTrigger")
@@ -123,23 +124,16 @@ func (srv *server) SubmitDecryptionTrigger(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	identityPreimage := identitypreimage.IdentityPreimage(epochIDBytes)
-
-	ctx := r.Context()
-	msgs, err := epochkghandler.SendDecryptionKeyShare(
-		ctx, srv.config, database.New(srv.dbpool), int64(requestBody.BlockNumber), identityPreimage,
-	)
-	if err != nil {
-		if err != nil {
-			sendError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	trigger := &epochkghandler.DecryptionTrigger{
+		BlockNumber:       requestBody.BlockNumber,
+		IdentityPreimages: []identitypreimage.IdentityPreimage{identityPreimage},
 	}
 
-	for _, msg := range msgs {
-		if err := srv.p2p.SendMessage(ctx, msg); err != nil {
-			log.Info().Err(err).Str("message", msg.LogInfo()).Str("topic", msg.Topic()).
-				Msg("failed to send message")
-			continue
-		}
+	ctx := r.Context()
+	select {
+	case srv.trigger <- broker.NewEvent(trigger):
+		return
+	case <-ctx.Done():
+		return
 	}
 }

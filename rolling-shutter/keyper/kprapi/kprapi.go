@@ -16,7 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -32,21 +34,34 @@ type Config interface {
 	GetInstanceID() uint64
 }
 
-type server struct {
-	dbpool *pgxpool.Pool
-	config Config
-	p2p    P2PMessageSender
+type Server struct {
+	dbpool  *pgxpool.Pool
+	config  Config
+	p2p     P2PMessageSender
+	trigger chan *broker.Event[*epochkghandler.DecryptionTrigger]
 }
 
-func NewHTTPService(dbpool *pgxpool.Pool, config Config, p2p P2PMessageSender) service.Service {
-	return &server{
-		dbpool: dbpool,
-		config: config,
-		p2p:    p2p,
+// Decryption triggering is blocking for now.
+const decrTrigChanBufferSize = 0
+
+func NewHTTPService(
+	dbpool *pgxpool.Pool,
+	config Config,
+	p2p P2PMessageSender,
+) *Server {
+	trigger := make(
+		chan *broker.Event[*epochkghandler.DecryptionTrigger],
+		decrTrigChanBufferSize,
+	)
+	return &Server{
+		dbpool:  dbpool,
+		config:  config,
+		p2p:     p2p,
+		trigger: trigger,
 	}
 }
 
-func (srv *server) setupRouter() *chi.Mux {
+func (srv *Server) setupRouter() *chi.Mux {
 	swagger, err := kproapi.GetSwagger()
 	if err != nil {
 		panic(err)
@@ -84,7 +99,11 @@ func (srv *server) setupRouter() *chi.Mux {
 	return router
 }
 
-func (srv *server) Start(ctx context.Context, runner service.Runner) error {
+func (srv *Server) GetDecryptionTriggerChannel() <-chan *broker.Event[*epochkghandler.DecryptionTrigger] {
+	return srv.trigger
+}
+
+func (srv *Server) Start(ctx context.Context, runner service.Runner) error { //nolint:unparam
 	httpServer := &http.Server{
 		Addr:              srv.config.GetHTTPListenAddress(),
 		Handler:           srv.setupRouter(),
@@ -100,7 +119,7 @@ func (srv *server) Start(ctx context.Context, runner service.Runner) error {
 	return nil
 }
 
-func (srv *server) setupAPIRouter(swagger *openapi3.T) http.Handler {
+func (srv *Server) setupAPIRouter(swagger *openapi3.T) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(chimiddleware.OapiRequestValidator(swagger))
