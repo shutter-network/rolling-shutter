@@ -1,4 +1,4 @@
-package epochkghandler
+package snapshot
 
 import (
 	"context"
@@ -10,20 +10,29 @@ import (
 	"github.com/rs/zerolog/log"
 
 	chainobscolldb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
-	kprdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-func NewDecryptionTriggerHandler(config Config, dbpool *pgxpool.Pool) p2p.MessageHandler {
-	return &DecryptionTriggerHandler{config: config, dbpool: dbpool}
+func NewDecryptionTriggerHandler(
+	config Config,
+	dbpool *pgxpool.Pool,
+	trigger chan<- *broker.Event[*epochkghandler.DecryptionTrigger],
+) p2p.MessageHandler {
+	return &DecryptionTriggerHandler{
+		trigger: trigger,
+		config:  config,
+		dbpool:  dbpool,
+	}
 }
 
 type DecryptionTriggerHandler struct {
-	config Config
-	dbpool *pgxpool.Pool
+	trigger chan<- *broker.Event[*epochkghandler.DecryptionTrigger]
+	config  Config
+	dbpool  *pgxpool.Pool
 }
 
 func (*DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
@@ -32,8 +41,8 @@ func (*DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
 	trigger := msg.(*p2pmsg.DecryptionTrigger)
-	if trigger.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), trigger.GetInstanceID())
+	if trigger.GetInstanceID() != handler.config.InstanceID {
+		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, trigger.GetInstanceID())
 	}
 
 	blk := trigger.BlockNumber
@@ -48,19 +57,14 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 		return false, errors.Wrapf(err, "error while getting collator from db for block number: %d", blk)
 	}
 
-	collator, err := shdb.DecodeAddress(chainCollator.Collator)
-	if err != nil {
-		return false, errors.Wrapf(err, "error while converting collator from string to address: %s", chainCollator.Collator)
-	}
-
-	signatureValid, err := p2pmsg.VerifySignature(trigger, collator)
+	signatureValid, err := p2pmsg.VerifySignature(trigger, chainCollator)
 	if err != nil {
 		return false, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %x", trigger.EpochID)
 	}
 	if !signatureValid {
 		return false, errors.Errorf("decryption trigger signature invalid for epoch: %x", trigger.EpochID)
 	}
-	return signatureValid, nil
+	return true, nil
 }
 
 func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
@@ -68,8 +72,18 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 	if !ok {
 		return nil, errors.New("Message type assertion mismatch")
 	}
-	metricsEpochKGDecryptionTriggersReceived.Inc()
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
 	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
-	return SendDecryptionKeyShare(ctx, handler.config, kprdb.New(handler.dbpool), int64(msg.BlockNumber), identityPreimage)
+
+	trig := &epochkghandler.DecryptionTrigger{
+		BlockNumber:       msg.BlockNumber,
+		IdentityPreimages: []identitypreimage.IdentityPreimage{identityPreimage},
+	}
+
+	select {
+	case handler.trigger <- broker.NewEvent(trig):
+		return nil, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }

@@ -1,4 +1,4 @@
-package snapshotkeyper
+package snapshot
 
 import (
 	"io"
@@ -44,7 +44,7 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Name() string {
-	return "snapshotkeyper"
+	return "keyper"
 }
 
 func (c *Config) SetDefaultValues() error {
