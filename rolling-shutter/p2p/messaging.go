@@ -24,14 +24,13 @@ import (
 type (
 	HandlerFunc       func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
 	HandlerRegistry   map[protoreflect.FullName][]HandlerFunc
-	ValidatorFunc     func(context.Context, p2pmsg.Message) (bool, error)
+	ValidatorFunc     func(context.Context, p2pmsg.Message) (pubsub.ValidationResult, error)
 	ValidatorRegistry map[string]pubsub.ValidatorEx
 )
 
 const (
 	allowTraceContext = true // whether we allow the trace field to be set in the message envelope
 	invalidResultType = pubsub.ValidationReject
-	validResultType   = pubsub.ValidationAccept
 )
 
 type Messaging interface {
@@ -42,7 +41,7 @@ type Messaging interface {
 }
 
 type MessageHandler interface {
-	ValidateMessage(context.Context, p2pmsg.Message) (bool, error)
+	ValidateMessage(context.Context, p2pmsg.Message) (pubsub.ValidationResult, error)
 	HandleMessage(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
 	MessagePrototypes() []p2pmsg.Message
 }
@@ -175,10 +174,7 @@ func (m *P2PMessaging) addValidatorImpl(valFunc ValidatorFunc, messProto p2pmsg.
 		if err != nil {
 			handleError(err)
 		}
-		if !valid {
-			return invalidResultType
-		}
-		return validResultType
+		return valid
 	}
 	m.validatorRegistry[topic] = validate
 	m.AddGossipTopic(topic)

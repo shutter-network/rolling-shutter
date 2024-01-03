@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -68,19 +69,19 @@ func (handler *decryptionKeyHandler) HandleMessage(
 func (handler *decryptionKeyHandler) ValidateMessage(
 	ctx context.Context,
 	k p2pmsg.Message,
-) (bool, error) {
+) (pubsub.ValidationResult, error) {
 	key := k.(*p2pmsg.DecryptionKey)
 
 	var eonPublicKey shcrypto.EonPublicKey
 	if key.GetInstanceID() != handler.Config.InstanceID {
-		return false, errors.Errorf(
+		return pubsub.ValidationReject, errors.Errorf(
 			"instance ID mismatch (want=%d, have=%d)",
 			handler.Config.InstanceID,
 			key.GetInstanceID(),
 		)
 	}
 	if key.Eon > math.MaxInt64 {
-		return false, errors.Errorf("eon %d overflows int64", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
 	identityPreimage := identitypreimage.IdentityPreimage(key.EpochID)
 
@@ -98,21 +99,21 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 		return nil
 	})
 	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 	epochSecretKey, err := key.GetEpochSecretKey()
 	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 
 	ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, &eonPublicKey, identityPreimage.Bytes())
 	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 	if !ok {
-		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", identityPreimage)
+		return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for epoch %s", identityPreimage)
 	}
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
 func (c *collator) sendDecryptionTriggers(ctx context.Context) error {

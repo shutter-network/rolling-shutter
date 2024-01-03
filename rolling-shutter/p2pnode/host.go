@@ -3,6 +3,7 @@ package p2pnode
 import (
 	"context"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -13,8 +14,8 @@ import (
 // dummyMessageHandler validates all p2p messages and emits a log message for each p2p message.
 type dummyMessageHandler struct{}
 
-func (dummyMessageHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) (bool, error) {
-	return true, nil
+func (dummyMessageHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) (pubsub.ValidationResult, error) {
+	return pubsub.ValidationAccept, nil
 }
 
 func (dummyMessageHandler) HandleMessage(

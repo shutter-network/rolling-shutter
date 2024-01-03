@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -29,39 +30,43 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
 }
 
-func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
+func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	key := msg.(*p2pmsg.DecryptionKey)
 	if key.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+		return pubsub.ValidationReject,
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
 	}
 	if key.Eon > math.MaxInt64 {
-		return false, errors.Errorf("eon %d overflows int64", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
 
 	dkgResultDB, err := database.New(handler.dbpool).GetDKGResult(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
-		return false, errors.Errorf("no DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
 	}
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
 	}
 	if !dkgResultDB.Success {
-		return false, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
 	}
 	epochSecretKey, err := key.GetEpochSecretKey()
 	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 
 	ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, key.EpochID)
 	if err != nil {
-		return false, errors.Wrapf(err, "error while checking epoch secret key for epoch %v", key.EpochID)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for epoch %v", key.EpochID)
 	}
-	return ok, nil
+	if !ok {
+		return pubsub.ValidationReject, errors.Wrapf(err, "epoch secret key for epoch %v is not valid", key.EpochID)
+	}
+	return pubsub.ValidationAccept, nil
 }
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {

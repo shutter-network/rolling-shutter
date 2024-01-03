@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -82,14 +83,14 @@ func (*eonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *eonPublicKeyHandler) ValidateMessage(
 	ctx context.Context,
 	k p2pmsg.Message,
-) (bool, error) {
+) (pubsub.ValidationResult, error) {
 	key := k.(*p2pmsg.EonPublicKey)
 	if err := ensureNoIntegerOverflowsInEonPublicKey(key); err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 
 	if handler.config.InstanceID != key.GetInstanceID() {
-		return false, errors.Errorf("eonPublicKey has wrong InstanceID (expected=%d, have=%d)",
+		return pubsub.ValidationReject, errors.Errorf("eonPublicKey has wrong InstanceID (expected=%d, have=%d)",
 			handler.config.InstanceID, key.GetInstanceID())
 	}
 
@@ -106,13 +107,13 @@ func (handler *eonPublicKeyHandler) ValidateMessage(
 		)
 		return err
 	}); err != nil {
-		return false, errors.Wrap(err, "failed to retrieve keyper set from db")
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to retrieve keyper set from db")
 	}
 
 	if err := ensureEonPublicKeyMatchesKeyperSet(keyperSet, key); err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
 func (handler *eonPublicKeyHandler) HandleMessage(
