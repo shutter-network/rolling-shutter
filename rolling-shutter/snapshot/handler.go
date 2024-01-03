@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -53,63 +54,65 @@ func (d *DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionTrigger{}}
 }
 
-func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
+func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	var eonPublicKey shcrypto.EonPublicKey
 
 	decryptionKeyMsg := msg.(*p2pmsg.DecryptionKey)
 	// FIXME: check snapshot business logic for decryptionKeyMsg validation
 	if decryptionKeyMsg.GetInstanceID() != handler.config.InstanceID {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, decryptionKeyMsg.GetInstanceID())
+		return pubsub.ValidationReject,
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, decryptionKeyMsg.GetInstanceID())
 	}
 
 	key, err := decryptionKeyMsg.GetEpochSecretKey()
 	if err != nil {
-		return false, errors.Wrapf(err, "error getting epochSecretKey at epoch: %d", decryptionKeyMsg.EpochID)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error getting epochSecretKey at epoch: %d", decryptionKeyMsg.EpochID)
 	}
 
 	// FIXME: unnecessary GobEncode?
 	_, err = key.GobEncode()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to encode decryption key")
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to encode decryption key")
 	}
 
 	eonID, err := medley.Uint64ToInt64Safe(decryptionKeyMsg.GetEon())
 	if err != nil {
-		return false, errors.Wrap(err, "can't cast eon to int64")
+		return pubsub.ValidationReject, errors.Wrap(err, "can't cast eon to int64")
 	}
 
 	eon, err := handler.snapshot.db.GetEonPublicKey(ctx, eonID)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to retrieve eon for decryption key")
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to retrieve eon for decryption key")
 	}
 
 	err = eonPublicKey.GobDecode(eon)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to retrieve eon for decryption key")
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to retrieve eon for decryption key")
 	}
 
 	epochID := decryptionKeyMsg.GetEpochID()
 	ok, err := shcrypto.VerifyEpochSecretKey(key, &eonPublicKey, epochID)
 	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 	if !ok {
-		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
+		return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
 	}
 
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
-func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (bool, error) {
+func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	eonKeyMsg := msg.(*p2pmsg.EonPublicKey)
 	if eonKeyMsg.GetInstanceID() != handler.config.InstanceID {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, eonKeyMsg.GetInstanceID())
+		return pubsub.ValidationReject,
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, eonKeyMsg.GetInstanceID())
 	}
 	eon := eonKeyMsg.GetEon()
 	if eon == 0 {
-		return false, errors.Errorf("failed to get eon public key from P2P message")
+		return pubsub.ValidationReject, errors.Errorf("failed to get eon public key from P2P message")
 	}
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
@@ -173,9 +176,9 @@ func (handler *EonPublicKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.
 	return nil, nil
 }
 
-func (d *DecryptionTriggerHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) (bool, error) {
+func (d *DecryptionTriggerHandler) ValidateMessage(_ context.Context, _ p2pmsg.Message) (pubsub.ValidationResult, error) {
 	log.Printf("Validating decryptionTrigger")
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
 func (d *DecryptionTriggerHandler) HandleMessage(_ context.Context, _ p2pmsg.Message) ([]p2pmsg.Message, error) {

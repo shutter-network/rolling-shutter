@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -82,13 +83,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 
 	tests := []struct {
-		name  string
-		valid bool
-		msg   *p2pmsg.DecryptionKeyShares
+		name             string
+		validationResult pubsub.ValidationResult
+		msg              *p2pmsg.DecryptionKeyShares
 	}{
 		{
-			name:  "valid decryption key share",
-			valid: true,
+			name:             "valid decryption key share",
+			validationResult: pubsub.ValidationAccept,
 			msg: &p2pmsg.DecryptionKeyShares{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
@@ -102,8 +103,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong epoch",
-			valid: false,
+			name:             "invalid decryption key share wrong epoch",
+			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
@@ -117,8 +118,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong instance ID",
-			valid: false,
+			name:             "invalid decryption key share wrong instance ID",
+			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
 				InstanceID:  config.GetInstanceID() + 1,
 				Eon:         eon,
@@ -132,8 +133,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:  "invalid decryption key share wrong keyper index",
-			valid: false,
+			name:             "invalid decryption key share wrong keyper index",
+			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
 				InstanceID:  config.GetInstanceID(),
 				Eon:         eon,
@@ -149,7 +150,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p2ptest.MustValidateMessageResult(t, tc.valid, handler, ctx, tc.msg)
+			p2ptest.MustValidateMessageResult(t, tc.validationResult, handler, ctx, tc.msg)
 		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"gotest.tools/assert"
 
 	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
@@ -139,7 +140,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 
 	tests := []struct {
 		name             string
-		valid            bool
+		validationResult pubsub.ValidationResult
 		instanceID       uint64
 		identityPreimage identitypreimage.IdentityPreimage
 		blockNumber      uint64
@@ -147,7 +148,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 	}{
 		{
 			name:             "valid trigger collator 1",
-			valid:            true,
+			validationResult: pubsub.ValidationAccept,
 			instanceID:       config.GetInstanceID(),
 			identityPreimage: idPreimage1,
 			blockNumber:      activationBlk1,
@@ -155,7 +156,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 		},
 		{
 			name:             "valid trigger collator 2",
-			valid:            true,
+			validationResult: pubsub.ValidationAccept,
 			instanceID:       config.GetInstanceID(),
 			identityPreimage: idPreimage2,
 			blockNumber:      activationBlk2,
@@ -163,7 +164,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 		},
 		{
 			name:             "invalid trigger wrong collator 1",
-			valid:            false,
+			validationResult: pubsub.ValidationReject,
 			instanceID:       config.GetInstanceID(),
 			identityPreimage: idPreimage2,
 			blockNumber:      activationBlk2,
@@ -171,7 +172,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 		},
 		{
 			name:             "invalid trigger wrong collator 2",
-			valid:            false,
+			validationResult: pubsub.ValidationReject,
 			instanceID:       config.GetInstanceID(),
 			identityPreimage: idPreimage1,
 			blockNumber:      activationBlk1,
@@ -179,7 +180,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 		},
 		{
 			name:             "invalid trigger wrong instanceID",
-			valid:            false,
+			validationResult: pubsub.ValidationReject,
 			instanceID:       config.GetInstanceID() + 1,
 			identityPreimage: idPreimage1,
 			blockNumber:      activationBlk1,
@@ -196,7 +197,7 @@ func TestTriggerValidatorIntegration(t *testing.T) { //nolint:funlen
 				tc.privKey,
 			)
 			assert.NilError(t, err)
-			p2ptest.MustValidateMessageResult(t, tc.valid, handler, ctx, msg)
+			p2ptest.MustValidateMessageResult(t, tc.validationResult, handler, ctx, msg)
 		})
 	}
 }

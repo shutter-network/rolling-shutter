@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -33,47 +34,47 @@ func (*DecryptionKeyShareHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShares{}}
 }
 
-func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (bool, error) {
+func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keyShare := msg.(*p2pmsg.DecryptionKeyShares)
 	if keyShare.GetInstanceID() != handler.config.GetInstanceID() {
-		return false, errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
+		return pubsub.ValidationReject,
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
 	}
 	if keyShare.Eon > math.MaxInt64 {
-		return false, errors.Errorf("eon %d overflows int64", keyShare.Eon)
+		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
 
 	dkgResultDB, err := database.New(handler.dbpool).GetDKGResult(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
-		return false, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
 	}
 	if err != nil {
-		return false, errors.Errorf("failed to get dkg result for eon %d from db", keyShare.Eon)
+		return pubsub.ValidationReject, errors.Errorf("failed to get dkg result for eon %d from db", keyShare.Eon)
 	}
 	if !dkgResultDB.Success {
-		return false, errors.Errorf("no successful DKG result found for eon %d", keyShare.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", keyShare.Eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return false, errors.Errorf("error while decoding pure DKG result for eon %d", keyShare.Eon)
+		return pubsub.ValidationReject, errors.Errorf("error while decoding pure DKG result for eon %d", keyShare.Eon)
 	}
 	if len(keyShare.Shares) != 1 {
-		return false, errors.New("decryption key share must have exactly one share")
+		return pubsub.ValidationReject, errors.New("decryption key share must have exactly one share")
 	}
 	for _, share := range keyShare.GetShares() {
-
 		epochSecretKeyShare, err := share.GetEpochSecretKeyShare()
 		if err != nil {
-			return false, err
+			return pubsub.ValidationReject, err
 		}
 		if !shcrypto.VerifyEpochSecretKeyShare(
 			epochSecretKeyShare,
 			pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
 			shcrypto.ComputeEpochID(share.EpochID),
 		) {
-			return false, errors.Errorf("cannot verify secret key share")
+			return pubsub.ValidationReject, errors.Errorf("cannot verify secret key share")
 		}
 	}
-	return true, nil
+	return pubsub.ValidationAccept, nil
 }
 
 func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
