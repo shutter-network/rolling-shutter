@@ -48,6 +48,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
+	kpr.dbpool = dbpool
 
 	// TODO: the new latest block handler function will put values into this channel
 	trigger := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
