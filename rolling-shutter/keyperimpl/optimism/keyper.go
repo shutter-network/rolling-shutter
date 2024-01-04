@@ -115,7 +115,7 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) er
 		Uint64("eon", ev.Eon).
 		Msg("new keyper set added")
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := obskeyper.New(tx)
+		obskeyperdb := obskeyper.New(tx)
 
 		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
 		if err != nil {
@@ -130,7 +130,7 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) er
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
 		}
 		// XXX: does this work when the memberset is empty?
-		return db.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
+		return obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 			KeyperConfigIndex:     keyperConfigIndex,
 			ActivationBlockNumber: activationBlockNumber,
 			Keypers:               shdb.EncodeAddresses(ev.Members),
