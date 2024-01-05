@@ -104,6 +104,16 @@ func (s *ShutterL2Client) GetShutterState(ctx context.Context) (*event.ShutterSt
 	return s.sssync.GetShutterState(ctx, opts)
 }
 
+func (s *ShutterL2Client) GetKeyperSetByIndex(ctx context.Context, index uint64) (*event.KeyperSet, error) {
+	if s.kssync == nil {
+		return nil, errors.Wrap(ErrServiceNotInstantiated, "KeyperSetSyncer service not instantiated")
+	}
+	opts := &bind.CallOpts{
+		Context: ctx,
+	}
+	return s.kssync.GetKeyperSetByIndex(ctx, opts, index)
+}
+
 func (s *ShutterL2Client) GetKeyperSetForBlock(ctx context.Context, b *number.BlockNumber) (*event.KeyperSet, error) {
 	if s.kssync == nil {
 		return nil, errors.Wrap(ErrServiceNotInstantiated, "KeyperSetSyncer service not instantiated")

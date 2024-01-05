@@ -19,15 +19,16 @@ func NewConfig() *Config {
 
 func (c *Config) Init() {
 	c.SigningKey = &keys.ECDSAPrivate{}
-	c.ActivationBlockNumber = number.NewBlockNumber()
+	c.ByActivationBlockNumber = number.NewBlockNumber()
 }
 
 type Config struct {
 	InstanceID uint64 `shconfig:",required"`
 
-	JSONRPCURL            string `                     comment:"The op-geth JSON RPC endpoint"`
-	ActivationBlockNumber *number.BlockNumber
-	KeyperSetFilePath     string
+	JSONRPCURL              string `                     comment:"The op-geth JSON RPC endpoint"`
+	ByActivationBlockNumber *number.BlockNumber
+	ByIndex                 *uint64
+	KeyperSetFilePath       string
 
 	ShuttermintURL string
 	SigningKey     *keys.ECDSAPrivate `shconfig:",required"`
@@ -45,7 +46,9 @@ func (c *Config) SetDefaultValues() error {
 	c.JSONRPCURL = "http://localhost:8545"
 	c.ShuttermintURL = "http://localhost:26657"
 	c.KeyperSetFilePath = "keyperset.json"
-	c.ActivationBlockNumber = number.LatestBlock
+	c.ByActivationBlockNumber = nil
+	i := uint64(1)
+	c.ByIndex = &i
 	return nil
 }
 

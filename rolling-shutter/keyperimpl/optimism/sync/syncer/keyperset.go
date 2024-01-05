@@ -55,6 +55,23 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	return nil
 }
 
+func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.CallOpts, index uint64) (*event.KeyperSet, error) {
+	if opts == nil {
+		opts = &bind.CallOpts{
+			Context: ctx,
+		}
+	}
+	actBl, err := s.Contract.GetKeyperSetActivationBlock(opts, index)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not retrieve keyper set activation block")
+	}
+	addr, err := s.Contract.GetKeyperSetAddress(opts, index)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not retrieve keyper set address")
+	}
+	return s.newEvent(ctx, opts, addr, actBl)
+}
+
 func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.CallOpts, b *number.BlockNumber) (*event.KeyperSet, error) {
 	if b.Equal(number.LatestBlock) {
 		latestBlock, err := s.Client.BlockNumber(ctx)
@@ -73,15 +90,7 @@ func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.C
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve keyper set index")
 	}
-	actBl, err := s.Contract.GetKeyperSetActivationBlock(opts, idx)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve keyper set activation block")
-	}
-	addr, err := s.Contract.GetKeyperSetAddress(opts, idx)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve keyper set address")
-	}
-	return s.newEvent(ctx, opts, addr, actBl)
+	return s.GetKeyperSetByIndex(ctx, opts, idx)
 }
 
 func (s *KeyperSetSyncer) newEvent(
