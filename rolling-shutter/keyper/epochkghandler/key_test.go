@@ -29,28 +29,45 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	queries := database.New(dbpool)
 
 	eon := config.GetEon()
-	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+	for i := 0; i < 3; i++ {
+		identityPreimage := identitypreimage.Uint64ToIdentityPreimage(uint64(i))
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
 	keyperIndex := uint64(1)
 
 	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
-	encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
+	encodedDecryptionKeys := [][]byte{}
+	for _, identityPreimage := range identityPreimages {
+		encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
+		encodedDecryptionKeys = append(encodedDecryptionKeys, encodedDecryptionKey)
+	}
 
 	// send a decryption key and check that it gets inserted
-	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKey{
+	keys := []*p2pmsg.Key{}
+	for i, identityPreimage := range identityPreimages {
+		key := &p2pmsg.Key{
+			Identity: identityPreimage.Bytes(),
+			Key:      encodedDecryptionKeys[i],
+		}
+		keys = append(keys, key)
+	}
+	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeys{
 		InstanceID: config.GetInstanceID(),
 		Eon:        eon,
-		EpochID:    identityPreimage.Bytes(),
-		Key:        encodedDecryptionKey,
+		Keys:       keys,
 	})
 	assert.Check(t, len(msgs) == 0)
-	key, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
-		Eon:     int64(eon),
-		EpochID: identityPreimage.Bytes(),
-	})
-	assert.NilError(t, err)
-	assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKey))
+	for i, identityPreimage := range identityPreimages {
+		key, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
+			Eon:     int64(eon),
+			EpochID: identityPreimage.Bytes(),
+		})
+		assert.NilError(t, err)
+		assert.Check(t, bytes.Equal(key.DecryptionKey, encodedDecryptionKeys[i]))
+	}
 }
 
 func TestDecryptionKeyValidatorIntegration(t *testing.T) {
@@ -65,44 +82,103 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 	eon := config.GetEon()
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
-	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
+	secondIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
+	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big2)
 	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 	secretKey := tkg.EpochSecretKey(identityPreimage).Marshal()
+	secondSecretKey := tkg.EpochSecretKey(secondIdentityPreimage).Marshal()
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
 	tests := []struct {
 		name             string
 		validationResult pubsub.ValidationResult
-		msg              *p2pmsg.DecryptionKey
+		msg              *p2pmsg.DecryptionKeys
 	}{
 		{
 			name:             "valid decryption key",
 			validationResult: pubsub.ValidationAccept,
-			msg: &p2pmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKeys{
 				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
-				EpochID:    identityPreimage.Bytes(),
-				Key:        secretKey,
+				Keys: []*p2pmsg.Key{
+					{
+						Identity: identityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+				},
 			},
 		},
 		{
 			name:             "invalid decryption key wrong epoch",
 			validationResult: pubsub.ValidationReject,
-			msg: &p2pmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKeys{
 				InstanceID: config.GetInstanceID(),
 				Eon:        eon,
-				EpochID:    wrongIdentityPreimage.Bytes(),
-				Key:        secretKey,
+				Keys: []*p2pmsg.Key{
+					{
+						Identity: wrongIdentityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+				},
 			},
 		},
 		{
 			name:             "invalid decryption key wrong instance ID",
 			validationResult: pubsub.ValidationReject,
-			msg: &p2pmsg.DecryptionKey{
+			msg: &p2pmsg.DecryptionKeys{
 				InstanceID: config.GetInstanceID() + 1,
 				Eon:        eon,
-				EpochID:    identityPreimage.Bytes(),
-				Key:        secretKey,
+				Keys: []*p2pmsg.Key{
+					{
+						Identity: identityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+				},
+			},
+		},
+		{
+			name:             "invalid decryption key empty",
+			validationResult: pubsub.ValidationReject,
+			msg: &p2pmsg.DecryptionKeys{
+				InstanceID: config.GetInstanceID(),
+				Eon:        eon,
+				Keys:       []*p2pmsg.Key{},
+			},
+		},
+		{
+			name:             "invalid decryption key duplicate",
+			validationResult: pubsub.ValidationReject,
+			msg: &p2pmsg.DecryptionKeys{
+				InstanceID: config.GetInstanceID(),
+				Eon:        eon,
+				Keys: []*p2pmsg.Key{
+					{
+						Identity: identityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+					{
+						Identity: identityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+				},
+			},
+		},
+		{
+			name:             "invalid decryption key unordered",
+			validationResult: pubsub.ValidationReject,
+			msg: &p2pmsg.DecryptionKeys{
+				InstanceID: config.GetInstanceID(),
+				Eon:        eon,
+				Keys: []*p2pmsg.Key{
+					{
+						Identity: secondIdentityPreimage.Bytes(),
+						Key:      secondSecretKey,
+					},
+					{
+						Identity: identityPreimage.Bytes(),
+						Key:      secretKey,
+					},
+				},
 			},
 		},
 	}

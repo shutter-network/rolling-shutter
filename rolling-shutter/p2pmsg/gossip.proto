@@ -19,7 +19,6 @@ message KeyShare {
         bytes share = 2;
 }
 
-// TODO: replace keyper index by signature
 message DecryptionKeyShares {
     uint64 instanceID = 1;
     uint64 eon = 4;
@@ -27,11 +26,15 @@ message DecryptionKeyShares {
     repeated KeyShare shares = 9;
 }
 
-message DecryptionKey {
+message Key {
+    bytes identity = 1;
+    bytes key = 2;
+}
+
+message DecryptionKeys {
     uint64 instanceID = 1;
     uint64 eon = 2;
-    bytes epochID = 3;
-    bytes key = 4;
+    repeated Key keys = 3;
 }
 
 // EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain
