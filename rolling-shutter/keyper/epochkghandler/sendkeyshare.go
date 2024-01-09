@@ -42,16 +42,19 @@ var (
 	ErrIgnoreDecryptionRequest = errors.New("ignoring decryption request")
 	ErrNotAKeyper              = errors.New("we are not a keyper")
 	ErrEonDKGFailed            = errors.New("eon key generation failed")
-	ErrShareAlreadySent        = errors.New("share exists already")
+	ErrSharesAlreadySent       = errors.New("shares exist already")
 )
 
-func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
+func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	ctx context.Context,
 	eon database.Eon,
 	identityPreimages []identitypreimage.IdentityPreimage,
 ) (*p2pmsg.DecryptionKeyShares, error) {
 	if len(identityPreimages) == 0 {
 		return nil, errors.New("cannot generate empty decryption key share")
+	}
+	if len(identityPreimages) > MaxNumKeysPerMessage {
+		return nil, errors.Errorf("too many decryption key shares for message (%d > %d)", len(identityPreimages), MaxNumKeysPerMessage)
 	}
 	db := database.New(ksh.DBPool)
 	batchConfig, err := db.GetBatchConfig(ctx, int32(eon.KeyperConfigIndex))
@@ -72,21 +75,25 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 		return nil, errors.Wrap(ErrNotAKeyper, ErrIgnoreDecryptionRequest.Error())
 	}
 
-	// check if we already computed (and therefore most likely sent) our key share
-	// FIXME: this only checks for existence of first preimage.
-	// If there are more in the array that haven't been released before,
-	// those will be missed when the first one is present.
-	shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
-		Eon:         eon.Eon,
-		EpochID:     identityPreimages[0].Bytes(),
-		KeyperIndex: keyperIndex,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
+	// check if we already computed (and therefore most likely sent) our key shares
+	allSharesExist := true
+	for _, identityPreimage := range identityPreimages {
+		shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
+			Eon:         eon.Eon,
+			EpochID:     identityPreimage.Bytes(),
+			KeyperIndex: keyperIndex,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
+		}
+		if !shareExists {
+			allSharesExist = false
+			break
+		}
 	}
-	if shareExists {
-		// we already sent our share
-		return nil, errors.Wrap(ErrShareAlreadySent, ErrIgnoreDecryptionRequest.Error())
+	if allSharesExist {
+		// we already sent our shares
+		return nil, errors.Wrap(ErrSharesAlreadySent, ErrIgnoreDecryptionRequest.Error())
 	}
 
 	// fetch dkg result from db
@@ -103,9 +110,8 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShare(
 	}
 
 	var shares []*p2pmsg.KeyShare
-	// compute the key share
+	// compute the key shares
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
-
 	for _, identityPreimage := range identityPreimages {
 		share := epochKG.ComputeEpochSecretKeyShare(identityPreimage)
 

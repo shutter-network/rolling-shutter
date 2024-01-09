@@ -16,6 +16,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshot/database"
 )
 
+const MaxNumKeysPerMessage = 128
+
 func NewDecryptionKeyHandler(config *Config, snapshot *Snapshot) p2p.MessageHandler {
 	return &DecryptionKeyHandler{config: config, snapshot: snapshot, dbpool: snapshot.dbpool}
 }
@@ -43,7 +45,7 @@ func NewDecryptionTriggerHandler() p2p.MessageHandler {
 type DecryptionTriggerHandler struct{}
 
 func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
+	return []p2pmsg.Message{&p2pmsg.DecryptionKeys{}}
 }
 
 func (*EonPublicKeyHandler) MessagePrototypes() []p2pmsg.Message {
@@ -57,25 +59,21 @@ func (d *DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	var eonPublicKey shcrypto.EonPublicKey
 
-	decryptionKeyMsg := msg.(*p2pmsg.DecryptionKey)
+	keys := msg.(*p2pmsg.DecryptionKeys)
 	// FIXME: check snapshot business logic for decryptionKeyMsg validation
-	if decryptionKeyMsg.GetInstanceID() != handler.config.InstanceID {
+	if keys.GetInstanceID() != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, decryptionKeyMsg.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceID())
 	}
 
-	key, err := decryptionKeyMsg.GetEpochSecretKey()
-	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "error getting epochSecretKey at epoch: %d", decryptionKeyMsg.EpochID)
+	if len(keys.Keys) == 0 {
+		return pubsub.ValidationReject, errors.Errorf("no keys in message")
+	}
+	if len(keys.Keys) > MaxNumKeysPerMessage {
+		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(keys.Keys), MaxNumKeysPerMessage)
 	}
 
-	// FIXME: unnecessary GobEncode?
-	_, err = key.GobEncode()
-	if err != nil {
-		return pubsub.ValidationReject, errors.Wrap(err, "failed to encode decryption key")
-	}
-
-	eonID, err := medley.Uint64ToInt64Safe(decryptionKeyMsg.GetEon())
+	eonID, err := medley.Uint64ToInt64Safe(keys.GetEon())
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrap(err, "can't cast eon to int64")
 	}
@@ -90,13 +88,18 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Wrap(err, "failed to retrieve eon for decryption key")
 	}
 
-	epochID := decryptionKeyMsg.GetEpochID()
-	ok, err := shcrypto.VerifyEpochSecretKey(key, &eonPublicKey, epochID)
-	if err != nil {
-		return pubsub.ValidationReject, err
-	}
-	if !ok {
-		return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for epoch %s", epochID)
+	for _, key := range keys.Keys {
+		k, err := key.GetEpochSecretKey()
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrapf(err, "error getting epochSecretKey for identity: %d", key.Identity)
+		}
+		ok, err := shcrypto.VerifyEpochSecretKey(k, &eonPublicKey, key.Identity)
+		if err != nil {
+			return pubsub.ValidationReject, err
+		}
+		if !ok {
+			return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for identity %s", key.Identity)
+		}
 	}
 
 	return pubsub.ValidationAccept, nil
@@ -117,31 +120,35 @@ func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pms
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg.Message) ([]p2pmsg.Message, error) {
 	var result []p2pmsg.Message
-	key := m.(*p2pmsg.DecryptionKey)
+	keys := m.(*p2pmsg.DecryptionKeys)
 	db := database.New(handler.dbpool)
 
-	rows, err := db.InsertDecryptionKey(
-		ctx, database.InsertDecryptionKeyParams{
-			EpochID: key.EpochID,
-			Key:     key.Key,
-		},
-	)
-	if err != nil {
-		return result, err
+	newKeys := []*p2pmsg.Key{}
+	for _, key := range keys.Keys {
+		rows, err := db.InsertDecryptionKey(
+			ctx, database.InsertDecryptionKeyParams{
+				EpochID: key.Identity,
+				Key:     key.Key,
+			},
+		)
+		if err != nil {
+			return result, err
+		}
+		// not yet seen
+		if rows != 0 {
+			newKeys = append(newKeys, key)
+			metricKeysGenerated.Inc()
+		}
 	}
 
-	// already seen
-	if rows == 0 {
-		return result, nil
+	for _, key := range newKeys {
+		log.Printf("Sending key %X for proposal %X to hub", key.Key, key.Identity)
+		err := handler.snapshot.hubapi.SubmitProposalKey(key.Identity, key.Key)
+		if err != nil {
+			return result, err
+		}
 	}
-	log.Printf("Sending key %X for proposal %X to hub", key.Key, key.EpochID)
 
-	metricKeysGenerated.Inc()
-
-	err = handler.snapshot.hubapi.SubmitProposalKey(key.EpochID, key.Key)
-	if err != nil {
-		return result, err
-	}
 	return result, nil
 }
 

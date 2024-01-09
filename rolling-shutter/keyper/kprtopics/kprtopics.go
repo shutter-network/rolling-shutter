@@ -2,7 +2,7 @@ package kprtopics
 
 const (
 	DecryptionTrigger   = "decryptionTrigger"
-	DecryptionKey       = "decryptionKey"
+	DecryptionKeys      = "decryptionKeys"
 	DecryptionKeyShares = "decryptionKeyShares"
 	EonPublicKey        = "EonPublicKey"
 )

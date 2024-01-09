@@ -29,7 +29,7 @@ func (dummyMessageHandler) HandleMessage(
 func (dummyMessageHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{
 		&p2pmsg.DecryptionKeyShares{},
-		&p2pmsg.DecryptionKey{},
+		&p2pmsg.DecryptionKeys{},
 		&p2pmsg.DecryptionTrigger{},
 		&p2pmsg.EonPublicKey{},
 	}

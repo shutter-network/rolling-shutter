@@ -54,18 +54,22 @@ func defaultTestConfig(t *testing.T) testConfig {
 	}
 }
 
-func TestDecryptionKey(t *testing.T) {
+func TestDecryptionKeys(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
 
-	orig := &DecryptionKey{
-		EpochID:    cfg.identityPreimage.Bytes(),
+	orig := &DecryptionKeys{
 		InstanceID: cfg.instanceID,
-		Key:        validSecretKey,
+		Keys: []*Key{
+			{
+				Identity: cfg.identityPreimage.Bytes(),
+				Key:      validSecretKey,
+			},
+		},
 	}
 	m, tc := marshalUnmarshalMessage(t, orig, nil)
 	assert.Assert(t, tc == nil)
-	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKey{}))
+	assert.DeepEqual(t, orig, m, cmpopts.IgnoreUnexported(DecryptionKeys{}, Key{}))
 }
 
 func TestDecryptionTrigger(t *testing.T) {
@@ -135,10 +139,14 @@ func TestTraceContext(t *testing.T) {
 	}
 	cfg := defaultTestConfig(t)
 	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
-	msg := &DecryptionKey{
-		EpochID:    cfg.identityPreimage.Bytes(),
+	msg := &DecryptionKeys{
 		InstanceID: cfg.instanceID,
-		Key:        validSecretKey,
+		Keys: []*Key{
+			{
+				Identity: cfg.identityPreimage.Bytes(),
+				Key:      validSecretKey,
+			},
+		},
 	}
 	_, newTc := marshalUnmarshalMessage(t, msg, tc)
 	assert.DeepEqual(t, tc, newTc, cmpopts.IgnoreUnexported(TraceContext{}))

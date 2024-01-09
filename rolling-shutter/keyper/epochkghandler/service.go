@@ -51,7 +51,7 @@ func (ksh *KeyShareHandler) handleEvent(ctx context.Context, ev *broker.Event[*D
 		return
 	}
 	log.Debug().Msg("constructing decryption key share")
-	keySharesMsg, err := ksh.ConstructDecryptionKeyShare(
+	keySharesMsg, err := ksh.ConstructDecryptionKeyShares(
 		ctx,
 		eon,
 		trigger.IdentityPreimages,

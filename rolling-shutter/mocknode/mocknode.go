@@ -90,7 +90,7 @@ func (m *MockNode) setupP2PHandler() {
 	m.p2p.AddHandlerFunc(m.handleEonPublicKey, &p2pmsg.EonPublicKey{})
 
 	m.p2p.AddGossipTopic(kprtopics.DecryptionTrigger)
-	m.p2p.AddGossipTopic(kprtopics.DecryptionKey)
+	m.p2p.AddGossipTopic(kprtopics.DecryptionKeys)
 }
 
 func (m *MockNode) logStartupInfo() {
@@ -272,10 +272,14 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, identityPreimage ident
 
 	keyBytes := epochSecretKey.Marshal()
 
-	msg := &p2pmsg.DecryptionKey{
+	msg := &p2pmsg.DecryptionKeys{
 		InstanceID: m.Config.InstanceID,
-		EpochID:    identityPreimage.Bytes(),
-		Key:        keyBytes,
+		Keys: []*p2pmsg.Key{
+			{
+				Identity: identityPreimage.Bytes(),
+				Key:      keyBytes,
+			},
+		},
 	}
 	return m.p2p.SendMessage(ctx, msg)
 }
