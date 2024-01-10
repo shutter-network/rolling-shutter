@@ -10,13 +10,14 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 type ShutterStateSyncer struct {
 	Client     client.Client
 	Contract   *bindings.KeyperSetManager
-	StartBlock *uint64
+	StartBlock *number.BlockNumber
 	Log        log.Logger
 	Handler    event.ShutterStateHandler
 
@@ -44,7 +45,7 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 		return errors.New("no handler registered")
 	}
 	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock, // nil means latest
+		Start:   s.StartBlock.ToUInt64Ptr(), // nil means latest
 		Context: ctx,
 	}
 	s.pausedCh = make(chan *bindings.KeyperSetManagerPaused)

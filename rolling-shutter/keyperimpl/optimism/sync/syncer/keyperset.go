@@ -19,15 +19,16 @@ func makeCallError(attrName string, err error) error {
 	return errors.Wrapf(err, "could not retrieve `%s` from contract", attrName)
 }
 
+const channelSize = 10
+
 type KeyperSetSyncer struct {
 	Client     client.Client
 	Contract   *bindings.KeyperSetManager
 	Log        log.Logger
-	StartBlock *uint64
+	StartBlock *number.BlockNumber
 	Handler    event.KeyperSetHandler
 
-	keyperAddedCh    chan *bindings.KeyperSetManagerKeyperSetAdded
-	handlerScheduler chan *event.KeyperSet
+	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 }
 
 func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -35,24 +36,82 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		return errors.New("no handler registered")
 	}
 
+	// the latest block still has to be fixed.
+	// otherwise we could skip some block events
+	// between the initial poll and the subscription.
+	if s.StartBlock.IsLatest() {
+		latest, err := s.Client.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		s.StartBlock.SetUint64(latest)
+	}
+
 	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock, // nil means latest
+		Start:   s.StartBlock.ToUInt64Ptr(),
 		Context: ctx,
 	}
-	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, 10)
+	initial, err := s.getInitialKeyperSets(ctx)
+	if err != nil {
+		return err
+	}
+	for _, ks := range initial {
+		err = s.Handler(ctx, ks)
+		if err != nil {
+			s.Log.Error(
+				"handler for `NewKeyperSet` errored for initial sync",
+				"error",
+				err.Error(),
+			)
+		}
+	}
+	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
+	runner.Defer(func() {
+		close(s.keyperAddedCh)
+	})
 	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
-	runner.Defer(func() {
-		close(s.keyperAddedCh)
-	})
 	runner.Go(func() error {
 		return s.watchNewKeypersService(ctx)
 	})
 	return nil
+}
+
+func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
+	// This blocknumber specifies AT what state
+	// the contract is called
+	// XXX: does the call-opts blocknumber -1 also means latest?
+	opts := &bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: s.StartBlock.Int,
+	}
+	numKS, err := s.Contract.GetNumKeyperSets(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	initialKeyperSets := []*event.KeyperSet{}
+	// this blocknumber specifies the argument to the contract
+	// getter
+	ks, err := s.GetKeyperSetForBlock(ctx, nil, s.StartBlock)
+	if err != nil {
+		return nil, err
+	}
+	initialKeyperSets = append(initialKeyperSets, ks)
+
+	for i := ks.Eon + 1; i < numKS; i++ {
+		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
+		if err != nil {
+			return nil, err
+		}
+		initialKeyperSets = append(initialKeyperSets, ks)
+	}
+
+	return initialKeyperSets, nil
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.CallOpts, index uint64) (*event.KeyperSet, error) {
@@ -73,20 +132,21 @@ func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.Ca
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.CallOpts, b *number.BlockNumber) (*event.KeyperSet, error) {
+	var latestBlock uint64
+	var err error
+
 	if b.Equal(number.LatestBlock) {
-		latestBlock, err := s.Client.BlockNumber(ctx)
-		if err != nil {
-			return nil, err
-		}
-		b = number.NewBlockNumber()
-		b.SetInt64(int64(latestBlock))
+		latestBlock, err = s.Client.BlockNumber(ctx)
+	} else {
+		latestBlock = b.Uint64()
 	}
 	if opts == nil {
+		// call at "latest block" state
 		opts = &bind.CallOpts{
 			Context: ctx,
 		}
 	}
-	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, b.Uint64())
+	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, latestBlock)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve keyper set index")
 	}

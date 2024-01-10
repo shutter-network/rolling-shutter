@@ -3,6 +3,7 @@ package optimism
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -28,9 +29,10 @@ import (
 var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
 type Keyper struct {
-	core   *keyper.KeyperCore
-	dbpool *pgxpool.Pool
-	config *config.Config
+	core     *keyper.KeyperCore
+	l2Client *shopclient.ShutterL2Client
+	dbpool   *pgxpool.Pool
+	config   *config.Config
 
 	trigger chan<- *broker.Event[*epochkghandler.DecryptionTrigger]
 }
@@ -50,7 +52,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 	kpr.dbpool = dbpool
 
-	// TODO: the new latest block handler function will put values into this channel
 	trigger := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 	kpr.trigger = trigger
 
@@ -77,17 +78,17 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 	// TODO: wrap the logger and pass in
-	l2Client, err := shopclient.NewShutterL2Client(
+	kpr.l2Client, err = shopclient.NewShutterL2Client(
 		ctx,
 		shopclient.WithClientURL(kpr.config.Optimism.JSONRPCURL),
 		shopclient.WithSyncNewBlock(kpr.newBlock),
 		shopclient.WithSyncNewKeyperSet(kpr.newKeyperSet),
+		shopclient.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
 	)
-	// TODO: how to deal with polling past state? (sounds like a big addition to the l2Client)
 	if err != nil {
 		return err
 	}
-	return runner.StartService(kpr.core, l2Client)
+	return runner.StartService(kpr.core, kpr.l2Client)
 }
 
 func (kpr *Keyper) newBlock(_ context.Context, ev *shopevent.LatestBlock) error {
@@ -139,11 +140,34 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) er
 	})
 }
 
-func (kpr *Keyper) newEonPublicKey(ctx context.Context, pk keyper.EonPublicKey) error {
+func (kpr *Keyper) newEonPublicKey(ctx context.Context, pubKey keyper.EonPublicKey) error {
 	log.Info().
-		Uint64("eon", pk.Eon).
-		Uint64("activation-block", pk.ActivationBlock).
+		Uint64("eon", pubKey.Eon).
+		Uint64("activation-block", pubKey.ActivationBlock).
 		Msg("new eon pk")
-	// TODO: post the public key to the contract
+	// Currently all keypers call this and race to call this function first.
+	// For now this is fine, but a keyper should only send a transaction if
+	// the key is not set yet.
+	// Best would be a coordinatated leader election who will broadcast the key.
+	tx, err := kpr.l2Client.BroadcastEonKey(ctx, pubKey.Eon, pubKey.PublicKey)
+	if err != nil {
+		log.Error().Err(err).Msg("error broadcasting eon public key")
+		return errors.Wrap(err, "error broadcasting eon public-key")
+	}
+	log.Info().
+		Str("hash", tx.Hash().Hex()).
+		Msg("sent eon pubkey transaction")
+
+	receipt, err := bind.WaitMined(ctx, kpr.l2Client, tx)
+	if err != nil {
+		log.Error().Err(err).Msg("error waiting for pubkey tx mined")
+		return err
+	}
+	// NOCHECKIN: log the JSON receipt or only specific fields
+	log.Info().
+		Interface("receipt", receipt).
+		Msg("eon pubkey transaction mined")
+	// TODO:
+	// wait / confirm of tx, otherwise resend
 	return nil
 }
