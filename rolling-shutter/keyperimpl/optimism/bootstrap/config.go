@@ -19,7 +19,7 @@ func NewConfig() *Config {
 
 func (c *Config) Init() {
 	c.SigningKey = &keys.ECDSAPrivate{}
-	c.ByActivationBlockNumber = number.NewBlockNumber()
+	c.ByActivationBlockNumber = number.NewBlockNumber(nil)
 }
 
 type Config struct {

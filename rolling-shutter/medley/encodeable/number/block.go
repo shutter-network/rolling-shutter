@@ -11,10 +11,16 @@ var (
 	LatestStr            = []byte("latest")
 )
 
-func NewBlockNumber() *BlockNumber {
-	return &BlockNumber{
-		Int: new(big.Int),
+func NewBlockNumber(u *uint64) *BlockNumber {
+	b := &BlockNumber{
+		Int: &big.Int{},
 	}
+	if u == nil {
+		b.SetInt64(LatestBlockInt)
+	} else {
+		b.SetUint64(*u)
+	}
+	return b
 }
 
 type BlockNumber struct {
@@ -22,7 +28,7 @@ type BlockNumber struct {
 }
 
 func (k *BlockNumber) UnmarshalText(b []byte) error {
-	k.Int = new(big.Int)
+	k.Int = &big.Int{}
 	if bytes.Equal(b, LatestStr) {
 		k.Int.SetInt64(LatestBlockInt)
 		return nil
@@ -32,6 +38,14 @@ func (k *BlockNumber) UnmarshalText(b []byte) error {
 
 func (k *BlockNumber) IsLatest() bool {
 	return k.Equal(LatestBlock)
+}
+
+func (k *BlockNumber) ToUInt64Ptr() *uint64 {
+	if k.IsLatest() {
+		return nil
+	}
+	u := k.Uint64()
+	return &u
 }
 
 func (k *BlockNumber) Equal(b *BlockNumber) bool {

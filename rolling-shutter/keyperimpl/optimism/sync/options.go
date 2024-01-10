@@ -2,17 +2,19 @@ package sync
 
 import (
 	"context"
-	"errors"
+	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 	"github.com/shutter-network/shop-contracts/predeploy"
 
 	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/syncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -25,7 +27,8 @@ type options struct {
 	client                      syncclient.Client
 	logger                      log.Logger
 	runner                      service.Runner
-	syncStart                   *uint64
+	syncStart                   *number.BlockNumber
+	privKey                     *ecdsa.PrivateKey
 
 	handlerShutterState event.ShutterStateHandler
 	handlerKeyperSet    event.KeyperSetHandler
@@ -66,6 +69,16 @@ func (o *options) apply(ctx context.Context, c *ShutterL2Client) error {
 	c.log = o.logger
 
 	c.Client = client
+
+	// the nil passthrough will use "latest" for each call,
+	// but we want to harmonize and fix the sync start to a specific block.
+	if o.syncStart.IsLatest() {
+		latestBlock, err := c.Client.BlockNumber(ctx)
+		if err != nil {
+			return errors.Wrap(err, "polling latest block")
+		}
+		o.syncStart = number.NewBlockNumber(&latestBlock)
+	}
 
 	c.KeyperSetManager, err = bindings.NewKeyperSetManager(*o.keyperSetManagerAddress, client)
 	if err != nil {
@@ -118,6 +131,7 @@ func (o *options) apply(ctx context.Context, c *ShutterL2Client) error {
 	if o.handlerBlock != nil {
 		c.services = append(c.services, c.uhsync)
 	}
+	c.privKey = o.privKey
 	return nil
 }
 
@@ -129,14 +143,16 @@ func defaultOptions() *options {
 		client:                      nil,
 		logger:                      noopLogger,
 		runner:                      nil,
-		syncStart:                   nil,
+		syncStart:                   number.NewBlockNumber(nil),
 	}
 }
 
-func WithSyncStartBlock(blockNumber uint64) Option {
+func WithSyncStartBlock(blockNumber *number.BlockNumber) Option {
+	if blockNumber == nil {
+		blockNumber = number.NewBlockNumber(nil)
+	}
 	return func(o *options) error {
-		bn := blockNumber
-		o.syncStart = &bn
+		o.syncStart = blockNumber
 		return nil
 	}
 }
@@ -179,6 +195,13 @@ func WithLogger(l log.Logger) Option {
 func WithClient(client syncclient.Client) Option {
 	return func(o *options) error {
 		o.client = client
+		return nil
+	}
+}
+
+func WithPrivateKey(key *ecdsa.PrivateKey) Option {
+	return func(o *options) error {
+		o.privKey = key
 		return nil
 	}
 }

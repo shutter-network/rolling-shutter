@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -18,34 +19,89 @@ type EonPubKeySyncer struct {
 	Client     client.Client
 	Log        log.Logger
 	Contract   *bindings.KeyBroadcastContract
-	StartBlock *uint64
+	StartBlock *number.BlockNumber
 	Handler    event.EonPublicKeyHandler
 
 	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
+	ksManager      *bindings.KeyperSetManager
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}
+	// the latest block still has to be fixed.
+	// otherwise we could skip some block events
+	// between the initial poll and the subscription.
+	if s.StartBlock.IsLatest() {
+		latest, err := s.Client.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		s.StartBlock.SetUint64(latest)
+	}
+	pubKs, err := s.getInitialPubKeys(ctx)
+	if err != nil {
+		return err
+	}
+	for _, k := range pubKs {
+		err := s.Handler(ctx, k)
+		if err != nil {
+			return err
+		}
+	}
+
 	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock, // nil means latest
+		Start:   s.StartBlock.ToUInt64Ptr(),
 		Context: ctx,
 	}
-	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, 10)
+	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, channelSize)
+	runner.Defer(func() {
+		close(s.keyBroadcastCh)
+	})
 	subs, err := s.Contract.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
-	runner.Defer(func() {
-		close(s.keyBroadcastCh)
-	})
 	runner.Go(func() error {
 		return s.watchNewEonPubkey(ctx)
 	})
 	return nil
+}
+
+func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPublicKey, error) {
+	// This blocknumber specifies AT what state
+	// the contract is called
+	// XXX: does the call-opts blocknumber -1 also means latest?
+	opts := &bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: s.StartBlock.Int,
+	}
+	numKS, err := s.ksManager.GetNumKeyperSets(opts)
+	if err != nil {
+		return nil, err
+	}
+	// this blocknumber specifies the argument to the contract
+	// getter
+	activeEon, err := s.ksManager.GetKeyperSetIndexByBlock(opts, s.StartBlock.Uint64())
+	if err != nil {
+		return nil, err
+	}
+
+	initialPubKeys := []*event.EonPublicKey{}
+	for i := activeEon; i < numKS; i++ {
+		e, err := s.GetEonPubKeyForEon(ctx, opts, i)
+		// FIXME: translate the error that there is no key
+		// to a continue of the loop
+		// (key not in mapping error, how can we catch that?)
+		if err != nil {
+			return nil, err
+		}
+		initialPubKeys = append(initialPubKeys, e)
+	}
+	return initialPubKeys, nil
 }
 
 func (s *EonPubKeySyncer) logCallError(attrName string, err error) {
