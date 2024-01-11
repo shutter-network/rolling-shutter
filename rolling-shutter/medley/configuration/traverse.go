@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"encoding"
 	"fmt"
 	"io"
 	"reflect"
@@ -20,6 +21,7 @@ func sliceToSet[T comparable](sl []T) map[T]bool {
 type tagOptions struct {
 	setExplicitly bool
 	required      bool
+	sensitive     bool
 }
 
 func extractTags(field *reflect.StructField) tagOptions {
@@ -38,10 +40,29 @@ func extractTags(field *reflect.StructField) tagOptions {
 	}
 	tags := sliceToSet(strings.Split(strings.TrimSpace(tagVal), ","))
 	_, required := tags["required"]
+	_, sensitive := tags["sensitive"]
 	return tagOptions{
 		setExplicitly: true,
 		required:      required,
+		sensitive:     sensitive,
 	}
+}
+
+// GetSensitiveRecursive will return all sensitive config paths.
+func GetSensitiveRecursive(root Config) map[string]any {
+	sensitive := map[string]any{}
+	execFn := func(n *node) error {
+		if n.isBranch {
+			return nil
+		}
+		opts := extractTags(n.fieldType)
+		if opts.sensitive {
+			sensitive[strings.ToLower(n.path)] = true
+		}
+		return nil
+	}
+	_ = traverseRecursive(root, execFn, true)
+	return sensitive
 }
 
 // GetRequiredRecursive will return all required config paths
@@ -54,11 +75,11 @@ func GetRequiredRecursive(root Config) map[string]any {
 		}
 		opts := extractTags(n.fieldType)
 		if opts.required {
-			required[n.path] = true
+			required[strings.ToLower(n.path)] = true
 		}
 		return nil
 	}
-	_ = traverseRecursive(root, execFn)
+	_ = traverseRecursive(root, execFn, true)
 	return required
 }
 
@@ -68,7 +89,7 @@ func SetDefaultValuesRecursive(root Config, excludePaths []string) error {
 		exPth[p] = true
 	}
 	execFn := func(n *node) error {
-		_, excluded := exPth[n.path]
+		_, excluded := exPth[strings.ToLower(n.path)]
 		if !n.isBranch || excluded {
 			return nil
 		}
@@ -78,7 +99,7 @@ func SetDefaultValuesRecursive(root Config, excludePaths []string) error {
 	// we need a second pass to reset excluded fields.
 	// this is not efficient, but ok for config parsing
 	execFnResetExcluded := func(n *node) error {
-		_, excluded := exPth[n.path]
+		_, excluded := exPth[strings.ToLower(n.path)]
 		if !n.isBranch && excluded {
 			if n.fieldValue.CanSet() {
 				n.fieldValue.SetZero()
@@ -87,11 +108,11 @@ func SetDefaultValuesRecursive(root Config, excludePaths []string) error {
 		}
 		return nil
 	}
-	err := traverseRecursive(root, execFn)
+	err := traverseRecursive(root, execFn, true)
 	if err != nil {
 		return err
 	}
-	return traverseRecursive(root, execFnResetExcluded)
+	return traverseRecursive(root, execFnResetExcluded, true)
 }
 
 func SetExampleValuesRecursive(root Config) error {
@@ -101,7 +122,7 @@ func SetExampleValuesRecursive(root Config) error {
 		}
 		return n.config.SetExampleValues()
 	}
-	return traverseRecursive(root, execFn)
+	return traverseRecursive(root, execFn, true)
 }
 
 func GetEnvironmentVarsRecursive(root Config) map[string][]string {
@@ -110,7 +131,7 @@ func GetEnvironmentVarsRecursive(root Config) map[string][]string {
 		if n.isBranch {
 			return nil
 		}
-		vars[n.path] = []string{
+		vars[strings.ToLower(n.path)] = []string{
 			// this is the old naming scheme, without the sub-config
 			// qualifiers ("P2P", "ETHEREUM") and with a subcommand specific
 			// prefix (e.g. KEYPER_CUSTOMBOOTSTRAPADDRESSES)
@@ -119,11 +140,11 @@ func GetEnvironmentVarsRecursive(root Config) map[string][]string {
 			// full path with a generic prefix not dependend on the
 			// subcommand executed
 			// (e.g. SHUTTER_P2P_CUSTOMBOOTSTRAPADDRESSES)
-			"SHUTTER_" + strings.ToUpper(strings.ReplaceAll(n.path, ".", "_")),
+			"SHUTTER_" + strings.ToUpper(strings.ReplaceAll(strings.ToLower(n.path), ".", "_")),
 		}
 		return nil
 	}
-	_ = traverseRecursive(root, execFn)
+	_ = traverseRecursive(root, execFn, true)
 	return vars
 }
 
@@ -137,7 +158,7 @@ func writeTOMLHeadersRecursive(root Config, w io.Writer) error {
 		totalBytesWritten += i
 		return err
 	}
-	err := traverseRecursive(root, execFn)
+	err := traverseRecursive(root, execFn, true)
 	if err != nil {
 		return err
 	}
@@ -168,7 +189,7 @@ func (e *execErr) error() error {
 	return errors.Wrapf(e.err, "error during recursion at path '%s'", e.node.path)
 }
 
-func traverseRecursive(root Config, exec execFunc) error {
+func traverseRecursive(root Config, exec execFunc, tailRecursive bool) error {
 	rootNode := &node{
 		isBranch:      true,
 		previousNodes: []*node{},
@@ -176,7 +197,7 @@ func traverseRecursive(root Config, exec execFunc) error {
 		path:          "",
 		fieldType:     nil,
 	}
-	err := execRecursive(rootNode, exec, stopNever)
+	err := execRecursive(rootNode, exec, stopNever, tailRecursive)
 	if err != nil {
 		return err.error()
 	}
@@ -196,7 +217,15 @@ func stopNever(_ *node) bool {
 
 // execRecursive recursively traverses the config struct like a tree.
 // The implementation is not optimized.
-func execRecursive(n *node, exec execFunc, stop stopFunc) *execErr {
+func execRecursive(n *node, exec execFunc, stop stopFunc, tailRecursion bool) *execErr {
+	if !tailRecursion {
+		if err := exec(n); err != nil {
+			return &execErr{
+				err:  err,
+				node: n,
+			}
+		}
+	}
 	// if the node is a branch, first handle potential subtrees.
 	// this results in child nodes always being executed before their parent node
 	if n.isBranch {
@@ -231,7 +260,7 @@ func execRecursive(n *node, exec execFunc, stop stopFunc) *execErr {
 			if nextPath != "" {
 				nextPath += "."
 			}
-			nextPath += strings.ToLower(structField.Name)
+			nextPath += structField.Name
 			nextNode := &node{
 				isBranch:      false,
 				previousNodes: newPath,
@@ -249,17 +278,85 @@ func execRecursive(n *node, exec execFunc, stop stopFunc) *execErr {
 			// if the stop function returns false,
 			// we can dive into the next subtree
 			if !stop(nextNode) {
-				if err := execRecursive(nextNode, exec, stop); err != nil {
+				if err := execRecursive(nextNode, exec, stop, tailRecursion); err != nil {
 					return err
 				}
 			}
 		}
 	}
-	if err := exec(n); err != nil {
-		return &execErr{
-			err:  err,
-			node: n,
+	if tailRecursion {
+		if err := exec(n); err != nil {
+			return &execErr{
+				err:  err,
+				node: n,
+			}
 		}
 	}
 	return nil
+}
+
+func UpsertDictForPath(d map[string]interface{}, path string) (map[string]interface{}, error) {
+	var current map[string]interface{}
+	if path == "" {
+		return d, nil
+	}
+	for _, elem := range strings.Split(path, ".") {
+		val, ok := d[elem]
+		if !ok {
+			current = map[string]interface{}{}
+			d[elem] = current
+			continue
+		}
+		current, ok = val.(map[string]interface{})
+		if !ok {
+			return nil, errors.Errorf("path dict (path=%s) has wrong type", path)
+		}
+	}
+	return current, nil
+}
+
+func ToDict(root Config, redactPaths []string) (map[string]interface{}, error) {
+	rdPth := map[string]bool{}
+	for _, p := range redactPaths {
+		rdPth[p] = true
+	}
+	out := map[string]interface{}{}
+	execFn := func(n *node) error {
+		if len(n.previousNodes) == 0 {
+			return nil
+		}
+		if n.isBranch {
+			_, err := UpsertDictForPath(out, n.path)
+			if err != nil {
+				return err
+			}
+		} else {
+			subdict, err := UpsertDictForPath(out, n.previousNodes[len(n.previousNodes)-1].path)
+			if err != nil {
+				return err
+			}
+
+			_, redacted := rdPth[strings.ToLower(n.path)]
+			var value any
+			if redacted {
+				value = "(sensitive)"
+			} else {
+				v := n.fieldValue.Interface()
+				marshaller, ok := v.(encoding.TextMarshaler)
+				if !ok {
+					value = v
+				} else {
+					res, err := marshaller.MarshalText()
+					if err != nil {
+						return err
+					}
+					value = string(res)
+				}
+			}
+			subdict[n.fieldType.Name] = value
+		}
+		return nil
+	}
+	err := traverseRecursive(root, execFn, false)
+	return out, err
 }
