@@ -7,7 +7,8 @@ ENV BASH_ENV=/home/app/.env
 RUN groupadd -g 1000 app && \
     useradd -g 1000 -u 1000 -m app
 
-RUN apt update && \
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt update && \
     apt install -y git curl
 
 USER 1000
@@ -22,7 +23,8 @@ FROM base AS build
 
 USER root
 
-RUN apt install -y build-essential libreadline-dev zlib1g-dev libssl-dev libuuid1 uuid-dev unzip
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt install -y build-essential libreadline-dev zlib1g-dev libssl-dev libuuid1 uuid-dev unzip
 
 COPY ./ /src
 
@@ -31,29 +33,15 @@ USER 1000
 
 WORKDIR /src/rolling-shutter
 
-RUN make install-asdf && \
+RUN --mount=type=cache,target=/home/app/.asdf/downloads,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/app/.asdf/tmp,uid=1000,gid=1000 \
+    make install-asdf
+
+RUN --mount=type=cache,target=/home/app/.asdf/downloads,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/app/.asdf/tmp,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/app/.cache/go-build,uid=1000,gid=1000 \
+    make install-asdf && \
     make install-tools && \
     make build
-
-RUN go clean -cache -modcache
-
-FROM base AS run
-
-USER root
-RUN apt install make
-
-USER 1000
-RUN mkdir /home/app/.asdf/installs
-COPY --from=build /src /src
-COPY --from=build /home/app/.asdf/plugins/ /home/app/.asdf/plugins/
-COPY --from=build /home/app/.asdf/installs/babashka/ /home/app/.asdf/installs/babashka/
-COPY --from=build /home/app/.asdf/installs/clojure/ /home/app/.asdf/installs/clojure/
-COPY --from=build /home/app/.asdf/installs/golang/ /home/app/.asdf/installs/golang/
-COPY --from=build /home/app/.asdf/installs/java/ /home/app/.asdf/installs/java/
-COPY --from=build /home/app/.asdf/installs/nodejs/ /home/app/.asdf/installs/nodejs/
-COPY --from=build /home/app/.asdf/installs/postgres/ /home/app/.asdf/installs/postgres/
-COPY --from=build /home/app/.asdf/installs/solidity/ /home/app/.asdf/installs/solidity/
-RUN asdf reshim
-
 
 WORKDIR /src
