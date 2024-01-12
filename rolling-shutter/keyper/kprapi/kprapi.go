@@ -3,7 +3,6 @@ package kprapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -40,13 +40,12 @@ type server struct {
 	shutdownSig chan struct{}
 }
 
-var ErrShutdownRequested = errors.New("shutdown requested from API")
-
 func NewHTTPService(dbpool *pgxpool.Pool, config Config, p2p P2PMessageSender) service.Service {
 	return &server{
-		dbpool: dbpool,
-		config: config,
-		p2p:    p2p,
+		dbpool:      dbpool,
+		config:      config,
+		p2p:         p2p,
+		shutdownSig: make(chan struct{}),
 	}
 }
 
@@ -94,7 +93,6 @@ func (srv *server) Start(ctx context.Context, runner service.Runner) error {
 		Handler:           srv.setupRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	srv.shutdownSig = make(chan struct{})
 	runner.Defer(func() { close(srv.shutdownSig) })
 
 	runner.Go(httpServer.ListenAndServe)
@@ -120,7 +118,7 @@ func (srv *server) waitShutdown(ctx context.Context) error {
 				// but not stop execution
 				return nil
 			}
-			return ErrShutdownRequested
+			return medley.ErrShutdownRequested
 		case <-ctx.Done():
 			// we canceled somewhere else
 			return nil
