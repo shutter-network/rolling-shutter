@@ -3,6 +3,7 @@ package kprapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -35,14 +36,17 @@ type Config interface {
 }
 
 type Server struct {
-	dbpool  *pgxpool.Pool
-	config  Config
-	p2p     P2PMessageSender
-	trigger chan *broker.Event[*epochkghandler.DecryptionTrigger]
+	dbpool      *pgxpool.Pool
+	config      Config
+	p2p         P2PMessageSender
+	trigger     chan *broker.Event[*epochkghandler.DecryptionTrigger]
+	shutdownSig chan struct{}
 }
 
 // Decryption triggering is blocking for now.
 const decrTrigChanBufferSize = 0
+
+var ErrShutdownRequested = errors.New("shutdown requested from API")
 
 func NewHTTPService(
 	dbpool *pgxpool.Pool,
@@ -109,7 +113,13 @@ func (srv *Server) Start(ctx context.Context, runner service.Runner) error { //n
 		Handler:           srv.setupRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	srv.shutdownSig = make(chan struct{})
+	runner.Defer(func() { close(srv.shutdownSig) })
+
 	runner.Go(httpServer.ListenAndServe)
+	runner.Go(func() error {
+		return srv.waitShutdown(ctx)
+	})
 	runner.Go(func() error {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -118,6 +128,24 @@ func (srv *Server) Start(ctx context.Context, runner service.Runner) error { //n
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	return nil
+}
+
+func (srv *Server) waitShutdown(ctx context.Context) error {
+	for {
+		select {
+		case _, ok := <-srv.shutdownSig:
+			if !ok {
+				// channel close without a send
+				// means we want to stop the shutdown waiter
+				// but not stop execution
+				return nil
+			}
+			return ErrShutdownRequested
+		case <-ctx.Done():
+			// we canceled somewhere else
+			return nil
+		}
+	}
 }
 
 func (srv *Server) setupAPIRouter(swagger *openapi3.T) http.Handler {

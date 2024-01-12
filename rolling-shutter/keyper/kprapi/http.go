@@ -32,6 +32,13 @@ func (srv *Server) Ping(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("pong"))
 }
 
+func (srv *Server) Shutdown(w http.ResponseWriter, _ *http.Request) {
+	srv.shutdownSig <- struct{}{}
+	// We still want to return here and thus return 200 to the caller after this.
+	// Not immediately closing open connctions is taken care
+	// of by the graceful shutdown of the http server.
+}
+
 func (srv *Server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon int, epochID kproapi.EpochID) {
 	ctx := r.Context()
 	db := database.New(srv.dbpool)
