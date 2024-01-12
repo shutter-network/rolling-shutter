@@ -3,7 +3,6 @@ package kprapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -46,8 +46,6 @@ type Server struct {
 // Decryption triggering is blocking for now.
 const decrTrigChanBufferSize = 0
 
-var ErrShutdownRequested = errors.New("shutdown requested from API")
-
 func NewHTTPService(
 	dbpool *pgxpool.Pool,
 	config Config,
@@ -58,10 +56,11 @@ func NewHTTPService(
 		decrTrigChanBufferSize,
 	)
 	return &Server{
-		dbpool:  dbpool,
-		config:  config,
-		p2p:     p2p,
-		trigger: trigger,
+		dbpool:      dbpool,
+		config:      config,
+		p2p:         p2p,
+		trigger:     trigger,
+		shutdownSig: make(chan struct{}),
 	}
 }
 
@@ -113,7 +112,6 @@ func (srv *Server) Start(ctx context.Context, runner service.Runner) error { //n
 		Handler:           srv.setupRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	srv.shutdownSig = make(chan struct{})
 	runner.Defer(func() { close(srv.shutdownSig) })
 
 	runner.Go(httpServer.ListenAndServe)
@@ -140,7 +138,7 @@ func (srv *Server) waitShutdown(ctx context.Context) error {
 				// but not stop execution
 				return nil
 			}
-			return ErrShutdownRequested
+			return medley.ErrShutdownRequested
 		case <-ctx.Done():
 			// we canceled somewhere else
 			return nil

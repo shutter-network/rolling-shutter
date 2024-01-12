@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"sync"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type Runner interface {
@@ -102,6 +105,11 @@ func RunWithSighandler(ctx context.Context, services ...Service) error {
 	defer cancel()
 	err := Run(ctx, services...)
 	if err == context.Canceled {
+		log.Info().Msg("bye")
+		return nil
+	}
+	if errors.Is(err, medley.ErrShutdownRequested) {
+		log.Info().Msg("user shut down service")
 		log.Info().Msg("bye")
 		return nil
 	}
