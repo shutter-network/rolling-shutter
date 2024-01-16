@@ -178,7 +178,7 @@
   (go-install "gotestsum" "gotest.tools/gotestsum@latest")
 
   -install:abigen
-  (go-install "abigen" "github.com/ethereum/go-ethereum/cmd/abigen")
+  (go-install "abigen" "github.com/ethereum/go-ethereum/cmd/abigen@v1.12.0")
 
   -install:oapi-codegen
   (go-install "oapi-codegen" "github.com/deepmap/oapi-codegen/cmd/oapi-codegen")
