@@ -44,4 +44,18 @@ RUN --mount=type=cache,target=/home/app/.asdf/downloads,uid=1000,gid=1000 \
     make install-tools && \
     make build
 
-WORKDIR /src
+ENV POSTGRES_DB="testdb"
+ENV POSTGRES_HOST_AUTH_METHOD="trust"
+ENV POSTGRES_PASSWORD="password"
+ENV POSTGRES_USER="app"
+
+
+RUN sh -c "$(curl --location https://raw.githubusercontent.com/F1bonacc1/process-compose/main/scripts/get-pc.sh)" -- -d -b /home/app/.asdf/bin
+USER root
+RUN ln -s /tmp/.s.PGSQL.5432 /var/run/.s.pgsql.5432
+USER 1000
+RUN bash -c "mkdir -p /src/play/work/db && /home/app/.asdf/shims/initdb /src/play/work/db"
+WORKDIR /src/play
+
+RUN bb --config /src/play/bb.edn build-all && clojure -T:build
+RUN echo '. /src/play/.envrc' >> ~/.bashrc
