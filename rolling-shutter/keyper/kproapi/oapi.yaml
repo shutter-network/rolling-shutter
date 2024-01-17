@@ -19,7 +19,7 @@ paths:
   /shutdown:
     post:
       description: |
-        Shut down the served
+        Shut down the server
       operationId: shutdown
       parameters:
 
