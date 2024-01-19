@@ -57,5 +57,15 @@ USER 1000
 RUN bash -c "mkdir -p /src/play/work/db && /home/app/.asdf/shims/initdb /src/play/work/db"
 WORKDIR /src/play
 
-RUN bb --config /src/play/bb.edn build-all && clojure -T:build
-RUN echo '. /src/play/.envrc' >> ~/.bashrc
+RUN --mount=type=cache,target=/home/app/.cache,uid=1000,gid=1000 \
+    bb --config /src/play/bb.edn build-all && \
+    clojure -T:build
+
+ENV ROLLING_SHUTTER_ROOT=/src
+ENV ROLLING_SHUTTER_BOOTSTRAP_SIGNING_KEY=479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad
+ENV ROLLING_SHUTTER_CHAIN_GENESIS_KEYPER=0x440Dc6F164e9241F04d282215ceF2780cd0B755e
+USER root
+RUN mkdir -p /home/app/.cache/hardhat-nodejs && chown -R 1000:1000 /home/app/.cache/hardhat-nodejs
+RUN ln -s /src/contracts/deployments /src/play/deployments
+
+USER 1000
