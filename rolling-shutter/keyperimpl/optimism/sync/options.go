@@ -100,11 +100,12 @@ func (o *options) apply(ctx context.Context, c *ShutterL2Client) error {
 		return err
 	}
 	c.epksync = &syncer.EonPubKeySyncer{
-		Client:     client,
-		Log:        c.log,
-		Contract:   c.KeyBroadcast,
-		Handler:    o.handlerEonPublicKey,
-		StartBlock: o.syncStart,
+		Client:           client,
+		Log:              c.log,
+		KeyBroadcast:     c.KeyBroadcast,
+		KeyperSetManager: c.KeyperSetManager,
+		Handler:          o.handlerEonPublicKey,
+		StartBlock:       o.syncStart,
 	}
 	if o.handlerEonPublicKey != nil {
 		c.services = append(c.services, c.epksync)
