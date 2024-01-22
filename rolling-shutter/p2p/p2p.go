@@ -11,16 +11,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 var DefaultBootstrapPeers []*address.P2PAddress
@@ -82,52 +81,43 @@ func NewP2PNode(config p2pNodeConfig) *P2PNode {
 
 func (p *P2PNode) Run(
 	ctx context.Context,
+	runner service.Runner,
 	topicNames []string,
 	topicValidators ValidatorRegistry,
 ) error {
-	defer func() {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	runner.Defer(func() {
 		close(p.GossipMessages)
-	}()
-
-	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
-	errorgroup.Go(func() error {
-		p.mux.Lock()
-		defer p.mux.Unlock()
-		if err := p.init(ctx); err != nil {
-			return err
-		}
-
-		for topicName, validator := range topicValidators {
-			if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
-				return err
-			}
-		}
-
-		if err := p.joinTopics(topicNames); err != nil {
-			return err
-		}
-
-		// listen to gossip on all topics
-		for _, room := range p.gossipRooms {
-			room := room
-			errorgroup.Go(func() error {
-				return room.readLoop(errorgroupctx, p.GossipMessages)
-			})
-		}
-
-		err := bootstrap(ctx, p.host, p.config, p.dht)
-		if err != nil {
-			return err
-		}
-
-		// block the function until the context is canceled
-		errorgroup.Go(func() error {
-			<-errorgroupctx.Done()
-			return ctx.Err()
-		})
-		return nil
 	})
-	return errorgroup.Wait()
+
+	if err := p.init(ctx); err != nil {
+		return err
+	}
+
+	for topicName, validator := range topicValidators {
+		if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
+			return err
+		}
+	}
+
+	if err := p.joinTopics(topicNames); err != nil {
+		return err
+	}
+
+	err := bootstrap(ctx, p.host, p.config, p.dht)
+	if err != nil {
+		return err
+	}
+	// listen to gossip on all topics
+	for _, room := range p.gossipRooms {
+		room := room
+		runner.Go(func() error {
+			return room.readLoop(ctx, p.GossipMessages)
+		})
+	}
+	return nil
 }
 
 func (p *P2PNode) Publish(ctx context.Context, topic string, message []byte) error {
