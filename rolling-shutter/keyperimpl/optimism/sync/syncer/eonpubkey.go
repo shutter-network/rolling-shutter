@@ -16,14 +16,14 @@ import (
 )
 
 type EonPubKeySyncer struct {
-	Client     client.Client
-	Log        log.Logger
-	Contract   *bindings.KeyBroadcastContract
-	StartBlock *number.BlockNumber
-	Handler    event.EonPublicKeyHandler
+	Client           client.Client
+	Log              log.Logger
+	KeyBroadcast     *bindings.KeyBroadcastContract
+	KeyperSetManager *bindings.KeyperSetManager
+	StartBlock       *number.BlockNumber
+	Handler          event.EonPublicKeyHandler
 
 	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
-	ksManager      *bindings.KeyperSetManager
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -59,7 +59,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 	runner.Defer(func() {
 		close(s.keyBroadcastCh)
 	})
-	subs, err := s.Contract.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
+	subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
 		return err
@@ -79,13 +79,13 @@ func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPu
 		Context:     ctx,
 		BlockNumber: s.StartBlock.Int,
 	}
-	numKS, err := s.ksManager.GetNumKeyperSets(opts)
+	numKS, err := s.KeyperSetManager.GetNumKeyperSets(opts)
 	if err != nil {
 		return nil, err
 	}
 	// this blocknumber specifies the argument to the contract
 	// getter
-	activeEon, err := s.ksManager.GetKeyperSetIndexByBlock(opts, s.StartBlock.Uint64())
+	activeEon, err := s.KeyperSetManager.GetKeyperSetIndexByBlock(opts, s.StartBlock.Uint64())
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 			Context: ctx,
 		}
 	}
-	key, err := s.Contract.GetEonKey(opts, eon)
+	key, err := s.KeyBroadcast.GetEonKey(opts, eon)
 	// XXX: can the key be a null byte?
 	// I think we rather get a index out of bounds error.
 	if err != nil {
