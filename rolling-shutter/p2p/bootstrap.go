@@ -73,9 +73,9 @@ func bootstrap(
 
 	f := func(c context.Context) (bool, error) {
 		if err := connectBootstrapNodes(c, h, config.BootstrapPeers); err != nil {
-			return true, err
+			return false, err
 		}
-		return false, nil
+		return true, nil
 	}
 
 	if config.IsBootstrapNode {

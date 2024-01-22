@@ -217,7 +217,7 @@ func (m *P2PMessaging) Start(
 	runner service.Runner,
 ) error { //nolint:unparam
 	runner.Go(func() error {
-		return m.P2P.Run(ctx, m.topics(), m.validatorRegistry)
+		return m.P2P.Run(ctx, runner, m.topics(), m.validatorRegistry)
 	})
 	if m.hasHandler() {
 		runner.Go(func() error {
