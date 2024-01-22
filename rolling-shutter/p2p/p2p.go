@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -12,8 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
-	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -51,7 +50,6 @@ type Notifee interface {
 type P2PNode struct {
 	config p2pNodeConfig
 
-	connmngr    *connmgr.BasicConnMgr
 	mux         sync.Mutex
 	host        host.Host
 	dht         *dht.IpfsDHT
@@ -74,7 +72,6 @@ type p2pNodeConfig struct {
 func NewP2PNode(config p2pNodeConfig) *P2PNode {
 	p := P2PNode{
 		config:         config,
-		connmngr:       nil,
 		host:           nil,
 		pubSub:         nil,
 		gossipRooms:    make(map[string]*gossipRoom),
@@ -149,7 +146,7 @@ func (p *P2PNode) init(ctx context.Context) error {
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
-	p2pHost, hashTable, connectionManager, err := createHost(ctx, p.config)
+	p2pHost, hashTable, err := createHost(ctx, p.config)
 	if err != nil {
 		return err
 	}
@@ -160,7 +157,6 @@ func (p *P2PNode) init(ctx context.Context) error {
 
 	p.host = p2pHost
 	p.dht = hashTable
-	p.connmngr = connectionManager
 	p.pubSub = p2pPubSub
 	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
 	return nil
@@ -169,24 +165,22 @@ func (p *P2PNode) init(ctx context.Context) error {
 func createHost(
 	ctx context.Context,
 	config p2pNodeConfig,
-) (host.Host, *dht.IpfsDHT, *connmgr.BasicConnMgr, error) {
+) (host.Host, *dht.IpfsDHT, error) {
 	var err error
 
-	connectionManager, err := connmgr.NewConnManager(
-		160, // Lowwater
-		192, // HighWater,
-		connmgr.WithGracePeriod(time.Minute),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	// NOTE:
+	// Upon initialization, we are seeing log warnings:
+	// "rcmgr limit conflicts with connmgr limit: conn manager high watermark limit: 192, exceeds the system connection limit of: 1"
+	//
+	// This was a bug in the check function, reading the wrong config value to check against:
+	// https://github.com/libp2p/go-libp2p/issues/2628
 
 	options := []libp2p.Option{
 		libp2p.Identity(&config.PrivKey.Key),
 		libp2p.ListenAddrs(config.ListenAddrs...),
-		libp2p.DefaultTransports,
-		libp2p.DefaultSecurity,
-		libp2p.ConnectionManager(connectionManager),
+		// libp2p.DefaultTransports,
+		// libp2p.DefaultSecurity,
+		// libp2p.ConnectionManager(connectionManager),
 		libp2p.ProtocolVersion(protocolVersion),
 	}
 
@@ -204,23 +198,23 @@ func createHost(
 
 	p2pHost, err := libp2p.New(options...)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if config.DisableRoutingDHT {
-		return p2pHost, nil, connectionManager, err
+		return p2pHost, nil, err
 	}
 
 	opts := dhtRoutingOptions(config.Environment, config.BootstrapPeers...)
 	idht, err := dht.New(ctx, p2pHost, opts...)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// the wrapped host will try to query the routing table (dht)/
 	// whenever it doesn't have the full routed address for a peer id
 	routedHost := rhost.Wrap(p2pHost, idht)
 
-	return routedHost, idht, connectionManager, nil
+	return routedHost, idht, nil
 }
 
 func createPubSub(
