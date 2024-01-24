@@ -82,26 +82,32 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 }
 
 func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
-	// This blocknumber specifies AT what state
-	// the contract is called
-	// XXX: does the call-opts blocknumber -1 also means latest?
 	opts := &bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: s.StartBlock.Int,
 	}
-	numKS, err := s.Contract.GetNumKeyperSets(opts)
-	if err != nil {
+	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
+	}
+	bn := s.StartBlock.ToUInt64Ptr()
+	if bn == nil {
+		// this should not be the case
+		return nil, errors.New("start block is 'latest'")
 	}
 
 	initialKeyperSets := []*event.KeyperSet{}
 	// this blocknumber specifies the argument to the contract
 	// getter
-	ks, err := s.GetKeyperSetForBlock(ctx, nil, s.StartBlock)
+	ks, err := s.GetKeyperSetForBlock(ctx, opts, s.StartBlock)
 	if err != nil {
 		return nil, err
 	}
 	initialKeyperSets = append(initialKeyperSets, ks)
+
+	numKS, err := s.Contract.GetNumKeyperSets(opts)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := ks.Eon + 1; i < numKS; i++ {
 		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
@@ -115,10 +121,8 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.CallOpts, index uint64) (*event.KeyperSet, error) {
-	if opts == nil {
-		opts = &bind.CallOpts{
-			Context: ctx,
-		}
+	if err := guardCallOpts(opts, true); err != nil {
+		return nil, err
 	}
 	actBl, err := s.Contract.GetKeyperSetActivationBlock(opts, index)
 	if err != nil {
@@ -134,17 +138,14 @@ func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.Ca
 func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.CallOpts, b *number.BlockNumber) (*event.KeyperSet, error) {
 	var latestBlock uint64
 	var err error
+	if err := guardCallOpts(opts, true); err != nil {
+		return nil, err
+	}
 
 	if b.Equal(number.LatestBlock) {
 		latestBlock, err = s.Client.BlockNumber(ctx)
 	} else {
 		latestBlock = b.Uint64()
-	}
-	if opts == nil {
-		// call at "latest block" state
-		opts = &bind.CallOpts{
-			Context: ctx,
-		}
 	}
 	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, latestBlock)
 	if err != nil {
@@ -159,11 +160,8 @@ func (s *KeyperSetSyncer) newEvent(
 	keyperSetContract common.Address,
 	activationBlock uint64,
 ) (*event.KeyperSet, error) {
-	callOpts := opts
-	if callOpts == nil {
-		callOpts = &bind.CallOpts{
-			Context: ctx,
-		}
+	if err := guardCallOpts(opts, false); err != nil {
+		return nil, err
 	}
 	ks, err := bindings.NewKeyperSet(keyperSetContract, s.Client)
 	if err != nil {
@@ -171,22 +169,22 @@ func (s *KeyperSetSyncer) newEvent(
 	}
 	// the manager only accepts final keyper sets,
 	// so we expect this to be final now.
-	final, err := ks.IsFinalized(callOpts)
+	final, err := ks.IsFinalized(opts)
 	if err != nil {
 		return nil, makeCallError("IsFinalized", err)
 	}
 	if !final {
 		return nil, errors.New("contract did accept unfinalized keyper-sets")
 	}
-	members, err := ks.GetMembers(callOpts)
+	members, err := ks.GetMembers(opts)
 	if err != nil {
 		return nil, makeCallError("Members", err)
 	}
-	threshold, err := ks.GetThreshold(callOpts)
+	threshold, err := ks.GetThreshold(opts)
 	if err != nil {
 		return nil, makeCallError("Threshold", err)
 	}
-	eon, err := s.Contract.GetKeyperSetIndexByBlock(callOpts, activationBlock)
+	eon, err := s.Contract.GetKeyperSetIndexByBlock(opts, activationBlock)
 	if err != nil {
 		return nil, makeCallError("KeyperSetIndexByBlock", err)
 	}
@@ -195,6 +193,7 @@ func (s *KeyperSetSyncer) newEvent(
 		Members:         members,
 		Threshold:       threshold,
 		Eon:             eon,
+		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
 }
 
@@ -205,9 +204,10 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			opts := logToCallOpts(ctx, &newKeypers.Raw)
 			newKeyperSet, err := s.newEvent(
 				ctx,
-				nil,
+				opts,
 				newKeypers.KeyperSetContract,
 				newKeypers.ActivationBlock,
 			)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -49,7 +50,7 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
 				return nil
 			}
 			ev := &event.LatestBlock{
-				Number:    newHeader.Number,
+				Number:    number.BigToBlockNumber(newHeader.Number),
 				BlockHash: newHeader.Hash(),
 			}
 			err := s.Handler(ctx, ev)
