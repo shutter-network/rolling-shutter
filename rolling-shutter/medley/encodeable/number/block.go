@@ -2,6 +2,7 @@ package number
 
 import (
 	"bytes"
+	"errors"
 	"math/big"
 )
 
@@ -10,6 +11,8 @@ var (
 	LatestBlock          = &BlockNumber{new(big.Int).SetInt64(LatestBlockInt)}
 	LatestStr            = []byte("latest")
 )
+
+var ErrLatestBlockToUint = errors.New("'latest' block can't be converted to uint64")
 
 func BigToBlockNumber(i *big.Int) *BlockNumber {
 	return &BlockNumber{
@@ -44,6 +47,14 @@ func (k *BlockNumber) UnmarshalText(b []byte) error {
 
 func (k *BlockNumber) IsLatest() bool {
 	return k.Equal(LatestBlock)
+}
+
+func (k *BlockNumber) ToUInt64() (uint64, error) {
+	p := k.ToUInt64Ptr()
+	if p == nil {
+		return 0, ErrLatestBlockToUint
+	}
+	return *p, nil
 }
 
 func (k *BlockNumber) ToUInt64Ptr() *uint64 {
