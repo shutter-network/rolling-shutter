@@ -9,7 +9,6 @@ import (
 
 type IdentityPreimage []byte
 
-// BigToIdentityPreimage converts n to an epoch id. It fails if n is too big.
 func BigToIdentityPreimage(n *big.Int) IdentityPreimage {
 	return IdentityPreimage(n.Bytes())
 }

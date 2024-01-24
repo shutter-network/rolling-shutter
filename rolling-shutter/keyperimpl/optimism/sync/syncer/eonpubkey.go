@@ -74,7 +74,6 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPublicKey, error) {
 	// This blocknumber specifies AT what state
 	// the contract is called
-	// XXX: does the call-opts blocknumber -1 also means latest?
 	opts := &bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: s.StartBlock.Int,
@@ -113,9 +112,14 @@ func (s *EonPubKeySyncer) logCallError(attrName string, err error) {
 }
 
 func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.CallOpts, eon uint64) (*event.EonPublicKey, error) {
-	if opts == nil {
-		opts = &bind.CallOpts{
-			Context: ctx,
+	var err error
+	if err := guardCallOpts(opts, true); err != nil {
+		return nil, err
+	}
+	if number.BigToBlockNumber(opts.BlockNumber).IsLatest() {
+		opts, err = fixCallOpts(ctx, s.Client, opts)
+		if err != nil {
+			return nil, err
 		}
 	}
 	key, err := s.KeyBroadcast.GetEonKey(opts, eon)
@@ -125,8 +129,9 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 		return nil, err
 	}
 	return &event.EonPublicKey{
-		Eon: eon,
-		Key: key,
+		Eon:           eon,
+		Key:           key,
+		AtBlockNumber: number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
 }
 
@@ -137,9 +142,11 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			bn := newEonKey.Raw.BlockNumber
 			ev := &event.EonPublicKey{
-				Eon: newEonKey.Eon,
-				Key: newEonKey.Key,
+				Eon:           newEonKey.Eon,
+				Key:           newEonKey.Key,
+				AtBlockNumber: number.NewBlockNumber(&bn),
 			}
 			err := s.Handler(ctx, ev)
 			if err != nil {

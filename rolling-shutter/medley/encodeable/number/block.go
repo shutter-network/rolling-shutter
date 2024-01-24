@@ -11,6 +11,12 @@ var (
 	LatestStr            = []byte("latest")
 )
 
+func BigToBlockNumber(i *big.Int) *BlockNumber {
+	return &BlockNumber{
+		Int: i,
+	}
+}
+
 func NewBlockNumber(u *uint64) *BlockNumber {
 	b := &BlockNumber{
 		Int: &big.Int{},
