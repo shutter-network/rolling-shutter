@@ -69,6 +69,8 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 
+	triggerer := NewDecryptionTriggerer(kpr.config.Gnosis, decrTrigChan)
+
 	kpr.chainSyncClient, err = chainsync.NewClient(
 		ctx,
 		chainsync.WithClientURL(kpr.config.Gnosis.EthereumURL),
@@ -82,7 +84,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	return runner.StartService(kpr.core, kpr.chainSyncClient)
+	return runner.StartService(kpr.core, triggerer, kpr.chainSyncClient)
 }
 
 func (kpr *Keyper) newBlock(_ context.Context, ev *syncevent.LatestBlock) error {
