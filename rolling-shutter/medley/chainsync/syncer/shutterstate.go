@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -84,7 +84,7 @@ func (s *ShutterStateSyncer) pollIsActive(ctx context.Context) (bool, error) {
 	return !paused, err
 }
 
-func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState) bool {
+func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState) {
 	err := s.Handler(ctx, ev)
 	if err != nil {
 		s.Log.Error(
@@ -92,9 +92,7 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 			"error",
 			err.Error(),
 		)
-		return false
 	}
-	return true
 }
 
 func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {

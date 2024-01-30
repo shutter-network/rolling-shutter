@@ -1,4 +1,4 @@
-package sync
+package chainsync
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"github.com/shutter-network/shop-contracts/bindings"
 	"github.com/shutter-network/shop-contracts/predeploy"
 
-	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/syncer"
+	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -54,7 +54,7 @@ func (o *options) verify() error {
 // the context is only the initialisation context,
 // and should not be considered to handle the lifecycle
 // of shutter clients background workers.
-func (o *options) apply(ctx context.Context, c *ShutterL2Client) error {
+func (o *options) apply(ctx context.Context, c *Client) error {
 	var (
 		client syncclient.Client
 		err    error

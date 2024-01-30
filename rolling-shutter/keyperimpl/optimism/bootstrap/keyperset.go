@@ -6,15 +6,15 @@ import (
 	"errors"
 	"os"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 )
 
 func GetKeyperSet(ctx context.Context, config *Config) error {
-	sl2, err := sync.NewShutterL2Client(
+	sl2, err := chainsync.NewClient(
 		ctx,
-		sync.WithClientURL(config.JSONRPCURL),
+		chainsync.WithClientURL(config.JSONRPCURL),
 	)
 	if err != nil {
 		return err

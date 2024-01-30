@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -166,7 +166,7 @@ func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.C
 }
 
 func (s *KeyperSetSyncer) newEvent(
-	ctx context.Context,
+	_ context.Context,
 	opts *bind.CallOpts,
 	keyperSetContract common.Address,
 	activationBlock uint64,
