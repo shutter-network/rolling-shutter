@@ -45,6 +45,7 @@ var (
 	ErrSharesAlreadySent       = errors.New("shares exist already")
 )
 
+//nolint:gocyclo
 func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	ctx context.Context,
 	eon database.Eon,
