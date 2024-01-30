@@ -1,12 +1,6 @@
 FROM golang:1.21 as builder
 ENV GOMODCACHE=/root/.cache/mod
 
-# allow private repos
-ENV GOPRIVATE="github.com/shutter-network/*"
-ENV GONOPROXY=localhost
-ARG GITHUB_ACCESS_TOKEN
-RUN git config --global url."https://$GITHUB_ACCESS_TOKEN@github.com/".insteadOf "https://github.com/"
-
 # Fetch go modules separately to improve cache usage
 RUN mkdir /gomod
 COPY /rolling-shutter/go.* /gomod/
