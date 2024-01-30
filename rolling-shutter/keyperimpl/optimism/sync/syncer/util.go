@@ -2,19 +2,20 @@ package syncer
 
 import (
 	"context"
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 )
 
 var (
-	errNilCallOpts = errors.New("nil call-opts")
-	errLatestBlock = errors.New("'nil' latest block")
+	errNilCallOpts        = errors.New("nil call-opts")
+	errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
+	errLatestBlock        = errors.New("'nil' latest block")
 )
 
 func logToCallOpts(ctx context.Context, log *types.Log) *bind.CallOpts {
@@ -31,7 +32,7 @@ func guardCallOpts(opts *bind.CallOpts, allowLatest bool) error {
 		return errNilCallOpts
 	}
 	if !allowLatest {
-		n := number.BlockNumber{Int: opts.BlockNumber}
+		n := number.BigToBlockNumber(opts.BlockNumber)
 		if n.IsLatest() {
 			return errLatestBlock
 		}
@@ -39,15 +40,15 @@ func guardCallOpts(opts *bind.CallOpts, allowLatest bool) error {
 	return nil
 }
 
-func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, error) {
+func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
 	err := guardCallOpts(opts, false)
-	if err != nil {
-		return opts, nil
+	if err == nil {
+		return opts, nil, nil
 	}
 	// query the current latest block and fix it
-	latest, err := c.BlockNumber(ctx)
-	if err != nil {
-		return nil, err
+	latest, queryErr := c.BlockNumber(ctx)
+	if queryErr != nil {
+		return nil, nil, errors.Wrap(err, "query latest block-number")
 	}
 	blockNumber := number.NewBlockNumber(&latest)
 	if errors.Is(err, errNilCallOpts) {
@@ -55,11 +56,11 @@ func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bi
 			Context:     ctx,
 			BlockNumber: blockNumber.Int,
 		}
-		return opts, nil
+		return opts, &latest, nil
 	}
 	if errors.Is(err, errLatestBlock) {
 		opts.BlockNumber = blockNumber.Int
-		return opts, nil
+		return opts, &latest, nil
 	}
-	return nil, err
+	return nil, nil, err
 }

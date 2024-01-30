@@ -113,14 +113,9 @@ func (s *EonPubKeySyncer) logCallError(attrName string, err error) {
 
 func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.CallOpts, eon uint64) (*event.EonPublicKey, error) {
 	var err error
-	if err := guardCallOpts(opts, true); err != nil {
+	opts, _, err = fixCallOpts(ctx, s.Client, opts)
+	if err != nil {
 		return nil, err
-	}
-	if number.BigToBlockNumber(opts.BlockNumber).IsLatest() {
-		opts, err = fixCallOpts(ctx, s.Client, opts)
-		if err != nil {
-			return nil, err
-		}
 	}
 	key, err := s.KeyBroadcast.GetEonKey(opts, eon)
 	// XXX: can the key be a null byte?

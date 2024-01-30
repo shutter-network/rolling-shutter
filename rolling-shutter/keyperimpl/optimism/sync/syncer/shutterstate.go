@@ -2,10 +2,10 @@ package syncer
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
@@ -26,17 +26,17 @@ type ShutterStateSyncer struct {
 }
 
 func (s *ShutterStateSyncer) GetShutterState(ctx context.Context, opts *bind.CallOpts) (*event.ShutterState, error) {
-	if opts == nil {
-		opts = &bind.CallOpts{
-			Context: ctx,
-		}
-	}
-	isPaused, err := s.Contract.Paused(opts)
+	opts, _, err := fixCallOpts(ctx, s.Client, opts)
 	if err != nil {
 		return nil, err
 	}
+	isPaused, err := s.Contract.Paused(opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "query paused state")
+	}
 	return &event.ShutterState{
-		Active: !isPaused,
+		Active:        !isPaused,
+		AtBlockNumber: number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
 }
 
