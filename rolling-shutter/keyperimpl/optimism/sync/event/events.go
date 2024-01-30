@@ -13,7 +13,7 @@ type (
 		Threshold       uint64
 		Eon             uint64
 
-		AtBlockNumber *number.BlockNumber
+		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}
 	EonPublicKey struct {
 		Eon uint64
@@ -24,7 +24,7 @@ type (
 	ShutterState struct {
 		Active bool
 
-		AtBlockNumber *number.BlockNumber
+		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}
 	LatestBlock struct {
 		Number    *number.BlockNumber

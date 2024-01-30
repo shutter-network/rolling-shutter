@@ -121,7 +121,8 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.CallOpts, index uint64) (*event.KeyperSet, error) {
-	if err := guardCallOpts(opts, true); err != nil {
+	opts, _, err := fixCallOpts(ctx, s.Client, opts)
+	if err != nil {
 		return nil, err
 	}
 	actBl, err := s.Contract.GetKeyperSetActivationBlock(opts, index)
@@ -136,18 +137,28 @@ func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.Ca
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.CallOpts, b *number.BlockNumber) (*event.KeyperSet, error) {
-	var latestBlock uint64
+	var atBlock uint64
 	var err error
-	if err := guardCallOpts(opts, true); err != nil {
+
+	opts, latestFromFix, err := fixCallOpts(ctx, s.Client, opts)
+	if err != nil {
 		return nil, err
 	}
 
 	if b.Equal(number.LatestBlock) {
-		latestBlock, err = s.Client.BlockNumber(ctx)
+		if latestFromFix == nil {
+			atBlock, err = s.Client.BlockNumber(ctx)
+			if err != nil {
+				return nil, errors.Wrap(err, "get current block-number")
+			}
+		} else {
+			atBlock = *latestFromFix
+		}
 	} else {
-		latestBlock = b.Uint64()
+		atBlock = b.Uint64()
 	}
-	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, latestBlock)
+
+	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, atBlock)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve keyper set index")
 	}
