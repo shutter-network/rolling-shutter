@@ -10,7 +10,7 @@ import (
 	"github.com/tendermint/tendermint/rpc/client/http"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 

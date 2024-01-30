@@ -1,9 +1,8 @@
-package sync
+package chainsync
 
 import (
 	"context"
 	"crypto/ecdsa"
-	"io"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -12,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/syncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/logger"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -22,15 +21,9 @@ import (
 
 var noopLogger = &logger.NoopLogger{}
 
-var ErrServiceNotInstantiated = errors.New("service is not instantiated, pass a handler function option.")
+var ErrServiceNotInstantiated = errors.New("service is not instantiated, pass a handler function option")
 
-type ShutterSync interface {
-	io.Closer
-	// Start starts an additional worker syncing job
-	Start() error
-}
-
-type ShutterL2Client struct {
+type Client struct {
 	client.Client
 	log log.Logger
 
@@ -49,7 +42,7 @@ type ShutterL2Client struct {
 	services []service.Service
 }
 
-func NewShutterL2Client(ctx context.Context, options ...Option) (*ShutterL2Client, error) {
+func NewClient(ctx context.Context, options ...Option) (*Client, error) {
 	opts := defaultOptions()
 	for _, option := range options {
 		err := option(opts)
@@ -63,7 +56,7 @@ func NewShutterL2Client(ctx context.Context, options ...Option) (*ShutterL2Clien
 		return nil, err
 	}
 
-	c := &ShutterL2Client{
+	c := &Client{
 		log:      noopLogger,
 		services: []service.Service{},
 	}
@@ -75,11 +68,11 @@ func NewShutterL2Client(ctx context.Context, options ...Option) (*ShutterL2Clien
 	return c, nil
 }
 
-func (s *ShutterL2Client) getServices() []service.Service {
+func (s *Client) getServices() []service.Service {
 	return s.services
 }
 
-func (s *ShutterL2Client) GetShutterState(ctx context.Context) (*event.ShutterState, error) {
+func (s *Client) GetShutterState(ctx context.Context) (*event.ShutterState, error) {
 	if s.sssync == nil {
 		return nil, errors.Wrap(ErrServiceNotInstantiated, "ShutterStateSyncer service not instantiated")
 	}
@@ -89,7 +82,7 @@ func (s *ShutterL2Client) GetShutterState(ctx context.Context) (*event.ShutterSt
 	return s.sssync.GetShutterState(ctx, opts)
 }
 
-func (s *ShutterL2Client) GetKeyperSetByIndex(ctx context.Context, index uint64) (*event.KeyperSet, error) {
+func (s *Client) GetKeyperSetByIndex(ctx context.Context, index uint64) (*event.KeyperSet, error) {
 	if s.kssync == nil {
 		return nil, errors.Wrap(ErrServiceNotInstantiated, "KeyperSetSyncer service not instantiated")
 	}
@@ -99,7 +92,7 @@ func (s *ShutterL2Client) GetKeyperSetByIndex(ctx context.Context, index uint64)
 	return s.kssync.GetKeyperSetByIndex(ctx, opts, index)
 }
 
-func (s *ShutterL2Client) GetKeyperSetForBlock(ctx context.Context, b *number.BlockNumber) (*event.KeyperSet, error) {
+func (s *Client) GetKeyperSetForBlock(ctx context.Context, b *number.BlockNumber) (*event.KeyperSet, error) {
 	if s.kssync == nil {
 		return nil, errors.Wrap(ErrServiceNotInstantiated, "KeyperSetSyncer service not instantiated")
 	}
@@ -109,7 +102,7 @@ func (s *ShutterL2Client) GetKeyperSetForBlock(ctx context.Context, b *number.Bl
 	return s.kssync.GetKeyperSetForBlock(ctx, opts, b)
 }
 
-func (s *ShutterL2Client) GetEonPubKeyForEon(ctx context.Context, eon uint64) (*event.EonPublicKey, error) {
+func (s *Client) GetEonPubKeyForEon(ctx context.Context, eon uint64) (*event.EonPublicKey, error) {
 	if s.sssync == nil {
 		return nil, errors.Wrap(ErrServiceNotInstantiated, "ShutterStateSyncer service not instantiated")
 	}
@@ -119,8 +112,9 @@ func (s *ShutterL2Client) GetEonPubKeyForEon(ctx context.Context, eon uint64) (*
 	return s.epksync.GetEonPubKeyForEon(ctx, opts, eon)
 }
 
-func (s *ShutterL2Client) BroadcastEonKey(ctx context.Context, eon uint64, eonPubKey []byte) (*types.Transaction, error) {
-	// TODO: first do a getEonKey. If we already have something (ideally the same)
+func (s *Client) BroadcastEonKey(ctx context.Context, eon uint64, eonPubKey []byte) (*types.Transaction, error) {
+	// TODO: first do a getEonKey. If we already have this key, do nothing,
+	// if we have a different key, error
 	// don't do a transaction
 	// s.KeyBroadcast.GetEonKey(eon)
 	if s.privKey == nil {
@@ -140,7 +134,7 @@ func (s *ShutterL2Client) BroadcastEonKey(ctx context.Context, eon uint64, eonPu
 
 // ChainID returns the chainid of the underlying L2 chain.
 // This value is cached, since it is not expected to change.
-func (s *ShutterL2Client) ChainID(ctx context.Context) (*big.Int, error) {
+func (s *Client) ChainID(ctx context.Context) (*big.Int, error) {
 	if s.chainID == nil {
 		cid, err := s.Client.ChainID(ctx)
 		if err != nil {
@@ -151,6 +145,6 @@ func (s *ShutterL2Client) ChainID(ctx context.Context) (*big.Int, error) {
 	return s.chainID, nil
 }
 
-func (s *ShutterL2Client) Start(_ context.Context, runner service.Runner) error {
+func (s *Client) Start(_ context.Context, runner service.Runner) error {
 	return runner.StartService(s.getServices()...)
 }

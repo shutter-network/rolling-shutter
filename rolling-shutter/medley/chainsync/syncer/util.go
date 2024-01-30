@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 )
 

@@ -15,10 +15,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/database"
-	shopclient "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync"
-	shopevent "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/sync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
+	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
@@ -30,7 +30,7 @@ var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
 type Keyper struct {
 	core     *keyper.KeyperCore
-	l2Client *shopclient.ShutterL2Client
+	l2Client *chainsync.Client
 	dbpool   *pgxpool.Pool
 	config   *config.Config
 
@@ -78,12 +78,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 	// TODO: wrap the logger and pass in
-	kpr.l2Client, err = shopclient.NewShutterL2Client(
+	kpr.l2Client, err = chainsync.NewClient(
 		ctx,
-		shopclient.WithClientURL(kpr.config.Optimism.JSONRPCURL),
-		shopclient.WithSyncNewBlock(kpr.newBlock),
-		shopclient.WithSyncNewKeyperSet(kpr.newKeyperSet),
-		shopclient.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
+		chainsync.WithClientURL(kpr.config.Optimism.JSONRPCURL),
+		chainsync.WithSyncNewBlock(kpr.newBlock),
+		chainsync.WithSyncNewKeyperSet(kpr.newKeyperSet),
+		chainsync.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
 	)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(kpr.core, kpr.l2Client)
 }
 
-func (kpr *Keyper) newBlock(_ context.Context, ev *shopevent.LatestBlock) error {
+func (kpr *Keyper) newBlock(_ context.Context, ev *syncevent.LatestBlock) error {
 	log.Info().
 		Int64("number", ev.Number.Int64()).
 		Str("hash", ev.BlockHash.Hex()).
@@ -110,7 +110,7 @@ func (kpr *Keyper) newBlock(_ context.Context, ev *shopevent.LatestBlock) error 
 	return nil
 }
 
-func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *shopevent.KeyperSet) error {
+func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) error {
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
 		Uint64("eon", ev.Eon).
