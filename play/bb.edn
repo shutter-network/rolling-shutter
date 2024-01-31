@@ -377,9 +377,7 @@
                bootstr-cfgs (get cfgs-by-is-btsrp true)
                non-bootstr-cfgs (get cfgs-by-is-btsrp false)
                peers (flatten (map (fn [cfg] (get cfg :ext-addrs)) bootstr-cfgs))]
-           (doseq [cfg bootstr-cfgs]
-             (toml-edit-file (get cfg :cfg-file) {"CustomBootstrapAddresses" []}))
-           (doseq [cfg non-bootstr-cfgs]
+           (doseq [cfg cfgs]
              (toml-edit-file (get cfg :cfg-file) {"CustomBootstrapAddresses" peers})))}
 
   init:testchain
