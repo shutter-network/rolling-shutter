@@ -44,7 +44,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		Messaging:     messaging,
 		Trigger:       decrTrigChan,
 	}
-	group := service.RunBackground(
+	group, cleanup := service.RunBackground(
 		ctx,
 		ksh,
 	)
@@ -58,6 +58,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	decrTrigChan <- broker.NewEvent(trig)
 	close(decrTrigChan)
 	err = group.Wait()
+	cleanup()
 	assert.NilError(t, err)
 
 	// send decryption key share when first trigger is received
