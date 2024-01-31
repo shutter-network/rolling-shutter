@@ -63,7 +63,7 @@ var testFlagTable = []testFlags{
 		[]Option{
 			Interval(baseInterval),
 			NumberOfRetries(5),
-			ExponentialBackoff(),
+			ExponentialBackoff(nil),
 		},
 		errDefault,
 		[]time.Duration{
@@ -83,7 +83,7 @@ var testFlagTable = []testFlags{
 			MaxInterval(
 				multDuration(baseInterval, math.Pow(1.5, 2)),
 			),
-			ExponentialBackoff(),
+			ExponentialBackoff(nil),
 		},
 		errDefault,
 		[]time.Duration{

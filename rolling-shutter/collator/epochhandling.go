@@ -140,7 +140,7 @@ func (c *collator) sendDecryptionTriggers(ctx context.Context) error {
 		err := c.p2p.SendMessage(ctx,
 			msg,
 			retry.Interval(time.Second),
-			retry.ExponentialBackoff(),
+			retry.ExponentialBackoff(nil),
 			retry.NumberOfRetries(3),
 			retry.LogIdentifier(msg.LogInfo()),
 		)

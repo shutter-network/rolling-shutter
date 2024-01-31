@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -38,10 +39,14 @@ func newRetrier() *retrier {
 	}
 }
 
-func (r *retrier) option(opts []Option) {
+func (r *retrier) applyOptions(opts []Option) error {
 	for _, opt := range opts {
-		opt(r)
+		err := opt(r)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
@@ -74,15 +79,20 @@ func (r *retrier) iterator(next <-chan time.Time) <-chan time.Time {
 }
 
 type (
-	Option                   func(*retrier)
+	Option                   func(*retrier) error
 	RetriableFunction[T any] func(ctx context.Context) (T, error)
 )
 
 // FunctionCall calls the given function multiple times until it doesn't return an error
 // or one of any optional, user-defined specific errors is returned.
 func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...Option) (T, error) {
+	var err error
+	var null T
+
 	retrier := newRetrier()
-	retrier.option(opts)
+	if err := retrier.applyOptions(opts); err != nil {
+		return null, errors.Wrap(err, "apply options")
+	}
 	funcName := introspection.GetFuncName(4)
 	retrier.zlogContext = retrier.zlogContext.Str("funcName", funcName)
 	logger := retrier.zlogContext.Logger()
@@ -90,9 +100,6 @@ func FunctionCall[T any](ctx context.Context, fn RetriableFunction[T], opts ...O
 	defer close(next)
 
 	retry := retrier.iterator(next)
-
-	var err error
-	var null T
 
 	callCount := 0
 
