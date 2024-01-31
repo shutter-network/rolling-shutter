@@ -118,6 +118,12 @@ process-compose -t=false up & # to start postgres
 bb test-system
 ```
 
+Keep in mind that the configurations are generated within the container on first
+invocation. This means that things like private keys and peer addresses are
+changing when the container is started with the `docker run --rm` command. To
+keep those values persistent, either the configuration files have to be copied
+to the container, or the container should be reused throughout runs.
+
 ### Self contained testrunner
 
 It is possible to compile the testrunner into a self contained `.jar` file, by
