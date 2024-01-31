@@ -36,8 +36,8 @@ func TestFanIn(t *testing.T) {
 		end := end
 		step := numFns
 		channels = append(channels, ch)
-		fnService := service.ServiceFn{
-			Fn: func(ctx context.Context) error {
+		fnService := service.Function{
+			Func: func(ctx context.Context, _ service.Runner) error {
 				putInts(ctx, ch, start, end, step)
 				return nil
 			},
@@ -48,8 +48,8 @@ func TestFanIn(t *testing.T) {
 	services = append(services, fanIn)
 
 	result := []int{}
-	fanConsumer := service.ServiceFn{
-		Fn: func(ctx context.Context) error {
+	fanConsumer := service.Function{
+		Func: func(ctx context.Context, _ service.Runner) error {
 			for val := range fanIn.C {
 				result = append(result, val)
 			}

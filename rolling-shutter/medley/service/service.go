@@ -121,13 +121,13 @@ func RunWithSighandler(ctx context.Context, services ...Service) error {
 	return err
 }
 
-type ServiceFn struct {
-	Fn func(ctx context.Context) error
+type Function struct {
+	Func func(ctx context.Context, group Runner) error
 }
 
-func (sf ServiceFn) Start(ctx context.Context, group Runner) error { //nolint:unparam
+func (sf Function) Start(ctx context.Context, group Runner) error { //nolint:unparam
 	group.Go(func() error {
-		return sf.Fn(ctx)
+		return sf.Func(ctx, group)
 	})
 	return nil
 }
