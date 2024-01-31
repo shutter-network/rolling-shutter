@@ -79,18 +79,20 @@ func bootstrap(
 	}
 
 	if config.IsBootstrapNode {
-		// A bootstrap node is not required to connect to other bootstrap nodes.
-		// If however we did configure a list of bootstrap nodes,
-		// we should try a long time to connect to at least one other bootstrapper first.
-		_, err := retry.FunctionCall(
-			ctx,
-			f,
-			retry.MaxInterval(5*time.Hour),
-			retry.StopOnErrors(errInsufficientBootstrpConfigured),
-			retry.Interval(2*time.Minute))
-		if err != nil {
-			log.Error().Err(err).
-				Msg("failed to bootstrap, continuing without peer connections.")
+		if len(config.BootstrapPeers) > 0 {
+			// A bootstrap node is not required to connect to other bootstrap nodes.
+			// If however we did configure a list of bootstrap nodes,
+			// we should try a long time to connect to at least one other bootstrapper first.
+			_, err := retry.FunctionCall(
+				ctx,
+				f,
+				retry.MaxInterval(5*time.Hour),
+				retry.StopOnErrors(errInsufficientBootstrpConfigured),
+				retry.Interval(2*time.Minute))
+			if err != nil {
+				log.Error().Err(err).
+					Msg("failed to bootstrap, continuing without peer connections.")
+			}
 		}
 	} else {
 		_, err := retry.FunctionCall(
