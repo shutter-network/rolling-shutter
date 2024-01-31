@@ -166,7 +166,7 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 func (kpr *KeyperCore) getServices() []service.Service {
 	services := []service.Service{
 		kpr.messaging,
-		service.ServiceFn{Fn: kpr.operateShuttermint},
+		service.Function{Func: kpr.operateShuttermint},
 		newEonPubKeyHandler(kpr),
 	}
 	keyTrigger := kpr.trigger
@@ -334,7 +334,7 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 
 // TODO: we need a better block syncing mechanism!
 // Also this is doing too much work sequentially in one routine.
-func (kpr *KeyperCore) operateShuttermint(ctx context.Context) error {
+func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner) error {
 	for {
 		syncBlockNumber, err := retry.FunctionCall(ctx, kpr.blockSyncClient.BlockNumber)
 		if err != nil {

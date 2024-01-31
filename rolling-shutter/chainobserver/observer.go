@@ -79,7 +79,7 @@ func (c *ChainObserver) Start(ctx context.Context, runner service.Runner) error 
 	log.Info().Uint64("from-block", fromBlock).Uint64("from-log-index", fromLogIndex).
 		Msg("starting event syncing")
 	syncer := eventsyncer.New(c.Client, finalityOffset, eventTypes, fromBlock, fromLogIndex)
-	handleSyncLoop := func(ctx context.Context) error {
+	handleSyncLoop := func(ctx context.Context, _ service.Runner) error {
 		for {
 			select {
 			case <-ctx.Done():
@@ -102,5 +102,5 @@ func (c *ChainObserver) Start(ctx context.Context, runner service.Runner) error 
 			}
 		}
 	}
-	return runner.StartService(syncer, service.ServiceFn{Fn: handleSyncLoop})
+	return runner.StartService(syncer, service.Function{Func: handleSyncLoop})
 }
