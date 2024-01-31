@@ -65,18 +65,22 @@ func (r *runner) runShutdownFuncs() {
 }
 
 func Run(ctx context.Context, services ...Service) error {
-	group := RunBackground(ctx, services...)
+	group, deferFn := RunBackground(ctx, services...)
+	defer deferFn()
 	return group.Wait()
 }
 
-func RunBackground(ctx context.Context, services ...Service) *errgroup.Group {
+// RunBackground runs the services within the context of an errgroup.Group.
+// It returns the errgroup.Group as well as the cleanup function to be deferred.
+// This is a low-level executor of services, the defer function is expected
+// to be called!
+func RunBackground(ctx context.Context, services ...Service) (*errgroup.Group, func()) {
 	group, ctx := errgroup.WithContext(ctx)
 	r := runner{group: group, ctx: ctx}
 	group.Go(func() error {
 		return r.StartService(services...)
 	})
-	defer r.runShutdownFuncs()
-	return group
+	return group, r.runShutdownFuncs
 }
 
 // notifyTermination creates a context that is canceled, when the process receives SIGINT or

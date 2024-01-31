@@ -47,10 +47,11 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	sender.AddMessageHandler(triggerHandler)
 
-	group := service.RunBackground(
+	group, cleanup := service.RunBackground(
 		ctx,
 		sender,
 	)
+	defer cleanup()
 
 	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
