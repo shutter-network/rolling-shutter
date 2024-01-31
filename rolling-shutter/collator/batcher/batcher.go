@@ -320,7 +320,6 @@ func (btchr *Batcher) CloseBatch(ctx context.Context) error {
 	err = btchr.dbpool.BeginFunc(ctx, func(dbtx pgx.Tx) error {
 		return btchr.closeBatchImpl(ctx, database.New(dbtx), int64(l1blockNumber))
 	})
-
 	if err != nil {
 		return err
 	}
