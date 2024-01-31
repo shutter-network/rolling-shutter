@@ -306,7 +306,6 @@ func (ShutterApp) decodeTx(tx []byte) (signer common.Address, msg *shmsg.Message
 	}
 
 	msg, err = shmsg.GetMessage(signedMsg)
-
 	if err != nil {
 		return
 	}
