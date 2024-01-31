@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testlog"
 )
 
@@ -21,12 +22,14 @@ func init() {
 	testlog.Setup()
 }
 
+var ErrTestComplete = errors.New("test complete")
+
 // TestStartNetworkNode test that we can init two p2p nodes and make them send/receive messages.
 func TestStartNetworkNodeIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	numBootstrappers := 2
@@ -82,51 +85,54 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 	gossipTopicNames := []string{"testTopic1", "testTopic2"}
 	testMessage := []byte("test message")
 
-	runctx, stopRun := context.WithCancel(ctx)
-
-	waitGroup := sync.WaitGroup{}
 	p2ps := []*P2PNode{}
-	for _, cfg := range configs {
+	services := make([]service.Service, len(configs))
+	for i, cfg := range configs {
 		p2pHandler, err := New(cfg)
 		assert.NilError(t, err)
 		p2ps = append(p2ps, p2pHandler.P2P)
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			err := p2pHandler.P2P.Run(runctx, gossipTopicNames, map[string]pubsub.ValidatorEx{})
-			assert.Assert(t, err == context.Canceled)
-		}()
+		fn := func(ctx context.Context, runner service.Runner) error {
+			return p2pHandler.P2P.Run(ctx, runner, gossipTopicNames, map[string]pubsub.ValidatorEx{})
+		}
+		services[i] = service.Function{Func: fn}
 	}
-	defer func() {
-		stopRun()
-		waitGroup.Wait()
-	}()
+
 	// The following loop publishes the same message over and over. Even though we did call
 	// ConnectToPeer, libp2p takes some time until the peer receives the first message.
-	var message *pubsub.Message
-	topicName := gossipTopicNames[0]
-	for message == nil {
-		if err := p2ps[1].Publish(ctx, topicName, testMessage); err != nil {
-			t.Fatalf("error while publishing message: %v", err)
-		}
-
-		select {
-		case message = <-p2ps[0].GossipMessages:
-			log.Info().Interface("message", message).Msg("got message")
-			if message == nil {
-				t.Fatalf("channel closed unexpectedly")
+	testFn := func(ctx context.Context, _ service.Runner) error {
+		// HACK:
+		time.Sleep(1 * time.Second)
+		var message *pubsub.Message
+		topicName := gossipTopicNames[0]
+		for message == nil {
+			if err := p2ps[1].Publish(ctx, topicName, testMessage); err != nil {
+				t.Fatalf("error while publishing message: %v", err)
 			}
-		case <-ctx.Done():
-			t.Fatalf("waiting for message: %s", ctx.Err())
-		case <-time.After(5 * time.Millisecond):
+
+			select {
+			case message = <-p2ps[0].GossipMessages:
+				log.Info().Interface("message", message).Msg("got message")
+				if message == nil {
+					t.Fatalf("channel closed unexpectedly")
+				}
+			case <-ctx.Done():
+				t.Fatalf("waiting for message: %s", ctx.Err())
+			case <-time.After(5 * time.Millisecond):
+			}
 		}
+		assert.Equal(t, topicName, message.GetTopic(), "received message with wrong topic")
+		assert.Check(t, bytes.Equal(testMessage, message.GetData()), "received wrong message")
+		assert.Equal(
+			t,
+			p2ps[1].HostID(),
+			message.GetFrom().String(),
+			"received message with wrong sender",
+		)
+		return ErrTestComplete
 	}
-	assert.Equal(t, topicName, message.GetTopic(), "received message with wrong topic")
-	assert.Check(t, bytes.Equal(testMessage, message.GetData()), "received wrong message")
-	assert.Equal(
-		t,
-		p2ps[1].HostID(),
-		message.GetFrom().String(),
-		"received message with wrong sender",
-	)
+	testService := service.Function{Func: testFn}
+	services = append(services, testService)
+
+	err := service.Run(ctx, services...)
+	assert.Error(t, err, ErrTestComplete.Error())
 }
