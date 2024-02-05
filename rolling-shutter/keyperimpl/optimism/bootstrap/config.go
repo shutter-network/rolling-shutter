@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"io"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
@@ -27,6 +29,7 @@ type Config struct {
 
 	JSONRPCURL              string `                     comment:"The op-geth JSON RPC endpoint"`
 	ByActivationBlockNumber *number.BlockNumber
+	KeyperSetManager        common.Address
 	ByIndex                 *uint64
 	KeyperSetFilePath       string
 

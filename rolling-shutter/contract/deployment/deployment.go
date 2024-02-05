@@ -334,7 +334,8 @@ func LoadChainID(dir string) (uint64, error) {
 		return 0, errors.Wrapf(err, "failed to load chain id file at %s", path)
 	}
 
-	chainID, err := strconv.ParseInt(string(data), 10, 64)
+	chainIDStr := strings.TrimSpace(string(data))
+	chainID, err := strconv.ParseInt(chainIDStr, 10, 64)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to parse chain id in %s", path)
 	}

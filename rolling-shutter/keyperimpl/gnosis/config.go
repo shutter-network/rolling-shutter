@@ -37,6 +37,14 @@ type Config struct {
 	Gnosis      *configuration.EthnodeConfig
 	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
+
+	GnosisContracts *GnosisContracts `shconfig:",required"`
+}
+
+type GnosisContracts struct {
+	KeyperSetManager     common.Address `shconfig:",required"`
+	KeyBroadcastContract common.Address `shconfig:",required"`
+	Sequencer            common.Address `shconfig:",required"`
 }
 
 func (c *Config) Validate() error {
@@ -50,6 +58,11 @@ func (c *Config) Name() string {
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
+	c.GnosisContracts = &GnosisContracts{
+		KeyperSetManager:     common.Address{},
+		KeyBroadcastContract: common.Address{},
+		Sequencer:            common.Address{},
+	}
 	return nil
 }
 
@@ -60,6 +73,7 @@ func (c *Config) SetExampleValues() error {
 	}
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
+
 	return nil
 }
 

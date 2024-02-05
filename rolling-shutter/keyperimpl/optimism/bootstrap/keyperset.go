@@ -15,6 +15,7 @@ func GetKeyperSet(ctx context.Context, config *Config) error {
 	sl2, err := chainsync.NewClient(
 		ctx,
 		chainsync.WithClientURL(config.JSONRPCURL),
+		chainsync.WithKeyperSetManager(config.KeyperSetManager),
 	)
 	if err != nil {
 		return err
