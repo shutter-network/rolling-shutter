@@ -14,7 +14,22 @@ CREATE TABLE transaction_submitted_event (
     PRIMARY KEY (block_number, block_hash, tx_index, log_index)
 );
 
-create table transaction_submitted_events_synced_until(
-       enforce_one_row bool primary key default true,
-       block_number bigint not null CHECK (block_number > 0)
+CREATE TABLE transaction_submitted_events_synced_until(
+    enforce_one_row bool PRIMARY KEY DEFAULT true,
+    block_number bigint NOT NULL CHECK (block_number > 0)
+);
+
+-- tx_pointer stores what we know about the current value of the tx pointer. There are two
+-- sources that are stored independently: The keyper itself (local) and the other keypers
+-- (consensus). The local value is updated whenever the keyper sends decryption key shares for some
+-- transactions. The consensus value is updated when decryption keys are received from other
+-- keypers. The values can be NULL if the keyper has lost track (e.g. after a restart or if no
+-- messages have been received recently). Each value is annotated with the number of the block at
+-- whose end the tx_pointer is valid.
+CREATE TABLE tx_pointer(
+    enforce_one_row bool PRIMARY KEY DEFAULT true,
+    local bigint DEFAULT NULL,
+    local_block bigint NOT NULL DEFAULT 0,
+    consensus bigint DEFAULT NULL,
+    consensus_block bigint NOT NULL DEFAULT 0
 );
