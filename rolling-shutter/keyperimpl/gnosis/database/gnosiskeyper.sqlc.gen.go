@@ -44,6 +44,19 @@ func (q *Queries) GetLocalTxPointer(ctx context.Context) (GetLocalTxPointerRow, 
 	return i, err
 }
 
+const getTransactionSubmittedEventCount = `-- name: GetTransactionSubmittedEventCount :one
+SELECT event_count FROM transaction_submitted_event_count
+WHERE eon = $1
+LIMIT 1
+`
+
+func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int64) (int64, error) {
+	row := q.db.QueryRow(ctx, getTransactionSubmittedEventCount, eon)
+	var event_count int64
+	err := row.Scan(&event_count)
+	return event_count, err
+}
+
 const getTransactionSubmittedEventsSyncedUntil = `-- name: GetTransactionSubmittedEventsSyncedUntil :one
 SELECT block_number FROM transaction_submitted_events_synced_until LIMIT 1
 `
@@ -57,6 +70,7 @@ func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) 
 
 const insertTransactionSubmittedEvent = `-- name: InsertTransactionSubmittedEvent :execresult
 INSERT INTO transaction_submitted_event (
+    index,
     block_number,
     block_hash,
     tx_index,
@@ -66,11 +80,12 @@ INSERT INTO transaction_submitted_event (
     sender,
     gas_limit
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT DO NOTHING
 `
 
 type InsertTransactionSubmittedEventParams struct {
+	Index          int64
 	BlockNumber    int64
 	BlockHash      []byte
 	TxIndex        int64
@@ -83,6 +98,7 @@ type InsertTransactionSubmittedEventParams struct {
 
 func (q *Queries) InsertTransactionSubmittedEvent(ctx context.Context, arg InsertTransactionSubmittedEventParams) (pgconn.CommandTag, error) {
 	return q.db.Exec(ctx, insertTransactionSubmittedEvent,
+		arg.Index,
 		arg.BlockNumber,
 		arg.BlockHash,
 		arg.TxIndex,
@@ -92,6 +108,23 @@ func (q *Queries) InsertTransactionSubmittedEvent(ctx context.Context, arg Inser
 		arg.Sender,
 		arg.GasLimit,
 	)
+}
+
+const setTransactionSubmittedEventCount = `-- name: SetTransactionSubmittedEventCount :exec
+INSERT INTO transaction_submitted_event_count (eon, event_count)
+VALUES ($1, $2)
+ON CONFLICT (eon) DO UPDATE
+SET event_count = $2
+`
+
+type SetTransactionSubmittedEventCountParams struct {
+	Eon        int64
+	EventCount int64
+}
+
+func (q *Queries) SetTransactionSubmittedEventCount(ctx context.Context, arg SetTransactionSubmittedEventCountParams) error {
+	_, err := q.db.Exec(ctx, setTransactionSubmittedEventCount, arg.Eon, arg.EventCount)
+	return err
 }
 
 const setTransactionSubmittedEventsSyncedUntil = `-- name: SetTransactionSubmittedEventsSyncedUntil :exec
