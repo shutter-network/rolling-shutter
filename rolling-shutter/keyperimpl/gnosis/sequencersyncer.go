@@ -33,7 +33,7 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 	if err == pgx.ErrNoRows {
 		start = 0
 	} else {
-		start = uint64(syncedUntilBlock) + 1
+		start = uint64(syncedUntilBlock + 1)
 	}
 
 	log.Debug().
@@ -69,19 +69,56 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 	if it.Error() != nil {
 		return errors.Wrap(it.Error(), "failed to iterate transaction submitted events")
 	}
-
 	if len(events) == 0 {
 		log.Debug().
 			Uint64("start-block", start).
 			Uint64("end-block", block).
 			Msg("no transaction submitted events found")
-		return nil
 	}
 
 	return s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		err = s.insertTransactionSubmittedEvents(ctx, tx, events)
+		if err != nil {
+			return err
+		}
+
+		newSyncedUntilBlock, err := medley.Uint64ToInt64Safe(block)
+		if err != nil {
+			return err
+		}
+		err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, newSyncedUntilBlock)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// insertTransactionSubmittedEvents inserts the given events into the database and updates the
+// transaction submitted event number accordingly.
+func (s *SequencerSyncer) insertTransactionSubmittedEvents(
+	ctx context.Context,
+	tx pgx.Tx,
+	events []*sequencerBindings.SequencerTransactionSubmitted,
+) error {
+	if len(events) > 0 {
 		queries := database.New(tx)
+		nextEventIndices := make(map[uint64]int64)
 		for _, event := range events {
+			nextEventIndex, ok := nextEventIndices[event.Eon]
+			if !ok {
+				nextEventIndexFromDB, err := queries.GetTransactionSubmittedEventCount(ctx, int64(event.Eon))
+				if err == pgx.ErrNoRows {
+					nextEventIndexFromDB = 0
+				} else if err != nil {
+					return errors.Wrapf(err, "failed to query count of transaction submitted events for eon %d", event.Eon)
+				}
+				nextEventIndices[event.Eon] = nextEventIndexFromDB
+				nextEventIndex = nextEventIndexFromDB
+			}
+
 			_, err := queries.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
+				Index:          nextEventIndex,
 				BlockNumber:    int64(event.Raw.BlockNumber),
 				BlockHash:      event.Raw.BlockHash[:],
 				TxIndex:        int64(event.Raw.TxIndex),
@@ -94,7 +131,9 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 			if err != nil {
 				return errors.Wrap(err, "failed to insert transaction submitted event into db")
 			}
+			nextEventIndices[event.Eon]++
 			log.Debug().
+				Int64("index", nextEventIndex).
 				Uint64("block", event.Raw.BlockNumber).
 				Uint64("eon", event.Eon).
 				Hex("identityPrefix", event.IdentityPrefix[:]).
@@ -102,10 +141,15 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 				Uint64("gasLimit", event.GasLimit.Uint64()).
 				Msg("synced new transaction submitted event")
 		}
-		newSyncedUntilBlock, err := medley.Uint64ToInt64Safe(block)
-		if err != nil {
-			return err
+		for eon, nextEventIndex := range nextEventIndices {
+			err := queries.SetTransactionSubmittedEventCount(ctx, database.SetTransactionSubmittedEventCountParams{
+				Eon:        int64(eon),
+				EventCount: nextEventIndex,
+			})
+			if err != nil {
+				return err
+			}
 		}
-		return queries.SetTransactionSubmittedEventsSyncedUntil(ctx, newSyncedUntilBlock)
-	})
+	}
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 )
 
 type TransactionSubmittedEvent struct {
+	Index          int64
 	BlockNumber    int64
 	BlockHash      []byte
 	TxIndex        int64
@@ -17,6 +18,11 @@ type TransactionSubmittedEvent struct {
 	IdentityPrefix []byte
 	Sender         string
 	GasLimit       int64
+}
+
+type TransactionSubmittedEventCount struct {
+	Eon        int64
+	EventCount int64
 }
 
 type TransactionSubmittedEventsSyncedUntil struct {
