@@ -1,15 +1,19 @@
 package gnosis
 
 import (
+	"bytes"
 	"context"
+	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
+	"golang.org/x/exp/slog"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
@@ -21,11 +25,15 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
+var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
+
+// maximum age of a tx pointer in blocks before it is considered outdated
+const maxTxPointerAge = 2
 
 type Keyper struct {
 	core            *keyper.KeyperCore
@@ -33,7 +41,8 @@ type Keyper struct {
 	dbpool          *pgxpool.Pool
 	chainSyncClient *chainsync.Client
 
-	sequencerSyncer *SequencerSyncer
+	sequencerSyncer          *SequencerSyncer
+	decryptionTriggerChannel chan<- *broker.Event[*epochkghandler.DecryptionTrigger]
 }
 
 func New(c *Config) *Keyper {
@@ -45,8 +54,9 @@ func New(c *Config) *Keyper {
 func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
 
-	decrTrigChan := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
-	runner.Defer(func() { close(decrTrigChan) })
+	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
+	kpr.decryptionTriggerChannel = decryptionTriggerChannel
+	runner.Defer(func() { close(kpr.decryptionTriggerChannel) })
 
 	kpr.dbpool, err = db.Connect(ctx, runner, kpr.config.DatabaseURL, database.Definition.Name())
 	if err != nil {
@@ -64,7 +74,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 			Shuttermint:       kpr.config.Shuttermint,
 			Metrics:           kpr.config.Metrics,
 		},
-		decrTrigChan,
+		decryptionTriggerChannel,
 		keyper.WithDBPool(kpr.dbpool),
 		keyper.NoBroadcastEonPublicKey(),
 		keyper.WithEonPublicKeyHandler(kpr.newEonPublicKey),
@@ -72,8 +82,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
-
-	triggerer := NewDecryptionTriggerer(kpr.config.Gnosis, decrTrigChan)
 
 	kpr.chainSyncClient, err = chainsync.NewClient(
 		ctx,
@@ -83,6 +91,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithSyncNewBlock(kpr.newBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.newKeyperSet),
 		chainsync.WithPrivateKey(kpr.config.Gnosis.PrivateKey.Key),
+		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)
 	if err != nil {
 		return err
@@ -93,11 +102,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	return runner.StartService(kpr.core, triggerer, kpr.chainSyncClient)
+	return runner.StartService(kpr.core, kpr.chainSyncClient)
 }
 
 // initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
-// keyper set. Otherwise, the syncer will only be initialied once such a keyper set is observed to
+// keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
 	obskeyperdb := obskeyper.New(kpr.dbpool)
@@ -169,6 +178,22 @@ func (kpr *Keyper) newBlock(ctx context.Context, ev *syncevent.LatestBlock) erro
 			return err
 		}
 	}
+
+	queries := obskeyper.New(kpr.dbpool)
+	keyperSet, err := queries.GetKeyperSet(ctx, ev.Number.Int64())
+	if err == pgx.ErrNoRows {
+		log.Debug().Uint64("block", ev.Number.Uint64()).Msg("ignoring block as no keyper set has been found for it")
+		return nil
+	}
+	if err != nil {
+		return errors.Wrapf(err, "failed to query keyper set for block %d", ev.Number)
+	}
+	for _, m := range keyperSet.Keypers {
+		if m == shdb.EncodeAddress(kpr.config.GetAddress()) {
+			return kpr.triggerDecryption(ctx, ev, &keyperSet)
+		}
+	}
+	log.Debug().Uint64("block", ev.Number.Uint64()).Msg("ignoring block as not part of keyper set")
 	return nil
 }
 
@@ -223,4 +248,122 @@ func (kpr *Keyper) newEonPublicKey(_ context.Context, pubKey keyper.EonPublicKey
 		Uint64("activation-block", pubKey.ActivationBlock).
 		Msg("new eon pk")
 	return nil
+}
+
+func (kpr *Keyper) triggerDecryption(ctx context.Context, ev *syncevent.LatestBlock, keyperSet *obskeyper.KeyperSet) error {
+	queries := database.New(kpr.dbpool)
+	eon := keyperSet.KeyperConfigIndex
+	var txPointer int64
+	var txPointerAge int64
+	txPointerDB, err := queries.GetTxPointer(ctx, eon)
+	if err == pgx.ErrNoRows {
+		txPointer = 0
+		txPointerAge = ev.Number.Int64() - keyperSet.ActivationBlockNumber + 1
+	} else if err != nil {
+		return errors.Wrap(err, "failed to query tx pointer from db")
+	} else {
+		txPointerAge = ev.Number.Int64() - txPointerDB.Block
+		txPointer = txPointerDB.Value
+	}
+	if txPointerAge == 0 {
+		// A pointer of age 0 means we already received the pointer from a DecryptionKeys message
+		// even though we haven't sent our shares yet. In that case, sending our shares is
+		// unnecessary.
+		log.Warn().
+			Int64("block-number", ev.Number.Int64()).
+			Int64("eon", eon).
+			Int64("tx-pointer", txPointer).
+			Int64("tx-pointer-age", txPointerAge).
+			Msg("ignoring new block as tx pointer age is 0")
+		return nil
+	}
+	if txPointerAge > maxTxPointerAge {
+		// If the tx pointer is outdated, the system has failed to generate decryption keys (or at
+		// least we haven't received them). This either means not enough keypers are online or they
+		// don't agree on the current value of the tx pointer. In order to recover, we choose the
+		// current length of the transaction queue as the new tx pointer, as this is a value
+		// everyone can agree on.
+		log.Warn().
+			Int64("block-number", ev.Number.Int64()).
+			Int64("eon", eon).
+			Int64("tx-pointer", txPointer).
+			Int64("tx-pointer-age", txPointerAge).
+			Msg("outdated tx pointer")
+		txPointer, err = queries.GetTransactionSubmittedEventCount(ctx, keyperSet.KeyperConfigIndex)
+		if err == pgx.ErrNoRows {
+			txPointer = 0
+		} else if err != nil {
+			return errors.Wrap(err, "failed to query transaction submitted event count from db")
+		}
+	}
+
+	identityPreimages, err := kpr.getDecryptionIdentityPreimages(ctx, ev, keyperSet.KeyperConfigIndex, txPointer)
+	if err != nil {
+		return err
+	}
+	trigger := epochkghandler.DecryptionTrigger{
+		BlockNumber:       uint64(ev.Number.Int64() + 1),
+		IdentityPreimages: identityPreimages,
+	}
+	event := broker.NewEvent(&trigger)
+	log.Debug().
+		Int64("block-number", int64(trigger.BlockNumber)).
+		Int("num-identities", len(trigger.IdentityPreimages)).
+		Int64("tx-pointer", txPointer).
+		Int64("tx-pointer-age", txPointerAge).
+		Msg("sending decryption trigger")
+	kpr.decryptionTriggerChannel <- event
+
+	return nil
+}
+
+func (kpr *Keyper) getDecryptionIdentityPreimages(
+	ctx context.Context, ev *syncevent.LatestBlock, eon int64, txPointer int64,
+) ([]identitypreimage.IdentityPreimage, error) {
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+
+	queries := database.New(kpr.dbpool)
+	limitUint64 := kpr.config.EncryptedGasLimit/kpr.config.MinGasPerTransaction + 1
+	if limitUint64 > math.MaxInt32 {
+		return identityPreimages, errors.New("gas limit too big")
+	}
+	limit := int32(limitUint64)
+
+	events, err := queries.GetTransactionSubmittedEvents(ctx, database.GetTransactionSubmittedEventsParams{
+		Eon:   eon,
+		Index: txPointer,
+		Limit: limit,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query transaction submitted events from index %d", txPointer)
+	}
+
+	identityPreimages = []identitypreimage.IdentityPreimage{
+		makeBlockIdentityPreimage(ev),
+	}
+	for _, event := range events {
+		identityPreimage, err := transactionSubmittedEventToIdentityPreimage(event)
+		if err != nil {
+			return []identitypreimage.IdentityPreimage{}, err
+		}
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+	return identityPreimages, nil
+}
+
+func transactionSubmittedEventToIdentityPreimage(event database.TransactionSubmittedEvent) (identitypreimage.IdentityPreimage, error) {
+	sender, err := shdb.DecodeAddress(event.Sender)
+	if err != nil {
+		return identitypreimage.IdentityPreimage{}, errors.Wrap(err, "failed to decode sender address of transaction submitted event from db")
+	}
+
+	var buf bytes.Buffer
+	buf.Write(event.IdentityPrefix)
+	buf.Write(sender.Bytes())
+
+	return identitypreimage.IdentityPreimage(buf.Bytes()), nil
+}
+
+func makeBlockIdentityPreimage(ev *syncevent.LatestBlock) identitypreimage.IdentityPreimage {
+	return identitypreimage.IdentityPreimage(ev.Number.Bytes())
 }

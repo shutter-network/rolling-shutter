@@ -38,7 +38,9 @@ type Config struct {
 	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
 
-	GnosisContracts *GnosisContracts `shconfig:",required"`
+	GnosisContracts      *GnosisContracts `shconfig:",required"`
+	EncryptedGasLimit    uint64           `shconfig:",required"`
+	MinGasPerTransaction uint64           `shconfig:",required"`
 }
 
 type GnosisContracts struct {
@@ -63,6 +65,8 @@ func (c *Config) SetDefaultValues() error {
 		KeyBroadcastContract: common.Address{},
 		Sequencer:            common.Address{},
 	}
+	c.EncryptedGasLimit = 1_000_000
+	c.MinGasPerTransaction = 21_000
 	return nil
 }
 

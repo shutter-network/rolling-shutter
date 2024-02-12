@@ -4,9 +4,7 @@
 
 package database
 
-import (
-	"database/sql"
-)
+import ()
 
 type TransactionSubmittedEvent struct {
 	Index          int64
@@ -31,9 +29,7 @@ type TransactionSubmittedEventsSyncedUntil struct {
 }
 
 type TxPointer struct {
-	EnforceOneRow  bool
-	Local          sql.NullInt64
-	LocalBlock     int64
-	Consensus      sql.NullInt64
-	ConsensusBlock int64
+	Eon   int64
+	Block int64
+	Value int64
 }
