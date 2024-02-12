@@ -19,11 +19,23 @@ message KeyShare {
         bytes share = 2;
 }
 
+message GnosisDecryptionKeySharesExtra {
+    uint64 slot = 1;
+    uint64 tx_pointer = 2;
+    bytes signature = 3;
+}
+
+message OptimismDecryptionKeySharesExtra {}
+
 message DecryptionKeyShares {
     uint64 instanceID = 1;
     uint64 eon = 4;
     uint64 keyperIndex = 5;
     repeated KeyShare shares = 9;
+    oneof extra {
+        GnosisDecryptionKeySharesExtra gnosis = 10;
+        OptimismDecryptionKeySharesExtra optimism = 11;
+    }
 }
 
 message Key {
@@ -31,10 +43,23 @@ message Key {
     bytes key = 2;
 }
 
+message GnosisDecryptionKeysExtra {
+    uint64 slot = 1;
+    uint64 tx_pointer = 2;
+    repeated uint64 signerIndices = 3;
+    repeated bytes signatures = 4;
+}
+
+message OptimismDecryptionKeysExtra {}
+
 message DecryptionKeys {
     uint64 instanceID = 1;
     uint64 eon = 2;
     repeated Key keys = 3;
+    oneof extra {
+        GnosisDecryptionKeysExtra gnosis = 4;
+        OptimismDecryptionKeysExtra optimism = 5;
+    }
 }
 
 // EonPublicKey is sent by the keypers to publish the EonPublicKey for a certain
