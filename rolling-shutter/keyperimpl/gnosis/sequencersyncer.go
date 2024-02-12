@@ -23,6 +23,9 @@ type SequencerSyncer struct {
 	StartEon uint64
 }
 
+// Sync fetches transaction submitted events from the sequencer contract and inserts them into the
+// database. It starts at the end point of the previous call to sync (or 0 if it is the first call)
+// and ends at the given block number.
 func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 	queries := database.New(s.DBPool)
 	syncedUntilBlock, err := queries.GetTransactionSubmittedEventsSyncedUntil(ctx)
@@ -101,54 +104,52 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 	tx pgx.Tx,
 	events []*sequencerBindings.SequencerTransactionSubmitted,
 ) error {
-	if len(events) > 0 {
-		queries := database.New(tx)
-		nextEventIndices := make(map[uint64]int64)
-		for _, event := range events {
-			nextEventIndex, ok := nextEventIndices[event.Eon]
-			if !ok {
-				nextEventIndexFromDB, err := queries.GetTransactionSubmittedEventCount(ctx, int64(event.Eon))
-				if err == pgx.ErrNoRows {
-					nextEventIndexFromDB = 0
-				} else if err != nil {
-					return errors.Wrapf(err, "failed to query count of transaction submitted events for eon %d", event.Eon)
-				}
-				nextEventIndices[event.Eon] = nextEventIndexFromDB
-				nextEventIndex = nextEventIndexFromDB
+	queries := database.New(tx)
+	nextEventIndices := make(map[uint64]int64)
+	for _, event := range events {
+		nextEventIndex, ok := nextEventIndices[event.Eon]
+		if !ok {
+			nextEventIndexFromDB, err := queries.GetTransactionSubmittedEventCount(ctx, int64(event.Eon))
+			if err == pgx.ErrNoRows {
+				nextEventIndexFromDB = 0
+			} else if err != nil {
+				return errors.Wrapf(err, "failed to query count of transaction submitted events for eon %d", event.Eon)
 			}
-
-			_, err := queries.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
-				Index:          nextEventIndex,
-				BlockNumber:    int64(event.Raw.BlockNumber),
-				BlockHash:      event.Raw.BlockHash[:],
-				TxIndex:        int64(event.Raw.TxIndex),
-				LogIndex:       int64(event.Raw.Index),
-				Eon:            int64(event.Eon),
-				IdentityPrefix: event.IdentityPrefix[:],
-				Sender:         shdb.EncodeAddress(event.Sender),
-				GasLimit:       event.GasLimit.Int64(),
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to insert transaction submitted event into db")
-			}
-			nextEventIndices[event.Eon]++
-			log.Debug().
-				Int64("index", nextEventIndex).
-				Uint64("block", event.Raw.BlockNumber).
-				Uint64("eon", event.Eon).
-				Hex("identityPrefix", event.IdentityPrefix[:]).
-				Hex("sender", event.Sender.Bytes()).
-				Uint64("gasLimit", event.GasLimit.Uint64()).
-				Msg("synced new transaction submitted event")
+			nextEventIndices[event.Eon] = nextEventIndexFromDB
+			nextEventIndex = nextEventIndexFromDB
 		}
-		for eon, nextEventIndex := range nextEventIndices {
-			err := queries.SetTransactionSubmittedEventCount(ctx, database.SetTransactionSubmittedEventCountParams{
-				Eon:        int64(eon),
-				EventCount: nextEventIndex,
-			})
-			if err != nil {
-				return err
-			}
+
+		_, err := queries.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
+			Index:          nextEventIndex,
+			BlockNumber:    int64(event.Raw.BlockNumber),
+			BlockHash:      event.Raw.BlockHash[:],
+			TxIndex:        int64(event.Raw.TxIndex),
+			LogIndex:       int64(event.Raw.Index),
+			Eon:            int64(event.Eon),
+			IdentityPrefix: event.IdentityPrefix[:],
+			Sender:         shdb.EncodeAddress(event.Sender),
+			GasLimit:       event.GasLimit.Int64(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to insert transaction submitted event into db")
+		}
+		nextEventIndices[event.Eon]++
+		log.Debug().
+			Int64("index", nextEventIndex).
+			Uint64("block", event.Raw.BlockNumber).
+			Uint64("eon", event.Eon).
+			Hex("identityPrefix", event.IdentityPrefix[:]).
+			Hex("sender", event.Sender.Bytes()).
+			Uint64("gasLimit", event.GasLimit.Uint64()).
+			Msg("synced new transaction submitted event")
+	}
+	for eon, nextEventIndex := range nextEventIndices {
+		err := queries.SetTransactionSubmittedEventCount(ctx, database.SetTransactionSubmittedEventCountParams{
+			Eon:        int64(eon),
+			EventCount: nextEventIndex,
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return nil
