@@ -25,8 +25,33 @@ type (
 	HandlerFunc       func(context.Context, p2pmsg.Message) ([]p2pmsg.Message, error)
 	HandlerRegistry   map[protoreflect.FullName][]HandlerFunc
 	ValidatorFunc     func(context.Context, p2pmsg.Message) (pubsub.ValidationResult, error)
-	ValidatorRegistry map[string]pubsub.ValidatorEx
+	ValidatorRegistry map[string][]pubsub.ValidatorEx
 )
+
+func (r *ValidatorRegistry) GetCombinedValidator(topic string) pubsub.ValidatorEx {
+	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
+		ignored := false
+		for _, valFunc := range (*r)[topic] {
+			res := valFunc(ctx, sender, message)
+			switch res {
+			case pubsub.ValidationAccept:
+				continue
+			case pubsub.ValidationReject:
+				return pubsub.ValidationReject
+			case pubsub.ValidationIgnore:
+				ignored = true
+			default:
+				log.Warn().Str("topic", topic).Msg("unknown validation result %d, treating as reject")
+				return pubsub.ValidationReject
+			}
+		}
+		if ignored {
+			return pubsub.ValidationIgnore
+		}
+		return pubsub.ValidationAccept
+	}
+	return validate
+}
 
 const (
 	allowTraceContext = true // whether we allow the trace field to be set in the message envelope
@@ -134,16 +159,6 @@ func (m *P2PMessaging) AddHandlerFunc(handlerFunc HandlerFunc, protos ...p2pmsg.
 
 func (m *P2PMessaging) addValidatorImpl(valFunc ValidatorFunc, messProto p2pmsg.Message) {
 	topic := messProto.Topic()
-	_, exists := m.validatorRegistry[topic]
-	if exists {
-		// This is likely not intended and happens when different messages return the same P2PMessage.Topic().
-		// Currently a topic is mapped 1 to 1 to a message type (instead of using an envelope for unmarshalling)
-		// (If feature needed, allow for chaining of successively registered validator functions per topic)
-		panic(errors.Errorf(
-			"can't register more than one validator per topic (topic: '%s', message-type: '%s')",
-			topic,
-			reflect.TypeOf(messProto)))
-	}
 	handleError := func(err error) {
 		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
 	}
@@ -176,8 +191,12 @@ func (m *P2PMessaging) addValidatorImpl(valFunc ValidatorFunc, messProto p2pmsg.
 		}
 		return valid
 	}
-	m.validatorRegistry[topic] = validate
-	m.AddGossipTopic(topic)
+
+	_, exists := m.validatorRegistry[topic]
+	if !exists {
+		m.AddGossipTopic(topic)
+	}
+	m.validatorRegistry[topic] = append(m.validatorRegistry[topic], validate)
 }
 
 // AddValidator will add a validator-function to a P2PHandler instance:
