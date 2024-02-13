@@ -341,7 +341,12 @@ func (kpr *Keyper) getDecryptionIdentityPreimages(
 	identityPreimages = []identitypreimage.IdentityPreimage{
 		makeBlockIdentityPreimage(ev),
 	}
+	gas := uint64(0)
 	for _, event := range events {
+		gas += uint64(event.GasLimit)
+		if gas > kpr.config.EncryptedGasLimit {
+			break
+		}
 		identityPreimage, err := transactionSubmittedEventToIdentityPreimage(event)
 		if err != nil {
 			return []identitypreimage.IdentityPreimage{}, err
