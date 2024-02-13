@@ -96,7 +96,8 @@ func (p *P2PNode) Run(
 		return err
 	}
 
-	for topicName, validator := range topicValidators {
+	for topicName := range topicValidators {
+		validator := topicValidators.GetCombinedValidator(topicName)
 		if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
 			return err
 		}

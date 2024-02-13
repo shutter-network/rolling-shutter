@@ -92,7 +92,7 @@ func TestStartNetworkNodeIntegration(t *testing.T) {
 		assert.NilError(t, err)
 		p2ps = append(p2ps, p2pHandler.P2P)
 		fn := func(ctx context.Context, runner service.Runner) error {
-			return p2pHandler.P2P.Run(ctx, runner, gossipTopicNames, map[string]pubsub.ValidatorEx{})
+			return p2pHandler.P2P.Run(ctx, runner, gossipTopicNames, map[string][]pubsub.ValidatorEx{})
 		}
 		services[i] = service.Function{Func: fn}
 	}
