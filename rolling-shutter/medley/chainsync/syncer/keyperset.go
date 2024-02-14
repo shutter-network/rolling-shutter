@@ -21,14 +21,50 @@ func makeCallError(attrName string, err error) error {
 
 const channelSize = 10
 
+var _ ManualFilterHandler = &KeyperSetSyncer{}
+
 type KeyperSetSyncer struct {
 	Client     client.Client
 	Contract   *bindings.KeyperSetManager
 	Log        log.Logger
 	StartBlock *number.BlockNumber
 	Handler    event.KeyperSetHandler
+	// disable this when the QueryAndHandle manual polling should be used:
+	DisableEventWatcher bool
 
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
+}
+
+func (s *KeyperSetSyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	opts := &bind.FilterOpts{
+		// FIXME: does this work, or do we need index -1 or something?
+		Start:   block,
+		End:     &block,
+		Context: ctx,
+	}
+	iter, err := s.Contract.FilterKeyperSetAdded(opts)
+	// TODO: what errors possible?
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.Next() {
+		select {
+		// XXX: this can be nil during the handlers startup.
+		// As far as I understand, a nil channel is never selected.
+		// Will it be selected as soon as the channel is not nil anymore?
+		case s.keyperAddedCh <- iter.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	// XXX: it looks like this is nil when the iterator is
+	// exhausted without failures
+	if err := iter.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	return nil
 }
 
 func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -69,12 +105,14 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	runner.Defer(func() {
 		close(s.keyperAddedCh)
 	})
-	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
+	if !s.DisableEventWatcher {
+		subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
 	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
 		return s.watchNewKeypersService(ctx)
 	})

@@ -18,6 +18,10 @@ var (
 	errLatestBlock        = errors.New("'nil' latest block")
 )
 
+type ManualFilterHandler interface {
+	QueryAndHandle(ctx context.Context, block uint64) error
+}
+
 func logToCallOpts(ctx context.Context, log *types.Log) *bind.CallOpts {
 	block := new(big.Int)
 	block.SetUint64(log.BlockNumber)

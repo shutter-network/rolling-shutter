@@ -2,11 +2,12 @@ package syncer
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
@@ -15,15 +16,43 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+var _ ManualFilterHandler = &EonPubKeySyncer{}
+
 type EonPubKeySyncer struct {
-	Client           client.Client
-	Log              log.Logger
-	KeyBroadcast     *bindings.KeyBroadcastContract
-	KeyperSetManager *bindings.KeyperSetManager
-	StartBlock       *number.BlockNumber
-	Handler          event.EonPublicKeyHandler
+	Client              client.Client
+	Log                 log.Logger
+	KeyBroadcast        *bindings.KeyBroadcastContract
+	KeyperSetManager    *bindings.KeyperSetManager
+	StartBlock          *number.BlockNumber
+	Handler             event.EonPublicKeyHandler
+	DisableEventWatcher bool
 
 	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
+}
+
+func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	opts := &bind.FilterOpts{
+		Start:   block,
+		End:     &block,
+		Context: ctx,
+	}
+	iter, err := s.KeyBroadcast.FilterEonKeyBroadcast(opts)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.Next() {
+		select {
+		case s.keyBroadcastCh <- iter.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	return nil
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -59,12 +88,14 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 	runner.Defer(func() {
 		close(s.keyBroadcastCh)
 	})
-	subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
+	if !s.DisableEventWatcher {
+		subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
 	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
 		return s.watchNewEonPubkey(ctx)
 	})
@@ -137,10 +168,29 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			// FIXME: this happens, why?
+			if len(newEonKey.Key) == 0 {
+				opts := &bind.CallOpts{
+					Context:     ctx,
+					BlockNumber: new(big.Int).SetUint64(newEonKey.Raw.BlockNumber),
+				}
+				k, err := s.GetEonPubKeyForEon(ctx, opts, newEonKey.Eon)
+				s.Log.Error(
+					"extra call for GetEonPubKeyForEon errored",
+					"error",
+					err.Error(),
+				)
+				s.Log.Info(
+					"retrieved eon pubkey by getter",
+					"eon",
+					k,
+				)
+			}
+			pubk := newEonKey.Key
 			bn := newEonKey.Raw.BlockNumber
 			ev := &event.EonPublicKey{
 				Eon:           newEonKey.Eon,
-				Key:           newEonKey.Key,
+				Key:           pubk,
 				AtBlockNumber: number.NewBlockNumber(&bn),
 			}
 			err := s.Handler(ctx, ev)

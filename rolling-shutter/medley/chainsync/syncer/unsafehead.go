@@ -17,6 +17,10 @@ type UnsafeHeadSyncer struct {
 	Client  client.Client
 	Log     log.Logger
 	Handler event.BlockHandler
+	// Handler to be manually triggered
+	// to handle their handler function
+	// before the own Handler is called:
+	SyncedHandler []ManualFilterHandler
 
 	newLatestHeadCh chan *types.Header
 }
@@ -42,6 +46,10 @@ func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) err
 	return nil
 }
 
+func parseLogs() error {
+	return nil
+}
+
 func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
 	for {
 		select {
@@ -49,8 +57,25 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			// TODO: check bloom filter for topic of all
+			// synced handlers and only call them if
+			// the bloomfilter retrieves something.
+
+			blockNum := number.BigToBlockNumber(newHeader.Number)
+			for _, h := range s.SyncedHandler {
+				// NOTE: this has to be blocking!
+				// So whenever this returns, it is expected
+				// that the handlers Handle function
+				// has been called and it returned.
+				err := h.QueryAndHandle(ctx, blockNum.Uint64())
+				if err != nil {
+					// XXX: return or log?
+					// return err
+					s.Log.Error("synced handler call errored, skipping", "error", err)
+				}
+			}
 			ev := &event.LatestBlock{
-				Number:    number.BigToBlockNumber(newHeader.Number),
+				Number:    blockNum,
 				BlockHash: newHeader.Hash(),
 			}
 			err := s.Handler(ctx, ev)

@@ -14,12 +14,15 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+var _ ManualFilterHandler = &ShutterStateSyncer{}
+
 type ShutterStateSyncer struct {
-	Client     client.Client
-	Contract   *bindings.KeyperSetManager
-	StartBlock *number.BlockNumber
-	Log        log.Logger
-	Handler    event.ShutterStateHandler
+	Client              client.Client
+	Contract            *bindings.KeyperSetManager
+	StartBlock          *number.BlockNumber
+	Log                 log.Logger
+	Handler             event.ShutterStateHandler
+	DisableEventWatcher bool
 
 	pausedCh   chan *bindings.KeyperSetManagerPaused
 	unpausedCh chan *bindings.KeyperSetManagerUnpaused
@@ -40,6 +43,47 @@ func (s *ShutterStateSyncer) GetShutterState(ctx context.Context, opts *bind.Cal
 	}, nil
 }
 
+func (s *ShutterStateSyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	opts := &bind.FilterOpts{
+		Start:   block,
+		End:     &block,
+		Context: ctx,
+	}
+	iterPaused, err := s.Contract.FilterPaused(opts)
+	if err != nil {
+		return err
+	}
+	defer iterPaused.Close()
+
+	for iterPaused.Next() {
+		select {
+		case s.pausedCh <- iterPaused.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := iterPaused.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	iterUnpaused, err := s.Contract.FilterUnpaused(opts)
+	if err != nil {
+		return err
+	}
+	defer iterUnpaused.Close()
+
+	for iterUnpaused.Next() {
+		select {
+		case s.unpausedCh <- iterUnpaused.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := iterUnpaused.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	return nil
+}
+
 func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.Handler == nil {
 		return errors.New("no handler registered")
@@ -49,26 +93,30 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 		Context: ctx,
 	}
 	s.pausedCh = make(chan *bindings.KeyperSetManagerPaused)
-	subs, err := s.Contract.WatchPaused(watchOpts, s.pausedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
-	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Defer(func() {
 		close(s.pausedCh)
 	})
-
 	s.unpausedCh = make(chan *bindings.KeyperSetManagerUnpaused)
-	subs, err = s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
+	if !s.DisableEventWatcher {
 	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Defer(func() {
 		close(s.unpausedCh)
 	})
+
+	if !s.DisableEventWatcher {
+		subs, err := s.Contract.WatchPaused(watchOpts, s.pausedCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
+		subs, err = s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
+	}
 
 	runner.Go(func() error {
 		return s.watchPaused(ctx)

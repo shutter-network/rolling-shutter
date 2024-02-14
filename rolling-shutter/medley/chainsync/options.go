@@ -70,6 +70,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 
 	c.Client = client
 
+	syncedServices := []syncer.ManualFilterHandler{}
 	// the nil passthrough will use "latest" for each call,
 	// but we want to harmonize and fix the sync start to a specific block.
 	if o.syncStart.IsLatest() {
@@ -85,14 +86,16 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		return err
 	}
 	c.kssync = &syncer.KeyperSetSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		StartBlock: o.syncStart,
-		Handler:    o.handlerKeyperSet,
+		Client:              client,
+		Contract:            c.KeyperSetManager,
+		Log:                 c.log,
+		StartBlock:          o.syncStart,
+		Handler:             o.handlerKeyperSet,
+		DisableEventWatcher: true,
 	}
 	if o.handlerKeyperSet != nil {
 		c.services = append(c.services, c.kssync)
+		syncedServices = append(syncedServices, c.kssync)
 	}
 
 	c.KeyBroadcast, err = bindings.NewKeyBroadcastContract(*o.keyBroadcastContractAddress, client)
@@ -100,34 +103,51 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		return err
 	}
 	c.epksync = &syncer.EonPubKeySyncer{
-		Client:           client,
-		Log:              c.log,
-		KeyBroadcast:     c.KeyBroadcast,
-		KeyperSetManager: c.KeyperSetManager,
-		Handler:          o.handlerEonPublicKey,
-		StartBlock:       o.syncStart,
+		Client:              client,
+		Log:                 c.log,
+		KeyBroadcast:        c.KeyBroadcast,
+		KeyperSetManager:    c.KeyperSetManager,
+		Handler:             o.handlerEonPublicKey,
+		StartBlock:          o.syncStart,
+		DisableEventWatcher: true,
 	}
 	if o.handlerEonPublicKey != nil {
 		c.services = append(c.services, c.epksync)
+		syncedServices = append(syncedServices, c.kssync)
 	}
 
 	c.sssync = &syncer.ShutterStateSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		Handler:    o.handlerShutterState,
-		StartBlock: o.syncStart,
+		Client:              client,
+		Contract:            c.KeyperSetManager,
+		Log:                 c.log,
+		Handler:             o.handlerShutterState,
+		StartBlock:          o.syncStart,
+		DisableEventWatcher: true,
 	}
 	if o.handlerShutterState != nil {
 		c.services = append(c.services, c.sssync)
+		syncedServices = append(syncedServices, c.kssync)
 	}
 
-	if o.handlerBlock != nil {
-		c.uhsync = &syncer.UnsafeHeadSyncer{
-			Client:  client,
-			Log:     c.log,
-			Handler: o.handlerBlock,
+	if o.handlerBlock == nil {
+		// NOOP - but we need to run the UnsafeHeadSyncer.
+		// This is to keep the inner workings consisten,
+		// we use the DisableEventWatcher mechanism in combination
+		// with the UnsafeHeadSyncer instead of the streaming
+		// Watch... subscription on events.
+		// TODO: think about allowing the streaming events,
+		// when guaranteed event order (event1,event2,new-block-event)
+		// is not required
+		o.handlerBlock = func(ctx context.Context, lb *event.LatestBlock) error {
+			return nil
 		}
+	}
+
+	c.uhsync = &syncer.UnsafeHeadSyncer{
+		Client:        client,
+		Log:           c.log,
+		Handler:       o.handlerBlock,
+		SyncedHandler: syncedServices,
 	}
 	if o.handlerBlock != nil {
 		c.services = append(c.services, c.uhsync)

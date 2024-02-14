@@ -144,11 +144,14 @@ func (kpr *Keyper) newEonPublicKey(ctx context.Context, pubKey keyper.EonPublicK
 	log.Info().
 		Uint64("eon", pubKey.Eon).
 		Uint64("activation-block", pubKey.ActivationBlock).
+		Bytes("pub-key", pubKey.PublicKey).
 		Msg("new eon pk")
 	// Currently all keypers call this and race to call this function first.
 	// For now this is fine, but a keyper should only send a transaction if
 	// the key is not set yet.
 	// Best would be a coordinatated leader election who will broadcast the key.
+	// FIXME: the syncer receives an empty key byte.
+	// Is this already
 	tx, err := kpr.l2Client.BroadcastEonKey(ctx, pubKey.Eon, pubKey.PublicKey)
 	if err != nil {
 		log.Error().Err(err).Msg("error broadcasting eon public key")
