@@ -3,7 +3,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
@@ -128,17 +127,23 @@ func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPu
 	if err != nil {
 		return nil, err
 	}
-
 	initialPubKeys := []*event.EonPublicKey{}
+	// NOTE: These are pubkeys that at the state of s.StartBlock
+	// are known to the contracts.
+	// That way we recreate older broadcast publickey events.
+	// We are only interested for keys that belong to keyper-set
+	// that are currently active or will become active in
+	// the future:
 	for i := activeEon; i < numKS; i++ {
 		e, err := s.GetEonPubKeyForEon(ctx, opts, i)
-		// FIXME: translate the error that there is no key
-		// to a continue of the loop
-		// (key not in mapping error, how can we catch that?)
 		if err != nil {
 			return nil, err
 		}
-		initialPubKeys = append(initialPubKeys, e)
+		// if e == nil, this means the keyperset did not broadcast a
+		// key (yet)
+		if e != nil {
+			initialPubKeys = append(initialPubKeys, e)
+		}
 	}
 	return initialPubKeys, nil
 }
@@ -158,10 +163,13 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 		return nil, err
 	}
 	key, err := s.KeyBroadcast.GetEonKey(opts, eon)
-	// XXX: can the key be a null byte?
-	// I think we rather get a index out of bounds error.
 	if err != nil {
 		return nil, err
+	}
+	// NOTE: Solidity returns the null value whenever
+	// one tries to access a key in mapping that doesn't exist
+	if len(key) == 0 {
+		return nil, nil
 	}
 	return &event.EonPublicKey{
 		Eon:           eon,
@@ -174,36 +182,8 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 	for {
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
-			s.Log.Info(
-				"pubsyncer received value",
-			)
 			if !ok {
 				return nil
-			}
-			s.Log.Info(
-				"pubsyncer channel ok",
-			)
-			// FIXME: this happens, why?
-			if len(newEonKey.Key) == 0 {
-				opts := &bind.CallOpts{
-					Context:     ctx,
-					BlockNumber: new(big.Int).SetUint64(newEonKey.Raw.BlockNumber),
-				}
-				k, err := s.GetEonPubKeyForEon(ctx, opts, newEonKey.Eon)
-				s.Log.Error(
-					"extra call for GetEonPubKeyForEon errored",
-					"error",
-					err.Error(),
-				)
-				s.Log.Info(
-					"retrieved eon pubkey by getter",
-					"eon",
-					k,
-				)
-			} else {
-				s.Log.Info(
-					"pubsyncer key lenght ok",
-				)
 			}
 			pubk := newEonKey.Key
 			bn := newEonKey.Raw.BlockNumber
@@ -212,11 +192,6 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 				Key:           pubk,
 				AtBlockNumber: number.NewBlockNumber(&bn),
 			}
-			s.Log.Info(
-				"pubsyncer constructed event",
-				"event",
-				ev,
-			)
 			err := s.Handler(ctx, ev)
 			if err != nil {
 				s.Log.Error(
