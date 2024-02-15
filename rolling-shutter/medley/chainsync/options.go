@@ -118,7 +118,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	}
 	if o.handlerEonPublicKey != nil {
 		c.services = append(c.services, c.epksync)
-		syncedServices = append(syncedServices, c.kssync)
+		syncedServices = append(syncedServices, c.epksync)
 	}
 
 	c.sssync = &syncer.ShutterStateSyncer{
@@ -131,7 +131,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	}
 	if o.handlerShutterState != nil {
 		c.services = append(c.services, c.sssync)
-		syncedServices = append(syncedServices, c.kssync)
+		syncedServices = append(syncedServices, c.sssync)
 	}
 
 	if o.handlerBlock == nil {

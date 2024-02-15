@@ -60,7 +60,6 @@ func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) erro
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
-	fmt.Println("pubsync looper started (println)")
 	s.Log.Info(
 		"pubsyncer loop started",
 	)
