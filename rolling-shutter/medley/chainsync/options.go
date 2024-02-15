@@ -24,7 +24,7 @@ type options struct {
 	keyperSetManagerAddress     *common.Address
 	keyBroadcastContractAddress *common.Address
 	clientURL                   string
-	client                      syncclient.Client
+	ethClient                   syncclient.EthereumClient
 	logger                      log.Logger
 	runner                      service.Runner
 	syncStart                   *number.BlockNumber
@@ -37,11 +37,11 @@ type options struct {
 }
 
 func (o *options) verify() error {
-	if o.clientURL != "" && o.client != nil {
+	if o.clientURL != "" && o.ethClient != nil {
 		// TODO: error message
 		return errors.New("can't use client and client url")
 	}
-	if o.clientURL == "" && o.client == nil {
+	if o.clientURL == "" && o.ethClient == nil {
 		// TODO: error message
 		return errors.New("have to provide either url or client")
 	}
@@ -56,25 +56,30 @@ func (o *options) verify() error {
 // of shutter clients background workers.
 func (o *options) apply(ctx context.Context, c *Client) error {
 	var (
-		client syncclient.Client
+		client syncclient.EthereumClient
 		err    error
 	)
 	if o.clientURL != "" {
-		o.client, err = ethclient.DialContext(ctx, o.clientURL)
+		o.ethClient, err = ethclient.DialContext(ctx, o.clientURL)
 		if err != nil {
 			return err
 		}
 	}
-	client = o.client
-	c.log = o.logger
+	client = o.ethClient
 
-	c.Client = client
+	c.EthereumClient = client
+
+	if o.logger != nil {
+		c.log = o.logger
+		// NOCHECKIN:
+		c.log.Info("got logger in options")
+	}
 
 	syncedServices := []syncer.ManualFilterHandler{}
 	// the nil passthrough will use "latest" for each call,
 	// but we want to harmonize and fix the sync start to a specific block.
 	if o.syncStart.IsLatest() {
-		latestBlock, err := c.Client.BlockNumber(ctx)
+		latestBlock, err := c.EthereumClient.BlockNumber(ctx)
 		if err != nil {
 			return errors.Wrap(err, "polling latest block")
 		}
@@ -161,7 +166,7 @@ func defaultOptions() *options {
 		keyperSetManagerAddress:     &predeploy.KeyperSetManagerAddr,
 		keyBroadcastContractAddress: &predeploy.KeyBroadcastContractAddr,
 		clientURL:                   "",
-		client:                      nil,
+		ethClient:                   nil,
 		logger:                      noopLogger,
 		runner:                      nil,
 		syncStart:                   number.NewBlockNumber(nil),
@@ -213,9 +218,9 @@ func WithLogger(l log.Logger) Option {
 	}
 }
 
-func WithClient(client syncclient.Client) Option {
+func WithClient(client syncclient.EthereumClient) Option {
 	return func(o *options) error {
-		o.client = client
+		o.ethClient = client
 		return nil
 	}
 }

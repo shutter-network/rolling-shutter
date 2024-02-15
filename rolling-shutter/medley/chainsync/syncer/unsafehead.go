@@ -14,7 +14,7 @@ import (
 )
 
 type UnsafeHeadSyncer struct {
-	Client  client.Client
+	Client  client.EthereumClient
 	Log     log.Logger
 	Handler event.BlockHandler
 	// Handler to be manually triggered
@@ -26,6 +26,7 @@ type UnsafeHeadSyncer struct {
 }
 
 func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) error {
+	s.Log.Info("unsafe head syncer started")
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}

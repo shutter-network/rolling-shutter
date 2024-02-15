@@ -19,7 +19,7 @@ import (
 var _ ManualFilterHandler = &EonPubKeySyncer{}
 
 type EonPubKeySyncer struct {
-	Client              client.Client
+	Client              client.EthereumClient
 	Log                 log.Logger
 	KeyBroadcast        *bindings.KeyBroadcastContract
 	KeyperSetManager    *bindings.KeyperSetManager
@@ -31,6 +31,11 @@ type EonPubKeySyncer struct {
 }
 
 func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	s.Log.Info(
+		"pubsyncer query and handle called",
+		"block",
+		block,
+	)
 	opts := &bind.FilterOpts{
 		Start:   block,
 		End:     &block,
@@ -56,6 +61,10 @@ func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) erro
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
+	fmt.Println("pubsync looper started (println)")
+	s.Log.Info(
+		"pubsyncer loop started",
+	)
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}
@@ -165,9 +174,15 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 	for {
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
+			s.Log.Info(
+				"pubsyncer received value",
+			)
 			if !ok {
 				return nil
 			}
+			s.Log.Info(
+				"pubsyncer channel ok",
+			)
 			// FIXME: this happens, why?
 			if len(newEonKey.Key) == 0 {
 				opts := &bind.CallOpts{
@@ -185,6 +200,10 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 					"eon",
 					k,
 				)
+			} else {
+				s.Log.Info(
+					"pubsyncer key lenght ok",
+				)
 			}
 			pubk := newEonKey.Key
 			bn := newEonKey.Raw.BlockNumber
@@ -193,6 +212,11 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 				Key:           pubk,
 				AtBlockNumber: number.NewBlockNumber(&bn),
 			}
+			s.Log.Info(
+				"pubsyncer constructed event",
+				"event",
+				ev,
+			)
 			err := s.Handler(ctx, ev)
 			if err != nil {
 				s.Log.Error(

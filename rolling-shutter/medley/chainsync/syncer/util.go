@@ -44,7 +44,7 @@ func guardCallOpts(opts *bind.CallOpts, allowLatest bool) error {
 	return nil
 }
 
-func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
+func fixCallOpts(ctx context.Context, c client.EthereumClient, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
 	err := guardCallOpts(opts, false)
 	if err == nil {
 		return opts, nil, nil
