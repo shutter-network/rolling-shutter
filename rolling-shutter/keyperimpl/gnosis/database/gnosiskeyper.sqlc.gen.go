@@ -11,6 +11,71 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
+SELECT eon, block, tx_pointer, identities_hash FROM current_decryption_trigger
+WHERE eon = $1
+`
+
+func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (CurrentDecryptionTrigger, error) {
+	row := q.db.QueryRow(ctx, getCurrentDecryptionTrigger, eon)
+	var i CurrentDecryptionTrigger
+	err := row.Scan(
+		&i.Eon,
+		&i.Block,
+		&i.TxPointer,
+		&i.IdentitiesHash,
+	)
+	return i, err
+}
+
+const getSlotDecryptionSignatures = `-- name: GetSlotDecryptionSignatures :many
+SELECT eon, block, keyper_index, tx_pointer, identities_hash, signature FROM slot_decryption_signatures
+WHERE eon = $1 AND block = $2 AND tx_pointer = $3 AND identities_hash = $4
+ORDER BY keyper_index ASC
+LIMIT $5
+`
+
+type GetSlotDecryptionSignaturesParams struct {
+	Eon            int64
+	Block          int64
+	TxPointer      int64
+	IdentitiesHash []byte
+	Limit          int32
+}
+
+func (q *Queries) GetSlotDecryptionSignatures(ctx context.Context, arg GetSlotDecryptionSignaturesParams) ([]SlotDecryptionSignature, error) {
+	rows, err := q.db.Query(ctx, getSlotDecryptionSignatures,
+		arg.Eon,
+		arg.Block,
+		arg.TxPointer,
+		arg.IdentitiesHash,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SlotDecryptionSignature
+	for rows.Next() {
+		var i SlotDecryptionSignature
+		if err := rows.Scan(
+			&i.Eon,
+			&i.Block,
+			&i.KeyperIndex,
+			&i.TxPointer,
+			&i.IdentitiesHash,
+			&i.Signature,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTransactionSubmittedEventCount = `-- name: GetTransactionSubmittedEventCount :one
 SELECT event_count FROM transaction_submitted_event_count
 WHERE eon = $1
@@ -106,6 +171,32 @@ func (q *Queries) InitTxPointer(ctx context.Context, arg InitTxPointerParams) er
 	return err
 }
 
+const insertSlotDecryptionSignature = `-- name: InsertSlotDecryptionSignature :exec
+INSERT INTO slot_decryption_signatures (eon, block, keyper_index, tx_pointer, identities_hash, signature)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertSlotDecryptionSignatureParams struct {
+	Eon            int64
+	Block          int64
+	KeyperIndex    int64
+	TxPointer      int64
+	IdentitiesHash []byte
+	Signature      []byte
+}
+
+func (q *Queries) InsertSlotDecryptionSignature(ctx context.Context, arg InsertSlotDecryptionSignatureParams) error {
+	_, err := q.db.Exec(ctx, insertSlotDecryptionSignature,
+		arg.Eon,
+		arg.Block,
+		arg.KeyperIndex,
+		arg.TxPointer,
+		arg.IdentitiesHash,
+		arg.Signature,
+	)
+	return err
+}
+
 const insertTransactionSubmittedEvent = `-- name: InsertTransactionSubmittedEvent :execresult
 INSERT INTO transaction_submitted_event (
     index,
@@ -146,6 +237,30 @@ func (q *Queries) InsertTransactionSubmittedEvent(ctx context.Context, arg Inser
 		arg.Sender,
 		arg.GasLimit,
 	)
+}
+
+const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
+INSERT INTO current_decryption_trigger (eon, block, tx_pointer, identities_hash)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (eon) DO UPDATE
+SET block = $2, tx_pointer = $3, identities_hash = $4
+`
+
+type SetCurrentDecryptionTriggerParams struct {
+	Eon            int64
+	Block          int64
+	TxPointer      int64
+	IdentitiesHash []byte
+}
+
+func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurrentDecryptionTriggerParams) error {
+	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger,
+		arg.Eon,
+		arg.Block,
+		arg.TxPointer,
+		arg.IdentitiesHash,
+	)
+	return err
 }
 
 const setTransactionSubmittedEventCount = `-- name: SetTransactionSubmittedEventCount :exec

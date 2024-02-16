@@ -52,3 +52,23 @@ INSERT INTO tx_pointer (eon, block, value)
 VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
 SET block = $2, value = $3;
+
+-- name: SetCurrentDecryptionTrigger :exec
+INSERT INTO current_decryption_trigger (eon, block, tx_pointer, identities_hash)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (eon) DO UPDATE
+SET block = $2, tx_pointer = $3, identities_hash = $4;
+
+-- name: GetCurrentDecryptionTrigger :one
+SELECT * FROM current_decryption_trigger
+WHERE eon = $1;
+
+-- name: InsertSlotDecryptionSignature :exec
+INSERT INTO slot_decryption_signatures (eon, block, keyper_index, tx_pointer, identities_hash, signature)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: GetSlotDecryptionSignatures :many
+SELECT * FROM slot_decryption_signatures
+WHERE eon = $1 AND block = $2 AND tx_pointer = $3 AND identities_hash = $4
+ORDER BY keyper_index ASC
+LIMIT $5;
