@@ -66,6 +66,14 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 
+	messageSender, err := p2p.New(kpr.config.P2P)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize p2p messaging")
+	}
+	messageSender.AddMessageHandler(&DecryptionKeySharesHandler{kpr.dbpool})
+	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
+	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool)
+
 	kpr.core, err = keyper.New(
 		&kprconfig.Config{
 			InstanceID:        kpr.config.InstanceID,
@@ -81,6 +89,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		keyper.WithDBPool(kpr.dbpool),
 		keyper.NoBroadcastEonPublicKey(),
 		keyper.WithEonPublicKeyHandler(kpr.newEonPublicKey),
+		keyper.WithMessaging(messagingMiddleware),
 	)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
