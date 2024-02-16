@@ -14,6 +14,7 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -21,6 +22,7 @@ import (
 )
 
 type MessagingMiddleware struct {
+	config    *Config
 	messaging p2p.Messaging
 	dbpool    *pgxpool.Pool
 }
@@ -56,8 +58,8 @@ func (h *WrappedMessageHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	return replacedMsgs, nil
 }
 
-func NewMessagingMiddleware(messaging p2p.Messaging, dbpool *pgxpool.Pool) *MessagingMiddleware {
-	return &MessagingMiddleware{messaging: messaging, dbpool: dbpool}
+func NewMessagingMiddleware(messaging p2p.Messaging, dbpool *pgxpool.Pool, config *Config) *MessagingMiddleware {
+	return &MessagingMiddleware{messaging: messaging, dbpool: dbpool, config: config}
 }
 
 func (i *MessagingMiddleware) Start(_ context.Context, runner service.Runner) error {
@@ -133,7 +135,22 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 		return nil, nil
 	}
 
-	signature := []byte("signed")
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+	for _, share := range originalMsg.Shares {
+		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(share.EpochID))
+	}
+	slotDecryptionSignatureData := SlotDecryptionSignatureData{
+		InstanceID:        i.config.InstanceID,
+		Eon:               originalMsg.Eon,
+		Slot:              uint64(currentDecryptionTrigger.Block),
+		TxPointer:         uint64(currentDecryptionTrigger.TxPointer),
+		IdentityPreimages: identityPreimages,
+	}
+	signature, err := ComputeSlotDecryptionSignature(&slotDecryptionSignatureData, i.config.Gnosis.PrivateKey.Key)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to compute slot decryption signature")
+	}
+
 	err = queries.InsertSlotDecryptionSignature(ctx, database.InsertSlotDecryptionSignatureParams{
 		Eon:            currentDecryptionTrigger.Eon,
 		Block:          currentDecryptionTrigger.Block,
@@ -155,7 +172,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 		Gnosis: &p2pmsg.GnosisDecryptionKeySharesExtra{
 			Slot:      uint64(currentDecryptionTrigger.Block),
 			TxPointer: uint64(currentDecryptionTrigger.TxPointer),
-			Signature: []byte("signed"),
+			Signature: signature,
 		},
 	}
 	return msg, nil

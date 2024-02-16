@@ -14,6 +14,7 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -26,7 +27,7 @@ func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShares{}}
 }
 
-func (h *DecryptionKeySharesHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
+func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keyShares := msg.(*p2pmsg.DecryptionKeyShares)
 	extra, ok := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Gnosis)
 	if !ok {
@@ -42,7 +43,54 @@ func (h *DecryptionKeySharesHandler) ValidateMessage(_ context.Context, msg p2pm
 	if extra.Gnosis.TxPointer > math.MaxInt64 {
 		return pubsub.ValidationReject, errors.New("tx pointer too large")
 	}
-	// TODO: check signature
+
+	keyperDB := corekeyperdatabase.New(h.dbpool)
+	eon, err := keyperDB.GetEon(ctx, int64(keyShares.Eon))
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get eon from database for eon %d", keyShares.Eon)
+	}
+	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err,
+			"failed to get keyper set from database for keyper set index %d (eon %d)",
+			eon.KeyperConfigIndex,
+			keyShares.Eon,
+		)
+	}
+	if keyShares.KeyperIndex >= uint64(len(keyperSet.Keypers)) {
+		return pubsub.ValidationReject, errors.Errorf(
+			"keyper index %d out of range for keyper set %d (eon %d)",
+			keyShares.KeyperIndex,
+			eon.KeyperConfigIndex,
+			keyShares.Eon,
+		)
+	}
+	keyperAddressStr := keyperSet.Keypers[keyShares.KeyperIndex]
+	keyperAddress, err := shdb.DecodeAddress(keyperAddressStr)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to decode keyper address from database")
+	}
+
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+	for _, share := range keyShares.Shares {
+		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+	slotDecryptionSignatureData := SlotDecryptionSignatureData{
+		InstanceID:        keyShares.InstanceID,
+		Eon:               keyShares.Eon,
+		Slot:              extra.Gnosis.Slot,
+		TxPointer:         extra.Gnosis.TxPointer,
+		IdentityPreimages: identityPreimages,
+	}
+	signatureValid, err := CheckSlotDecryptionSignature(&slotDecryptionSignatureData, extra.Gnosis.Signature, keyperAddress)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to check slot decryption signature")
+	}
+	if !signatureValid {
+		return pubsub.ValidationReject, errors.New("slot decryption signature invalid")
+	}
 
 	return pubsub.ValidationAccept, nil
 }
@@ -193,7 +241,29 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 		signers = append(signers, signer)
 	}
 
-	// TODO: check signatures
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+	for _, key := range keys.Keys {
+		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+	slotDecryptionSignatureData := SlotDecryptionSignatureData{
+		InstanceID:        keys.InstanceID,
+		Eon:               keys.Eon,
+		Slot:              extra.Gnosis.Slot,
+		TxPointer:         extra.Gnosis.TxPointer,
+		IdentityPreimages: identityPreimages,
+	}
+	for signatureIndex := 0; signatureIndex < len(extra.Gnosis.Signatures); signatureIndex++ {
+		signature := extra.Gnosis.Signatures[signatureIndex]
+		signer := signers[signatureIndex]
+		signatureValid, err := CheckSlotDecryptionSignature(&slotDecryptionSignatureData, signature, signer)
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrap(err, "failed to check slot decryption signature")
+		}
+		if !signatureValid {
+			return pubsub.ValidationReject, errors.New("slot decryption signature invalid")
+		}
+	}
 
 	return pubsub.ValidationAccept, nil
 }
