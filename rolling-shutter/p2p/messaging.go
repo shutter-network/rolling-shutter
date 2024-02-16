@@ -160,7 +160,7 @@ func (m *P2PMessaging) AddHandlerFunc(handlerFunc HandlerFunc, protos ...p2pmsg.
 func (m *P2PMessaging) addValidatorImpl(valFunc ValidatorFunc, messProto p2pmsg.Message) {
 	topic := messProto.Topic()
 	handleError := func(err error) {
-		log.Info().Str("topic", topic).Err(err).Msg("received invalid message)")
+		log.Info().Str("topic", topic).Err(err).Msg("received invalid message")
 	}
 	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		if message.GetTopic() != topic {
