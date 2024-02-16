@@ -405,5 +405,12 @@ func transactionSubmittedEventToIdentityPreimage(event database.TransactionSubmi
 }
 
 func makeBlockIdentityPreimage(ev *syncevent.LatestBlock) identitypreimage.IdentityPreimage {
-	return identitypreimage.IdentityPreimage(ev.Number.Bytes())
+	// 32 bytes of zeros plus the block number as big endian (ie starting with lots of zeros as well)
+	// this ensures the block identity preimage is always alphanumerically before any transaction
+	// identity preimages.
+	var buf bytes.Buffer
+	buf.Write(common.BigToHash(common.Big0).Bytes())
+	buf.Write(common.BigToHash(ev.Number.Int).Bytes())
+
+	return identitypreimage.IdentityPreimage(buf.Bytes())
 }
