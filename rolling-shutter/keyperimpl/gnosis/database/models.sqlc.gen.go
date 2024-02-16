@@ -6,6 +6,22 @@ package database
 
 import ()
 
+type CurrentDecryptionTrigger struct {
+	Eon            int64
+	Block          int64
+	TxPointer      int64
+	IdentitiesHash []byte
+}
+
+type SlotDecryptionSignature struct {
+	Eon            int64
+	Block          int64
+	KeyperIndex    int64
+	TxPointer      int64
+	IdentitiesHash []byte
+	Signature      []byte
+}
+
 type TransactionSubmittedEvent struct {
 	Index          int64
 	BlockNumber    int64

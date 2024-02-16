@@ -30,3 +30,20 @@ CREATE TABLE tx_pointer(
     block bigint NOT NULL DEFAULT 0,
     value bigint NOT NULL DEFAULT 0
 );
+
+CREATE TABLE current_decryption_trigger(
+    eon bigint PRIMARY KEY CHECK (eon >= 0),
+    block bigint NOT NULL CHECK (block >= 0),
+    tx_pointer bigint NOT NULL CHECK (tx_pointer >= 0),
+    identities_hash bytea NOT NULL
+);
+
+CREATE TABLE slot_decryption_signatures(
+    eon bigint NOT NULL CHECK (eon >= 0),
+    block bigint NOT NULL CHECK (block >= 0),
+    keyper_index bigint NOT NULL,
+    tx_pointer bigint NOT NULL CHECK (tx_pointer >= 0),
+    identities_hash bytea NOT NULL,
+    signature bytea NOT NULL,
+    PRIMARY KEY (eon, block, keyper_index)
+);
