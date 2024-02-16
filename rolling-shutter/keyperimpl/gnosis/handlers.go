@@ -2,14 +2,25 @@ package gnosis
 
 import (
 	"context"
+	"math"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
+	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-type DecryptionKeySharesHandler struct{}
+type DecryptionKeySharesHandler struct {
+	dbpool *pgxpool.Pool
+}
 
 func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShares{}}
@@ -17,32 +28,196 @@ func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (h *DecryptionKeySharesHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keyShares := msg.(*p2pmsg.DecryptionKeyShares)
-	_, ok := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Gnosis)
+	extra, ok := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Gnosis)
 	if !ok {
 		return pubsub.ValidationReject, errors.Errorf("unexpected extra type %T, expected Gnosis", keyShares.Extra)
 	}
+	if extra.Gnosis == nil {
+		return pubsub.ValidationReject, errors.New("missing extra Gnosis data")
+	}
+
+	if extra.Gnosis.Slot > math.MaxInt64 {
+		return pubsub.ValidationReject, errors.New("slot number too large")
+	}
+	if extra.Gnosis.TxPointer > math.MaxInt64 {
+		return pubsub.ValidationReject, errors.New("tx pointer too large")
+	}
+	// TODO: check signature
+
 	return pubsub.ValidationAccept, nil
 }
 
-func (h *DecryptionKeySharesHandler) HandleMessage(_ context.Context, _ p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+	keyShares := msg.(*p2pmsg.DecryptionKeyShares)
+	extra := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Gnosis).Gnosis
+
+	gnosisDB := database.New(h.dbpool)
+	keyperCoreDB := corekeyperdatabase.New(h.dbpool)
+	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
+
+	identitiesHash := computeIdentitiesHashFromShares(keyShares.Shares)
+	err := gnosisDB.InsertSlotDecryptionSignature(ctx, database.InsertSlotDecryptionSignatureParams{
+		Eon:            int64(keyShares.Eon),
+		Block:          int64(extra.Slot),
+		KeyperIndex:    int64(keyShares.KeyperIndex),
+		TxPointer:      int64(extra.TxPointer),
+		IdentitiesHash: identitiesHash,
+		Signature:      extra.Signature,
+	})
+	if err != nil {
+		return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert tx pointer vote")
+	}
+
+	eonData, err := keyperCoreDB.GetEon(ctx, int64(keyShares.Eon))
+	if err != nil {
+		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get eon data from database for eon %d", keyShares.Eon)
+	}
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, eonData.KeyperConfigIndex)
+	if err != nil {
+		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keyShares.Eon)
+	}
+
+	signaturesDB, err := gnosisDB.GetSlotDecryptionSignatures(ctx, database.GetSlotDecryptionSignaturesParams{
+		Eon:            int64(keyShares.Eon),
+		Block:          int64(extra.Slot),
+		TxPointer:      int64(extra.TxPointer),
+		IdentitiesHash: identitiesHash,
+		Limit:          keyperSet.Threshold,
+	})
+	if err != nil {
+		return []p2pmsg.Message{}, errors.Wrap(err, "failed to count slot decryption signatures")
+	}
+
+	// send a keys message if we have reached the required number of both the signatures and the key shares
+	if len(signaturesDB) >= int(keyperSet.Threshold) {
+		keys := []*p2pmsg.Key{}
+		for _, share := range keyShares.GetShares() {
+			decryptionKeyDB, err := keyperCoreDB.GetDecryptionKey(ctx, corekeyperdatabase.GetDecryptionKeyParams{
+				Eon:     int64(keyShares.Eon),
+				EpochID: share.EpochID,
+			})
+			if err == pgx.ErrNoRows {
+				return []p2pmsg.Message{}, nil
+			}
+			key := &p2pmsg.Key{
+				Identity: share.EpochID,
+				Key:      decryptionKeyDB.DecryptionKey,
+			}
+			keys = append(keys, key)
+		}
+		signerIndices := []uint64{}
+		signatures := [][]byte{}
+		for _, signature := range signaturesDB {
+			signerIndices = append(signerIndices, uint64(signature.KeyperIndex))
+			signatures = append(signatures, signature.Signature)
+		}
+		decryptionKeysMsg := &p2pmsg.DecryptionKeys{
+			InstanceID: keyShares.InstanceID,
+			Eon:        keyShares.Eon,
+			Keys:       keys,
+			Extra: &p2pmsg.DecryptionKeys_Gnosis{
+				Gnosis: &p2pmsg.GnosisDecryptionKeysExtra{
+					Slot:          extra.Slot,
+					TxPointer:     extra.TxPointer,
+					SignerIndices: signerIndices,
+					Signatures:    signatures,
+				},
+			},
+		}
+		return []p2pmsg.Message{decryptionKeysMsg}, nil
+	}
+
 	return []p2pmsg.Message{}, nil
 }
 
-type DecryptionKeysHandler struct{}
+type DecryptionKeysHandler struct {
+	dbpool *pgxpool.Pool
+}
 
 func (h *DecryptionKeysHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeys{}}
 }
 
-func (h *DecryptionKeysHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
+func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keys := msg.(*p2pmsg.DecryptionKeys)
-	_, ok := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis)
+	extra, ok := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis)
 	if !ok {
 		return pubsub.ValidationReject, errors.Errorf("unexpected extra type %T, expected Gnosis", keys.Extra)
 	}
+	if extra.Gnosis == nil {
+		return pubsub.ValidationReject, errors.New("missing extra Gnosis data")
+	}
+
+	if extra.Gnosis.Slot > math.MaxInt64 {
+		return pubsub.ValidationReject, errors.New("slot number too large")
+	}
+	if extra.Gnosis.TxPointer > math.MaxInt32 { // the pointer will have to be incremented
+		return pubsub.ValidationReject, errors.New("tx pointer too large")
+	}
+	if len(keys.Keys) == 0 {
+		return pubsub.ValidationReject, errors.New("msg does not contain any keys")
+	}
+
+	keyperCoreDB := corekeyperdatabase.New(h.dbpool)
+	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
+	eonData, err := keyperCoreDB.GetEon(ctx, int64(keys.Eon))
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get eon data from database for eon %d", keys.Eon)
+	}
+	keyperSet, err := obsKeyperDB.GetKeyperSet(ctx, eonData.ActivationBlockNumber)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keys.Eon)
+	}
+
+	if int32(len(extra.Gnosis.SignerIndices)) != keyperSet.Threshold {
+		return pubsub.ValidationReject, errors.Errorf("expected %d signers, got %d", keyperSet.Threshold, len(extra.Gnosis.SignerIndices))
+	}
+	signers := []common.Address{}
+	for i, signerIndex := range extra.Gnosis.SignerIndices {
+		if i >= 1 {
+			prevSignerIndex := extra.Gnosis.SignerIndices[i-1]
+			if signerIndex == prevSignerIndex {
+				return pubsub.ValidationReject, errors.New("duplicate signer index found")
+			}
+			if signerIndex < prevSignerIndex {
+				return pubsub.ValidationReject, errors.New("signer indices not ordered")
+			}
+		}
+		if signerIndex >= uint64(len(keyperSet.Keypers)) {
+			return pubsub.ValidationReject, errors.New("signer index out of range")
+		}
+		signer, err := shdb.DecodeAddress(keyperSet.Keypers[signerIndex])
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrap(err, "failed to decode signer address")
+		}
+		signers = append(signers, signer)
+	}
+
+	// TODO: check signatures
+
 	return pubsub.ValidationAccept, nil
 }
 
-func (h *DecryptionKeysHandler) HandleMessage(_ context.Context, _ p2pmsg.Message) ([]p2pmsg.Message, error) {
+func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+	keys := msg.(*p2pmsg.DecryptionKeys)
+	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis).Gnosis
+	gnosisDB := database.New(h.dbpool)
+	// the first key is the block key, only the rest are tx keys, so subtract 1
+	newTxPointer := int64(extra.TxPointer) + int64(len(keys.Keys)) - 1
+	log.Debug().
+		Uint64("eon", keys.Eon).
+		Uint64("block", extra.Slot).
+		Uint64("tx-pointer-msg", extra.TxPointer).
+		Int("num-keys", len(keys.Keys)).
+		Int64("tx-pointer-updated", newTxPointer).
+		Msg("updating tx pointer")
+	err := gnosisDB.SetTxPointer(ctx, database.SetTxPointerParams{
+		Eon:   int64(keys.Eon),
+		Block: int64(extra.Slot),
+		Value: newTxPointer,
+	})
+	if err != nil {
+		return []p2pmsg.Message{}, errors.Wrap(err, "failed to set tx pointer")
+	}
 	return []p2pmsg.Message{}, nil
 }
