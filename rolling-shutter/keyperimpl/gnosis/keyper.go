@@ -72,7 +72,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 	messageSender.AddMessageHandler(&DecryptionKeySharesHandler{kpr.dbpool})
 	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
-	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool)
+	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
 	kpr.core, err = keyper.New(
 		&kprconfig.Config{
