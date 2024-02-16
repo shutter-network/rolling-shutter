@@ -541,6 +541,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
 INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyShareParams struct {
