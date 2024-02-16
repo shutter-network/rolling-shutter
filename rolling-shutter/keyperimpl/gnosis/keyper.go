@@ -3,6 +3,7 @@ package gnosis
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +18,7 @@ import (
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
@@ -27,6 +29,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -208,6 +211,8 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) er
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
 		Uint64("eon", ev.Eon).
+		Int("num-members", len(ev.Members)).
+		Uint64("threshold", ev.Threshold).
 		Bool("is-member", isMember).
 		Msg("new keyper set added")
 
@@ -251,11 +256,23 @@ func (kpr *Keyper) newEonPublicKey(_ context.Context, pubKey keyper.EonPublicKey
 }
 
 func (kpr *Keyper) triggerDecryption(ctx context.Context, ev *syncevent.LatestBlock, keyperSet *obskeyper.KeyperSet) error {
-	queries := database.New(kpr.dbpool)
-	eon := keyperSet.KeyperConfigIndex
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println(ev.Number.Int64())
+	fmt.Println("")
+	fmt.Println("")
+	gnosisKeyperDB := database.New(kpr.dbpool)
+	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+
+	eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, ev.Number.Int64())
+	if err != nil {
+		return errors.Wrapf(err, "failed to query eon for block number %d from db", ev.Number.Int64())
+	}
+	eon := eonStruct.Eon
+
 	var txPointer int64
 	var txPointerAge int64
-	txPointerDB, err := queries.GetTxPointer(ctx, eon)
+	txPointerDB, err := gnosisKeyperDB.GetTxPointer(ctx, eon)
 	if err == pgx.ErrNoRows {
 		txPointer = 0
 		txPointerAge = ev.Number.Int64() - keyperSet.ActivationBlockNumber + 1
@@ -289,7 +306,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context, ev *syncevent.LatestBl
 			Int64("tx-pointer", txPointer).
 			Int64("tx-pointer-age", txPointerAge).
 			Msg("outdated tx pointer")
-		txPointer, err = queries.GetTransactionSubmittedEventCount(ctx, keyperSet.KeyperConfigIndex)
+		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, keyperSet.KeyperConfigIndex)
 		if err == pgx.ErrNoRows {
 			txPointer = 0
 		} else if err != nil {
@@ -301,13 +318,22 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context, ev *syncevent.LatestBl
 	if err != nil {
 		return err
 	}
+	err = gnosisKeyperDB.SetCurrentDecryptionTrigger(ctx, database.SetCurrentDecryptionTriggerParams{
+		Eon:            eon,
+		Block:          ev.Number.Int64(),
+		TxPointer:      txPointer,
+		IdentitiesHash: computeIdentitiesHash(identityPreimages),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to insert published tx pointer into db")
+	}
 	trigger := epochkghandler.DecryptionTrigger{
-		BlockNumber:       uint64(ev.Number.Int64() + 1),
+		BlockNumber:       ev.Number.Uint64(),
 		IdentityPreimages: identityPreimages,
 	}
 	event := broker.NewEvent(&trigger)
 	log.Debug().
-		Int64("block-number", int64(trigger.BlockNumber)).
+		Uint64("block-number", ev.Number.Uint64()).
 		Int("num-identities", len(trigger.IdentityPreimages)).
 		Int64("tx-pointer", txPointer).
 		Int64("tx-pointer-age", txPointerAge).
