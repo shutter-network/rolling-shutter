@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosiskeyperwatcher"
 	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
@@ -28,6 +29,12 @@ Shuttermint node which have to be started separately in advance.`,
 		command.WithDumpConfigSubcommand(),
 	)
 	builder.AddInitDBCommand(initDB)
+	builder.AddFunctionSubcommand(
+		watch,
+		"watch",
+		"Watch the keypers doing their work and log the generated decryption keys.",
+		cobra.NoArgs,
+	)
 	return builder.Command()
 }
 
@@ -36,7 +43,7 @@ func main(config *keyper.Config) error {
 		Str("version", shversion.Version()).
 		Str("address", config.GetAddress().Hex()).
 		Str("shuttermint", config.Shuttermint.ShuttermintURL).
-		Msg("starting gnosiskeyper")
+		Msg("starting gnosis keyper")
 
 	kpr := keyper.New(config)
 	return service.RunWithSighandler(context.Background(), kpr)
@@ -50,4 +57,9 @@ func initDB(cfg *keyper.Config) error {
 	}
 	defer dbpool.Close()
 	return db.InitDB(ctx, dbpool, database.Definition.Name(), database.Definition)
+}
+
+func watch(cfg *keyper.Config) error {
+	log.Info().Msg("starting monitor")
+	return service.RunWithSighandler(context.Background(), gnosiskeyperwatcher.New(cfg))
 }
