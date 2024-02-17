@@ -159,10 +159,8 @@ func Build[T configuration.Config](
 
 type CobraRunE func(cmd *cobra.Command, args []string) error
 
-// AddInitDBCommand attaches an additional subcommand
-// 'initdb' to the command initially built by the Build method.
-// The initDB function argument is structured in the same way than the "main"
-// function passed in to the Build method.
+// AddFunctionSubcommand attaches an additional subcommand to the command initially built by the
+// Build method. The command executes the given function and takes the given arguments.
 func (cb *CommandBuilder[T]) AddFunctionSubcommand(
 	fnc ConfigurableFunc[T],
 	use, short string,
