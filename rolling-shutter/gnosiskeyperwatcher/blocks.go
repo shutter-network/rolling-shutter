@@ -2,6 +2,7 @@ package gnosiskeyperwatcher
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -12,12 +13,19 @@ import (
 )
 
 type BlocksWatcher struct {
-	config *keyper.Config
+	config        *keyper.Config
+	blocksChannel chan *BlockReceivedEvent
 }
 
-func NewBlocksWatcher(config *keyper.Config) *BlocksWatcher {
+type BlockReceivedEvent struct {
+	Header *types.Header
+	Time   time.Time
+}
+
+func NewBlocksWatcher(config *keyper.Config, blocksChannel chan *BlockReceivedEvent) *BlocksWatcher {
 	return &BlocksWatcher{
-		config: config,
+		config:        config,
+		blocksChannel: blocksChannel,
 	}
 }
 
@@ -41,6 +49,11 @@ func (w *BlocksWatcher) Start(ctx context.Context, runner service.Runner) error 
 				return ctx.Err()
 			case head := <-newHeads:
 				w.logNewHead(head)
+				ev := &BlockReceivedEvent{
+					Header: head,
+					Time:   time.Now(),
+				}
+				w.blocksChannel <- ev
 			case err := <-sub.Err():
 				return err
 			}
