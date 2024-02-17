@@ -18,7 +18,8 @@ func New(config *keyper.Config) *Watcher {
 }
 
 func (w *Watcher) Start(_ context.Context, runner service.Runner) error {
-	blocksWatcher := NewBlocksWatcher(w.config)
-	keysWatcher := NewKeysWatcher(w.config)
+	blocksChannel := make(chan *BlockReceivedEvent)
+	blocksWatcher := NewBlocksWatcher(w.config, blocksChannel)
+	keysWatcher := NewKeysWatcher(w.config, blocksChannel)
 	return runner.StartService(blocksWatcher, keysWatcher)
 }
