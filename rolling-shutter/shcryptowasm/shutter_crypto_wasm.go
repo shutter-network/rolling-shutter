@@ -147,9 +147,6 @@ func decodeEpochIDArgBytes(arg js.Value) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(b) != 32 {
-		return nil, fmt.Errorf("sigma must be 32 bytes, got %d", len(b))
-	}
 	return b, nil
 }
 
