@@ -1,6 +1,6 @@
 {
   "name": "@shutter-network/shutter-crypto",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Core crypto primitives to interact with Shutter Network",
   "author": "Shutter Network <contact@shutter.network>",
   "license": "MIT",
