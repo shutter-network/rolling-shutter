@@ -1,6 +1,8 @@
 version: 2.1
 
 commands:
+  install-rsync:
+    - run: sudo apt update && sudo apt install rsync
   install-asdf:
     steps:
       - run:

@@ -4,9 +4,13 @@ NPM       ?= npm
 NPX       ?= npx
 TINYGO    ?= tinygo
 
-build: derive
+clean:
+	rm -r dist
+	mkdir -p dist
+
+build: clean derive
 	${NPX} webpack build
-	cp -L derived/shutter-crypto.wasm dist/
+	rsync derived/shutter-crypto.wasm dist/shutter-crypto.wasm
 
 publish: build
 	${NPM} publish --access=public
@@ -22,5 +26,7 @@ derived/wasm_exec.js:
 	cp $(shell ${TINYGO} env TINYGOROOT)/targets/wasm_exec.js derived/
 	patch --quiet --directory derived --strip 1 --input ../patches/wasm_exec.patch
 
+test:
+	${NPM} test
 
-.PHONY: build derive publish
+.PHONY: build derive publish test
