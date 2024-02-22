@@ -1,7 +1,4 @@
-import { dirname, path } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const path = require("path");
 
 module.exports = {
   mode: "production",
