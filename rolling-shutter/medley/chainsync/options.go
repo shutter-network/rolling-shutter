@@ -28,6 +28,7 @@ type options struct {
 	logger                      log.Logger
 	runner                      service.Runner
 	syncStart                   *number.BlockNumber
+	fetchActivesAtSyncStart     bool
 	privKey                     *ecdsa.PrivateKey
 
 	handlerShutterState event.ShutterStateHandler
@@ -91,12 +92,13 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		return err
 	}
 	c.kssync = &syncer.KeyperSetSyncer{
-		Client:              client,
-		Contract:            c.KeyperSetManager,
-		Log:                 c.log,
-		StartBlock:          o.syncStart,
-		Handler:             o.handlerKeyperSet,
-		DisableEventWatcher: true,
+		Client:                  client,
+		Contract:                c.KeyperSetManager,
+		Log:                     c.log,
+		StartBlock:              o.syncStart,
+		Handler:                 o.handlerKeyperSet,
+		FetchActiveAtStartBlock: o.fetchActivesAtSyncStart,
+		DisableEventWatcher:     true,
 	}
 	if o.handlerKeyperSet != nil {
 		c.services = append(c.services, c.kssync)
@@ -108,13 +110,14 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		return err
 	}
 	c.epksync = &syncer.EonPubKeySyncer{
-		Client:              client,
-		Log:                 c.log,
-		KeyBroadcast:        c.KeyBroadcast,
-		KeyperSetManager:    c.KeyperSetManager,
-		Handler:             o.handlerEonPublicKey,
-		StartBlock:          o.syncStart,
-		DisableEventWatcher: true,
+		Client:                  client,
+		Log:                     c.log,
+		KeyBroadcast:            c.KeyBroadcast,
+		KeyperSetManager:        c.KeyperSetManager,
+		Handler:                 o.handlerEonPublicKey,
+		StartBlock:              o.syncStart,
+		FetchActiveAtStartBlock: o.fetchActivesAtSyncStart,
+		DisableEventWatcher:     true,
 	}
 	if o.handlerEonPublicKey != nil {
 		c.services = append(c.services, c.epksync)
@@ -122,12 +125,13 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	}
 
 	c.sssync = &syncer.ShutterStateSyncer{
-		Client:              client,
-		Contract:            c.KeyperSetManager,
-		Log:                 c.log,
-		Handler:             o.handlerShutterState,
-		StartBlock:          o.syncStart,
-		DisableEventWatcher: true,
+		Client:                  client,
+		Contract:                c.KeyperSetManager,
+		Log:                     c.log,
+		Handler:                 o.handlerShutterState,
+		StartBlock:              o.syncStart,
+		FetchActiveAtStartBlock: o.fetchActivesAtSyncStart,
+		DisableEventWatcher:     true,
 	}
 	if o.handlerShutterState != nil {
 		c.services = append(c.services, c.sssync)
@@ -169,11 +173,21 @@ func defaultOptions() *options {
 		ethClient:                   nil,
 		logger:                      noopLogger,
 		runner:                      nil,
+		fetchActivesAtSyncStart:     true,
 		syncStart:                   number.NewBlockNumber(nil),
 	}
 }
 
-func WithSyncStartBlock(blockNumber *number.BlockNumber) Option {
+func WithNoFetchActivesBeforeStart() Option {
+	return func(o *options) error {
+		o.fetchActivesAtSyncStart = false
+		return nil
+	}
+}
+
+func WithSyncStartBlock(
+	blockNumber *number.BlockNumber,
+) Option {
 	if blockNumber == nil {
 		blockNumber = number.NewBlockNumber(nil)
 	}

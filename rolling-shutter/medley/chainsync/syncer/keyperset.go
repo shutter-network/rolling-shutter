@@ -30,7 +30,8 @@ type KeyperSetSyncer struct {
 	StartBlock *number.BlockNumber
 	Handler    event.KeyperSetHandler
 	// disable this when the QueryAndHandle manual polling should be used:
-	DisableEventWatcher bool
+	FetchActiveAtStartBlock bool
+	DisableEventWatcher     bool
 
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 }
@@ -87,18 +88,21 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		Start:   s.StartBlock.ToUInt64Ptr(),
 		Context: ctx,
 	}
-	initial, err := s.getInitialKeyperSets(ctx)
-	if err != nil {
-		return err
-	}
-	for _, ks := range initial {
-		err = s.Handler(ctx, ks)
+
+	if s.FetchActiveAtStartBlock {
+		initial, err := s.getInitialKeyperSets(ctx)
 		if err != nil {
-			s.Log.Error(
-				"handler for `NewKeyperSet` errored for initial sync",
-				"error",
-				err.Error(),
-			)
+			return err
+		}
+		for _, ks := range initial {
+			err = s.Handler(ctx, ks)
+			if err != nil {
+				s.Log.Error(
+					"handler for `NewKeyperSet` errored for initial sync",
+					"error",
+					err.Error(),
+				)
+			}
 		}
 	}
 	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
