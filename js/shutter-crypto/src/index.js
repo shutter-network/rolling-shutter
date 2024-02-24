@@ -58,7 +58,7 @@ function _checkInitialized() {
 }
 
 function _throwOnError(result) {
-  if (result.startsWith("Error:")) {
+  if (typeof result === "string" && result.startsWith("Error:")) {
     throw result;
   }
 }
