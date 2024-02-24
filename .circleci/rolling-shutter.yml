@@ -60,6 +60,7 @@ jobs:
       - restore_cache:
           keys:
             - rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - install-rsync
       - install-asdf
       - run:
           name: "Install asdf plugins"
