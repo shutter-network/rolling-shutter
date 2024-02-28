@@ -11,7 +11,7 @@ type (
 		ActivationBlock uint64
 		Members         []common.Address
 		Threshold       uint64
-		Eon             uint64
+		Index           uint64
 
 		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}

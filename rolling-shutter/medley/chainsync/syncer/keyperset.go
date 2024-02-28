@@ -151,7 +151,7 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 		return nil, err
 	}
 
-	for i := ks.Eon + 1; i < numKS; i++ {
+	for i := ks.Index + 1; i < numKS; i++ {
 		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
 		if err != nil {
 			return nil, err
@@ -237,7 +237,7 @@ func (s *KeyperSetSyncer) newEvent(
 	if err != nil {
 		return nil, makeCallError("Threshold", err)
 	}
-	eon, err := s.Contract.GetKeyperSetIndexByBlock(opts, activationBlock)
+	keyperSetIndex, err := s.Contract.GetKeyperSetIndexByBlock(opts, activationBlock)
 	if err != nil {
 		return nil, makeCallError("KeyperSetIndexByBlock", err)
 	}
@@ -245,8 +245,9 @@ func (s *KeyperSetSyncer) newEvent(
 		ActivationBlock: activationBlock,
 		Members:         members,
 		Threshold:       threshold,
-		Eon:             eon,
-		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
+		Index:           keyperSetIndex,
+
+		AtBlockNumber: number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
 }
 
