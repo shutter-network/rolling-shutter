@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kproapi"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -33,16 +34,18 @@ type Config interface {
 }
 
 type server struct {
-	dbpool *pgxpool.Pool
-	config Config
-	p2p    P2PMessageSender
+	dbpool      *pgxpool.Pool
+	config      Config
+	p2p         P2PMessageSender
+	shutdownSig chan struct{}
 }
 
 func NewHTTPService(dbpool *pgxpool.Pool, config Config, p2p P2PMessageSender) service.Service {
 	return &server{
-		dbpool: dbpool,
-		config: config,
-		p2p:    p2p,
+		dbpool:      dbpool,
+		config:      config,
+		p2p:         p2p,
+		shutdownSig: make(chan struct{}),
 	}
 }
 
@@ -90,7 +93,12 @@ func (srv *server) Start(ctx context.Context, runner service.Runner) error {
 		Handler:           srv.setupRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	runner.Defer(func() { close(srv.shutdownSig) })
+
 	runner.Go(httpServer.ListenAndServe)
+	runner.Go(func() error {
+		return srv.waitShutdown(ctx)
+	})
 	runner.Go(func() error {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -98,6 +106,24 @@ func (srv *server) Start(ctx context.Context, runner service.Runner) error {
 		return httpServer.Shutdown(shutdownCtx)
 	})
 	return nil
+}
+
+func (srv *server) waitShutdown(ctx context.Context) error {
+	for {
+		select {
+		case _, ok := <-srv.shutdownSig:
+			if !ok {
+				// channel close without a send
+				// means we want to stop the shutdown waiter
+				// but not stop execution
+				return nil
+			}
+			return medley.ErrShutdownRequested
+		case <-ctx.Done():
+			// we canceled somewhere else
+			return nil
+		}
+	}
 }
 
 func (srv *server) setupAPIRouter(swagger *openapi3.T) http.Handler {

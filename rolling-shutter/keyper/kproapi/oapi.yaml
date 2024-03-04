@@ -16,6 +16,13 @@ paths:
       operationId: ping
       parameters:
 
+  /shutdown:
+    post:
+      description: |
+        Shut down the server
+      operationId: shutdown
+      parameters:
+
   /eons:
     get:
       description: |

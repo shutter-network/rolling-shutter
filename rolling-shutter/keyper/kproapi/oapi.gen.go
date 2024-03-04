@@ -68,6 +68,9 @@ type ServerInterface interface {
 
 	// (GET /ping)
 	Ping(w http.ResponseWriter, r *http.Request)
+
+	// (POST /shutdown)
+	Shutdown(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -150,6 +153,21 @@ func (siw *ServerInterfaceWrapper) Ping(w http.ResponseWriter, r *http.Request) 
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Ping(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// Shutdown operation middleware
+func (siw *ServerInterfaceWrapper) Shutdown(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Shutdown(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -284,6 +302,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ping", wrapper.Ping)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/shutdown", wrapper.Shutdown)
+	})
 
 	return r
 }
@@ -291,20 +312,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"y/GjCwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
