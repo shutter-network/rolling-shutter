@@ -830,8 +830,6 @@ github.com/shurcooL/users v0.0.0-20180125191416-49c67e49c537/go.mod h1:QJTqeLYED
 github.com/shurcooL/webdavfs v0.0.0-20170829043945-18c3829fa133/go.mod h1:hKmq5kWdCj2z2KEozexVbfEZIWiTjhE0+UjmZgPqehw=
 github.com/shutter-network/shop-contracts v0.0.0-20231220085304-80b8977d0bca h1:05Ghqw3FqH/UFuYIzc7z6GJyHk3HxAqY3iuY4L3x4Ow=
 github.com/shutter-network/shop-contracts v0.0.0-20231220085304-80b8977d0bca/go.mod h1:LEWXLRruvxq9fe2oKtJI3xfzbauhfWTjOczHN61RU+4=
-github.com/shutter-network/shutter/shlib v0.1.13 h1:9YloDJBdhFAKm2GMg4gBNeaJ+Mw9Qzeh5Kz9A2ayp1E=
-github.com/shutter-network/shutter/shlib v0.1.13/go.mod h1:RlYNZjx+pfKAi0arH+jfdlxG4kQ75UFzDfVjgCVYaUw=
 github.com/shutter-network/shutter/shlib v0.1.15 h1:HsAL3h5govZjFcHaox2Nf1DxawCjTcR0qNb+08YaM5c=
 github.com/shutter-network/shutter/shlib v0.1.15/go.mod h1:RlYNZjx+pfKAi0arH+jfdlxG4kQ75UFzDfVjgCVYaUw=
 github.com/shutter-network/txtypes v0.1.0 h1:QqdiiiB9AiBCSJ/ke6z1ZoDGfu2+1Lgpz5vHzVN4FKc=
