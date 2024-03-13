@@ -12,22 +12,16 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 var _ ManualFilterHandler = &EonPubKeySyncer{}
 
 type EonPubKeySyncer struct {
-	Client                  client.EthereumClient
-	Log                     log.Logger
-	KeyBroadcast            *bindings.KeyBroadcastContract
-	KeyperSetManager        *bindings.KeyperSetManager
-	StartBlock              *number.BlockNumber
-	Handler                 event.EonPublicKeyHandler
-	FetchActiveAtStartBlock bool
-	DisableEventWatcher     bool
-
-	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
+	Client           client.EthereumClient
+	Log              log.Logger
+	KeyBroadcast     *bindings.KeyBroadcastContract
+	KeyperSetManager *bindings.KeyperSetManager
+	Handler          event.EonPublicKeyHandler
 }
 
 func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) error {
@@ -48,10 +42,13 @@ func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) erro
 	defer iter.Close()
 
 	for iter.Next() {
-		select {
-		case s.keyBroadcastCh <- iter.Event:
-		case <-ctx.Done():
-			return ctx.Err()
+		err := s.handle(ctx, iter.Event)
+		if err != nil {
+			s.Log.Error(
+				"handler for `NewKeyperSet` errored",
+				"error",
+				err.Error(),
+			)
 		}
 	}
 	if err := iter.Error(); err != nil {
@@ -60,65 +57,41 @@ func (s *EonPubKeySyncer) QueryAndHandle(ctx context.Context, block uint64) erro
 	return nil
 }
 
-func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
-	s.Log.Info(
-		"pubsyncer loop started",
-	)
-	if s.Handler == nil {
-		return errors.New("no handler registered")
+func (s *EonPubKeySyncer) handle(ctx context.Context, newEonKey *bindings.KeyBroadcastContractEonKeyBroadcast) error {
+	pubk := newEonKey.Key
+	bn := newEonKey.Raw.BlockNumber
+	ev := &event.EonPublicKey{
+		Eon:           newEonKey.Eon,
+		Key:           pubk,
+		AtBlockNumber: number.NewBlockNumber(&bn),
 	}
-	// the latest block still has to be fixed.
-	// otherwise we could skip some block events
-	// between the initial poll and the subscription.
-	if s.StartBlock.IsLatest() {
-		latest, err := s.Client.BlockNumber(ctx)
-		if err != nil {
-			return err
-		}
-		s.StartBlock.SetUint64(latest)
+	err := s.Handler(ctx, ev)
+	if err != nil {
+		return err
 	}
-
-	if s.FetchActiveAtStartBlock {
-		pubKs, err := s.getInitialPubKeys(ctx)
-		if err != nil {
-			return err
-		}
-		for _, k := range pubKs {
-			err := s.Handler(ctx, k)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock.ToUInt64Ptr(),
-		Context: ctx,
-	}
-	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, channelSize)
-	runner.Defer(func() {
-		close(s.keyBroadcastCh)
-	})
-	if !s.DisableEventWatcher {
-		subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
-		// FIXME: what to do on subs.Error()
-		if err != nil {
-			return err
-		}
-		runner.Defer(subs.Unsubscribe)
-	}
-	runner.Go(func() error {
-		return s.watchNewEonPubkey(ctx)
-	})
 	return nil
 }
 
-func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPublicKey, error) {
+func (s *EonPubKeySyncer) HandleVirtualEvent(ctx context.Context, block *number.BlockNumber) error {
+	pubKs, err := s.getInitialPubKeys(ctx, block)
+	if err != nil {
+		return err
+	}
+	for _, k := range pubKs {
+		err := s.Handler(ctx, k)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context, block *number.BlockNumber) ([]*event.EonPublicKey, error) {
 	// This blocknumber specifies AT what state
 	// the contract is called
 	opts := &bind.CallOpts{
 		Context:     ctx,
-		BlockNumber: s.StartBlock.Int,
+		BlockNumber: block.Int,
 	}
 	numKS, err := s.KeyperSetManager.GetNumKeyperSets(opts)
 	if err != nil {
@@ -126,7 +99,7 @@ func (s *EonPubKeySyncer) getInitialPubKeys(ctx context.Context) ([]*event.EonPu
 	}
 	// this blocknumber specifies the argument to the contract
 	// getter
-	activeEon, err := s.KeyperSetManager.GetKeyperSetIndexByBlock(opts, s.StartBlock.Uint64())
+	activeEon, err := s.KeyperSetManager.GetKeyperSetIndexByBlock(opts, block.Uint64())
 	if err != nil {
 		return nil, err
 	}
@@ -179,32 +152,4 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 		Key:           key,
 		AtBlockNumber: number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
-}
-
-func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
-	for {
-		select {
-		case newEonKey, ok := <-s.keyBroadcastCh:
-			if !ok {
-				return nil
-			}
-			pubk := newEonKey.Key
-			bn := newEonKey.Raw.BlockNumber
-			ev := &event.EonPublicKey{
-				Eon:           newEonKey.Eon,
-				Key:           pubk,
-				AtBlockNumber: number.NewBlockNumber(&bn),
-			}
-			err := s.Handler(ctx, ev)
-			if err != nil {
-				s.Log.Error(
-					"handler for `NewKeyperSet` errored",
-					"error",
-					err.Error(),
-				)
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
 }
