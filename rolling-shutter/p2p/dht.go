@@ -1,9 +1,17 @@
 package p2p
 
 import (
+	"context"
+	"time"
+
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/discovery/util"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 )
@@ -15,18 +23,24 @@ const (
 	dhtProtocolPrefix           protocol.ID = "/shutter"
 	dhtProtocolExtensionStaging protocol.ID = "/staging"
 	dhtProtocolExtensionLocal   protocol.ID = "/local"
+
+	findPeerInterval = 10 * time.Second
 )
 
-func dhtRoutingOptions(
-	environment env.Environment,
-	bootstrapPeers ...peer.AddrInfo,
-) []dht.Option {
+var (
+	peerLow    = pubsub.GossipSubDlo * 2
+	peerTarget = pubsub.GossipSubDhi * 3
+	peerHigh   = pubsub.GossipSubDhi * 6
+)
+
+func dhtRoutingOptions(config *p2pNodeConfig) []dht.Option {
 	// options with higher index in the array will overwrite existing ones
 	opts := []dht.Option{
 		dht.ProtocolPrefix(dhtProtocolPrefix),
+		dht.BootstrapPeers(config.BootstrapPeers...),
 	}
 
-	switch environment { //nolint: exhaustive
+	switch config.Environment { //nolint: exhaustive
 	case env.EnvironmentStaging:
 		opts = append(opts,
 			dht.ProtocolExtension(dhtProtocolExtensionStaging),
@@ -42,10 +56,56 @@ func dhtRoutingOptions(
 	default:
 	}
 
-	if len(bootstrapPeers) > 0 {
-		// this overwrites the option set before
-		opts = append(opts, dht.BootstrapPeers(bootstrapPeers...))
+	if config.IsBootstrapNode {
+		opts = append(opts, dht.Mode(dht.ModeServer))
 	}
 
 	return opts
+}
+
+func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns string) error {
+	log.Info().Str("namespace", ns).Msg("starting peer discovery")
+
+	ticker := time.NewTicker(findPeerInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			peersBefore := len(h.Network().Peers())
+			if peersBefore >= peerTarget {
+				continue
+			}
+
+			peers, err := util.FindPeers(ctx, d, ns)
+			if err != nil {
+				log.Error().Err(err).Msg("error finding peers")
+			}
+
+			newConnections := 0
+			failedDials := 0
+			for _, p := range peers {
+				if p.ID == h.ID() {
+					continue
+				}
+				if h.Network().Connectedness(p.ID) != network.Connected {
+					_, err = h.Network().DialPeer(ctx, p.ID)
+					if err != nil {
+						log.Error().Err(err).Str("peer", p.ID.String()).Msg("error dialing peer")
+						failedDials++
+					}
+					newConnections++
+				}
+			}
+
+			log.Debug().
+				Int("peers-before", peersBefore).
+				Int("peer-target", peerTarget).
+				Int("new-connections", newConnections).
+				Int("failed-dials", failedDials).
+				Msg("looking for peers")
+		}
+	}
 }

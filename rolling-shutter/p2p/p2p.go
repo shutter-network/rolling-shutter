@@ -11,7 +11,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -52,6 +54,7 @@ type P2PNode struct {
 	mux         sync.Mutex
 	host        host.Host
 	dht         *dht.IpfsDHT
+	discovery   *routing.RoutingDiscovery
 	pubSub      *pubsub.PubSub
 	gossipRooms map[string]*gossipRoom
 
@@ -59,13 +62,12 @@ type P2PNode struct {
 }
 
 type p2pNodeConfig struct {
-	ListenAddrs       []multiaddr.Multiaddr
-	BootstrapPeers    []peer.AddrInfo
-	PrivKey           keys.Libp2pPrivate
-	Environment       env.Environment
-	IsBootstrapNode   bool
-	DisableTopicDHT   bool
-	DisableRoutingDHT bool
+	ListenAddrs        []multiaddr.Multiaddr
+	BootstrapPeers     []peer.AddrInfo
+	PrivKey            keys.Libp2pPrivate
+	Environment        env.Environment
+	IsBootstrapNode    bool
+	DiscoveryNamespace string
 }
 
 func NewP2PNode(config p2pNodeConfig) *P2PNode {
@@ -118,6 +120,15 @@ func (p *P2PNode) Run(
 			return room.readLoop(ctx, p.GossipMessages)
 		})
 	}
+	runner.Go(func() error {
+		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")
+		util.Advertise(ctx, p.discovery, p.config.DiscoveryNamespace)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	runner.Go(func() error {
+		return findPeers(ctx, p.host, p.discovery, p.config.DiscoveryNamespace)
+	})
 	return nil
 }
 
@@ -141,16 +152,29 @@ func (p *P2PNode) init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p2pPubSub, err := createPubSub(ctx, p2pHost, p.config, hashTable)
+	discovery := routing.NewRoutingDiscovery(hashTable)
+	p2pPubSub, err := createPubSub(ctx, p2pHost, p.config, discovery)
 	if err != nil {
 		return err
 	}
 
 	p.host = p2pHost
 	p.dht = hashTable
+	p.discovery = discovery
 	p.pubSub = p2pPubSub
 	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
 	return nil
+}
+
+func createConnectionManager() (*connmgr.BasicConnMgr, error) {
+	// TODO: This starts a background goroutine. It works, but it's better to do that later in
+	// P2PNode.Run() when we have a proper context.
+	m, err := connmgr.NewConnManager(peerLow, peerHigh)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create connection manager")
+	}
+
+	return m, nil
 }
 
 func createHost(
@@ -166,12 +190,15 @@ func createHost(
 	// This was a bug in the check function, reading the wrong config value to check against:
 	// https://github.com/libp2p/go-libp2p/issues/2628
 
+	connectionManager, err := createConnectionManager()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	options := []libp2p.Option{
 		libp2p.Identity(&config.PrivKey.Key),
 		libp2p.ListenAddrs(config.ListenAddrs...),
-		// libp2p.DefaultTransports,
-		// libp2p.DefaultSecurity,
-		// libp2p.ConnectionManager(connectionManager),
+		libp2p.ConnectionManager(connectionManager),
 		libp2p.ProtocolVersion(protocolVersion),
 	}
 
@@ -192,11 +219,7 @@ func createHost(
 		return nil, nil, err
 	}
 
-	if config.DisableRoutingDHT {
-		return p2pHost, nil, err
-	}
-
-	opts := dhtRoutingOptions(config.Environment, config.BootstrapPeers...)
+	opts := dhtRoutingOptions(&config)
 	idht, err := dht.New(ctx, p2pHost, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -212,7 +235,7 @@ func createPubSub(
 	ctx context.Context,
 	p2pHost host.Host,
 	config p2pNodeConfig,
-	hashTable *dht.IpfsDHT,
+	discovery *routing.RoutingDiscovery,
 ) (*pubsub.PubSub, error) {
 	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
 		isBootstrapNode: config.IsBootstrapNode,
@@ -222,14 +245,9 @@ func createPubSub(
 	pubsubOptions := []pubsub.Option{
 		pubsub.WithGossipSubParams(*gossipSubParams),
 		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
+		pubsub.WithDiscovery(discovery),
 	}
 
-	if !config.DisableTopicDHT {
-		pubsubOptions = append(
-			pubsubOptions,
-			pubsub.WithDiscovery(routing.NewRoutingDiscovery(hashTable)),
-		)
-	}
 	if config.IsBootstrapNode {
 		// enables the pubsub v1.1 feature to handle discovery and
 		// connection management over the PubSub protocol
