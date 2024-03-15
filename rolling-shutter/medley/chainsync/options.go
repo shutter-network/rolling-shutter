@@ -24,7 +24,7 @@ type options struct {
 	keyperSetManagerAddress     *common.Address
 	keyBroadcastContractAddress *common.Address
 	clientURL                   string
-	ethClient                   syncclient.EthereumClient
+	ethClient                   syncclient.FullEthereumClient
 	logger                      log.Logger
 	runner                      service.Runner
 	syncStart                   *number.BlockNumber
@@ -122,7 +122,7 @@ func (o *options) applyHandler(c *Client) error {
 // of shutter clients background workers.
 func (o *options) apply(ctx context.Context, c *Client) error {
 	var (
-		client syncclient.EthereumClient
+		client syncclient.SyncEthereumClient
 		err    error
 	)
 	if o.clientURL != "" {
@@ -132,12 +132,12 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		}
 	}
 	client = o.ethClient
-	c.EthereumClient = client
+	c.SyncEthereumClient = client
 
 	// the nil passthrough will use "latest" for each call,
 	// but we want to harmonize and fix the sync start to a specific block.
 	if o.syncStart.IsLatest() {
-		latestBlock, err := c.EthereumClient.BlockNumber(ctx)
+		latestBlock, err := c.SyncEthereumClient.BlockNumber(ctx)
 		if err != nil {
 			return errors.Wrap(err, "polling latest block")
 		}
@@ -219,7 +219,7 @@ func WithLogger(l log.Logger) Option {
 	}
 }
 
-func WithClient(client syncclient.EthereumClient) Option {
+func WithClient(client syncclient.FullEthereumClient) Option {
 	return func(o *options) error {
 		o.ethClient = client
 		return nil

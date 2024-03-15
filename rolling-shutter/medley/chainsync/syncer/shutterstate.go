@@ -16,7 +16,7 @@ import (
 var _ ManualFilterHandler = &ShutterStateSyncer{}
 
 type ShutterStateSyncer struct {
-	Client   client.EthereumClient
+	Client   client.SyncEthereumClient
 	Contract *bindings.KeyperSetManager
 	Log      log.Logger
 	Handler  event.ShutterStateHandler

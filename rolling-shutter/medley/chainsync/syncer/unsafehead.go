@@ -17,7 +17,7 @@ import (
 )
 
 type UnsafeHeadSyncer struct {
-	Client  client.EthereumClient
+	Client  client.SyncEthereumClient
 	Log     log.Logger
 	Handler event.BlockHandler
 	// Handler to be manually triggered
