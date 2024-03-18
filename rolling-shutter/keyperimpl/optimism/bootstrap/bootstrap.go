@@ -38,7 +38,7 @@ func BootstrapValidators(config *Config) error {
 		ks.ActivationBlock,
 		ks.Members,
 		ks.Threshold,
-		ks.Eon,
+		ks.Index,
 	)
 
 	err = ms.SendMessage(ctx, batchConfigMsg)

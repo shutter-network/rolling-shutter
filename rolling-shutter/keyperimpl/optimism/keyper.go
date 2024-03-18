@@ -114,12 +114,12 @@ func (kpr *Keyper) newBlock(_ context.Context, ev *syncevent.LatestBlock) error 
 func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) error {
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
-		Uint64("eon", ev.Eon).
+		Uint64("index", ev.Index).
 		Msg("new keyper set added")
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
 
-		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
+		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Index)
 		if err != nil {
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
 		}
