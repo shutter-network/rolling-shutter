@@ -82,13 +82,10 @@ func New(config *Config) (*P2PMessaging, error) {
 		listenAddresses = append(listenAddresses, addr.Multiaddr)
 	}
 	cfg := &p2pNodeConfig{
-		ListenAddrs: listenAddresses,
-		PrivKey:     *config.P2PKey,
-		Environment: config.Environment,
-		// for now, disable those features, since
-		// they are not stable from our side
-		DisableTopicDHT:   true,
-		DisableRoutingDHT: true,
+		ListenAddrs:        listenAddresses,
+		PrivKey:            *config.P2PKey,
+		Environment:        config.Environment,
+		DiscoveryNamespace: config.DiscoveryNamespace,
 	}
 
 	bootstrapAddresses := config.CustomBootstrapAddresses
