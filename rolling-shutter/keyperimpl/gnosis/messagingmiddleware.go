@@ -142,7 +142,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 	slotDecryptionSignatureData := SlotDecryptionSignatureData{
 		InstanceID:        i.config.InstanceID,
 		Eon:               originalMsg.Eon,
-		Slot:              uint64(currentDecryptionTrigger.Block),
+		Slot:              uint64(currentDecryptionTrigger.Slot),
 		TxPointer:         uint64(currentDecryptionTrigger.TxPointer),
 		IdentityPreimages: identityPreimages,
 	}
@@ -153,7 +153,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 
 	err = queries.InsertSlotDecryptionSignature(ctx, database.InsertSlotDecryptionSignatureParams{
 		Eon:            currentDecryptionTrigger.Eon,
-		Block:          currentDecryptionTrigger.Block,
+		Slot:           currentDecryptionTrigger.Slot,
 		KeyperIndex:    int64(originalMsg.KeyperIndex),
 		TxPointer:      currentDecryptionTrigger.TxPointer,
 		IdentitiesHash: identitiesHash,
@@ -161,16 +161,16 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err,
-			"failed to insert slot decryption signature for eon %d and block %d",
+			"failed to insert slot decryption signature for eon %d and slot %d",
 			originalMsg.Eon,
-			currentDecryptionTrigger.Block,
+			currentDecryptionTrigger.Slot,
 		)
 	}
 
 	msg := proto.Clone(originalMsg).(*p2pmsg.DecryptionKeyShares)
 	msg.Extra = &p2pmsg.DecryptionKeyShares_Gnosis{
 		Gnosis: &p2pmsg.GnosisDecryptionKeySharesExtra{
-			Slot:      uint64(currentDecryptionTrigger.Block),
+			Slot:      uint64(currentDecryptionTrigger.Slot),
 			TxPointer: uint64(currentDecryptionTrigger.TxPointer),
 			Signature: signature,
 		},
@@ -216,18 +216,18 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 
 	signaturesDB, err := gnosisDB.GetSlotDecryptionSignatures(ctx, database.GetSlotDecryptionSignaturesParams{
 		Eon:            int64(originalMsg.Eon),
-		Block:          trigger.Block,
+		Slot:           trigger.Slot,
 		TxPointer:      trigger.TxPointer,
 		IdentitiesHash: trigger.IdentitiesHash,
 		Limit:          keyperSet.Threshold,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to count slot decryption signatures for eon %d and block %d", originalMsg.Eon, trigger.Block)
+		return nil, errors.Wrapf(err, "failed to count slot decryption signatures for eon %d and slot %d", originalMsg.Eon, trigger.Slot)
 	}
 	if len(signaturesDB) < int(keyperSet.Threshold) {
 		log.Debug().
 			Uint64("eon", originalMsg.Eon).
-			Int64("block", trigger.Block).
+			Int64("slot", trigger.Slot).
 			Int64("tx-pointer", trigger.TxPointer).
 			Hex("identities-hash", trigger.IdentitiesHash).
 			Int32("threshold", keyperSet.Threshold).
@@ -244,7 +244,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	}
 	msg := proto.Clone(originalMsg).(*p2pmsg.DecryptionKeys)
 	extra := &p2pmsg.GnosisDecryptionKeysExtra{
-		Slot:          uint64(trigger.Block),
+		Slot:          uint64(trigger.Slot),
 		TxPointer:     uint64(trigger.TxPointer),
 		SignerIndices: signerIndices,
 		Signatures:    signatures,

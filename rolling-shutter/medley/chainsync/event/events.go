@@ -2,6 +2,7 @@ package event
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 )
@@ -29,5 +30,6 @@ type (
 	LatestBlock struct {
 		Number    *number.BlockNumber
 		BlockHash common.Hash
+		Header    *types.Header
 	}
 )

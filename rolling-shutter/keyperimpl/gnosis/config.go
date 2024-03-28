@@ -2,13 +2,20 @@ package gnosis
 
 import (
 	"io"
+	"math"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+)
+
+const (
+	maxSecondsPerSlot = 60 * 60
+	maxChainAge       = 100 * 365 * 24 * 60 * 60
 )
 
 var _ configuration.Config = &Config{}
@@ -38,9 +45,12 @@ type Config struct {
 	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
 
+	// TODO: put these in a child config
 	GnosisContracts      *GnosisContracts `shconfig:",required"`
 	EncryptedGasLimit    uint64           `shconfig:",required"`
 	MinGasPerTransaction uint64           `shconfig:",required"`
+	SecondsPerSlot       uint64           `shconfig:",required"`
+	GenesisSlotTimestamp uint64           `shconfig:",required"`
 }
 
 type GnosisContracts struct {
@@ -50,6 +60,13 @@ type GnosisContracts struct {
 }
 
 func (c *Config) Validate() error {
+	if c.SecondsPerSlot > maxSecondsPerSlot {
+		return errors.Errorf("seconds per slot is too big (%d > %d)", c.SecondsPerSlot, maxSecondsPerSlot)
+	}
+	maxGenesisSlotTime := uint64(math.MaxInt64 - maxChainAge)
+	if c.GenesisSlotTimestamp > maxGenesisSlotTime {
+		return errors.Errorf("genesis slot timestamp is too big (%d > %d)", c.GenesisSlotTimestamp, maxGenesisSlotTime)
+	}
 	return nil
 }
 

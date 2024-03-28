@@ -106,7 +106,7 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 	identitiesHash := computeIdentitiesHashFromShares(keyShares.Shares)
 	err := gnosisDB.InsertSlotDecryptionSignature(ctx, database.InsertSlotDecryptionSignatureParams{
 		Eon:            int64(keyShares.Eon),
-		Block:          int64(extra.Slot),
+		Slot:           int64(extra.Slot),
 		KeyperIndex:    int64(keyShares.KeyperIndex),
 		TxPointer:      int64(extra.TxPointer),
 		IdentitiesHash: identitiesHash,
@@ -127,7 +127,7 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 
 	signaturesDB, err := gnosisDB.GetSlotDecryptionSignatures(ctx, database.GetSlotDecryptionSignaturesParams{
 		Eon:            int64(keyShares.Eon),
-		Block:          int64(extra.Slot),
+		Slot:           int64(extra.Slot),
 		TxPointer:      int64(extra.TxPointer),
 		IdentitiesHash: identitiesHash,
 		Limit:          keyperSet.Threshold,

@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -18,17 +19,19 @@ import (
 
 // SequencerSyncer inserts transaction submitted events from the sequencer contract into the database.
 type SequencerSyncer struct {
-	Contract *sequencerBindings.Sequencer
-	DBPool   *pgxpool.Pool
-	StartEon uint64
+	Contract             *sequencerBindings.Sequencer
+	DBPool               *pgxpool.Pool
+	StartEon             uint64
+	GenesisSlotTimestamp uint64
+	SecondsPerSlot       uint64
 }
 
 // Sync fetches transaction submitted events from the sequencer contract and inserts them into the
 // database. It starts at the end point of the previous call to sync (or 0 if it is the first call)
 // and ends at the given block number.
-func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
+func (s *SequencerSyncer) Sync(ctx context.Context, header *types.Header) error {
 	queries := database.New(s.DBPool)
-	syncedUntilBlock, err := queries.GetTransactionSubmittedEventsSyncedUntil(ctx)
+	syncedUntil, err := queries.GetTransactionSubmittedEventsSyncedUntil(ctx)
 	if err != nil && err != pgx.ErrNoRows {
 		return errors.Wrap(err, "failed to query transaction submitted events sync status")
 	}
@@ -36,17 +39,18 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 	if err == pgx.ErrNoRows {
 		start = 0
 	} else {
-		start = uint64(syncedUntilBlock + 1)
+		start = uint64(syncedUntil.BlockNumber + 1)
 	}
 
 	log.Debug().
 		Uint64("start-block", start).
-		Uint64("end-block", block).
+		Uint64("end-block", header.Number.Uint64()).
 		Msg("syncing sequencer contract")
 
+	endBlock := header.Number.Uint64()
 	opts := bind.FilterOpts{
 		Start:   start,
-		End:     &block,
+		End:     &endBlock,
 		Context: ctx,
 	}
 	it, err := s.Contract.SequencerFilterer.FilterTransactionSubmitted(&opts)
@@ -75,7 +79,7 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 	if len(events) == 0 {
 		log.Debug().
 			Uint64("start-block", start).
-			Uint64("end-block", block).
+			Uint64("end-block", endBlock).
 			Msg("no transaction submitted events found")
 	}
 
@@ -85,11 +89,16 @@ func (s *SequencerSyncer) Sync(ctx context.Context, block uint64) error {
 			return err
 		}
 
-		newSyncedUntilBlock, err := medley.Uint64ToInt64Safe(block)
+		newSyncedUntilBlock, err := medley.Uint64ToInt64Safe(endBlock)
 		if err != nil {
 			return err
 		}
-		err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, newSyncedUntilBlock)
+		slot := medley.BlockTimestampToSlot(header.Time, s.GenesisSlotTimestamp, s.SecondsPerSlot)
+		err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
+			BlockNumber: newSyncedUntilBlock,
+			BlockHash:   header.Hash().Bytes(),
+			Slot:        int64(slot),
+		})
 		if err != nil {
 			return err
 		}

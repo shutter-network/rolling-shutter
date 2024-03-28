@@ -17,7 +17,9 @@ CREATE TABLE transaction_submitted_event (
 
 CREATE TABLE transaction_submitted_events_synced_until(
     enforce_one_row bool PRIMARY KEY DEFAULT true,
-    block_number bigint NOT NULL CHECK (block_number >= 0)
+    block_hash bytea NOT NULL,
+    block_number bigint NOT NULL CHECK (block_number >= 0),
+    slot bigint NOT NULL CHECK (slot >= 0)
 );
 
 CREATE TABLE transaction_submitted_event_count(
@@ -33,17 +35,17 @@ CREATE TABLE tx_pointer(
 
 CREATE TABLE current_decryption_trigger(
     eon bigint PRIMARY KEY CHECK (eon >= 0),
-    block bigint NOT NULL CHECK (block >= 0),
+    slot bigint NOT NULL CHECK (slot >= 0),
     tx_pointer bigint NOT NULL CHECK (tx_pointer >= 0),
     identities_hash bytea NOT NULL
 );
 
 CREATE TABLE slot_decryption_signatures(
     eon bigint NOT NULL CHECK (eon >= 0),
-    block bigint NOT NULL CHECK (block >= 0),
+    slot bigint NOT NULL CHECK (slot >= 0),
     keyper_index bigint NOT NULL,
     tx_pointer bigint NOT NULL CHECK (tx_pointer >= 0),
     identities_hash bytea NOT NULL,
     signature bytea NOT NULL,
-    PRIMARY KEY (eon, block, keyper_index)
+    PRIMARY KEY (eon, slot, keyper_index)
 );

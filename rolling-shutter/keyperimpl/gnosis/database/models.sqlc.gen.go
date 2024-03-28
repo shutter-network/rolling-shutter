@@ -8,14 +8,14 @@ import ()
 
 type CurrentDecryptionTrigger struct {
 	Eon            int64
-	Block          int64
+	Slot           int64
 	TxPointer      int64
 	IdentitiesHash []byte
 }
 
 type SlotDecryptionSignature struct {
 	Eon            int64
-	Block          int64
+	Slot           int64
 	KeyperIndex    int64
 	TxPointer      int64
 	IdentitiesHash []byte
@@ -41,7 +41,9 @@ type TransactionSubmittedEventCount struct {
 
 type TransactionSubmittedEventsSyncedUntil struct {
 	EnforceOneRow bool
+	BlockHash     []byte
 	BlockNumber   int64
+	Slot          int64
 }
 
 type TxPointer struct {

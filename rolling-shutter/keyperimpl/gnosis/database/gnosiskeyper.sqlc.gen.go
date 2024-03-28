@@ -12,7 +12,7 @@ import (
 )
 
 const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
-SELECT eon, block, tx_pointer, identities_hash FROM current_decryption_trigger
+SELECT eon, slot, tx_pointer, identities_hash FROM current_decryption_trigger
 WHERE eon = $1
 `
 
@@ -21,7 +21,7 @@ func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (C
 	var i CurrentDecryptionTrigger
 	err := row.Scan(
 		&i.Eon,
-		&i.Block,
+		&i.Slot,
 		&i.TxPointer,
 		&i.IdentitiesHash,
 	)
@@ -29,15 +29,15 @@ func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (C
 }
 
 const getSlotDecryptionSignatures = `-- name: GetSlotDecryptionSignatures :many
-SELECT eon, block, keyper_index, tx_pointer, identities_hash, signature FROM slot_decryption_signatures
-WHERE eon = $1 AND block = $2 AND tx_pointer = $3 AND identities_hash = $4
+SELECT eon, slot, keyper_index, tx_pointer, identities_hash, signature FROM slot_decryption_signatures
+WHERE eon = $1 AND slot = $2 AND tx_pointer = $3 AND identities_hash = $4
 ORDER BY keyper_index ASC
 LIMIT $5
 `
 
 type GetSlotDecryptionSignaturesParams struct {
 	Eon            int64
-	Block          int64
+	Slot           int64
 	TxPointer      int64
 	IdentitiesHash []byte
 	Limit          int32
@@ -46,7 +46,7 @@ type GetSlotDecryptionSignaturesParams struct {
 func (q *Queries) GetSlotDecryptionSignatures(ctx context.Context, arg GetSlotDecryptionSignaturesParams) ([]SlotDecryptionSignature, error) {
 	rows, err := q.db.Query(ctx, getSlotDecryptionSignatures,
 		arg.Eon,
-		arg.Block,
+		arg.Slot,
 		arg.TxPointer,
 		arg.IdentitiesHash,
 		arg.Limit,
@@ -60,7 +60,7 @@ func (q *Queries) GetSlotDecryptionSignatures(ctx context.Context, arg GetSlotDe
 		var i SlotDecryptionSignature
 		if err := rows.Scan(
 			&i.Eon,
-			&i.Block,
+			&i.Slot,
 			&i.KeyperIndex,
 			&i.TxPointer,
 			&i.IdentitiesHash,
@@ -133,14 +133,19 @@ func (q *Queries) GetTransactionSubmittedEvents(ctx context.Context, arg GetTran
 }
 
 const getTransactionSubmittedEventsSyncedUntil = `-- name: GetTransactionSubmittedEventsSyncedUntil :one
-SELECT block_number FROM transaction_submitted_events_synced_until LIMIT 1
+SELECT enforce_one_row, block_hash, block_number, slot FROM transaction_submitted_events_synced_until LIMIT 1
 `
 
-func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) (int64, error) {
+func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) (TransactionSubmittedEventsSyncedUntil, error) {
 	row := q.db.QueryRow(ctx, getTransactionSubmittedEventsSyncedUntil)
-	var block_number int64
-	err := row.Scan(&block_number)
-	return block_number, err
+	var i TransactionSubmittedEventsSyncedUntil
+	err := row.Scan(
+		&i.EnforceOneRow,
+		&i.BlockHash,
+		&i.BlockNumber,
+		&i.Slot,
+	)
+	return i, err
 }
 
 const getTxPointer = `-- name: GetTxPointer :one
@@ -172,13 +177,13 @@ func (q *Queries) InitTxPointer(ctx context.Context, arg InitTxPointerParams) er
 }
 
 const insertSlotDecryptionSignature = `-- name: InsertSlotDecryptionSignature :exec
-INSERT INTO slot_decryption_signatures (eon, block, keyper_index, tx_pointer, identities_hash, signature)
+INSERT INTO slot_decryption_signatures (eon, slot, keyper_index, tx_pointer, identities_hash, signature)
 VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertSlotDecryptionSignatureParams struct {
 	Eon            int64
-	Block          int64
+	Slot           int64
 	KeyperIndex    int64
 	TxPointer      int64
 	IdentitiesHash []byte
@@ -188,7 +193,7 @@ type InsertSlotDecryptionSignatureParams struct {
 func (q *Queries) InsertSlotDecryptionSignature(ctx context.Context, arg InsertSlotDecryptionSignatureParams) error {
 	_, err := q.db.Exec(ctx, insertSlotDecryptionSignature,
 		arg.Eon,
-		arg.Block,
+		arg.Slot,
 		arg.KeyperIndex,
 		arg.TxPointer,
 		arg.IdentitiesHash,
@@ -240,15 +245,15 @@ func (q *Queries) InsertTransactionSubmittedEvent(ctx context.Context, arg Inser
 }
 
 const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
-INSERT INTO current_decryption_trigger (eon, block, tx_pointer, identities_hash)
+INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (eon) DO UPDATE
-SET block = $2, tx_pointer = $3, identities_hash = $4
+SET slot = $2, tx_pointer = $3, identities_hash = $4
 `
 
 type SetCurrentDecryptionTriggerParams struct {
 	Eon            int64
-	Block          int64
+	Slot           int64
 	TxPointer      int64
 	IdentitiesHash []byte
 }
@@ -256,7 +261,7 @@ type SetCurrentDecryptionTriggerParams struct {
 func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurrentDecryptionTriggerParams) error {
 	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger,
 		arg.Eon,
-		arg.Block,
+		arg.Slot,
 		arg.TxPointer,
 		arg.IdentitiesHash,
 	)
@@ -281,13 +286,19 @@ func (q *Queries) SetTransactionSubmittedEventCount(ctx context.Context, arg Set
 }
 
 const setTransactionSubmittedEventsSyncedUntil = `-- name: SetTransactionSubmittedEventsSyncedUntil :exec
-INSERT INTO transaction_submitted_events_synced_until (block_number) VALUES ($1)
+INSERT INTO transaction_submitted_events_synced_until (block_hash, block_number, slot) VALUES ($1, $2, $3)
 ON CONFLICT (enforce_one_row) DO UPDATE
-SET block_number = $1
+SET block_hash = $1, block_number = $2, slot = $3
 `
 
-func (q *Queries) SetTransactionSubmittedEventsSyncedUntil(ctx context.Context, blockNumber int64) error {
-	_, err := q.db.Exec(ctx, setTransactionSubmittedEventsSyncedUntil, blockNumber)
+type SetTransactionSubmittedEventsSyncedUntilParams struct {
+	BlockHash   []byte
+	BlockNumber int64
+	Slot        int64
+}
+
+func (q *Queries) SetTransactionSubmittedEventsSyncedUntil(ctx context.Context, arg SetTransactionSubmittedEventsSyncedUntilParams) error {
+	_, err := q.db.Exec(ctx, setTransactionSubmittedEventsSyncedUntil, arg.BlockHash, arg.BlockNumber, arg.Slot)
 	return err
 }
 
