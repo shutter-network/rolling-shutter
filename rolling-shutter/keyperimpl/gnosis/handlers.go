@@ -4,7 +4,6 @@ import (
 	"context"
 	"math"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -186,6 +185,24 @@ func (h *DecryptionKeysHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeys{}}
 }
 
+func validateSignerIndices(extra *p2pmsg.DecryptionKeys_Gnosis, n int) (pubsub.ValidationResult, error) {
+	for i, signerIndex := range extra.Gnosis.SignerIndices {
+		if i >= 1 {
+			prevSignerIndex := extra.Gnosis.SignerIndices[i-1]
+			if signerIndex == prevSignerIndex {
+				return pubsub.ValidationReject, errors.New("duplicate signer index found")
+			}
+			if signerIndex < prevSignerIndex {
+				return pubsub.ValidationReject, errors.New("signer indices not ordered")
+			}
+		}
+		if signerIndex >= uint64(n) {
+			return pubsub.ValidationReject, errors.New("signer index out of range")
+		}
+	}
+	return pubsub.ValidationAccept, nil
+}
+
 func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keys := msg.(*p2pmsg.DecryptionKeys)
 	extra, ok := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis)
@@ -220,25 +237,14 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 	if int32(len(extra.Gnosis.SignerIndices)) != keyperSet.Threshold {
 		return pubsub.ValidationReject, errors.Errorf("expected %d signers, got %d", keyperSet.Threshold, len(extra.Gnosis.SignerIndices))
 	}
-	signers := []common.Address{}
-	for i, signerIndex := range extra.Gnosis.SignerIndices {
-		if i >= 1 {
-			prevSignerIndex := extra.Gnosis.SignerIndices[i-1]
-			if signerIndex == prevSignerIndex {
-				return pubsub.ValidationReject, errors.New("duplicate signer index found")
-			}
-			if signerIndex < prevSignerIndex {
-				return pubsub.ValidationReject, errors.New("signer indices not ordered")
-			}
-		}
-		if signerIndex >= uint64(len(keyperSet.Keypers)) {
-			return pubsub.ValidationReject, errors.New("signer index out of range")
-		}
-		signer, err := shdb.DecodeAddress(keyperSet.Keypers[signerIndex])
-		if err != nil {
-			return pubsub.ValidationReject, errors.Wrap(err, "failed to decode signer address")
-		}
-		signers = append(signers, signer)
+
+	res, err := validateSignerIndices(extra, len(keyperSet.Keypers))
+	if res != pubsub.ValidationAccept {
+		return res, err
+	}
+	signers, err := keyperSet.GetSubset(extra.Gnosis.SignerIndices)
+	if err != nil {
+		return pubsub.ValidationReject, err
 	}
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
