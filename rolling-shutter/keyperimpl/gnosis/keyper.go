@@ -65,8 +65,8 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(func() { close(kpr.decryptionTriggerChannel) })
 
 	kpr.slotTicker = slotticker.NewSlotTicker(
-		time.Duration(kpr.config.SecondsPerSlot*uint64(time.Second)),
-		time.Unix(int64(kpr.config.GenesisSlotTimestamp), 0),
+		time.Duration(kpr.config.Gnosis.SecondsPerSlot*uint64(time.Second)),
+		time.Unix(int64(kpr.config.Gnosis.GenesisSlotTimestamp), 0),
 	)
 
 	kpr.dbpool, err = db.Connect(ctx, runner, kpr.config.DatabaseURL, database.Definition.Name())
@@ -89,7 +89,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 			HTTPEnabled:       kpr.config.HTTPEnabled,
 			HTTPListenAddress: kpr.config.HTTPListenAddress,
 			P2P:               kpr.config.P2P,
-			Ethereum:          kpr.config.Gnosis,
+			Ethereum:          kpr.config.Gnosis.Node,
 			Shuttermint:       kpr.config.Shuttermint,
 			Metrics:           kpr.config.Metrics,
 		},
@@ -105,12 +105,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	kpr.chainSyncClient, err = chainsync.NewClient(
 		ctx,
-		chainsync.WithClientURL(kpr.config.Gnosis.EthereumURL),
-		chainsync.WithKeyperSetManager(kpr.config.GnosisContracts.KeyperSetManager),
-		chainsync.WithKeyBroadcastContract(kpr.config.GnosisContracts.KeyBroadcastContract),
+		chainsync.WithClientURL(kpr.config.Gnosis.Node.EthereumURL),
+		chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
+		chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
 		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
-		chainsync.WithPrivateKey(kpr.config.Gnosis.PrivateKey.Key),
+		chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)
 	if err != nil {
@@ -164,13 +164,13 @@ func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error
 	if kpr.sequencerSyncer == nil {
 		log.Info().
 			Uint64("eon", eon).
-			Str("contract-address", kpr.config.GnosisContracts.KeyperSetManager.Hex()).
+			Str("contract-address", kpr.config.Gnosis.Contracts.KeyperSetManager.Hex()).
 			Msg("initializing sequencer syncer")
-		client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.ContractsURL)
+		client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
 		if err != nil {
 			return err
 		}
-		contract, err := sequencerBindings.NewSequencer(kpr.config.GnosisContracts.Sequencer, client)
+		contract, err := sequencerBindings.NewSequencer(kpr.config.Gnosis.Contracts.Sequencer, client)
 		if err != nil {
 			return err
 		}
@@ -178,8 +178,8 @@ func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error
 			Contract:             contract,
 			DBPool:               kpr.dbpool,
 			StartEon:             eon,
-			GenesisSlotTimestamp: kpr.config.GenesisSlotTimestamp,
-			SecondsPerSlot:       kpr.config.SecondsPerSlot,
+			GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
+			SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
 		}
 
 		// TODO: perform an initial sync without blocking and/or set start block

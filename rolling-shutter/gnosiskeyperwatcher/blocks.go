@@ -31,7 +31,7 @@ func NewBlocksWatcher(config *keyper.Config, blocksChannel chan *BlockReceivedEv
 
 func (w *BlocksWatcher) Start(ctx context.Context, runner service.Runner) error {
 	runner.Go(func() error {
-		ethClient, err := ethclient.Dial(w.config.Gnosis.EthereumURL)
+		ethClient, err := ethclient.Dial(w.config.Gnosis.Node.EthereumURL)
 		if err != nil {
 			return err
 		}

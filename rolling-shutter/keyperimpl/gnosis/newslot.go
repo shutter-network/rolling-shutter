@@ -195,7 +195,7 @@ func (kpr *Keyper) getDecryptionIdentityPreimages(
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 
 	queries := gnosisdatabase.New(kpr.dbpool)
-	limitUint64 := kpr.config.EncryptedGasLimit/kpr.config.MinGasPerTransaction + 1
+	limitUint64 := kpr.config.Gnosis.EncryptedGasLimit/kpr.config.Gnosis.MinGasPerTransaction + 1
 	if limitUint64 > math.MaxInt32 {
 		return identityPreimages, errors.New("gas limit too big")
 	}
@@ -216,7 +216,7 @@ func (kpr *Keyper) getDecryptionIdentityPreimages(
 	gas := uint64(0)
 	for _, event := range events {
 		gas += uint64(event.GasLimit)
-		if gas > kpr.config.EncryptedGasLimit {
+		if gas > kpr.config.Gnosis.EncryptedGasLimit {
 			break
 		}
 		identityPreimage, err := transactionSubmittedEventToIdentityPreimage(event)

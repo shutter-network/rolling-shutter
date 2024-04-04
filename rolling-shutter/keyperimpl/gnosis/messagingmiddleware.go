@@ -146,7 +146,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 		TxPointer:         uint64(currentDecryptionTrigger.TxPointer),
 		IdentityPreimages: identityPreimages,
 	}
-	signature, err := ComputeSlotDecryptionSignature(&slotDecryptionSignatureData, i.config.Gnosis.PrivateKey.Key)
+	signature, err := ComputeSlotDecryptionSignature(&slotDecryptionSignatureData, i.config.Gnosis.Node.PrivateKey.Key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to compute slot decryption signature")
 	}
