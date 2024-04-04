@@ -29,7 +29,7 @@ CREATE TABLE transaction_submitted_event_count(
 
 CREATE TABLE tx_pointer(
     eon bigint PRIMARY KEY,
-    block bigint NOT NULL DEFAULT 0,
+    slot bigint NOT NULL DEFAULT 0,
     value bigint NOT NULL DEFAULT 0
 );
 

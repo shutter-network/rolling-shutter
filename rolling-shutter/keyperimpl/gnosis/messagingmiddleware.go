@@ -273,14 +273,14 @@ func (i *MessagingMiddleware) advanceTxPointer(ctx context.Context, msg *p2pmsg.
 	newTxPointer := int64(extra.TxPointer) + int64(len(msg.Keys)) - 1
 	log.Debug().
 		Uint64("eon", msg.Eon).
-		Uint64("block", extra.Slot).
+		Uint64("slot", extra.Slot).
 		Uint64("tx-pointer-msg", extra.TxPointer).
 		Int("num-keys", len(msg.Keys)).
 		Int64("tx-pointer-updated", newTxPointer).
 		Msg("updating tx pointer")
 	err := gnosisDB.SetTxPointer(ctx, database.SetTxPointerParams{
 		Eon:   int64(msg.Eon),
-		Block: int64(extra.Slot),
+		Slot:  int64(extra.Slot),
 		Value: newTxPointer,
 	})
 	if err != nil {

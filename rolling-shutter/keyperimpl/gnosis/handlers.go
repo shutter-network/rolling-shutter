@@ -276,14 +276,14 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	newTxPointer := int64(extra.TxPointer) + int64(len(keys.Keys)) - 1
 	log.Debug().
 		Uint64("eon", keys.Eon).
-		Uint64("block", extra.Slot).
+		Uint64("slot", extra.Slot).
 		Uint64("tx-pointer-msg", extra.TxPointer).
 		Int("num-keys", len(keys.Keys)).
 		Int64("tx-pointer-updated", newTxPointer).
 		Msg("updating tx pointer")
 	err := gnosisDB.SetTxPointer(ctx, database.SetTxPointerParams{
 		Eon:   int64(keys.Eon),
-		Block: int64(extra.Slot),
+		Slot:  int64(extra.Slot),
 		Value: newTxPointer,
 	})
 	if err != nil {

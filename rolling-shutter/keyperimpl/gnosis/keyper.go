@@ -29,9 +29,6 @@ import (
 
 var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
 
-// Maximum age of a tx pointer in blocks before it is considered outdated.
-const maxTxPointerAge = 2
-
 type Keyper struct {
 	core            *keyper.KeyperCore
 	config          *Config

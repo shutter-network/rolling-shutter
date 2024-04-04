@@ -149,30 +149,30 @@ func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) 
 }
 
 const getTxPointer = `-- name: GetTxPointer :one
-SELECT eon, block, value FROM tx_pointer
+SELECT eon, slot, value FROM tx_pointer
 WHERE eon = $1
 `
 
 func (q *Queries) GetTxPointer(ctx context.Context, eon int64) (TxPointer, error) {
 	row := q.db.QueryRow(ctx, getTxPointer, eon)
 	var i TxPointer
-	err := row.Scan(&i.Eon, &i.Block, &i.Value)
+	err := row.Scan(&i.Eon, &i.Slot, &i.Value)
 	return i, err
 }
 
 const initTxPointer = `-- name: InitTxPointer :exec
-INSERT INTO tx_pointer (eon, block, value)
+INSERT INTO tx_pointer (eon, slot, value)
 VALUES ($1, $2, 0)
 ON CONFLICT DO NOTHING
 `
 
 type InitTxPointerParams struct {
-	Eon   int64
-	Block int64
+	Eon  int64
+	Slot int64
 }
 
 func (q *Queries) InitTxPointer(ctx context.Context, arg InitTxPointerParams) error {
-	_, err := q.db.Exec(ctx, initTxPointer, arg.Eon, arg.Block)
+	_, err := q.db.Exec(ctx, initTxPointer, arg.Eon, arg.Slot)
 	return err
 }
 
@@ -303,19 +303,19 @@ func (q *Queries) SetTransactionSubmittedEventsSyncedUntil(ctx context.Context, 
 }
 
 const setTxPointer = `-- name: SetTxPointer :exec
-INSERT INTO tx_pointer (eon, block, value)
+INSERT INTO tx_pointer (eon, slot, value)
 VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
-SET block = $2, value = $3
+SET slot = $2, value = $3
 `
 
 type SetTxPointerParams struct {
 	Eon   int64
-	Block int64
+	Slot  int64
 	Value int64
 }
 
 func (q *Queries) SetTxPointer(ctx context.Context, arg SetTxPointerParams) error {
-	_, err := q.db.Exec(ctx, setTxPointer, arg.Eon, arg.Block, arg.Value)
+	_, err := q.db.Exec(ctx, setTxPointer, arg.Eon, arg.Slot, arg.Value)
 	return err
 }

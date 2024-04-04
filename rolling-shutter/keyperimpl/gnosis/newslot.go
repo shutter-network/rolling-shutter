@@ -22,7 +22,18 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
+// Maximum age of a tx pointer in blocks before it is considered outdated.
+const maxTxPointerAge = 2
+
+var errZeroTxPointerAge = errors.New("tx pointer has age 0")
+
 func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) error {
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println(slot.Number)
+	fmt.Println("")
+	fmt.Println("")
+
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
 	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)
 	if err != nil {
@@ -35,92 +46,118 @@ func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) err
 		// already been built, so we return an error.
 		return errors.Errorf("processing slot %d for which a block has already been processed", slot.Number)
 	}
+	nextBlock := syncedUntil.BlockNumber + 1
 
 	queries := obskeyper.New(kpr.dbpool)
-	keyperSet, err := queries.GetKeyperSet(ctx, syncedUntil.BlockNumber)
+	keyperSet, err := queries.GetKeyperSet(ctx, nextBlock)
 	if err == pgx.ErrNoRows {
 		log.Debug().
 			Uint64("slot", slot.Number).
-			Int64("block-number", syncedUntil.BlockNumber).
+			Int64("block-number", nextBlock).
 			Msg("ignoring slot as no keyper set has been found for it")
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to query keyper set for block %d", syncedUntil.BlockNumber)
+		return errors.Wrapf(err, "failed to query keyper set for block %d", nextBlock)
 	}
-	for _, m := range keyperSet.Keypers {
-		if m == shdb.EncodeAddress(kpr.config.GetAddress()) {
-			return kpr.triggerDecryption(ctx, slot, syncedUntil, &keyperSet)
-		}
+	if keyperSet.Contains(kpr.config.GetAddress()) {
+		return kpr.triggerDecryption(ctx, slot, nextBlock, &keyperSet)
 	}
-	log.Debug().Uint64("slot", slot.Number).Msg("ignoring block as not part of keyper set")
+	log.Debug().
+		Uint64("slot", slot.Number).
+		Int64("block-number", nextBlock).
+		Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
+		Str("address", kpr.config.GetAddress().Hex()).
+		Msg("ignoring block as not part of keyper set")
 	return nil
 }
 
-func (kpr *Keyper) triggerDecryption(
-	ctx context.Context,
-	slot slotticker.Slot,
-	syncedUntil gnosisdatabase.TransactionSubmittedEventsSyncedUntil,
-	keyperSet *obskeyper.KeyperSet,
-) error {
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Println(slot.Number)
-	fmt.Println("")
-	fmt.Println("")
+func (kpr *Keyper) getTxPointer(ctx context.Context, eon int64, slot int64, keyperConfigIndex int64) (int64, error) {
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
-	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
-
-	eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, syncedUntil.BlockNumber)
-	if err != nil {
-		return errors.Wrapf(err, "failed to query eon for block number %d from db", syncedUntil.BlockNumber)
-	}
-	eon := eonStruct.Eon
-
-	var txPointer int64
-	var txPointerAge int64
+	var txPointer, txPointerAge int64
 	txPointerDB, err := gnosisKeyperDB.GetTxPointer(ctx, eon)
 	if err == pgx.ErrNoRows {
+		// The tx pointer is expected to be missing from the db if the eon has just started. In
+		// this case, we should initialize it to zero with an age of 1, ie decrypt starting with
+		// the first transaction.
+		// The tx pointer may also be missing if the keyper has been started late and no decryption
+		// key has been generated or received yet (receiving the keys message would update the
+		// pointer). In this case, the true age is unknown, as we only know the start block but
+		// not the start slot of the eon. However, we can ignore this edge case as it will be
+		// resolved automatically when the first keys message is received. If key generation
+		// continues to fail, eventually our tx pointer age will exceed the maximum value and we
+		// will start participating in the recovery process, albeit a bit late.
+		err := gnosisKeyperDB.SetTxPointer(ctx, gnosisdatabase.SetTxPointerParams{
+			Eon:   eon,
+			Slot:  slot,
+			Value: 0,
+		})
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to initialize tx pointer")
+		}
 		txPointer = 0
-		txPointerAge = syncedUntil.BlockNumber - keyperSet.ActivationBlockNumber + 1
+		txPointerAge = 1
 	} else if err != nil {
-		return errors.Wrap(err, "failed to query tx pointer from db")
+		return 0, errors.Wrap(err, "failed to query tx pointer from db")
 	} else {
-		txPointerAge = syncedUntil.BlockNumber - txPointerDB.Block
 		txPointer = txPointerDB.Value
+		txPointerAge = slot - txPointerDB.Slot
 	}
 	if txPointerAge == 0 {
 		// A pointer of age 0 means we already received the pointer from a DecryptionKeys message
 		// even though we haven't sent our shares yet. In that case, sending our shares is
 		// unnecessary.
-		log.Warn().
-			Uint64("slot", slot.Number).
-			Int64("block-number", syncedUntil.BlockNumber).
-			Int64("eon", eon).
-			Int64("tx-pointer", txPointer).
-			Int64("tx-pointer-age", txPointerAge).
-			Msg("ignoring new block as tx pointer age is 0")
-		return nil
+		return 0, errZeroTxPointerAge
 	}
-	if txPointerAge > maxTxPointerAge {
-		// If the tx pointer is outdated, the system has failed to generate decryption keys (or at
-		// least we haven't received them). This either means not enough keypers are online or they
-		// don't agree on the current value of the tx pointer. In order to recover, we choose the
-		// current length of the transaction queue as the new tx pointer, as this is a value
-		// everyone can agree on.
+	// If the tx pointer is outdated, the system has failed to generate decryption keys (or at
+	// least we haven't received them). This either means not enough keypers are online or they
+	// don't agree on the current value of the tx pointer. In order to recover, we choose the
+	// current length of the transaction queue as the new tx pointer, as this is a value
+	// everyone can agree on.
+	isOutdated := txPointerAge > maxTxPointerAge
+	if isOutdated {
 		log.Warn().
-			Uint64("slot", slot.Number).
-			Int64("block-number", syncedUntil.BlockNumber).
+			Int64("slot", slot).
 			Int64("eon", eon).
 			Int64("tx-pointer", txPointer).
 			Int64("tx-pointer-age", txPointerAge).
 			Msg("outdated tx pointer")
-		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, keyperSet.KeyperConfigIndex)
+		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, keyperConfigIndex)
 		if err == pgx.ErrNoRows {
 			txPointer = 0
 		} else if err != nil {
-			return errors.Wrap(err, "failed to query transaction submitted event count from db")
+			return 0, errors.Wrap(err, "failed to query transaction submitted event count from db")
 		}
+	}
+	return txPointer, nil
+}
+
+func (kpr *Keyper) triggerDecryption(
+	ctx context.Context,
+	slot slotticker.Slot,
+	nextBlock int64,
+	keyperSet *obskeyper.KeyperSet,
+) error {
+	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
+	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+
+	eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
+	}
+	eon := eonStruct.Eon
+
+	txPointer, err := kpr.getTxPointer(ctx, eon, int64(slot.Number), keyperSet.KeyperConfigIndex)
+	if err == errZeroTxPointerAge {
+		log.Warn().
+			Uint64("slot", slot.Number).
+			Int64("block-number", nextBlock).
+			Int64("eon", eon).
+			Int64("tx-pointer", txPointer).
+			Msg("ignoring new block as tx pointer age is 0")
+		return nil
+	} else if err != nil {
+		return err
 	}
 
 	identityPreimages, err := kpr.getDecryptionIdentityPreimages(ctx, slot, keyperSet.KeyperConfigIndex, txPointer)
@@ -137,16 +174,15 @@ func (kpr *Keyper) triggerDecryption(
 		return errors.Wrap(err, "failed to insert published tx pointer into db")
 	}
 	trigger := epochkghandler.DecryptionTrigger{
-		BlockNumber:       uint64(syncedUntil.BlockNumber),
+		BlockNumber:       uint64(nextBlock),
 		IdentityPreimages: identityPreimages,
 	}
 	event := broker.NewEvent(&trigger)
 	log.Debug().
 		Uint64("slot", slot.Number).
-		Uint64("block-number", uint64(syncedUntil.BlockNumber)).
+		Uint64("block-number", uint64(nextBlock)).
 		Int("num-identities", len(trigger.IdentityPreimages)).
 		Int64("tx-pointer", txPointer).
-		Int64("tx-pointer-age", txPointerAge).
 		Msg("sending decryption trigger")
 	kpr.decryptionTriggerChannel <- event
 

@@ -48,6 +48,6 @@ type TransactionSubmittedEventsSyncedUntil struct {
 
 type TxPointer struct {
 	Eon   int64
-	Block int64
+	Slot  int64
 	Value int64
 }

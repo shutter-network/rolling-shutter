@@ -43,15 +43,15 @@ SELECT * FROM tx_pointer
 WHERE eon = $1;
 
 -- name: InitTxPointer :exec
-INSERT INTO tx_pointer (eon, block, value)
+INSERT INTO tx_pointer (eon, slot, value)
 VALUES ($1, $2, 0)
 ON CONFLICT DO NOTHING;
 
 -- name: SetTxPointer :exec
-INSERT INTO tx_pointer (eon, block, value)
+INSERT INTO tx_pointer (eon, slot, value)
 VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
-SET block = $2, value = $3;
+SET slot = $2, value = $3;
 
 -- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)
