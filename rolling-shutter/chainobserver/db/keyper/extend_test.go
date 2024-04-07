@@ -22,6 +22,20 @@ func makeTestKeyperSet() KeyperSet {
 	}
 }
 
+func TestKeyperSetGetIndex(t *testing.T) {
+	keyperSet := makeTestKeyperSet()
+	addresses, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	assert.NilError(t, err)
+
+	for i, address := range addresses {
+		index, err := keyperSet.GetIndex(address)
+		assert.NilError(t, err)
+		assert.Equal(t, uint64(i), index)
+	}
+	_, err = keyperSet.GetIndex(common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff"))
+	assert.ErrorContains(t, err, "keyper 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF not found")
+}
+
 func TestKeyperSetContains(t *testing.T) {
 	keyperSet := makeTestKeyperSet()
 	addresses, err := shdb.DecodeAddresses(keyperSet.Keypers)

@@ -7,6 +7,17 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
+// GetIndex returns the index of the given address in the KeyperSet.
+func (s *KeyperSet) GetIndex(address common.Address) (uint64, error) {
+	encodedAddress := shdb.EncodeAddress(address)
+	for i, m := range s.Keypers {
+		if m == encodedAddress {
+			return uint64(i), nil
+		}
+	}
+	return 0, errors.Errorf("keyper %s not found", address.String())
+}
+
 // Contains checks if the given address is present in the KeyperSet.
 // It returns true if the address is found, otherwise false.
 func (s *KeyperSet) Contains(address common.Address) bool {

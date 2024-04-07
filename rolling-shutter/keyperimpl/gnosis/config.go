@@ -149,6 +149,7 @@ func (c *GnosisConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 type GnosisContractsConfig struct {
 	KeyperSetManager     common.Address `shconfig:",required"`
 	KeyBroadcastContract common.Address `shconfig:",required"`
+	EonKeyPublish        common.Address `shconfig:",required"`
 	Sequencer            common.Address `shconfig:",required"`
 }
 
@@ -156,6 +157,7 @@ func NewGnosisContractsConfig() *GnosisContractsConfig {
 	return &GnosisContractsConfig{
 		KeyperSetManager:     common.Address{},
 		KeyBroadcastContract: common.Address{},
+		EonKeyPublish:        common.Address{},
 		Sequencer:            common.Address{},
 	}
 }

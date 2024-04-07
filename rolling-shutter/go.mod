@@ -30,7 +30,7 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/zerolog v1.28.0
 	github.com/shutter-network/gnosh-contracts v0.2.0
-	github.com/shutter-network/shop-contracts v0.0.0-20231220085304-80b8977d0bca
+	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
 	github.com/shutter-network/shutter/shlib v0.1.13
 	github.com/shutter-network/txtypes v0.1.0
 	github.com/spf13/afero v1.8.2

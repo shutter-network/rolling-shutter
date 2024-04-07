@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -33,8 +34,10 @@ type Keyper struct {
 	core            *keyper.KeyperCore
 	config          *Config
 	dbpool          *pgxpool.Pool
+	client          *ethclient.Client
 	chainSyncClient *chainsync.Client
 	sequencerSyncer *SequencerSyncer
+	eonKeyPublisher *eonkeypublisher.EonKeyPublisher
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -117,13 +120,27 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	eonKeyPublisherClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
+	if err != nil {
+		return errors.Wrapf(err, "failed to dial ethereum node at %s", kpr.config.Gnosis.Node.EthereumURL)
+	}
+	kpr.eonKeyPublisher, err = eonkeypublisher.NewEonKeyPublisher(
+		kpr.dbpool,
+		eonKeyPublisherClient,
+		kpr.config.Gnosis.Contracts.EonKeyPublish,
+		kpr.config.Gnosis.Node.PrivateKey.Key,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize eon key publisher")
+	}
+
 	err = kpr.initSequencerSyncer(ctx)
 	if err != nil {
 		return err
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
 }
 
 // initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
