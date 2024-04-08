@@ -17,8 +17,10 @@ import (
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
+	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 const (
@@ -57,11 +59,13 @@ func NewEonKeyPublisher(
 }
 
 func (p *EonKeyPublisher) Start(ctx context.Context, runner service.Runner) error { //nolint: unparam
+	log.Info().Msg("starting eon key publisher")
 	runner.Go(func() error {
+		p.publishOldKeys(ctx)
 		for {
 			select {
 			case key := <-p.keys:
-				p.publish(ctx, key)
+				p.publishIfResponsible(ctx, key)
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -75,24 +79,18 @@ func (p *EonKeyPublisher) Publish(key keyper.EonPublicKey) {
 	p.keys <- key
 }
 
-func (p *EonKeyPublisher) publish(ctx context.Context, key keyper.EonPublicKey) {
-	_, err := retry.FunctionCall[struct{}](ctx, func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, p.tryPublish(ctx, key)
-	}, retry.Interval(retryInterval))
+// publishIfResponsible publishes a eon key if the keyper is part of the corresponding keyper
+// set, unless the key is already confirmed or the keyper has already voted on it.
+func (p *EonKeyPublisher) publishIfResponsible(ctx context.Context, key keyper.EonPublicKey) {
+	db := obskeyperdb.New(p.dbpool)
+	keyperSet, err := db.GetKeyperSetByKeyperConfigIndex(ctx, int64(key.Eon))
 	if err != nil {
 		log.Error().
 			Err(err).
 			Uint64("keyper-set-index", key.KeyperConfigIndex).
 			Hex("key", key.PublicKey).
-			Msg("failed to publish eon key")
-	}
-}
-
-func (p *EonKeyPublisher) tryPublish(ctx context.Context, key keyper.EonPublicKey) error {
-	db := obskeyperdb.New(p.dbpool)
-	keyperSet, err := db.GetKeyperSetByKeyperConfigIndex(ctx, int64(key.Eon))
-	if err != nil {
-		return errors.Wrapf(err, "failed to query keyper set %d by index from db", key.KeyperConfigIndex)
+			Msg("failed to check if eon key should be published")
+		return
 	}
 	keyperAddress := ethcrypto.PubkeyToAddress(p.privateKey.PublicKey)
 	keyperIndex, err := keyperSet.GetIndex(keyperAddress)
@@ -100,29 +98,74 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key keyper.EonPublicKe
 		log.Info().
 			Uint64("keyper-set-index", key.KeyperConfigIndex).
 			Str("keyper-address", keyperAddress.Hex()).
+			Hex("key", key.PublicKey).
 			Msg("not publishing eon key as keyper is not part of corresponding keyper set")
-		return nil
+		return
 	}
+	p.publish(ctx, key.PublicKey, key.KeyperConfigIndex, keyperIndex)
+}
 
+// publishOldKeys publishes all eon keys that are already in the database, unless they're already
+// confirmed or the keyper has already voted on them.
+func (p *EonKeyPublisher) publishOldKeys(ctx context.Context) {
+	db := corekeyperdb.New(p.dbpool)
+	dkgResultsDB, err := db.GetAllDKGResults(ctx)
+	if err != nil {
+		err := errors.Wrap(err, "failed to query DKG results from db")
+		log.Error().Err(err).Msg("failed to publish old eon keys")
+		return
+	}
+	for _, dkgResultDB := range dkgResultsDB {
+		if !dkgResultDB.Success {
+			continue
+		}
+		dkgResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
+		if err != nil {
+			err := errors.Wrapf(err, "failed to decode DKG result of eon %d", dkgResultDB.Eon)
+			log.Error().Err(err).Msg("failed to publish old eon keys")
+			continue
+		}
+		p.publish(ctx, dkgResult.PublicKey.Marshal(), dkgResult.Eon, dkgResult.Keyper)
+	}
+}
+
+// publish publishes an eon key, unless it's already confirmed or the keyper has already voted on
+// it. On errors, publishing will be retried a few times and eventually aborted.
+func (p *EonKeyPublisher) publish(ctx context.Context, key []byte, keyperSetIndex uint64, keyperIndex uint64) {
+	_, err := retry.FunctionCall[struct{}](ctx, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, p.tryPublish(ctx, key, keyperSetIndex, keyperIndex)
+	}, retry.Interval(retryInterval))
+	if err != nil {
+		log.Error().
+			Err(err).
+			Uint64("keyper-set-index", keyperSetIndex).
+			Hex("key", key).
+			Msg("failed to publish eon key")
+	}
+}
+
+func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetIndex uint64, keyperIndex uint64) error {
+	keyperAddress := ethcrypto.PubkeyToAddress(p.privateKey.PublicKey)
 	hasAlreadyVoted, err := p.contract.HasKeyperVoted(&bind.CallOpts{}, keyperAddress)
 	if err != nil {
 		return errors.Wrap(err, "failed to query eon key publisher contract if keyper has already voted")
 	}
 	if hasAlreadyVoted {
 		log.Info().
-			Uint64("keyper-set-index", key.KeyperConfigIndex).
+			Uint64("keyper-set-index", keyperSetIndex).
 			Str("keyper-address", keyperAddress.Hex()).
+			Hex("key", key).
 			Msg("not publishing eon key as keyper has already voted")
 		return nil
 	}
-	isAlreadyConfirmed, err := p.contract.EonKeyConfirmed(&bind.CallOpts{}, key.PublicKey)
+	isAlreadyConfirmed, err := p.contract.EonKeyConfirmed(&bind.CallOpts{}, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to query eon key publisher contract if eon key is confirmed")
 	}
 	if isAlreadyConfirmed {
 		log.Info().
-			Uint64("keyper-set-index", key.KeyperConfigIndex).
-			Hex("key", key.PublicKey).
+			Uint64("keyper-set-index", keyperSetIndex).
+			Hex("key", key).
 			Msg("not publishing eon key as it is already confirmed")
 		return nil
 	}
@@ -135,13 +178,13 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key keyper.EonPublicKe
 	if err != nil {
 		return errors.Wrap(err, "failed to construct tx opts")
 	}
-	tx, err := p.contract.PublishEonKey(opts, key.PublicKey, keyperIndex)
+	tx, err := p.contract.PublishEonKey(opts, key, keyperIndex)
 	if err != nil {
 		return errors.Wrap(err, "failed to send publish eon key tx")
 	}
 	log.Info().
-		Uint64("keyper-set-index", key.KeyperConfigIndex).
-		Hex("key", key.PublicKey).
+		Uint64("keyper-set-index", keyperSetIndex).
+		Hex("key", key).
 		Hex("tx-hash", tx.Hash().Bytes()).
 		Msg("eon key publish tx sent")
 	receipt, err := bind.WaitMined(ctx, p.client, tx)
@@ -156,6 +199,10 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key keyper.EonPublicKe
 			Msg("eon key publish tx failed")
 		return errors.New("eon key publish tx failed")
 	}
-	log.Info().Msg("successfully published eon key")
+	log.Info().
+		Uint64("keyper-set-index", keyperSetIndex).
+		Hex("key", key).
+		Hex("tx-hash", tx.Hash().Bytes()).
+		Msg("successfully published eon key")
 	return nil
 }

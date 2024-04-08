@@ -143,6 +143,36 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	return exists, err
 }
 
+const getAllDKGResults = `-- name: GetAllDKGResults :many
+SELECT eon, success, error, pure_result FROM dkg_result
+ORDER BY eon ASC
+`
+
+func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
+	rows, err := q.db.Query(ctx, getAllDKGResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgResult
+	for rows.Next() {
+		var i DkgResult
+		if err := rows.Scan(
+			&i.Eon,
+			&i.Success,
+			&i.Error,
+			&i.PureResult,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllEons = `-- name: GetAllEons :many
 SELECT eon, height, activation_block_number, keyper_config_index FROM eons ORDER BY eon
 `

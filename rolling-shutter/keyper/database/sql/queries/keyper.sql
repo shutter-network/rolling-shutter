@@ -169,6 +169,10 @@ WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(bloc
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
+-- name: GetAllDKGResults :many
+SELECT * FROM dkg_result
+ORDER BY eon ASC;
+
 -- name: InsertEonPublicKey :exec
 INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2);
