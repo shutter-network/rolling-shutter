@@ -54,7 +54,7 @@ func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) err
 		log.Debug().
 			Uint64("slot", slot.Number).
 			Int64("block-number", nextBlock).
-			Msg("ignoring slot as no keyper set has been found for it")
+			Msg("skipping slot as no keyper set has been found for it")
 		return nil
 	}
 	if err != nil {
@@ -68,7 +68,7 @@ func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) err
 		Int64("block-number", nextBlock).
 		Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
 		Str("address", kpr.config.GetAddress().Hex()).
-		Msg("ignoring block as not part of keyper set")
+		Msg("skipping slot as not part of keyper set")
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (kpr *Keyper) triggerDecryption(
 			Int64("block-number", nextBlock).
 			Int64("eon", eon).
 			Int64("tx-pointer", txPointer).
-			Msg("ignoring new block as tx pointer age is 0")
+			Msg("skipping new block as tx pointer age is 0")
 		return nil
 	} else if err != nil {
 		return err
