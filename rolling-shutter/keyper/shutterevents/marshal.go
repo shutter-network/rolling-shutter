@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/pkg/errors"
 
@@ -96,16 +96,18 @@ func decodePubkey(val string) (*ecdsa.PublicKey, error) {
 }
 
 func encodeGammas(gammas *shcrypto.Gammas) string {
+	g2 := bls12381.NewG2()
 	var encoded []string
 	if gammas != nil {
 		for _, g := range *gammas {
-			encoded = append(encoded, hex.EncodeToString(g.Marshal()))
+			encoded = append(encoded, hex.EncodeToString(g2.ToBytes(g)))
 		}
 	}
 	return strings.Join(encoded, ",")
 }
 
 func decodeGammas(eventValue string) (shcrypto.Gammas, error) {
+	g2 := bls12381.NewG2()
 	parts := strings.Split(eventValue, ",")
 	var res shcrypto.Gammas
 	for _, p := range parts {
@@ -113,10 +115,12 @@ func decodeGammas(eventValue string) (shcrypto.Gammas, error) {
 		if err != nil {
 			return shcrypto.Gammas{}, err
 		}
-		g := new(bn256.G2)
-		_, err = g.Unmarshal(marshaledG2)
+		g, err := g2.FromBytes(marshaledG2)
 		if err != nil {
 			return shcrypto.Gammas{}, err
+		}
+		if !g2.IsOnCurve(g) {
+			return shcrypto.Gammas{}, errors.Errorf("invalid gamma value %x", p)
 		}
 		res = append(res, g)
 	}

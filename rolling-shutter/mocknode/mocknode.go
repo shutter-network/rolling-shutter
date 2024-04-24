@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
@@ -107,7 +106,7 @@ func (m *MockNode) handleEonPublicKey(
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
 		log.Info().Err(err).Msg("failed to unmarshal eon public key")
 	}
-	log.Info().Str("eon-public-key", (*bn256.G2)(m.eonPublicKey).String()).
+	log.Info().Hex("eon-public-key", m.eonPublicKey.Marshal()).
 		Msg("updated eon public key from messages to %s")
 	return make([]p2pmsg.Message, 0), nil
 }

@@ -31,7 +31,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/shutter-network/gnosh-contracts v0.2.0
 	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
-	github.com/shutter-network/shutter/shlib v0.1.13
+	github.com/shutter-network/shutter/shlib v0.1.18
 	github.com/shutter-network/txtypes v0.1.0
 	github.com/spf13/afero v1.8.2
 	github.com/spf13/cobra v1.6.1
