@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -54,14 +54,17 @@ func ParsePolyEvalMsg(msg *shmsg.PolyEval, sender common.Address) (*PolyEval, er
 
 // ParsePolyCommitmentMsg converts a shmsg.PolyCommitmentMsg to an app.PolyCommitmentMsg.
 func ParsePolyCommitmentMsg(msg *shmsg.PolyCommitment, sender common.Address) (*PolyCommitment, error) {
+	g2 := bls12381.NewG2()
 	gammas := shcrypto.Gammas{}
 	for _, g := range msg.Gammas {
-		g2 := new(bn256.G2)
-		_, err := g2.Unmarshal(g)
+		p, err := g2.FromBytes(g)
 		if err != nil {
 			return nil, err
 		}
-		gammas = append(gammas, g2)
+		if !g2.IsOnCurve(p) {
+			return nil, errors.Errorf("invalid gamma value %x", g)
+		}
+		gammas = append(gammas, p)
 	}
 	return &PolyCommitment{
 		Sender: sender,
