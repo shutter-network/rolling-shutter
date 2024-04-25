@@ -15,9 +15,12 @@ var files embed.FS
 var Definition db.Definition
 
 func init() {
-	var err error
-	Definition, err = db.NewSQLCDefinition(files, "sql/", "snapshot", 22)
+	def, err := db.NewSQLCDefinition(files, "sql/", "snapshot", 22)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize DB metadata")
 	}
+	Definition = db.NewAggregateDefinition(
+		"snapshot",
+		def,
+	)
 }
