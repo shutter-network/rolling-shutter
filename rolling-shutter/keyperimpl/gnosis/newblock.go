@@ -3,6 +3,7 @@ package gnosis
 import (
 	"context"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 )
 
@@ -12,5 +13,10 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
-	return nil
+	slot := medley.BlockTimestampToSlot(
+		ev.Header.Time,
+		kpr.config.Gnosis.GenesisSlotTimestamp,
+		kpr.config.Gnosis.SecondsPerSlot,
+	)
+	return kpr.maybeTriggerDecryption(ctx, slot+1)
 }

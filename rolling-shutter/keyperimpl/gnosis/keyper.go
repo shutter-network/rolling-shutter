@@ -30,14 +30,23 @@ import (
 
 var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
 
+// The relative proposal timeout specifies for how long we wait for a block proposal to appear in
+// a block. If we don't receive one in this time, we assume the slot is empty. The timeout is
+// given as a fraction of the slot duration.
+const (
+	relativeProposalTimeoutNumerator   = 1
+	relativeProposalTimeoutDenominator = 3
+)
+
 type Keyper struct {
-	core            *keyper.KeyperCore
-	config          *Config
-	dbpool          *pgxpool.Pool
-	client          *ethclient.Client
-	chainSyncClient *chainsync.Client
-	sequencerSyncer *SequencerSyncer
-	eonKeyPublisher *eonkeypublisher.EonKeyPublisher
+	core                *keyper.KeyperCore
+	config              *Config
+	dbpool              *pgxpool.Pool
+	client              *ethclient.Client
+	chainSyncClient     *chainsync.Client
+	sequencerSyncer     *SequencerSyncer
+	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
+	latestTriggeredSlot *uint64
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -67,9 +76,15 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	runner.Defer(func() { close(kpr.newEonPublicKeys) })
 	runner.Defer(func() { close(kpr.decryptionTriggerChannel) })
 
+	kpr.latestTriggeredSlot = nil
+
+	offset := -(time.Duration(kpr.config.Gnosis.SecondsPerSlot) * time.Second) *
+		(relativeProposalTimeoutDenominator - relativeProposalTimeoutNumerator) /
+		relativeProposalTimeoutDenominator
 	kpr.slotTicker = slotticker.NewSlotTicker(
 		time.Duration(kpr.config.Gnosis.SecondsPerSlot*uint64(time.Second)),
 		time.Unix(int64(kpr.config.Gnosis.GenesisSlotTimestamp), 0),
+		offset,
 	)
 
 	kpr.dbpool, err = db.Connect(ctx, runner, kpr.config.DatabaseURL, database.Definition.Name())

@@ -24,14 +24,16 @@ type SlotTicker struct {
 	C               chan Slot
 	slotDuration    time.Duration
 	genesisSlotTime time.Time
+	offset          time.Duration
 }
 
-func NewSlotTicker(slotDuration time.Duration, genesisSlotTime time.Time) *SlotTicker {
+func NewSlotTicker(slotDuration time.Duration, genesisSlotTime time.Time, offset time.Duration) *SlotTicker {
 	c := make(chan Slot, 1)
 	return &SlotTicker{
 		C:               c,
 		slotDuration:    slotDuration,
 		genesisSlotTime: genesisSlotTime,
+		offset:          offset,
 	}
 }
 
@@ -64,14 +66,7 @@ func (t *SlotTicker) run(ctx context.Context) error {
 
 	for {
 		now := time.Now()
-		timeSinceGenesis := now.Sub(t.genesisSlotTime)
-
-		var nextSlotNumber uint64
-		if timeSinceGenesis < 0 {
-			nextSlotNumber = 0
-		} else {
-			nextSlotNumber = uint64(timeSinceGenesis/t.slotDuration) + 1
-		}
+		nextSlotNumber, nextTickTime := calcNextTick(now, t.genesisSlotTime, t.slotDuration, t.offset)
 
 		if prevSlotNumber != nil {
 			expectedNextSlotNumber := *prevSlotNumber + 1
@@ -95,8 +90,7 @@ func (t *SlotTicker) run(ctx context.Context) error {
 			}
 		}
 
-		nextSlotTime := t.genesisSlotTime.Add(t.slotDuration * time.Duration(nextSlotNumber))
-		timeToNextSlot := nextSlotTime.Sub(now)
+		timeToNextSlot := nextTickTime.Sub(now)
 		timer.Reset(timeToNextSlot)
 		<-timer.C
 
@@ -106,4 +100,14 @@ func (t *SlotTicker) run(ctx context.Context) error {
 
 		prevSlotNumber = &nextSlotNumber
 	}
+}
+
+func calcNextTick(now time.Time, genesisSlotTime time.Time, slotDuration time.Duration, offset time.Duration) (uint64, time.Time) {
+	firstTick := genesisSlotTime.Add(offset)
+	if now.Before(firstTick) {
+		return 0, firstTick
+	}
+	slot := uint64((now.Sub(genesisSlotTime) - offset + slotDuration - 1) / slotDuration)
+	tick := genesisSlotTime.Add(slotDuration * time.Duration(slot)).Add(offset)
+	return slot, tick
 }
