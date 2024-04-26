@@ -223,13 +223,8 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 		return pubsub.ValidationReject, errors.New("msg does not contain any keys")
 	}
 
-	keyperCoreDB := corekeyperdatabase.New(h.dbpool)
 	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
-	eonData, err := keyperCoreDB.GetEon(ctx, int64(keys.Eon))
-	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get eon data from database for eon %d", keys.Eon)
-	}
-	keyperSet, err := obsKeyperDB.GetKeyperSet(ctx, eonData.ActivationBlockNumber)
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keys.Eon))
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keys.Eon)
 	}

@@ -122,7 +122,7 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 		})
 	}
 
-	eonUint, err := medley.Int64ToUint64Safe(eon.Eon)
+	keyperSetIndexUint, err := medley.Int64ToUint64Safe(eon.Eon)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	}
 	msg := &p2pmsg.DecryptionKeyShares{
 		InstanceID:  ksh.InstanceID,
-		Eon:         eonUint,
+		Eon:         keyperSetIndexUint,
 		KeyperIndex: keyperIndexUint,
 		Shares:      shares,
 	}

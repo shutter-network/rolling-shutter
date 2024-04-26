@@ -160,7 +160,7 @@ func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.C
 
 	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, atBlock)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve keyper set index")
+		return nil, errors.Wrapf(err, "could not retrieve keyper set index at block %d", atBlock)
 	}
 	return s.GetKeyperSetByIndex(ctx, opts, idx)
 }
