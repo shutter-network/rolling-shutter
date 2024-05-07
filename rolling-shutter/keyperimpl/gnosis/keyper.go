@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
+	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 	"golang.org/x/exp/slog"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
@@ -19,6 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -45,6 +47,7 @@ type Keyper struct {
 	client              *ethclient.Client
 	chainSyncClient     *chainsync.Client
 	sequencerSyncer     *SequencerSyncer
+	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
 
@@ -90,6 +93,32 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.dbpool, err = db.Connect(ctx, runner, kpr.config.DatabaseURL, database.Definition.Name())
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
+	}
+	beaconAPIClient, err := beaconapiclient.New(kpr.config.BeaconAPIURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize beacon API client")
+	}
+
+	validatorSyncerClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to dial ethereum node")
+	}
+	chainID, err := validatorSyncerClient.ChainID(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get chain ID")
+	}
+	validatorRegistryContract, err := validatorRegistryBindings.NewValidatorregistry(
+		kpr.config.Gnosis.Contracts.ValidatorRegistry,
+		validatorSyncerClient,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to instantiate validator registry contract")
+	}
+	kpr.validatorSyncer = &ValidatorSyncer{
+		Contract:        validatorRegistryContract,
+		DBPool:          kpr.dbpool,
+		BeaconAPIClient: beaconAPIClient,
+		ChainID:         chainID.Uint64(),
 	}
 
 	messageSender, err := p2p.New(kpr.config.P2P)
@@ -213,8 +242,6 @@ func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error
 			GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
 			SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
 		}
-
-		// TODO: perform an initial sync without blocking and/or set start block
 	}
 
 	if eon < kpr.sequencerSyncer.StartEon {

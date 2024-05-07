@@ -13,6 +13,10 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
+	err := kpr.validatorSyncer.Sync(ctx, ev.Header)
+	if err != nil {
+		return err
+	}
 	slot := medley.BlockTimestampToSlot(
 		ev.Header.Time,
 		kpr.config.Gnosis.GenesisSlotTimestamp,

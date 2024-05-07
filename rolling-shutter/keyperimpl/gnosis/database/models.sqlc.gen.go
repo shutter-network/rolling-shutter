@@ -51,3 +51,19 @@ type TxPointer struct {
 	Slot  int64
 	Value int64
 }
+
+type ValidatorRegistration struct {
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	ValidatorIndex int64
+	Nonce          int64
+	IsRegistration bool
+}
+
+type ValidatorRegistrationsSyncedUntil struct {
+	EnforceOneRow bool
+	BlockHash     []byte
+	BlockNumber   int64
+}

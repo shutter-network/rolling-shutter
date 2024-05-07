@@ -38,8 +38,9 @@ func (c *Config) Init() {
 }
 
 type Config struct {
-	InstanceID  uint64 `shconfig:",required"`
-	DatabaseURL string `shconfig:",required" comment:"If it's empty, we use the standard PG_ environment variables"`
+	InstanceID   uint64 `shconfig:",required"`
+	DatabaseURL  string `shconfig:",required" comment:"If it's empty, we use the standard PG_ environment variables"`
+	BeaconAPIURL string `shconfig:",required"`
 
 	HTTPEnabled       bool
 	HTTPListenAddress string
@@ -80,6 +81,7 @@ func (c *Config) SetExampleValues() error {
 	}
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
+	c.BeaconAPIURL = "http://localhost:5052"
 
 	return nil
 }
@@ -151,6 +153,7 @@ type GnosisContractsConfig struct {
 	KeyBroadcastContract common.Address `shconfig:",required"`
 	EonKeyPublish        common.Address `shconfig:",required"`
 	Sequencer            common.Address `shconfig:",required"`
+	ValidatorRegistry    common.Address `shconfig:",required"`
 }
 
 func NewGnosisContractsConfig() *GnosisContractsConfig {
@@ -159,6 +162,7 @@ func NewGnosisContractsConfig() *GnosisContractsConfig {
 		KeyBroadcastContract: common.Address{},
 		EonKeyPublish:        common.Address{},
 		Sequencer:            common.Address{},
+		ValidatorRegistry:    common.Address{},
 	}
 }
 

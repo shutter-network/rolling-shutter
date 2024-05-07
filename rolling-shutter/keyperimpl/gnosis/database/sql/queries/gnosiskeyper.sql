@@ -72,3 +72,34 @@ SELECT * FROM slot_decryption_signatures
 WHERE eon = $1 AND slot = $2 AND tx_pointer = $3 AND identities_hash = $4
 ORDER BY keyper_index ASC
 LIMIT $5;
+
+-- name: InsertValidatorRegistration :exec
+INSERT INTO validator_registrations (
+    block_number,
+    block_hash,
+    tx_index,
+    log_index,
+    validator_index,
+    nonce,
+    is_registration
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: IsValidatorRegistered :one
+SELECT is_registration FROM validator_registrations
+WHERE validator_index = $1 AND block_number < $1
+ORDER BY block_number DESC, tx_index DESC, log_index DESC
+LIMIT 1;
+
+-- name: SetValidatorRegistrationsSyncedUntil :exec
+INSERT INTO validator_registrations_synced_until (block_hash, block_number) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_hash = $1, block_number = $2;
+
+-- name: GetValidatorRegistrationsSyncedUntil :one
+SELECT * FROM validator_registrations_synced_until LIMIT 1;
+
+-- name: GetValidatorRegistrationNonceBefore :one
+SELECT nonce FROM validator_registrations
+WHERE validator_index = $1 AND block_number <= $2 AND tx_index <= $3 AND log_index <= $4
+ORDER BY block_number DESC, tx_index DESC, log_index DESC
+LIMIT 1;

@@ -160,6 +160,43 @@ func (q *Queries) GetTxPointer(ctx context.Context, eon int64) (TxPointer, error
 	return i, err
 }
 
+const getValidatorRegistrationNonceBefore = `-- name: GetValidatorRegistrationNonceBefore :one
+SELECT nonce FROM validator_registrations
+WHERE validator_index = $1 AND block_number <= $2 AND tx_index <= $3 AND log_index <= $4
+ORDER BY block_number DESC, tx_index DESC, log_index DESC
+LIMIT 1
+`
+
+type GetValidatorRegistrationNonceBeforeParams struct {
+	ValidatorIndex int64
+	BlockNumber    int64
+	TxIndex        int64
+	LogIndex       int64
+}
+
+func (q *Queries) GetValidatorRegistrationNonceBefore(ctx context.Context, arg GetValidatorRegistrationNonceBeforeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getValidatorRegistrationNonceBefore,
+		arg.ValidatorIndex,
+		arg.BlockNumber,
+		arg.TxIndex,
+		arg.LogIndex,
+	)
+	var nonce int64
+	err := row.Scan(&nonce)
+	return nonce, err
+}
+
+const getValidatorRegistrationsSyncedUntil = `-- name: GetValidatorRegistrationsSyncedUntil :one
+SELECT enforce_one_row, block_hash, block_number FROM validator_registrations_synced_until LIMIT 1
+`
+
+func (q *Queries) GetValidatorRegistrationsSyncedUntil(ctx context.Context) (ValidatorRegistrationsSyncedUntil, error) {
+	row := q.db.QueryRow(ctx, getValidatorRegistrationsSyncedUntil)
+	var i ValidatorRegistrationsSyncedUntil
+	err := row.Scan(&i.EnforceOneRow, &i.BlockHash, &i.BlockNumber)
+	return i, err
+}
+
 const initTxPointer = `-- name: InitTxPointer :exec
 INSERT INTO tx_pointer (eon, slot, value)
 VALUES ($1, $2, 0)
@@ -244,6 +281,55 @@ func (q *Queries) InsertTransactionSubmittedEvent(ctx context.Context, arg Inser
 	)
 }
 
+const insertValidatorRegistration = `-- name: InsertValidatorRegistration :exec
+INSERT INTO validator_registrations (
+    block_number,
+    block_hash,
+    tx_index,
+    log_index,
+    validator_index,
+    nonce,
+    is_registration
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+type InsertValidatorRegistrationParams struct {
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	ValidatorIndex int64
+	Nonce          int64
+	IsRegistration bool
+}
+
+func (q *Queries) InsertValidatorRegistration(ctx context.Context, arg InsertValidatorRegistrationParams) error {
+	_, err := q.db.Exec(ctx, insertValidatorRegistration,
+		arg.BlockNumber,
+		arg.BlockHash,
+		arg.TxIndex,
+		arg.LogIndex,
+		arg.ValidatorIndex,
+		arg.Nonce,
+		arg.IsRegistration,
+	)
+	return err
+}
+
+const isValidatorRegistered = `-- name: IsValidatorRegistered :one
+SELECT is_registration FROM validator_registrations
+WHERE validator_index = $1 AND block_number < $1
+ORDER BY block_number DESC, tx_index DESC, log_index DESC
+LIMIT 1
+`
+
+func (q *Queries) IsValidatorRegistered(ctx context.Context, validatorIndex int64) (bool, error) {
+	row := q.db.QueryRow(ctx, isValidatorRegistered, validatorIndex)
+	var is_registration bool
+	err := row.Scan(&is_registration)
+	return is_registration, err
+}
+
 const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)
 VALUES ($1, $2, $3, $4)
@@ -317,5 +403,21 @@ type SetTxPointerParams struct {
 
 func (q *Queries) SetTxPointer(ctx context.Context, arg SetTxPointerParams) error {
 	_, err := q.db.Exec(ctx, setTxPointer, arg.Eon, arg.Slot, arg.Value)
+	return err
+}
+
+const setValidatorRegistrationsSyncedUntil = `-- name: SetValidatorRegistrationsSyncedUntil :exec
+INSERT INTO validator_registrations_synced_until (block_hash, block_number) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_hash = $1, block_number = $2
+`
+
+type SetValidatorRegistrationsSyncedUntilParams struct {
+	BlockHash   []byte
+	BlockNumber int64
+}
+
+func (q *Queries) SetValidatorRegistrationsSyncedUntil(ctx context.Context, arg SetValidatorRegistrationsSyncedUntilParams) error {
+	_, err := q.db.Exec(ctx, setValidatorRegistrationsSyncedUntil, arg.BlockHash, arg.BlockNumber)
 	return err
 }

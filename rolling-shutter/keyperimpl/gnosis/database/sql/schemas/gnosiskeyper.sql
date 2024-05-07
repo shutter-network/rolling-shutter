@@ -49,3 +49,21 @@ CREATE TABLE slot_decryption_signatures(
     signature bytea NOT NULL,
     PRIMARY KEY (eon, slot, keyper_index)
 );
+
+CREATE TABLE validator_registrations(
+    block_number bigint NOT NULL CHECK (block_number >= 0),
+    block_hash bytea NOT NULL,
+    tx_index bigint NOT NULL CHECK (tx_index >= 0),
+    log_index bigint NOT NULL CHECK (log_index >= 0),
+    validator_index bigint NOT NULL CHECK (validator_index >= 0),
+    nonce bigint NOT NULL CHECK (nonce >= 0),
+    is_registration bool NOT NULL,
+    PRIMARY KEY (block_number, tx_index, log_index)
+);
+CREATE INDEX idx_validator_index ON validator_registrations (validator_index);
+
+CREATE TABLE validator_registrations_synced_until(
+    enforce_one_row bool PRIMARY KEY DEFAULT true,
+    block_hash bytea NOT NULL,
+    block_number bigint NOT NULL CHECK (block_number >= 0)
+);
