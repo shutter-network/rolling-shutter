@@ -16,6 +16,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	gnosisdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/slotticker"
@@ -72,16 +73,60 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	if err != nil {
 		return errors.Wrapf(err, "failed to query keyper set for block %d", nextBlock)
 	}
-	if keyperSet.Contains(kpr.config.GetAddress()) {
-		return kpr.triggerDecryption(ctx, slot, nextBlock, &keyperSet)
+
+	// don't trigger if we're not part of the keyper set
+	if !keyperSet.Contains(kpr.config.GetAddress()) {
+		log.Debug().
+			Uint64("slot", slot).
+			Int64("block-number", nextBlock).
+			Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
+			Str("address", kpr.config.GetAddress().Hex()).
+			Msg("skipping slot as not part of keyper set")
+		return nil
 	}
-	log.Debug().
-		Uint64("slot", slot).
-		Int64("block-number", nextBlock).
-		Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
-		Str("address", kpr.config.GetAddress().Hex()).
-		Msg("skipping slot as not part of keyper set")
-	return nil
+
+	// don't trigger if the block proposer is not part of the validator registry
+	isRegistered, err := kpr.isProposerRegistered(ctx, slot)
+	if err != nil {
+		return err
+	}
+	if !isRegistered {
+		log.Debug().
+			Uint64("slot", slot).
+			Msg("skipping slot as proposer is not registered")
+		return nil
+	}
+
+	return kpr.triggerDecryption(ctx, slot, nextBlock, &keyperSet)
+}
+
+func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64) (bool, error) {
+	epoch := medley.SlotToEpoch(slot, kpr.config.Gnosis.SlotsPerEpoch)
+	proposerDuties, err := kpr.beaconAPIClient.GetProposerDutiesByEpoch(ctx, epoch)
+	if err != nil {
+		return false, err
+	}
+	if proposerDuties == nil {
+		return false, errors.Errorf("no proposer duties found for slot %d in epoch %d", slot, epoch)
+	}
+	proposerDuty, err := proposerDuties.GetDutyForSlot(slot)
+	if err != nil {
+		return false, err
+	}
+	proposerIndex := proposerDuty.ValidatorIndex
+	if proposerIndex > math.MaxInt64 {
+		return false, errors.New("proposer index too big")
+	}
+
+	db := gnosisdatabase.New(kpr.dbpool)
+	isRegistered, err := db.IsValidatorRegistered(ctx, int64(proposerDuty.ValidatorIndex))
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to query registration status for validator %d", proposerDuty.ValidatorIndex)
+	}
+	return isRegistered, nil
 }
 
 func (kpr *Keyper) getTxPointer(ctx context.Context, eon int64, slot int64, keyperConfigIndex int64) (int64, error) {

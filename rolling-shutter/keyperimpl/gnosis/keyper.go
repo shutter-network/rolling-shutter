@@ -41,10 +41,11 @@ const (
 )
 
 type Keyper struct {
-	core                *keyper.KeyperCore
-	config              *Config
-	dbpool              *pgxpool.Pool
-	client              *ethclient.Client
+	core            *keyper.KeyperCore
+	config          *Config
+	dbpool          *pgxpool.Pool
+	beaconAPIClient *beaconapiclient.Client
+
 	chainSyncClient     *chainsync.Client
 	sequencerSyncer     *SequencerSyncer
 	validatorSyncer     *ValidatorSyncer
@@ -94,7 +95,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
-	beaconAPIClient, err := beaconapiclient.New(kpr.config.BeaconAPIURL)
+	kpr.beaconAPIClient, err = beaconapiclient.New(kpr.config.BeaconAPIURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize beacon API client")
 	}
@@ -117,7 +118,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.validatorSyncer = &ValidatorSyncer{
 		Contract:        validatorRegistryContract,
 		DBPool:          kpr.dbpool,
-		BeaconAPIClient: beaconAPIClient,
+		BeaconAPIClient: kpr.beaconAPIClient,
 		ChainID:         chainID.Uint64(),
 	}
 

@@ -100,6 +100,7 @@ type GnosisConfig struct {
 	EncryptedGasLimit    uint64                       `shconfig:",required"`
 	MinGasPerTransaction uint64                       `shconfig:",required"`
 	SecondsPerSlot       uint64                       `shconfig:",required"`
+	SlotsPerEpoch        uint64                       `shconfig:",required"`
 	GenesisSlotTimestamp uint64                       `shconfig:",required"`
 }
 
@@ -110,6 +111,7 @@ func NewGnosisConfig() *GnosisConfig {
 		EncryptedGasLimit:    0,
 		MinGasPerTransaction: 0,
 		SecondsPerSlot:       0,
+		SlotsPerEpoch:        0,
 		GenesisSlotTimestamp: 0,
 	}
 	c.Init()
@@ -140,6 +142,7 @@ func (c *GnosisConfig) SetExampleValues() error {
 	c.EncryptedGasLimit = 1_000_000
 	c.MinGasPerTransaction = 21_000
 	c.SecondsPerSlot = 5
+	c.SlotsPerEpoch = 16
 	c.GenesisSlotTimestamp = 1665410700
 	return nil
 }
