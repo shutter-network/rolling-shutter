@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-type Client interface {
+type EthereumClient interface {
 	Close()
 	ChainID(ctx context.Context) (*big.Int, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)

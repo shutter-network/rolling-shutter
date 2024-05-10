@@ -14,12 +14,15 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+var _ ManualFilterHandler = &ShutterStateSyncer{}
+
 type ShutterStateSyncer struct {
-	Client     client.Client
-	Contract   *bindings.KeyperSetManager
-	StartBlock *number.BlockNumber
-	Log        log.Logger
-	Handler    event.ShutterStateHandler
+	Client              client.EthereumClient
+	Contract            *bindings.KeyperSetManager
+	StartBlock          *number.BlockNumber
+	Log                 log.Logger
+	Handler             event.ShutterStateHandler
+	DisableEventWatcher bool
 
 	pausedCh   chan *bindings.KeyperSetManagerPaused
 	unpausedCh chan *bindings.KeyperSetManagerUnpaused
@@ -40,48 +43,94 @@ func (s *ShutterStateSyncer) GetShutterState(ctx context.Context, opts *bind.Cal
 	}, nil
 }
 
+func (s *ShutterStateSyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	opts := &bind.FilterOpts{
+		Start:   block,
+		End:     &block,
+		Context: ctx,
+	}
+	iterPaused, err := s.Contract.FilterPaused(opts)
+	if err != nil {
+		return err
+	}
+	defer iterPaused.Close()
+
+	for iterPaused.Next() {
+		select {
+		case s.pausedCh <- iterPaused.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := iterPaused.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	iterUnpaused, err := s.Contract.FilterUnpaused(opts)
+	if err != nil {
+		return err
+	}
+	defer iterUnpaused.Close()
+
+	for iterUnpaused.Next() {
+		select {
+		case s.unpausedCh <- iterUnpaused.Event:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := iterUnpaused.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	return nil
+}
+
 func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}
-	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock.ToUInt64Ptr(), // nil means latest
+	// the latest block still has to be fixed.
+	// otherwise we could skip some block events
+	// between the initial poll and the subscription.
+	if s.StartBlock.IsLatest() {
+		latest, err := s.Client.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		s.StartBlock.SetUint64(latest)
+	}
+
+	opts := &bind.WatchOpts{
+		Start:   s.StartBlock.ToUInt64Ptr(),
 		Context: ctx,
 	}
 	s.pausedCh = make(chan *bindings.KeyperSetManagerPaused)
-	subs, err := s.Contract.WatchPaused(watchOpts, s.pausedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
-	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Defer(func() {
 		close(s.pausedCh)
 	})
-
 	s.unpausedCh = make(chan *bindings.KeyperSetManagerUnpaused)
-	subs, err = s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
-	}
-	runner.Defer(subs.Unsubscribe)
 	runner.Defer(func() {
 		close(s.unpausedCh)
 	})
+
+	if !s.DisableEventWatcher {
+		subs, err := s.Contract.WatchPaused(opts, s.pausedCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
+		subs, err = s.Contract.WatchUnpaused(opts, s.unpausedCh)
+		// FIXME: what to do on subs.Error()
+		if err != nil {
+			return err
+		}
+		runner.Defer(subs.Unsubscribe)
+	}
 
 	runner.Go(func() error {
 		return s.watchPaused(ctx)
 	})
 	return nil
-}
-
-func (s *ShutterStateSyncer) pollIsActive(ctx context.Context) (bool, error) {
-	callOpts := bind.CallOpts{
-		Context: ctx,
-	}
-	paused, err := s.Contract.Paused(&callOpts)
-	return !paused, err
 }
 
 func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState) {
@@ -96,40 +145,56 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 }
 
 func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
-	isActive, err := s.pollIsActive(ctx)
+	// query the initial state
+	// and construct a "virtual"
+	// event
+	opts := &bind.CallOpts{
+		BlockNumber: s.StartBlock.Int,
+		Context:     nil,
+	}
+
+	stateAtStartBlock, err := s.GetShutterState(ctx, opts)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
 		return err
 	}
-	ev := &event.ShutterState{
-		Active: isActive,
-	}
-	s.handle(ctx, ev)
+	s.handle(ctx, stateAtStartBlock)
+	lastState := stateAtStartBlock
 	for {
 		select {
-		case _, ok := <-s.unpausedCh:
+		case unpaused, ok := <-s.unpausedCh:
 			if !ok {
 				return nil
 			}
-			if isActive {
-				s.Log.Error("state mismatch", "got", "actice", "have", "inactive")
+			if lastState.Active {
+				s.Log.Warn(
+					"state/event mismatch, but continue handler",
+					"new-event", "Unpaused",
+					"last-state", "active",
+				)
 			}
+			block := unpaused.Raw.BlockNumber
 			ev := &event.ShutterState{
-				Active: true,
+				Active:        true,
+				AtBlockNumber: number.NewBlockNumber(&block),
 			}
-			isActive = ev.Active
 			s.handle(ctx, ev)
-		case _, ok := <-s.pausedCh:
+		case paused, ok := <-s.pausedCh:
 			if !ok {
 				return nil
 			}
-			if isActive {
-				s.Log.Error("state mismatch", "got", "inactive", "have", "active")
+			if !lastState.Active {
+				s.Log.Warn(
+					"state/event mismatch, but continue handler",
+					"new-event", "Paused",
+					"last-state", "inactive",
+				)
 			}
+			block := paused.Raw.BlockNumber
 			ev := &event.ShutterState{
-				Active: false,
+				Active:        false,
+				AtBlockNumber: number.NewBlockNumber(&block),
 			}
-			isActive = ev.Active
 			s.handle(ctx, ev)
 		case <-ctx.Done():
 			return ctx.Err()
