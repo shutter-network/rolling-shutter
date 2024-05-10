@@ -17,7 +17,7 @@ import (
 var _ ManualFilterHandler = &EonPubKeySyncer{}
 
 type EonPubKeySyncer struct {
-	Client           client.EthereumClient
+	Client           client.SyncEthereumClient
 	Log              log.Logger
 	KeyBroadcast     *bindings.KeyBroadcastContract
 	KeyperSetManager *bindings.KeyperSetManager

@@ -23,7 +23,7 @@ const channelSize = 10
 var _ ManualFilterHandler = &KeyperSetSyncer{}
 
 type KeyperSetSyncer struct {
-	Client   client.EthereumClient
+	Client   client.FullEthereumClient
 	Contract *bindings.KeyperSetManager
 	Log      log.Logger
 	Handler  event.KeyperSetHandler
