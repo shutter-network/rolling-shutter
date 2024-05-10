@@ -20,6 +20,7 @@ var (
 
 type ManualFilterHandler interface {
 	QueryAndHandle(ctx context.Context, block uint64) error
+	HandleVirtualEvent(ctx context.Context, block *number.BlockNumber) error
 }
 
 func logToCallOpts(ctx context.Context, log *types.Log) *bind.CallOpts {
