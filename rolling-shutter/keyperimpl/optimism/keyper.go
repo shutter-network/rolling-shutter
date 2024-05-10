@@ -99,9 +99,10 @@ func (kpr *Keyper) newBlock(_ context.Context, ev *syncevent.LatestBlock) error 
 
 	// TODO: sanity checks
 
-	idPreimage := identitypreimage.BigToIdentityPreimage(ev.Number.Int)
+	latestBlockNumber := ev.Number.Uint64()
+	idPreimage := identitypreimage.Uint64ToIdentityPreimage(latestBlockNumber + 1)
 	trig := &epochkghandler.DecryptionTrigger{
-		BlockNumber:       ev.Number.Uint64(),
+		BlockNumber:       latestBlockNumber + 1,
 		IdentityPreimages: []identitypreimage.IdentityPreimage{idPreimage},
 	}
 
