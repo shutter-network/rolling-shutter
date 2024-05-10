@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -52,17 +53,45 @@ func parseLogs() error {
 }
 
 func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
+	var currentBlock *big.Int
 	for {
 		select {
 		case newHeader, ok := <-s.newLatestHeadCh:
 			if !ok {
 				return nil
 			}
+			blockNum := number.BigToBlockNumber(newHeader.Number)
+			if currentBlock != nil {
+				switch newHeader.Number.Cmp(currentBlock) {
+				case -1, 0:
+					prevNum := new(big.Int).Sub(newHeader.Number, big.NewInt(1))
+					prevBlockNum := number.BigToBlockNumber(prevNum)
+					// Re-emit the previous block, to pre-emptively signal an
+					// incoming reorg. Like this a client is able to e.g.
+					// rewind changes first before processing the new
+					// events of the reorg
+					ev := &event.LatestBlock{
+						Number:    prevBlockNum,
+						BlockHash: newHeader.ParentHash,
+					}
+					err := s.Handler(ctx, ev)
+					if err != nil {
+						// XXX: return or log?
+						// return err
+						s.Log.Error(
+							"handler for `NewLatestBlock` errored",
+							"error",
+							err.Error(),
+						)
+					}
+				case 1:
+					// expected
+				}
+			}
+
 			// TODO: check bloom filter for topic of all
 			// synced handlers and only call them if
 			// the bloomfilter retrieves something.
-
-			blockNum := number.BigToBlockNumber(newHeader.Number)
 			for _, h := range s.SyncedHandler {
 				// NOTE: this has to be blocking!
 				// So whenever this returns, it is expected
@@ -88,6 +117,7 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context) error {
 					err.Error(),
 				)
 			}
+			currentBlock = newHeader.Number
 		case <-ctx.Done():
 			return ctx.Err()
 		}
