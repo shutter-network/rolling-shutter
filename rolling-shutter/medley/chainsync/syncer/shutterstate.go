@@ -17,12 +17,13 @@ import (
 var _ ManualFilterHandler = &ShutterStateSyncer{}
 
 type ShutterStateSyncer struct {
-	Client              client.EthereumClient
-	Contract            *bindings.KeyperSetManager
-	StartBlock          *number.BlockNumber
-	Log                 log.Logger
-	Handler             event.ShutterStateHandler
-	DisableEventWatcher bool
+	Client                  client.EthereumClient
+	Contract                *bindings.KeyperSetManager
+	StartBlock              *number.BlockNumber
+	Log                     log.Logger
+	Handler                 event.ShutterStateHandler
+	FetchActiveAtStartBlock bool
+	DisableEventWatcher     bool
 
 	pausedCh   chan *bindings.KeyperSetManagerPaused
 	unpausedCh chan *bindings.KeyperSetManagerUnpaused
@@ -153,25 +154,19 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 		Context:     nil,
 	}
 
-	stateAtStartBlock, err := s.GetShutterState(ctx, opts)
-	if err != nil {
-		// XXX: this will fail everything, do we want that?
-		return err
+	if s.FetchActiveAtStartBlock {
+		stateAtStartBlock, err := s.GetShutterState(ctx, opts)
+		if err != nil {
+			// XXX: this will fail everything, do we want that?
+			return err
+		}
+		s.handle(ctx, stateAtStartBlock)
 	}
-	s.handle(ctx, stateAtStartBlock)
-	lastState := stateAtStartBlock
 	for {
 		select {
 		case unpaused, ok := <-s.unpausedCh:
 			if !ok {
 				return nil
-			}
-			if lastState.Active {
-				s.Log.Warn(
-					"state/event mismatch, but continue handler",
-					"new-event", "Unpaused",
-					"last-state", "active",
-				)
 			}
 			block := unpaused.Raw.BlockNumber
 			ev := &event.ShutterState{
@@ -182,13 +177,6 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 		case paused, ok := <-s.pausedCh:
 			if !ok {
 				return nil
-			}
-			if !lastState.Active {
-				s.Log.Warn(
-					"state/event mismatch, but continue handler",
-					"new-event", "Paused",
-					"last-state", "inactive",
-				)
 			}
 			block := paused.Raw.BlockNumber
 			ev := &event.ShutterState{

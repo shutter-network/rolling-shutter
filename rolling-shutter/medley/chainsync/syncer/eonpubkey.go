@@ -18,13 +18,14 @@ import (
 var _ ManualFilterHandler = &EonPubKeySyncer{}
 
 type EonPubKeySyncer struct {
-	Client              client.EthereumClient
-	Log                 log.Logger
-	KeyBroadcast        *bindings.KeyBroadcastContract
-	KeyperSetManager    *bindings.KeyperSetManager
-	StartBlock          *number.BlockNumber
-	Handler             event.EonPublicKeyHandler
-	DisableEventWatcher bool
+	Client                  client.EthereumClient
+	Log                     log.Logger
+	KeyBroadcast            *bindings.KeyBroadcastContract
+	KeyperSetManager        *bindings.KeyperSetManager
+	StartBlock              *number.BlockNumber
+	Handler                 event.EonPublicKeyHandler
+	FetchActiveAtStartBlock bool
+	DisableEventWatcher     bool
 
 	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
 }
@@ -76,14 +77,17 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		}
 		s.StartBlock.SetUint64(latest)
 	}
-	pubKs, err := s.getInitialPubKeys(ctx)
-	if err != nil {
-		return err
-	}
-	for _, k := range pubKs {
-		err := s.Handler(ctx, k)
+
+	if s.FetchActiveAtStartBlock {
+		pubKs, err := s.getInitialPubKeys(ctx)
 		if err != nil {
 			return err
+		}
+		for _, k := range pubKs {
+			err := s.Handler(ctx, k)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
