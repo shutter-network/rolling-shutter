@@ -13,6 +13,7 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -76,14 +77,17 @@ func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2
 		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
-	slotDecryptionSignatureData := SlotDecryptionSignatureData{
-		InstanceID:        keyShares.InstanceID,
-		Eon:               keyShares.Eon,
-		Slot:              extra.Gnosis.Slot,
-		TxPointer:         extra.Gnosis.TxPointer,
-		IdentityPreimages: identityPreimages,
+	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
+		keyShares.InstanceID,
+		keyShares.Eon,
+		extra.Gnosis.Slot,
+		extra.Gnosis.TxPointer,
+		identityPreimages,
+	)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to create slot decryption signature data object")
 	}
-	signatureValid, err := CheckSlotDecryptionSignature(&slotDecryptionSignatureData, extra.Gnosis.Signature, keyperAddress)
+	signatureValid, err := slotDecryptionSignatureData.CheckSignature(extra.Gnosis.Signature, keyperAddress)
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrap(err, "failed to check slot decryption signature")
 	}
@@ -247,17 +251,20 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
-	slotDecryptionSignatureData := SlotDecryptionSignatureData{
-		InstanceID:        keys.InstanceID,
-		Eon:               keys.Eon,
-		Slot:              extra.Gnosis.Slot,
-		TxPointer:         extra.Gnosis.TxPointer,
-		IdentityPreimages: identityPreimages,
+	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
+		keys.InstanceID,
+		keys.Eon,
+		extra.Gnosis.Slot,
+		extra.Gnosis.TxPointer,
+		identityPreimages,
+	)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrap(err, "failed to create slot decryption signature data object")
 	}
 	for signatureIndex := 0; signatureIndex < len(extra.Gnosis.Signatures); signatureIndex++ {
 		signature := extra.Gnosis.Signatures[signatureIndex]
 		signer := signers[signatureIndex]
-		signatureValid, err := CheckSlotDecryptionSignature(&slotDecryptionSignatureData, signature, signer)
+		signatureValid, err := slotDecryptionSignatureData.CheckSignature(signature, signer)
 		if err != nil {
 			return pubsub.ValidationReject, errors.Wrap(err, "failed to check slot decryption signature")
 		}

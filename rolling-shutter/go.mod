@@ -10,6 +10,7 @@ require (
 	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/ethereum/go-ethereum v1.13.11
+	github.com/ferranbt/fastssz v0.1.3
 	github.com/getkin/kin-openapi v0.87.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/google/go-cmp v0.6.0

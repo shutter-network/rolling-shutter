@@ -14,6 +14,7 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -139,14 +140,17 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 	for _, share := range originalMsg.Shares {
 		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(share.EpochID))
 	}
-	slotDecryptionSignatureData := SlotDecryptionSignatureData{
-		InstanceID:        i.config.InstanceID,
-		Eon:               originalMsg.Eon,
-		Slot:              uint64(currentDecryptionTrigger.Slot),
-		TxPointer:         uint64(currentDecryptionTrigger.TxPointer),
-		IdentityPreimages: identityPreimages,
+	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
+		i.config.InstanceID,
+		originalMsg.Eon,
+		uint64(currentDecryptionTrigger.Slot),
+		uint64(currentDecryptionTrigger.TxPointer),
+		identityPreimages,
+	)
+	if err != nil {
+		return nil, err
 	}
-	signature, err := ComputeSlotDecryptionSignature(&slotDecryptionSignatureData, i.config.Gnosis.Node.PrivateKey.Key)
+	signature, err := slotDecryptionSignatureData.ComputeSignature(i.config.Gnosis.Node.PrivateKey.Key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to compute slot decryption signature")
 	}
