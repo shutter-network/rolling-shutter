@@ -3,9 +3,11 @@ package gnosis
 import (
 	"context"
 	"math"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -21,6 +23,7 @@ import (
 type SequencerSyncer struct {
 	Contract             *sequencerBindings.Sequencer
 	DBPool               *pgxpool.Pool
+	ExecutionClient      *ethclient.Client
 	StartEon             uint64
 	GenesisSlotTimestamp uint64
 	SecondsPerSlot       uint64
@@ -41,69 +44,103 @@ func (s *SequencerSyncer) Sync(ctx context.Context, header *types.Header) error 
 	} else {
 		start = uint64(syncedUntil.BlockNumber + 1)
 	}
-
+	endBlock := header.Number.Uint64()
 	log.Debug().
 		Uint64("start-block", start).
-		Uint64("end-block", header.Number.Uint64()).
+		Uint64("end-block", endBlock).
 		Msg("syncing sequencer contract")
 
-	endBlock := header.Number.Uint64()
+	syncRanges := medley.GetSyncRanges(start, endBlock, maxRequestBlockRange)
+	for _, r := range syncRanges {
+		err = s.syncRange(ctx, r[0], r[1])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *SequencerSyncer) syncRange(
+	ctx context.Context,
+	start,
+	end uint64,
+) error {
+	events, err := s.fetchEvents(ctx, start, end)
+	if err != nil {
+		return err
+	}
+	filteredEvents := s.filterEvents(events)
+
+	header, err := s.ExecutionClient.HeaderByNumber(ctx, new(big.Int).SetUint64(end))
+	if err != nil {
+		return errors.Wrap(err, "failed to get execution block header by number")
+	}
+	err = s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		err = s.insertTransactionSubmittedEvents(ctx, tx, filteredEvents)
+		if err != nil {
+			return err
+		}
+
+		slot := medley.BlockTimestampToSlot(header.Time, s.GenesisSlotTimestamp, s.SecondsPerSlot)
+		return database.New(tx).SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
+			BlockNumber: int64(end),
+			BlockHash:   header.Hash().Bytes(),
+			Slot:        int64(slot),
+		})
+	})
+	log.Info().
+		Uint64("start-block", start).
+		Uint64("end-block", end).
+		Int("num-inserted-events", len(filteredEvents)).
+		Int("num-discarded-events", len(events)-len(filteredEvents)).
+		Msg("synced sequencer contract")
+	return nil
+}
+
+func (s *SequencerSyncer) fetchEvents(
+	ctx context.Context,
+	start,
+	end uint64,
+) ([]*sequencerBindings.SequencerTransactionSubmitted, error) {
 	opts := bind.FilterOpts{
 		Start:   start,
-		End:     &endBlock,
+		End:     &end,
 		Context: ctx,
 	}
 	it, err := s.Contract.SequencerFilterer.FilterTransactionSubmitted(&opts)
 	if err != nil {
-		return errors.Wrap(err, "failed to query transaction submitted events")
+		return nil, errors.Wrap(err, "failed to query transaction submitted events")
 	}
 	events := []*sequencerBindings.SequencerTransactionSubmitted{}
 	for it.Next() {
-		if it.Event.Eon < s.StartEon ||
-			it.Event.Eon > math.MaxInt64 ||
-			!it.Event.GasLimit.IsInt64() {
-			log.Debug().
-				Uint64("eon", it.Event.Eon).
-				Uint64("block-number", it.Event.Raw.BlockNumber).
-				Str("block-hash", it.Event.Raw.BlockHash.Hex()).
-				Uint("tx-index", it.Event.Raw.TxIndex).
-				Uint("log-index", it.Event.Raw.Index).
-				Msg("ignoring transaction submitted event")
-			continue
-		}
 		events = append(events, it.Event)
 	}
 	if it.Error() != nil {
-		return errors.Wrap(it.Error(), "failed to iterate transaction submitted events")
+		return nil, errors.Wrap(it.Error(), "failed to iterate transaction submitted events")
 	}
-	if len(events) == 0 {
-		log.Debug().
-			Uint64("start-block", start).
-			Uint64("end-block", endBlock).
-			Msg("no transaction submitted events found")
+	return events, nil
+}
+
+func (s *SequencerSyncer) filterEvents(
+	events []*sequencerBindings.SequencerTransactionSubmitted,
+) []*sequencerBindings.SequencerTransactionSubmitted {
+	filteredEvents := []*sequencerBindings.SequencerTransactionSubmitted{}
+	for _, event := range events {
+		if event.Eon < s.StartEon ||
+			event.Eon > math.MaxInt64 ||
+			!event.GasLimit.IsInt64() {
+			log.Debug().
+				Uint64("eon", event.Eon).
+				Uint64("block-number", event.Raw.BlockNumber).
+				Str("block-hash", event.Raw.BlockHash.Hex()).
+				Uint("tx-index", event.Raw.TxIndex).
+				Uint("log-index", event.Raw.Index).
+				Msg("ignoring transaction submitted event")
+			continue
+		}
+		filteredEvents = append(filteredEvents, event)
 	}
-
-	return s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		err = s.insertTransactionSubmittedEvents(ctx, tx, events)
-		if err != nil {
-			return err
-		}
-
-		newSyncedUntilBlock, err := medley.Uint64ToInt64Safe(endBlock)
-		if err != nil {
-			return err
-		}
-		slot := medley.BlockTimestampToSlot(header.Time, s.GenesisSlotTimestamp, s.SecondsPerSlot)
-		err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
-			BlockNumber: newSyncedUntilBlock,
-			BlockHash:   header.Hash().Bytes(),
-			Slot:        int64(slot),
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	return filteredEvents
 }
 
 // insertTransactionSubmittedEvents inserts the given events into the database and updates the

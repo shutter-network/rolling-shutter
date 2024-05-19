@@ -100,28 +100,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to initialize beacon API client")
 	}
 
-	validatorSyncerClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to dial ethereum node")
-	}
-	chainID, err := validatorSyncerClient.ChainID(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to get chain ID")
-	}
-	validatorRegistryContract, err := validatorRegistryBindings.NewValidatorregistry(
-		kpr.config.Gnosis.Contracts.ValidatorRegistry,
-		validatorSyncerClient,
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to instantiate validator registry contract")
-	}
-	kpr.validatorSyncer = &ValidatorSyncer{
-		Contract:        validatorRegistryContract,
-		DBPool:          kpr.dbpool,
-		BeaconAPIClient: kpr.beaconAPIClient,
-		ChainID:         chainID.Uint64(),
-	}
-
 	messageSender, err := p2p.New(kpr.config.P2P)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
@@ -183,6 +161,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
+	err = kpr.initValidatorSyncer(ctx)
+	if err != nil {
+		return err
+	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
@@ -223,15 +205,16 @@ func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
 }
 
 func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error {
+	client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to dial Ethereum execution node")
+	}
+
 	if kpr.sequencerSyncer == nil {
 		log.Info().
 			Uint64("eon", eon).
 			Str("contract-address", kpr.config.Gnosis.Contracts.KeyperSetManager.Hex()).
 			Msg("initializing sequencer syncer")
-		client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
-		if err != nil {
-			return err
-		}
 		contract, err := sequencerBindings.NewSequencer(kpr.config.Gnosis.Contracts.Sequencer, client)
 		if err != nil {
 			return err
@@ -239,6 +222,7 @@ func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error
 		kpr.sequencerSyncer = &SequencerSyncer{
 			Contract:             contract,
 			DBPool:               kpr.dbpool,
+			ExecutionClient:      client,
 			StartEon:             eon,
 			GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
 			SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
@@ -251,6 +235,55 @@ func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error
 			Uint64("new-start-eon", eon).
 			Msg("decreasing sequencer syncing start eon")
 		kpr.sequencerSyncer.StartEon = eon
+	}
+
+	// Perform an initial sync now because it might take some time and doing so during regular
+	// slot processing might hold up things
+	latestHeader, err := client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block header")
+	}
+	err = kpr.sequencerSyncer.Sync(ctx, latestHeader)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
+	validatorSyncerClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to dial ethereum node")
+	}
+	chainID, err := validatorSyncerClient.ChainID(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get chain ID")
+	}
+	validatorRegistryContract, err := validatorRegistryBindings.NewValidatorregistry(
+		kpr.config.Gnosis.Contracts.ValidatorRegistry,
+		validatorSyncerClient,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to instantiate validator registry contract")
+	}
+	kpr.validatorSyncer = &ValidatorSyncer{
+		Contract:        validatorRegistryContract,
+		DBPool:          kpr.dbpool,
+		BeaconAPIClient: kpr.beaconAPIClient,
+		ExecutionClient: validatorSyncerClient,
+		ChainID:         chainID.Uint64(),
+	}
+
+	// Perform an initial sync now because it might take some time and doing so during regular
+	// slot processing might hold up things
+	latestHeader, err := validatorSyncerClient.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block header")
+	}
+	err = kpr.validatorSyncer.Sync(ctx, latestHeader)
+	if err != nil {
+		return err
 	}
 	return nil
 }

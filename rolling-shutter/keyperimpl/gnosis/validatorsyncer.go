@@ -2,32 +2,38 @@ package gnosis
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	registryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
+	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 	blst "github.com/supranational/blst/bindings/go"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/validatorregistry"
 )
 
 const (
 	ValidatorRegistrationMessageVersion = 0
+	maxRequestBlockRange                = 100000
 )
 
 type ValidatorSyncer struct {
-	Contract        *registryBindings.Validatorregistry
+	Contract        *validatorRegistryBindings.Validatorregistry
 	DBPool          *pgxpool.Pool
 	BeaconAPIClient *beaconapiclient.Client
+	ExecutionClient *ethclient.Client
 	ChainID         uint64
 }
 
@@ -43,47 +49,43 @@ func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error 
 	} else {
 		start = uint64(syncedUntil.BlockNumber + 1)
 	}
-
+	endBlock := header.Number.Uint64()
 	log.Debug().
 		Uint64("start-block", start).
-		Uint64("end-block", header.Number.Uint64()).
+		Uint64("end-block", endBlock).
 		Msg("syncing validator registry")
 
-	endBlock := header.Number.Uint64()
-	opts := bind.FilterOpts{
-		Start:   start,
-		End:     &endBlock,
-		Context: ctx,
+	syncRanges := medley.GetSyncRanges(start, endBlock, maxRequestBlockRange)
+	for _, r := range syncRanges {
+		err = v.syncRange(ctx, r[0], r[1])
+		if err != nil {
+			return err
+		}
 	}
-	it, err := v.Contract.ValidatorregistryFilterer.FilterUpdated(&opts)
-	if err != nil {
-		return errors.Wrap(err, "failed to query validator registry update events")
-	}
-	events := []*registryBindings.ValidatorregistryUpdated{}
-	for it.Next() {
-		events = append(events, it.Event)
-	}
-	if it.Error() != nil {
-		return errors.Wrap(it.Error(), "failed to iterate validator registry update events")
-	}
-	if len(events) == 0 {
-		log.Debug().
-			Uint64("start-block", start).
-			Uint64("end-block", endBlock).
-			Msg("no validator registry update events found")
-	}
+	return nil
+}
 
+func (v *ValidatorSyncer) syncRange(ctx context.Context, start, end uint64) error {
+	db := database.New(v.DBPool)
+	events, err := v.fetchEvents(ctx, start, end)
+	if err != nil {
+		return err
+	}
 	filteredEvents, err := v.filterEvents(ctx, events)
 	if err != nil {
 		return err
 	}
-	return v.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	header, err := v.ExecutionClient.HeaderByNumber(ctx, new(big.Int).SetUint64(end))
+	if err != nil {
+		return errors.Wrap(err, "failed to get execution block header by number")
+	}
+	err = v.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		err = v.insertEvents(ctx, tx, filteredEvents)
 		if err != nil {
 			return err
 		}
 		err = db.SetValidatorRegistrationsSyncedUntil(ctx, database.SetValidatorRegistrationsSyncedUntilParams{
-			BlockNumber: int64(endBlock),
+			BlockNumber: int64(end),
 			BlockHash:   header.Hash().Bytes(),
 		})
 		if err != nil {
@@ -91,14 +93,48 @@ func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error 
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Uint64("start-block", start).
+		Uint64("end-block", end).
+		Int("num-inserted-events", len(filteredEvents)).
+		Int("num-discarded-events", len(events)-len(filteredEvents)).
+		Msg("synced validator registry")
+	return nil
+}
+
+func (v *ValidatorSyncer) fetchEvents(
+	ctx context.Context,
+	start,
+	end uint64,
+) ([]*validatorRegistryBindings.ValidatorregistryUpdated, error) {
+	opts := bind.FilterOpts{
+		Start:   start,
+		End:     &end,
+		Context: ctx,
+	}
+	it, err := v.Contract.ValidatorregistryFilterer.FilterUpdated(&opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query validator registry update events")
+	}
+	events := []*validatorRegistryBindings.ValidatorregistryUpdated{}
+	for it.Next() {
+		events = append(events, it.Event)
+	}
+	if it.Error() != nil {
+		return nil, errors.Wrap(it.Error(), "failed to iterate validator registry update events")
+	}
+	return events, nil
 }
 
 func (v *ValidatorSyncer) filterEvents(
 	ctx context.Context,
-	events []*registryBindings.ValidatorregistryUpdated,
-) ([]*registryBindings.ValidatorregistryUpdated, error) {
+	events []*validatorRegistryBindings.ValidatorregistryUpdated,
+) ([]*validatorRegistryBindings.ValidatorregistryUpdated, error) {
 	db := database.New(v.DBPool)
-	filteredEvents := []*registryBindings.ValidatorregistryUpdated{}
+	filteredEvents := []*validatorRegistryBindings.ValidatorregistryUpdated{}
 	for _, event := range events {
 		evLog := log.With().
 			Hex("block-hash", event.Raw.BlockHash.Bytes()).
@@ -133,7 +169,7 @@ func (v *ValidatorSyncer) filterEvents(
 		if err == pgx.ErrNoRows {
 			latestNonce = -1
 		}
-		if msg.Nonce <= uint64(latestNonce) || msg.Nonce > math.MaxInt64 {
+		if msg.Nonce > math.MaxInt64 || int64(msg.Nonce) <= latestNonce {
 			evLog.Warn().
 				Uint64("nonce", msg.Nonce).
 				Int64("latest-nonce", latestNonce).
@@ -149,16 +185,22 @@ func (v *ValidatorSyncer) filterEvents(
 			evLog.Warn().Msg("ignoring registration message for unknown validator")
 			continue
 		}
-		pubkey := &validator.Data.Validator.Pubkey
-		sig := new(blst.P2Affine).Deserialize(event.Signature)
+		pubkey, err := validator.Data.Validator.GetPubkey()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get pubkey of validator %d", msg.ValidatorIndex)
+		}
+		sig := new(blst.P2Affine).Uncompress(event.Signature)
 		if sig == nil {
-			evLog.Warn().Msg("ignoring registration message with invalid signature")
+			evLog.Warn().Msg("ignoring registration message with undecodable signature")
 			continue
 		}
+		fmt.Printf("signature original: %X\n", event.Signature)
+		fmt.Printf("validator pubkey original: %s\n", validator.Data.Validator.PubkeyHex)
 		validSignature := validatorregistry.VerifySignature(sig, pubkey, msg)
 		if !validSignature {
+			fmt.Printf("%X\n", event.Signature)
 			evLog.Warn().Msg("ignoring registration message with invalid signature")
-			continue
+			// continue
 		}
 
 		filteredEvents = append(filteredEvents, event)
@@ -166,7 +208,7 @@ func (v *ValidatorSyncer) filterEvents(
 	return filteredEvents, nil
 }
 
-func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []*registryBindings.ValidatorregistryUpdated) error {
+func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []*validatorRegistryBindings.ValidatorregistryUpdated) error {
 	db := database.New(tx)
 	for _, event := range events {
 		msg := new(validatorregistry.RegistrationMessage)
