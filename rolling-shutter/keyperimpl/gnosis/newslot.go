@@ -314,12 +314,12 @@ func transactionSubmittedEventToIdentityPreimage(
 }
 
 func makeSlotIdentityPreimage(slot uint64) identitypreimage.IdentityPreimage {
-	// 32 bytes of zeros plus the block number as big endian (ie starting with lots of zeros as well)
-	// this ensures the block identity preimage is always alphanumerically before any transaction
-	// identity preimages.
+	// 32 bytes of zeros plus the block number as 20 byte big endian (ie starting with lots of
+	// zeros as well). This ensures the block identity preimage is always alphanumerically before
+	// any transaction identity preimages, because sender addresses cannot be that small.
 	var buf bytes.Buffer
 	buf.Write(common.BigToHash(common.Big0).Bytes())
-	buf.Write(common.BigToHash(new(big.Int).SetUint64(slot)).Bytes())
+	buf.Write(common.BigToHash(new(big.Int).SetUint64(slot)).Bytes()[12:])
 
 	return identitypreimage.IdentityPreimage(buf.Bytes())
 }
