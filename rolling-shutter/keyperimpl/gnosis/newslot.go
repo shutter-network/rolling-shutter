@@ -211,16 +211,16 @@ func (kpr *Keyper) triggerDecryption(
 	if err != nil {
 		return errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
 	}
-	eon := eonStruct.Eon
+	keyperConfigIndex := eonStruct.KeyperConfigIndex
 
-	txPointer, err := kpr.getTxPointer(ctx, eon, int64(slot), keyperSet.KeyperConfigIndex)
+	txPointer, err := kpr.getTxPointer(ctx, keyperConfigIndex, int64(slot), keyperSet.KeyperConfigIndex)
 	if err == errZeroTxPointerAge {
 		log.Warn().
 			Uint64("slot", slot).
 			Int64("block-number", nextBlock).
-			Int64("eon", eon).
+			Int64("eon", keyperConfigIndex).
 			Int64("tx-pointer", txPointer).
-			Msg("skipping new block as tx pointer age is 0")
+			Msg("skipping trigger as tx pointer age is 0")
 		return nil
 	} else if err != nil {
 		return err
@@ -231,7 +231,7 @@ func (kpr *Keyper) triggerDecryption(
 		return err
 	}
 	err = gnosisKeyperDB.SetCurrentDecryptionTrigger(ctx, gnosisdatabase.SetCurrentDecryptionTriggerParams{
-		Eon:            eon,
+		Eon:            keyperConfigIndex,
 		Slot:           int64(slot),
 		TxPointer:      txPointer,
 		IdentitiesHash: computeIdentitiesHash(identityPreimages),
