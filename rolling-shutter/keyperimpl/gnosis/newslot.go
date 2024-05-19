@@ -50,7 +50,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
 	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to query synced until from db")
+		return errors.Wrap(err, "failed to query transaction submitted sync status from db")
 	}
 	if syncedUntil.Slot >= int64(slot) {
 		// If we already synced the block for slot n before this slot has started on our clock,
@@ -86,13 +86,14 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	}
 
 	// don't trigger if the block proposer is not part of the validator registry
-	isRegistered, err := kpr.isProposerRegistered(ctx, slot)
+	isRegistered, proposerIndex, err := kpr.isProposerRegistered(ctx, slot, uint64(nextBlock))
 	if err != nil {
 		return err
 	}
 	if !isRegistered {
 		log.Debug().
 			Uint64("slot", slot).
+			Uint64("proposer-index", proposerIndex).
 			Msg("skipping slot as proposer is not registered")
 		// Even if we don't trigger decryption, we still need to update the tx pointer or it will
 		// become outdated.
@@ -109,22 +110,22 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	return kpr.triggerDecryption(ctx, slot, nextBlock, &keyperSet)
 }
 
-func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64) (bool, error) {
+func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64, block uint64) (bool, uint64, error) {
 	epoch := medley.SlotToEpoch(slot, kpr.config.Gnosis.SlotsPerEpoch)
 	proposerDuties, err := kpr.beaconAPIClient.GetProposerDutiesByEpoch(ctx, epoch)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	if proposerDuties == nil {
-		return false, errors.Errorf("no proposer duties found for slot %d in epoch %d", slot, epoch)
+		return false, 0, errors.Errorf("no proposer duties found for slot %d in epoch %d", slot, epoch)
 	}
 	proposerDuty, err := proposerDuties.GetDutyForSlot(slot)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	proposerIndex := proposerDuty.ValidatorIndex
 	if proposerIndex > math.MaxInt64 {
-		return false, errors.New("proposer index too big")
+		return false, 0, errors.New("proposer index too big")
 	}
 
 	db := gnosisdatabase.New(kpr.dbpool)
@@ -133,12 +134,12 @@ func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64) (bool,
 		BlockNumber:    int64(block),
 	})
 	if err == pgx.ErrNoRows {
-		return false, nil
+		return false, proposerIndex, nil
 	}
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to query registration status for validator %d", proposerDuty.ValidatorIndex)
+		return false, 0, errors.Wrapf(err, "failed to query registration status for validator %d", proposerDuty.ValidatorIndex)
 	}
-	return isRegistered, nil
+	return isRegistered, proposerDuty.ValidatorIndex, nil
 }
 
 func (kpr *Keyper) getTxPointer(ctx context.Context, eon int64, slot int64, keyperConfigIndex int64) (int64, error) {
