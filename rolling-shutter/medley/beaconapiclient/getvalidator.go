@@ -2,6 +2,7 @@ package beaconapiclient
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,14 +26,14 @@ type ValidatorData struct {
 }
 
 type Validator struct {
-	Pubkey                     blst.P1Affine `json:"pubkey"`
-	WithdrawalCredentials      string        `json:"withdrawal_credentials,string"`
-	EffectiveBalance           uint64        `json:"effective_balance,string"`
-	Slashed                    bool          `json:"slashed"`
-	ActivationEligibilityEpoch uint64        `json:"activation_eligibility_epoch,string"`
-	ActivationEpoch            uint64        `json:"activation_epoch,string"`
-	ExitEpoch                  uint64        `json:"exit_epoch,string"`
-	WithdrawalEpoch            uint64        `json:"withdrawal_epoch,string"`
+	PubkeyHex                  string `json:"pubkey"`
+	WithdrawalCredentials      string `json:"withdrawal_credentials"`
+	EffectiveBalance           uint64 `json:"effective_balance,string"`
+	Slashed                    bool   `json:"slashed"`
+	ActivationEligibilityEpoch uint64 `json:"activation_eligibility_epoch,string"`
+	ActivationEpoch            uint64 `json:"activation_epoch,string"`
+	ExitEpoch                  uint64 `json:"exit_epoch,string"`
+	WithdrawalEpoch            uint64 `json:"withdrawal_epoch,string"`
 }
 
 func (c *Client) GetValidatorByIndex(
@@ -70,4 +71,24 @@ func (c *Client) GetValidatorByIndex(
 	}
 
 	return response, nil
+}
+
+func (v *Validator) GetPubkey() (*blst.P1Affine, error) {
+	pubkeyHex := v.PubkeyHex
+	if pubkeyHex[:2] == "0x" {
+		pubkeyHex = pubkeyHex[2:]
+	}
+
+	pubkeyBytes, err := hex.DecodeString(pubkeyHex)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to hex decode validator pubkey")
+	}
+
+	pubkey := new(blst.P1Affine)
+	pubkey = pubkey.Uncompress(pubkeyBytes)
+	if pubkey == nil {
+		return nil, errors.New("failed to deserialize pubkey")
+	}
+
+	return pubkey, nil
 }
