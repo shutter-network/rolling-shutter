@@ -91,7 +91,7 @@ INSERT INTO validator_registrations (
 
 -- name: IsValidatorRegistered :one
 SELECT is_registration FROM validator_registrations
-WHERE validator_index = $1 AND block_number < $1
+WHERE validator_index = $1 AND block_number < $2
 ORDER BY block_number DESC, tx_index DESC, log_index DESC
 LIMIT 1;
 

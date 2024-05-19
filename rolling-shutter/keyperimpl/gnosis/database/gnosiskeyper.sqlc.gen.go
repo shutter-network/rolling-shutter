@@ -318,13 +318,18 @@ func (q *Queries) InsertValidatorRegistration(ctx context.Context, arg InsertVal
 
 const isValidatorRegistered = `-- name: IsValidatorRegistered :one
 SELECT is_registration FROM validator_registrations
-WHERE validator_index = $1 AND block_number < $1
+WHERE validator_index = $1 AND block_number < $2
 ORDER BY block_number DESC, tx_index DESC, log_index DESC
 LIMIT 1
 `
 
-func (q *Queries) IsValidatorRegistered(ctx context.Context, validatorIndex int64) (bool, error) {
-	row := q.db.QueryRow(ctx, isValidatorRegistered, validatorIndex)
+type IsValidatorRegisteredParams struct {
+	ValidatorIndex int64
+	BlockNumber    int64
+}
+
+func (q *Queries) IsValidatorRegistered(ctx context.Context, arg IsValidatorRegisteredParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isValidatorRegistered, arg.ValidatorIndex, arg.BlockNumber)
 	var is_registration bool
 	err := row.Scan(&is_registration)
 	return is_registration, err

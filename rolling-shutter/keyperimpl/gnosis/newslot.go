@@ -128,7 +128,10 @@ func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64) (bool,
 	}
 
 	db := gnosisdatabase.New(kpr.dbpool)
-	isRegistered, err := db.IsValidatorRegistered(ctx, int64(proposerDuty.ValidatorIndex))
+	isRegistered, err := db.IsValidatorRegistered(ctx, gnosisdatabase.IsValidatorRegisteredParams{
+		ValidatorIndex: int64(proposerDuty.ValidatorIndex),
+		BlockNumber:    int64(block),
+	})
 	if err == pgx.ErrNoRows {
 		return false, nil
 	}
