@@ -232,9 +232,14 @@ func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []
 	return nil
 }
 
-func checkStaticRegistrationMessageFields(msg *validatorregistry.RegistrationMessage, chainID uint64, validatorRegistryAddress common.Address, log zerolog.Logger) bool {
+func checkStaticRegistrationMessageFields(
+	msg *validatorregistry.RegistrationMessage,
+	chainID uint64,
+	validatorRegistryAddress common.Address,
+	logger zerolog.Logger,
+) bool {
 	if msg.Version != ValidatorRegistrationMessageVersion {
-		log.Warn().
+		logger.Warn().
 			Uint8("version", msg.Version).
 			Uint8("expected-version", ValidatorRegistrationMessageVersion).
 			Uint64("validator-index", msg.ValidatorIndex).
@@ -242,7 +247,7 @@ func checkStaticRegistrationMessageFields(msg *validatorregistry.RegistrationMes
 		return false
 	}
 	if msg.ChainID != chainID {
-		log.Warn().
+		logger.Warn().
 			Uint64("chain-id", msg.ChainID).
 			Uint64("expected-chain-id", chainID).
 			Uint64("validator-index", msg.ValidatorIndex).
@@ -250,7 +255,7 @@ func checkStaticRegistrationMessageFields(msg *validatorregistry.RegistrationMes
 		return false
 	}
 	if msg.ValidatorRegistryAddress != validatorRegistryAddress {
-		log.Warn().
+		logger.Warn().
 			Hex("validator-registry-address", msg.ValidatorRegistryAddress.Bytes()).
 			Hex("expected-validator-registry-address", validatorRegistryAddress.Bytes()).
 			Uint64("validator-index", msg.ValidatorIndex).
@@ -258,7 +263,7 @@ func checkStaticRegistrationMessageFields(msg *validatorregistry.RegistrationMes
 		return false
 	}
 	if msg.ValidatorIndex > math.MaxInt64 {
-		log.Warn().
+		logger.Warn().
 			Uint64("validator-index", msg.ValidatorIndex).
 			Msg("ignoring registration message with invalid validator index")
 		return false
