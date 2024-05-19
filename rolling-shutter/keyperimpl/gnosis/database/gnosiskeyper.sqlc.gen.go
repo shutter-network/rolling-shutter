@@ -406,6 +406,22 @@ func (q *Queries) SetTxPointer(ctx context.Context, arg SetTxPointerParams) erro
 	return err
 }
 
+const setTxPointerSlot = `-- name: SetTxPointerSlot :exec
+UPDATE tx_pointer
+SET slot = $2
+WHERE eon = $1
+`
+
+type SetTxPointerSlotParams struct {
+	Eon  int64
+	Slot int64
+}
+
+func (q *Queries) SetTxPointerSlot(ctx context.Context, arg SetTxPointerSlotParams) error {
+	_, err := q.db.Exec(ctx, setTxPointerSlot, arg.Eon, arg.Slot)
+	return err
+}
+
 const setValidatorRegistrationsSyncedUntil = `-- name: SetValidatorRegistrationsSyncedUntil :exec
 INSERT INTO validator_registrations_synced_until (block_hash, block_number) VALUES ($1, $2)
 ON CONFLICT (enforce_one_row) DO UPDATE

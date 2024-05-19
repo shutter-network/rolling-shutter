@@ -94,6 +94,15 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 		log.Debug().
 			Uint64("slot", slot).
 			Msg("skipping slot as proposer is not registered")
+		// Even if we don't trigger decryption, we still need to update the tx pointer or it will
+		// become outdated.
+		err := gnosisKeyperDB.SetTxPointerSlot(ctx, gnosisdatabase.SetTxPointerSlotParams{
+			Eon:  keyperSet.KeyperConfigIndex,
+			Slot: int64(slot),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to update tx pointer slot")
+		}
 		return nil
 	}
 

@@ -53,6 +53,11 @@ VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
 SET slot = $2, value = $3;
 
+-- name: SetTxPointerSlot :exec
+UPDATE tx_pointer
+SET slot = $2
+WHERE eon = $1;
+
 -- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)
 VALUES ($1, $2, $3, $4)
