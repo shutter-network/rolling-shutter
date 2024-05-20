@@ -46,7 +46,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
 
-	dkgResultDB, err := database.New(handler.dbpool).GetDKGResult(ctx, int64(keyShare.Eon))
+	dkgResultDB, err := database.New(handler.dbpool).GetDKGResultForKeyperConfigIndex(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)
 	}
@@ -122,7 +122,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 
 	// fetch dkg result from db
-	dkgResultDB, err := db.GetDKGResult(ctx, int64(msg.Eon))
+	dkgResultDB, err := db.GetDKGResultForKeyperConfigIndex(ctx, int64(msg.Eon))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", msg.Eon)
 	}

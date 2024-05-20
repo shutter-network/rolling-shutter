@@ -335,6 +335,23 @@ func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber in
 	return i, err
 }
 
+const getDKGResultForKeyperConfigIndex = `-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT eon, success, error, pure_result FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1)
+`
+
+func (q *Queries) GetDKGResultForKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (DkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResultForKeyperConfigIndex, keyperConfigIndex)
+	var i DkgResult
+	err := row.Scan(
+		&i.Eon,
+		&i.Success,
+		&i.Error,
+		&i.PureResult,
+	)
+	return i, err
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT eon, epoch_id, decryption_key FROM decryption_key
 WHERE eon = $1 AND epoch_id = $2

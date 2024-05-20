@@ -43,7 +43,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
 
-	dkgResultDB, err := database.New(handler.dbpool).GetDKGResult(ctx, int64(key.Eon))
+	dkgResultDB, err := database.New(handler.dbpool).GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
 	}

@@ -169,6 +169,10 @@ WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(bloc
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
+-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT * FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1);
+
 -- name: GetAllDKGResults :many
 SELECT * FROM dkg_result
 ORDER BY eon ASC;
