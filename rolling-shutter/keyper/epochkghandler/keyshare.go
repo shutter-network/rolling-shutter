@@ -128,7 +128,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 	if !dkgResultDB.Success {
 		log.Info().Uint64("eon", msg.Eon).
-			Msg("ignoring decryption trigger: eon key generation failed")
+			Msg("ignoring decryption key share: eon key generation failed")
 		return nil, nil
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -141,7 +141,12 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	for _, share := range msg.GetShares() {
 		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
 
-		epochKG, err := handler.aggregateDecryptionKeySharesFromDB(ctx, pureDKGResult, identityPreimage)
+		epochKG, err := handler.aggregateDecryptionKeySharesFromDB(
+			ctx,
+			int64(msg.Eon),
+			pureDKGResult,
+			identityPreimage,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -178,12 +183,13 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 
 func (handler *DecryptionKeyShareHandler) aggregateDecryptionKeySharesFromDB(
 	ctx context.Context,
+	keyperConfigIndex int64,
 	pureDKGResult *puredkg.Result,
 	identityPreimage identitypreimage.IdentityPreimage,
 ) (*epochkg.EpochKG, error) {
 	db := database.New(handler.dbpool)
 	shares, err := db.SelectDecryptionKeyShares(ctx, database.SelectDecryptionKeySharesParams{
-		Eon:     int64(pureDKGResult.Eon),
+		Eon:     keyperConfigIndex,
 		EpochID: identityPreimage.Bytes(),
 	})
 	if err != nil {
