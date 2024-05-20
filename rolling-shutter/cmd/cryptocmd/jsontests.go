@@ -416,7 +416,7 @@ func verifyTestCase(tc *testCase) error {
 }
 
 func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*encryptionTest, error) {
-	epochID := keygen.RandomEpochID(make([]byte, 32))
+	epochID := keygen.RandomEpochID(make([]byte, 52))
 
 	et := encryptionTest{}
 
@@ -501,8 +501,8 @@ func createVerificationTest(keygen *testkeygen.KeyGenerator, payload []byte) (ve
 func createFailedVerificationTest(keygen *testkeygen.KeyGenerator, _ []byte) (verificationTest, error) {
 	var err error
 	vt := verificationTest{}
-	epochID := keygen.RandomEpochID(make([]byte, 32))
-	mismatch := keygen.RandomEpochID(make([]byte, 32))
+	epochID := keygen.RandomEpochID(make([]byte, 52))
+	mismatch := keygen.RandomEpochID(make([]byte, 52))
 	vt.EpochID = epochID
 	vt.EpochSecretKey = *keygen.EpochSecretKey(epochID)
 	vt.EonPublicKey = *keygen.EonPublicKey(mismatch)
