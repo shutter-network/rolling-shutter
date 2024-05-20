@@ -49,7 +49,9 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
 	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)
-	if err != nil {
+	if err != nil && err != pgx.ErrNoRows {
+		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
+		// That's because non-keypers don't sync transaction submitted events.
 		return errors.Wrap(err, "failed to query transaction submitted sync status from db")
 	}
 	if syncedUntil.Slot >= int64(slot) {
