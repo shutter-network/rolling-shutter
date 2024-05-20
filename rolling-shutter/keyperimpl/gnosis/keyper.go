@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -14,7 +13,6 @@ import (
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 	"golang.org/x/exp/slog"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -174,67 +172,24 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
-	obskeyperdb := obskeyper.New(kpr.dbpool)
-	keyperSets, err := obskeyperdb.GetKeyperSets(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to query keyper sets from db")
-	}
-
-	keyperSetFound := false
-	minEon := uint64(0)
-	for _, keyperSet := range keyperSets {
-		for _, m := range keyperSet.Keypers {
-			mAddress := common.HexToAddress(m)
-			if mAddress.Cmp(kpr.config.GetAddress()) == 0 {
-				keyperSetFound = true
-				if minEon > uint64(keyperSet.KeyperConfigIndex) {
-					minEon = uint64(keyperSet.KeyperConfigIndex)
-				}
-				break
-			}
-		}
-	}
-
-	if keyperSetFound {
-		err := kpr.ensureSequencerSyncing(ctx, minEon)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (kpr *Keyper) ensureSequencerSyncing(ctx context.Context, eon uint64) error {
 	client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial Ethereum execution node")
 	}
 
-	if kpr.sequencerSyncer == nil {
-		log.Info().
-			Uint64("eon", eon).
-			Str("contract-address", kpr.config.Gnosis.Contracts.KeyperSetManager.Hex()).
-			Msg("initializing sequencer syncer")
-		contract, err := sequencerBindings.NewSequencer(kpr.config.Gnosis.Contracts.Sequencer, client)
-		if err != nil {
-			return err
-		}
-		kpr.sequencerSyncer = &SequencerSyncer{
-			Contract:             contract,
-			DBPool:               kpr.dbpool,
-			ExecutionClient:      client,
-			StartEon:             eon,
-			GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
-			SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
-		}
+	log.Info().
+		Str("contract-address", kpr.config.Gnosis.Contracts.KeyperSetManager.Hex()).
+		Msg("initializing sequencer syncer")
+	contract, err := sequencerBindings.NewSequencer(kpr.config.Gnosis.Contracts.Sequencer, client)
+	if err != nil {
+		return err
 	}
-
-	if eon < kpr.sequencerSyncer.StartEon {
-		log.Info().
-			Uint64("old-start-eon", kpr.sequencerSyncer.StartEon).
-			Uint64("new-start-eon", eon).
-			Msg("decreasing sequencer syncing start eon")
-		kpr.sequencerSyncer.StartEon = eon
+	kpr.sequencerSyncer = &SequencerSyncer{
+		Contract:             contract,
+		DBPool:               kpr.dbpool,
+		ExecutionClient:      client,
+		GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
+		SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular

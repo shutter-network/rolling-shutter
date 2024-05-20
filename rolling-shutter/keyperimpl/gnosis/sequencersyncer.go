@@ -24,7 +24,6 @@ type SequencerSyncer struct {
 	Contract             *sequencerBindings.Sequencer
 	DBPool               *pgxpool.Pool
 	ExecutionClient      *ethclient.Client
-	StartEon             uint64
 	GenesisSlotTimestamp uint64
 	SecondsPerSlot       uint64
 }
@@ -126,8 +125,7 @@ func (s *SequencerSyncer) filterEvents(
 ) []*sequencerBindings.SequencerTransactionSubmitted {
 	filteredEvents := []*sequencerBindings.SequencerTransactionSubmitted{}
 	for _, event := range events {
-		if event.Eon < s.StartEon ||
-			event.Eon > math.MaxInt64 ||
+		if event.Eon > math.MaxInt64 ||
 			!event.GasLimit.IsInt64() {
 			log.Debug().
 				Uint64("eon", event.Eon).
@@ -135,7 +133,7 @@ func (s *SequencerSyncer) filterEvents(
 				Str("block-hash", event.Raw.BlockHash.Hex()).
 				Uint("tx-index", event.Raw.TxIndex).
 				Uint("log-index", event.Raw.Index).
-				Msg("ignoring transaction submitted event")
+				Msg("ignoring transaction submitted event with high eon")
 			continue
 		}
 		filteredEvents = append(filteredEvents, event)

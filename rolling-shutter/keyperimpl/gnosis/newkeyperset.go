@@ -29,12 +29,6 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		Bool("is-member", isMember).
 		Msg("new keyper set added")
 
-	if isMember {
-		if err := kpr.ensureSequencerSyncing(ctx, ev.Eon); err != nil {
-			return err
-		}
-	}
-
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
 
