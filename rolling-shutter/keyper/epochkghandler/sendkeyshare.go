@@ -122,7 +122,7 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 		})
 	}
 
-	keyperSetIndexUint, err := medley.Int64ToUint64Safe(eon.Eon)
+	keyperSetIndexUint, err := medley.Int64ToUint64Safe(eon.KeyperConfigIndex)
 	if err != nil {
 		return nil, err
 	}
