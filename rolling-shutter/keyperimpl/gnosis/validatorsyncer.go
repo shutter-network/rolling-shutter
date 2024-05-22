@@ -2,7 +2,6 @@ package gnosis
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/big"
 
@@ -194,13 +193,10 @@ func (v *ValidatorSyncer) filterEvents(
 			evLog.Warn().Msg("ignoring registration message with undecodable signature")
 			continue
 		}
-		fmt.Printf("signature original: %X\n", event.Signature)
-		fmt.Printf("validator pubkey original: %s\n", validator.Data.Validator.PubkeyHex)
 		validSignature := validatorregistry.VerifySignature(sig, pubkey, msg)
 		if !validSignature {
-			fmt.Printf("%X\n", event.Signature)
 			evLog.Warn().Msg("ignoring registration message with invalid signature")
-			// continue
+			continue
 		}
 
 		filteredEvents = append(filteredEvents, event)
