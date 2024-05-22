@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -297,7 +298,10 @@ func (kpr *Keyper) getDecryptionIdentityPreimages(
 		}
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
-	return identityPreimages, nil
+
+	sortedIdentityPreimages := sortIdentityPreimages(identityPreimages)
+
+	return sortedIdentityPreimages, nil
 }
 
 func transactionSubmittedEventToIdentityPreimage(
@@ -324,4 +328,13 @@ func makeSlotIdentityPreimage(slot uint64) identitypreimage.IdentityPreimage {
 	buf.Write(common.BigToHash(new(big.Int).SetUint64(slot)).Bytes()[12:])
 
 	return identitypreimage.IdentityPreimage(buf.Bytes())
+}
+
+func sortIdentityPreimages(identityPreimages []identitypreimage.IdentityPreimage) []identitypreimage.IdentityPreimage {
+	sorted := make([]identitypreimage.IdentityPreimage, len(identityPreimages))
+	copy(sorted, identityPreimages)
+	sort.Slice(sorted, func(i, j int) bool {
+		return bytes.Compare(sorted[i], sorted[j]) < 0
+	})
+	return sorted
 }
