@@ -110,7 +110,7 @@ func NewShuttermintConfig() *ShuttermintConfig {
 type ShuttermintConfig struct {
 	ShuttermintURL     string
 	ValidatorPublicKey *keys.Ed25519Public `shconfig:",required"`
-	EncryptionKey      *keys.ECDSAPrivate  `shconfig:",required"`
+	EncryptionKey      *keys.ECDSAPrivate  `shconfig:",required,sensitive"`
 	DKGPhaseLength     int64               // in shuttermint blocks
 	DKGStartBlockDelta uint64
 }

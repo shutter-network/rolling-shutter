@@ -92,9 +92,11 @@ func Build[T configuration.Config](
 			if err != nil {
 				return errors.Wrap(err, "unable to parse configuration")
 			}
-			log.Debug().
-				Interface("config", cfg).
-				Msg("got config")
+			err = LogConfig(log.Debug(), cfg, "using configuration")
+			// XXX should the program panic when the config can't be logged?
+			if err != nil {
+				return err
+			}
 			return main(cfg)
 		},
 	}
