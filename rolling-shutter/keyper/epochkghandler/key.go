@@ -77,7 +77,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, key.Keys[i-1].Identity) != 1 {
+		if i > 0 && bytes.Compare(k.Identity, key.Keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}

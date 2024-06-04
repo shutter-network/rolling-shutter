@@ -80,7 +80,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 			return pubsub.ValidationReject, errors.Errorf("cannot verify secret key share")
 		}
 
-		if i > 0 && bytes.Compare(share.EpochID, shares[i-1].EpochID) != 1 {
+		if i > 0 && bytes.Compare(share.EpochID, shares[i-1].EpochID) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keyshares not ordered")
 		}
 	}
