@@ -59,8 +59,9 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}
+	snkpr.dbpool = dbpool
 	runner.Defer(dbpool.Close)
-	shdb.AddConnectionInfo(log.Info(), dbpool).Msg("connected to database")
+	shdb.AddConnectionInfo(log.Debug(), dbpool).Msg("connected to database")
 
 	l1Client, err := ethclient.Dial(config.Ethereum.EthereumURL)
 	if err != nil {
@@ -70,6 +71,7 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	if err != nil {
 		return err
 	}
+	log.Debug().Msg("Connected to Ethereum node")
 
 	err = snkpr.dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
@@ -79,20 +81,25 @@ func (snkpr *snapshotkeyper) Start(ctx context.Context, runner service.Runner) e
 	if err != nil {
 		return err
 	}
+	log.Debug().Msg("Connect shuttermint")
 	shuttermintClient, err := tmhttp.New(config.Shuttermint.ShuttermintURL, "/websocket")
 	if err != nil {
 		return err
 	}
+	log.Debug().Msg("Init RPC message sender")
 	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
 
+	log.Debug().Msg("Init P2P")
 	p2pHandler, err := p2p.New(config.P2P)
 	if err != nil {
 		return err
 	}
 
 	if snkpr.config.Metrics.Enabled {
-		epochkghandler.InitMetrics()
+		log.Debug().Msg("initializing metrics server")
 		keypermetrics.InitMetrics()
+		epochkghandler.InitMetrics()
+		deployment.InitMetrics()
 		snkpr.metricsServer = metricsserver.New(snkpr.config.Metrics)
 	}
 
@@ -131,6 +138,7 @@ func (snkpr *snapshotkeyper) getServices() []service.Service {
 	if snkpr.config.Metrics.Enabled {
 		services = append(services, snkpr.metricsServer)
 	}
+	log.Debug().Interface("services to be started", services)
 	return services
 }
 
@@ -170,10 +178,11 @@ func (snkpr *snapshotkeyper) sendNewBlockSeen(
 		return err
 	}
 
-	count, err := q.CountBatchConfigsInBlockRange(ctx,
-		database.CountBatchConfigsInBlockRangeParams{
-			StartBlock: lastBlock,
-			EndBlock:   int64(l1BlockNumber),
+	count, err := q.CountBatchConfigsInBlockRangeWithKeyper(ctx,
+		database.CountBatchConfigsInBlockRangeWithKeyperParams{
+			KeyperAddress: []string{snkpr.config.GetAddress().String()},
+			StartBlock:    lastBlock,
+			EndBlock:      int64(l1BlockNumber),
 		})
 	if err != nil {
 		return err
@@ -208,6 +217,18 @@ func (snkpr *snapshotkeyper) handleOnChainKeyperSetChanges(ctx context.Context, 
 		return nil
 	} else if err != nil {
 		return err
+	}
+
+	isKeyperInBatch := false
+	for _, addr := range latestBatchConfig.Keypers {
+		if addr == snkpr.config.GetAddress().Hex() {
+			isKeyperInBatch = true
+			break
+		}
+	}
+	if !isKeyperInBatch {
+		// We're not a Keyper in this batchconfig
+		return nil
 	}
 
 	cq := chainobskprdb.New(tx)

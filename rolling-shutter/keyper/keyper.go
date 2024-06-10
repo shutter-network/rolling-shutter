@@ -118,8 +118,9 @@ func (kpr *keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	if kpr.config.Metrics.Enabled {
-		epochkghandler.InitMetrics()
 		keypermetrics.InitMetrics()
+		epochkghandler.InitMetrics()
+		deployment.InitMetrics()
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
 	}
 
@@ -196,10 +197,11 @@ func (kpr *keyper) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockNumbe
 		return err
 	}
 
-	count, err := q.CountBatchConfigsInBlockRange(ctx,
-		database.CountBatchConfigsInBlockRangeParams{
-			StartBlock: lastBlock,
-			EndBlock:   int64(l1BlockNumber),
+	count, err := q.CountBatchConfigsInBlockRangeWithKeyper(ctx,
+		database.CountBatchConfigsInBlockRangeWithKeyperParams{
+			KeyperAddress: []string{kpr.config.GetAddress().String()},
+			StartBlock:    lastBlock,
+			EndBlock:      int64(l1BlockNumber),
 		})
 	if err != nil {
 		return err

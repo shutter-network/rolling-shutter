@@ -14,6 +14,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.3.0
+	github.com/icza/gog v0.0.0-20240408124036-741771d15ae3
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jackc/pgconn v1.14.1
 	github.com/jackc/pgx/v4 v4.18.1
