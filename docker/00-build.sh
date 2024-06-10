@@ -2,5 +2,4 @@
 
 source ./common.sh
 
-$DC --profile dev down
 $DC --profile dev build
