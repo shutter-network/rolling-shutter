@@ -260,7 +260,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	}
 
 	log.Info().
-		Uint64("block", extra.Slot).
+		Uint64("slot", extra.Slot).
 		Uint64("tx-pointer", extra.TxPointer).
 		Int("num-signatures", len(signaturesDB)).
 		Int("num-keys", len(msg.Keys)).
