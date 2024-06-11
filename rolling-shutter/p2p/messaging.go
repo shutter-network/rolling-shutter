@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -30,6 +31,15 @@ type (
 
 func (r *ValidatorRegistry) GetCombinedValidator(topic string) pubsub.ValidatorEx {
 	validate := func(ctx context.Context, sender peer.ID, message *pubsub.Message) pubsub.ValidationResult {
+		startTime := time.Now()
+		defer func() {
+			elapsedTime := time.Since(startTime)
+			log.Debug().
+				Str("topic", topic).
+				Str("duration", elapsedTime.String()).
+				Msg("validated message")
+		}()
+
 		ignored := false
 		for _, valFunc := range (*r)[topic] {
 			res := valFunc(ctx, sender, message)
@@ -284,11 +294,21 @@ var (
 )
 
 func (m *P2PMessaging) Handle(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+	startTime := time.Now()
+	messageName := proto.MessageName(msg)
+	defer func() {
+		elapsedTime := time.Since(startTime)
+		log.Debug().
+			Str("message-name", string(messageName)).
+			Str("duration", elapsedTime.String()).
+			Msg("handled message")
+	}()
+
 	var (
 		msgsOut   []p2pmsg.Message
 		errResult error
 	)
-	fns, exists := m.handlerRegistry[proto.MessageName(msg)]
+	fns, exists := m.handlerRegistry[messageName]
 	if !exists {
 		return nil, ErrNoMessageHandler
 	}
