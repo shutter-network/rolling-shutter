@@ -46,6 +46,7 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
 
+	log.Debug().Uint64("eon", keyShare.Eon).Msg("getting dkg result")
 	dkgResultDB, err := database.New(handler.dbpool).GetDKGResultForKeyperConfigIndex(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)

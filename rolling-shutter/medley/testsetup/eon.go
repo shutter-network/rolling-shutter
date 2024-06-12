@@ -31,15 +31,15 @@ type TestConfig interface {
 
 func InitializeEon(
 	ctx context.Context,
-	t *testing.T,
+	tb testing.TB,
 	dbpool *pgxpool.Pool,
 	config TestConfig,
 	keyperIndex uint64,
 ) *testkeygen.TestKeyGenerator {
-	t.Helper()
+	tb.Helper()
 
 	err := dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
 	keyperDB := database.New(dbpool)
 	keypers := []string{
@@ -51,16 +51,16 @@ func InitializeEon(
 	collatorKey := config.GetCollatorKey()
 	if collatorKey != nil {
 		err := dbpool.BeginFunc(db.WrapContext(ctx, chainobsdb.Definition.Validate))
-		assert.NilError(t, err)
+		assert.NilError(tb, err)
 		chdb := chainobsdb.New(dbpool)
 		err = chdb.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 			ActivationBlockNumber: 0,
 			Collator:              shdb.EncodeAddress(ethcrypto.PubkeyToAddress(config.GetCollatorKey().PublicKey)),
 		})
-		assert.NilError(t, err)
+		assert.NilError(tb, err)
 	}
 
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
+	tkg := testkeygen.NewTestKeyGenerator(tb, 3, 2, false)
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	for i := uint64(0); i < tkg.NumKeypers; i++ {
@@ -77,7 +77,7 @@ func InitializeEon(
 		PublicKeyShares: publicKeyShares,
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
 	err = keyperDB.InsertBatchConfig(ctx, database.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
@@ -85,21 +85,21 @@ func InitializeEon(
 		Keypers:           keypers,
 		Threshold:         int32(tkg.Threshold),
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{
 		Eon:                   int64(config.GetEon()),
 		Height:                0,
 		ActivationBlockNumber: 0,
 		KeyperConfigIndex:     1,
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 	err = keyperDB.InsertDKGResult(ctx, database.InsertDKGResultParams{
 		Eon:        int64(config.GetEon()),
 		Success:    true,
 		Error:      sql.NullString{},
 		PureResult: dkgResultEncoded,
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
 	return tkg
 }

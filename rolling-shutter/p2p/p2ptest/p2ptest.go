@@ -16,13 +16,13 @@ import (
 // MustValidateMessageResult calls the handlers ValidateMessage method and ensures it returns the
 // expected result.
 func MustValidateMessageResult(
-	t *testing.T,
+	tb testing.TB,
 	expectedResult pubsub.ValidationResult,
 	handler p2p.MessageHandler,
 	ctx context.Context, //nolint:revive
 	msg p2pmsg.Message,
 ) {
-	t.Helper()
+	tb.Helper()
 	validationResult, err := handler.ValidateMessage(ctx, msg)
 	accepted := validationResult == pubsub.ValidationAccept
 	log.Debug().
@@ -30,21 +30,21 @@ func MustValidateMessageResult(
 		Int("result", int(validationResult)).
 		Int("expected", int(expectedResult)).Err(err).Msg("ValidateMessage")
 	if accepted {
-		assert.NilError(t, err, "validation returned error")
+		assert.NilError(tb, err, "validation returned error")
 	}
-	assert.Equal(t, expectedResult, validationResult, "validation did not validate with expected result ")
+	assert.Equal(tb, expectedResult, validationResult, "validation did not validate with expected result ")
 }
 
 // MustHandleMessage makes sure the handler validates and handles the given message without errors.
 func MustHandleMessage(
-	t *testing.T,
+	tb testing.TB,
 	handler p2p.MessageHandler,
 	ctx context.Context, //nolint:revive
 	msg p2pmsg.Message,
 ) []p2pmsg.Message {
-	t.Helper()
-	MustValidateMessageResult(t, pubsub.ValidationAccept, handler, ctx, msg)
+	tb.Helper()
+	MustValidateMessageResult(tb, pubsub.ValidationAccept, handler, ctx, msg)
 	msgs, err := handler.HandleMessage(ctx, msg)
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 	return msgs
 }
