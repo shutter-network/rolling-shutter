@@ -531,7 +531,7 @@ func (et *encryptionTest) Run() error {
 		return fmt.Errorf("failed encryption test on encoding expected: %s", err)
 	}
 	if !bytes.Equal(encoded, expectation) {
-		return fmt.Errorf("failed encryption test on equal results: %s != %s", encoded, et.Expected)
+		return fmt.Errorf("failed encryption test on equal results: %s != %s", encoded, expectation)
 	}
 	return nil
 }
