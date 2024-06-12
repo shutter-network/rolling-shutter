@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"sync"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
 
 type Runner interface {
@@ -62,13 +65,22 @@ func (r *runner) runShutdownFuncs() {
 }
 
 func Run(ctx context.Context, services ...Service) error {
+	group, deferFn := RunBackground(ctx, services...)
+	defer deferFn()
+	return group.Wait()
+}
+
+// RunBackground runs the services within the context of an errgroup.Group.
+// It returns the errgroup.Group as well as the cleanup function to be deferred.
+// This is a low-level executor of services, the defer function is expected
+// to be called!
+func RunBackground(ctx context.Context, services ...Service) (*errgroup.Group, func()) {
 	group, ctx := errgroup.WithContext(ctx)
 	r := runner{group: group, ctx: ctx}
 	group.Go(func() error {
 		return r.StartService(services...)
 	})
-	defer r.runShutdownFuncs()
-	return group.Wait()
+	return group, r.runShutdownFuncs
 }
 
 // notifyTermination creates a context that is canceled, when the process receives SIGINT or
@@ -100,17 +112,22 @@ func RunWithSighandler(ctx context.Context, services ...Service) error {
 		log.Info().Msg("bye")
 		return nil
 	}
+	if errors.Is(err, medley.ErrShutdownRequested) {
+		log.Info().Msg("user shut down service")
+		log.Info().Msg("bye")
+		return nil
+	}
 
 	return err
 }
 
-type ServiceFn struct {
-	Fn func(ctx context.Context) error
+type Function struct {
+	Func func(ctx context.Context, group Runner) error
 }
 
-func (sf ServiceFn) Start(ctx context.Context, group Runner) error { //nolint:unparam
+func (sf Function) Start(ctx context.Context, group Runner) error { //nolint:unparam
 	group.Go(func() error {
-		return sf.Fn(ctx)
+		return sf.Func(ctx, group)
 	})
 	return nil
 }

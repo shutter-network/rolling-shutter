@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -416,7 +416,7 @@ func verifyTestCase(tc *testCase) error {
 }
 
 func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*encryptionTest, error) {
-	epochID := keygen.RandomEpochID(make([]byte, 32))
+	epochID := keygen.RandomEpochID(make([]byte, 52))
 
 	et := encryptionTest{}
 
@@ -452,12 +452,13 @@ func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*enc
 // tamperEncryptedMessage changes the C1 value of EncryptedMessage, which allows to test for malleability issues.
 func tamperEncryptedMessage(keygen *testkeygen.KeyGenerator, et encryptionTest) encryptionTest {
 	decryptionKey := keygen.EpochSecretKey(et.EpochID)
-	var c1 *bn256.G2
+	g2 := bls12381.NewG2()
+	var c1 *bls12381.PointG2
 	var err error
 
 	for i := 1; i <= 10000; i++ {
 		c1 = et.Expected.C1
-		c1.Add(c1, c1)
+		g2.Add(c1, c1, c1)
 		et.Expected.C1 = c1
 		sigma := et.Expected.Sigma(decryptionKey)
 		decryptedBlocks := shcrypto.DecryptBlocks(et.Expected.C3, sigma)
@@ -500,8 +501,8 @@ func createVerificationTest(keygen *testkeygen.KeyGenerator, payload []byte) (ve
 func createFailedVerificationTest(keygen *testkeygen.KeyGenerator, _ []byte) (verificationTest, error) {
 	var err error
 	vt := verificationTest{}
-	epochID := keygen.RandomEpochID(make([]byte, 32))
-	mismatch := keygen.RandomEpochID(make([]byte, 32))
+	epochID := keygen.RandomEpochID(make([]byte, 52))
+	mismatch := keygen.RandomEpochID(make([]byte, 52))
 	vt.EpochID = epochID
 	vt.EpochSecretKey = *keygen.EpochSecretKey(epochID)
 	vt.EonPublicKey = *keygen.EonPublicKey(mismatch)
@@ -530,7 +531,7 @@ func (et *encryptionTest) Run() error {
 		return fmt.Errorf("failed encryption test on encoding expected: %s", err)
 	}
 	if !bytes.Equal(encoded, expectation) {
-		return fmt.Errorf("failed encryption test on equal results: %s != %s", encoded, et.Expected)
+		return fmt.Errorf("failed encryption test on equal results: %s != %s", encoded, expectation)
 	}
 	return nil
 }

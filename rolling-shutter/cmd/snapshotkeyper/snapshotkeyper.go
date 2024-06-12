@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/snapshot"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/snapshotkeyper"
 )
 
 func Cmd() *cobra.Command {
@@ -40,13 +39,13 @@ func main(config *keyper.Config) error {
 		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting snapshotkeyper")
 
-	return service.RunWithSighandler(context.Background(), snapshotkeyper.New(config))
+	kpr := keyper.New(config)
+	return service.RunWithSighandler(context.Background(), kpr)
 }
 
-func initDB(config *keyper.Config) error {
+func initDB(cfg *keyper.Config) error {
 	ctx := context.Background()
-
-	dbpool, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to database")
 	}

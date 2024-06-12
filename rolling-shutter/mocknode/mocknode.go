@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	txtypes "github.com/shutter-network/txtypes/types"
@@ -29,7 +28,7 @@ type MockNode struct {
 	mux sync.Mutex
 
 	collatorClient *client.Client
-	p2p            *p2p.P2PHandler
+	p2p            *p2p.P2PMessaging
 
 	eonSecretKeyShare *shcrypto.EonSecretKeyShare
 	eonPublicKey      *shcrypto.EonPublicKey
@@ -90,7 +89,7 @@ func (m *MockNode) setupP2PHandler() {
 	m.p2p.AddHandlerFunc(m.handleEonPublicKey, &p2pmsg.EonPublicKey{})
 
 	m.p2p.AddGossipTopic(kprtopics.DecryptionTrigger)
-	m.p2p.AddGossipTopic(kprtopics.DecryptionKey)
+	m.p2p.AddGossipTopic(kprtopics.DecryptionKeys)
 }
 
 func (m *MockNode) logStartupInfo() {
@@ -107,7 +106,7 @@ func (m *MockNode) handleEonPublicKey(
 	if err := m.eonPublicKey.Unmarshal(key.PublicKey); err != nil {
 		log.Info().Err(err).Msg("failed to unmarshal eon public key")
 	}
-	log.Info().Str("eon-public-key", (*bn256.G2)(m.eonPublicKey).String()).
+	log.Info().Hex("eon-public-key", m.eonPublicKey.Marshal()).
 		Msg("updated eon public key from messages to %s")
 	return make([]p2pmsg.Message, 0), nil
 }
@@ -272,10 +271,14 @@ func (m *MockNode) sendDecryptionKey(ctx context.Context, identityPreimage ident
 
 	keyBytes := epochSecretKey.Marshal()
 
-	msg := &p2pmsg.DecryptionKey{
+	msg := &p2pmsg.DecryptionKeys{
 		InstanceID: m.Config.InstanceID,
-		EpochID:    identityPreimage.Bytes(),
-		Key:        keyBytes,
+		Keys: []*p2pmsg.Key{
+			{
+				Identity: identityPreimage.Bytes(),
+				Key:      keyBytes,
+			},
+		},
 	}
 	return m.p2p.SendMessage(ctx, msg)
 }

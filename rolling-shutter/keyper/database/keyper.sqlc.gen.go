@@ -143,6 +143,36 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	return exists, err
 }
 
+const getAllDKGResults = `-- name: GetAllDKGResults :many
+SELECT eon, success, error, pure_result FROM dkg_result
+ORDER BY eon ASC
+`
+
+func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
+	rows, err := q.db.Query(ctx, getAllDKGResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgResult
+	for rows.Next() {
+		var i DkgResult
+		if err := rows.Scan(
+			&i.Eon,
+			&i.Success,
+			&i.Error,
+			&i.PureResult,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllEons = `-- name: GetAllEons :many
 SELECT eon, height, activation_block_number, keyper_config_index FROM eons ORDER BY eon
 `
@@ -295,6 +325,23 @@ LIMIT 1)
 
 func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber int64) (DkgResult, error) {
 	row := q.db.QueryRow(ctx, getDKGResultForBlockNumber, blockNumber)
+	var i DkgResult
+	err := row.Scan(
+		&i.Eon,
+		&i.Success,
+		&i.Error,
+		&i.PureResult,
+	)
+	return i, err
+}
+
+const getDKGResultForKeyperConfigIndex = `-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT eon, success, error, pure_result FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1)
+`
+
+func (q *Queries) GetDKGResultForKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (DkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResultForKeyperConfigIndex, keyperConfigIndex)
 	var i DkgResult
 	err := row.Scan(
 		&i.Eon,
@@ -541,6 +588,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
 INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyShareParams struct {

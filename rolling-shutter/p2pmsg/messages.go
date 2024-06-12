@@ -117,25 +117,37 @@ func (share *DecryptionKeyShares) Validate() error {
 	return nil
 }
 
-func (key *DecryptionKey) LogInfo() string {
-	return fmt.Sprintf("DecryptionKey{epochid=%x}", key.EpochID)
+func (keys *DecryptionKeys) LogInfo() string {
+	var firstIdentity string
+	if len(keys.Keys) == 0 {
+		firstIdentity = "none"
+	} else {
+		id := identitypreimage.IdentityPreimage(keys.Keys[0].Identity)
+		firstIdentity = id.Hex()
+	}
+	return fmt.Sprintf("DecryptionKeys{firstIdentity=%s, numKeys=%d}", firstIdentity, len(keys.Keys))
 }
 
-func (*DecryptionKey) Topic() string {
-	return kprtopics.DecryptionKey
+func (*DecryptionKeys) Topic() string {
+	return kprtopics.DecryptionKeys
 }
 
-func (key *DecryptionKey) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
+func (keys *DecryptionKeys) Validate() error {
+	for _, k := range keys.Keys {
+		_, err := k.GetEpochSecretKey()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (k *Key) GetEpochSecretKey() (*shcrypto.EpochSecretKey, error) {
 	epochSecretKey := new(shcrypto.EpochSecretKey)
-	if err := epochSecretKey.Unmarshal(key.GetKey()); err != nil {
+	if err := epochSecretKey.Unmarshal(k.GetKey()); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal decryption key P2P message")
 	}
 	return epochSecretKey, nil
-}
-
-func (key *DecryptionKey) Validate() error {
-	_, err := key.GetEpochSecretKey()
-	return err
 }
 
 func (e *EonPublicKey) LogInfo() string {

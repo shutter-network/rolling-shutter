@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -23,6 +24,7 @@ import (
 
 const (
 	minRetryPollInterval time.Duration = 50 * time.Millisecond
+	MaxNumKeysPerMessage               = 128
 	newDecryptionTrigger               = "new_decryption_trigger"
 	newDecryptionKey                   = "new_decryption_key"
 	newBatchtx                         = "new_batchtx"
@@ -40,53 +42,57 @@ type decryptionKeyHandler struct {
 }
 
 func (*decryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
-	return []p2pmsg.Message{&p2pmsg.DecryptionKey{}}
+	return []p2pmsg.Message{&p2pmsg.DecryptionKeys{}}
 }
 
 func (handler *decryptionKeyHandler) HandleMessage(
 	ctx context.Context,
 	m p2pmsg.Message,
 ) ([]p2pmsg.Message, error) {
-	msg := m.(*p2pmsg.DecryptionKey)
-	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
+	msg := m.(*p2pmsg.DecryptionKeys)
 
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := database.New(tx)
-		_, err := db.InsertDecryptionKey(ctx, database.InsertDecryptionKeyParams{
-			EpochID:       identityPreimage.Bytes(),
-			DecryptionKey: msg.Key,
-		})
-		return err
+		for _, key := range msg.Keys {
+			identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+			_, err := db.InsertDecryptionKey(ctx, database.InsertDecryptionKeyParams{
+				EpochID:       identityPreimage.Bytes(),
+				DecryptionKey: key.Key,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "error while inserting decryption key for epoch %s", identityPreimage)
+			}
+			log.Info().Str("epoch-id", identityPreimage.Hex()).Msg("inserted decryption key to database")
+		}
+		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while inserting decryption key for epoch %s", identityPreimage)
+		return nil, err
 	}
-	log.Info().Str("epoch-id", identityPreimage.Hex()).Msg("inserted decryption key to database")
 	return []p2pmsg.Message{}, nil
 }
 
 func (handler *decryptionKeyHandler) ValidateMessage(
 	ctx context.Context,
 	k p2pmsg.Message,
-) (bool, error) {
-	key := k.(*p2pmsg.DecryptionKey)
+) (pubsub.ValidationResult, error) {
+	keys := k.(*p2pmsg.DecryptionKeys)
 
-	var eonPublicKey shcrypto.EonPublicKey
-	if key.GetInstanceID() != handler.Config.InstanceID {
-		return false, errors.Errorf(
+	if keys.GetInstanceID() != handler.Config.InstanceID {
+		return pubsub.ValidationReject, errors.Errorf(
 			"instance ID mismatch (want=%d, have=%d)",
 			handler.Config.InstanceID,
-			key.GetInstanceID(),
+			keys.GetInstanceID(),
 		)
 	}
-	if key.Eon > math.MaxInt64 {
-		return false, errors.Errorf("eon %d overflows int64", key.Eon)
+	if keys.Eon > math.MaxInt64 {
+		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keys.Eon)
 	}
-	identityPreimage := identitypreimage.IdentityPreimage(key.EpochID)
 
+	var eonPublicKey shcrypto.EonPublicKey
 	err := handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := database.New(tx)
-		eonPub, err := db.GetEonPublicKey(ctx, int64(key.Eon))
+		eonPub, err := db.GetEonPublicKey(ctx, int64(keys.Eon))
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve EonPublicKey from DB")
 		}
@@ -98,21 +104,31 @@ func (handler *decryptionKeyHandler) ValidateMessage(
 		return nil
 	})
 	if err != nil {
-		return false, err
-	}
-	epochSecretKey, err := key.GetEpochSecretKey()
-	if err != nil {
-		return false, err
+		return pubsub.ValidationReject, err
 	}
 
-	ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, &eonPublicKey, identityPreimage.Bytes())
-	if err != nil {
-		return false, err
+	if len(keys.Keys) == 0 {
+		return pubsub.ValidationReject, errors.Errorf("no keys in message")
 	}
-	if !ok {
-		return false, errors.Errorf("recovery of epoch secret key failed for epoch %s", identityPreimage)
+	if len(keys.Keys) > MaxNumKeysPerMessage {
+		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(keys.Keys), MaxNumKeysPerMessage)
 	}
-	return true, nil
+	for _, key := range keys.Keys {
+		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		epochSecretKey, err := key.GetEpochSecretKey()
+		if err != nil {
+			return pubsub.ValidationReject, err
+		}
+
+		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, &eonPublicKey, identityPreimage.Bytes())
+		if err != nil {
+			return pubsub.ValidationReject, err
+		}
+		if !ok {
+			return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for epoch %s", identityPreimage)
+		}
+	}
+	return pubsub.ValidationAccept, nil
 }
 
 func (c *collator) sendDecryptionTriggers(ctx context.Context) error {
@@ -124,7 +140,7 @@ func (c *collator) sendDecryptionTriggers(ctx context.Context) error {
 		err := c.p2p.SendMessage(ctx,
 			msg,
 			retry.Interval(time.Second),
-			retry.ExponentialBackoff(),
+			retry.ExponentialBackoff(nil),
 			retry.NumberOfRetries(3),
 			retry.LogIdentifier(msg.LogInfo()),
 		)

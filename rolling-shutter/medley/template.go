@@ -16,7 +16,7 @@ import (
 
 func p2pKeyPublic(privkey p2pcrypto.PrivKey) string {
 	id, _ := peer.IDFromPublicKey(privkey.GetPublic())
-	return id.Pretty()
+	return id.String()
 }
 
 func p2pKey(privkey p2pcrypto.PrivKey) string {

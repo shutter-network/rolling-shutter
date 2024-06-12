@@ -83,6 +83,10 @@ chain's genesis config.`,
 	return cmd
 }
 
+// TODO: deprecate this command and split this up in 2 stages:
+//  1. gather initial keyperset information e.g. from contracts
+//     (could be different from optimism, rollupshutter,snapshot)
+//  2. send the batch-config / new block seen message based on that info.
 func bootstrap(config *Config) error {
 	ctx := context.Background()
 	ethereumClient, err := ethclient.DialContext(ctx, config.EthereumURL)

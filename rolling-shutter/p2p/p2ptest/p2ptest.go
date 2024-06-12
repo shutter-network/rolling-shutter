@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog/log"
 	"gotest.tools/assert"
 
@@ -16,20 +17,22 @@ import (
 // expected result.
 func MustValidateMessageResult(
 	t *testing.T,
-	expectedResult bool,
+	expectedResult pubsub.ValidationResult,
 	handler p2p.MessageHandler,
 	ctx context.Context, //nolint:revive
 	msg p2pmsg.Message,
 ) {
 	t.Helper()
-	ok, err := handler.ValidateMessage(ctx, msg)
-	log.Debug().Interface("msg", msg).Bool("ok?", ok).Bool("expect", expectedResult).Err(err).Msg("ValidateMessage")
-	if expectedResult {
+	validationResult, err := handler.ValidateMessage(ctx, msg)
+	accepted := validationResult == pubsub.ValidationAccept
+	log.Debug().
+		Interface("msg", msg).
+		Int("result", int(validationResult)).
+		Int("expected", int(expectedResult)).Err(err).Msg("ValidateMessage")
+	if accepted {
 		assert.NilError(t, err, "validation returned error")
-		assert.Assert(t, ok, "validation failed")
-	} else {
-		assert.Assert(t, !ok, "validation unexpectedly succeeded")
 	}
+	assert.Equal(t, expectedResult, validationResult, "validation did not validate with expected result ")
 }
 
 // MustHandleMessage makes sure the handler validates and handles the given message without errors.
@@ -40,7 +43,7 @@ func MustHandleMessage(
 	msg p2pmsg.Message,
 ) []p2pmsg.Message {
 	t.Helper()
-	MustValidateMessageResult(t, true, handler, ctx, msg)
+	MustValidateMessageResult(t, pubsub.ValidationAccept, handler, ctx, msg)
 	msgs, err := handler.HandleMessage(ctx, msg)
 	assert.NilError(t, err)
 	return msgs

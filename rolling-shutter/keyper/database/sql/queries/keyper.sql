@@ -16,7 +16,8 @@ SELECT EXISTS (
 
 -- name: InsertDecryptionKeyShare :exec
 INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
-VALUES ($1, $2, $3, $4);
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING;
 
 -- name: SelectDecryptionKeyShares :many
 SELECT * FROM decryption_key_share
@@ -167,6 +168,14 @@ SELECT * FROM dkg_result
 WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(block_number)
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
+
+-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT * FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1);
+
+-- name: GetAllDKGResults :many
+SELECT * FROM dkg_result
+ORDER BY eon ASC;
 
 -- name: InsertEonPublicKey :exec
 INSERT INTO outgoing_eon_keys (eon_public_key, eon)

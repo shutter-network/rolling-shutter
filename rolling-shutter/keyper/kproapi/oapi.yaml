@@ -16,6 +16,13 @@ paths:
       operationId: ping
       parameters:
 
+  /shutdown:
+    post:
+      description: |
+        Shut down the served
+      operationId: shutdown
+      parameters:
+
   /eons:
     get:
       description: |
@@ -112,7 +119,7 @@ components:
           pattern: "^0x[0-9a-f]{16}$"
         block_number:
           type: integer
-          minimum: 0
+          format: uint64
 
     Eon:
       type: object

@@ -5,10 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -19,27 +19,52 @@ type Config interface {
 	GetInstanceID() uint64
 }
 
-func SendDecryptionKeyShare(
+type DecryptionTrigger struct {
+	BlockNumber       uint64
+	IdentityPreimages []identitypreimage.IdentityPreimage
+}
+
+func (ksh *KeyShareHandler) getEonForBlockNumber(ctx context.Context, blockNumber uint64) (database.Eon, error) {
+	var (
+		eon database.Eon
+		err error
+	)
+	db := database.New(ksh.DBPool)
+	block, err := medley.Uint64ToInt64Safe(blockNumber)
+	if err != nil {
+		return eon, errors.Wrap(err, "invalid blocknumber")
+	}
+	eon, err = db.GetEonForBlockNumber(ctx, block)
+	return eon, errors.Wrap(err, "failed to retrieve eon from db")
+}
+
+var (
+	ErrIgnoreDecryptionRequest = errors.New("ignoring decryption request")
+	ErrNotAKeyper              = errors.New("we are not a keyper")
+	ErrEonDKGFailed            = errors.New("eon key generation failed")
+	ErrSharesAlreadySent       = errors.New("shares exist already")
+)
+
+//nolint:gocyclo
+func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	ctx context.Context,
-	config Config,
-	db *database.Queries,
-	blockNumber int64,
-	identityPreimages ...identitypreimage.IdentityPreimage,
-) ([]p2pmsg.Message, error) {
+	eon database.Eon,
+	identityPreimages []identitypreimage.IdentityPreimage,
+) (*p2pmsg.DecryptionKeyShares, error) {
 	if len(identityPreimages) == 0 {
 		return nil, errors.New("cannot generate empty decryption key share")
 	}
-	eon, err := db.GetEonForBlockNumber(ctx, blockNumber)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get eon for block %d from db", blockNumber)
+	if len(identityPreimages) > MaxNumKeysPerMessage {
+		return nil, errors.Errorf("too many decryption key shares for message (%d > %d)", len(identityPreimages), MaxNumKeysPerMessage)
 	}
+	db := database.New(ksh.DBPool)
 	batchConfig, err := db.GetBatchConfig(ctx, int32(eon.KeyperConfigIndex))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.KeyperConfigIndex)
 	}
 
 	// get our keyper index (and check that we in fact are a keyper)
-	encodedAddress := shdb.EncodeAddress(config.GetAddress())
+	encodedAddress := shdb.EncodeAddress(ksh.KeyperAddress)
 	keyperIndex := int64(-1)
 	for i, address := range batchConfig.Keypers {
 		if address == encodedAddress {
@@ -48,22 +73,28 @@ func SendDecryptionKeyShare(
 		}
 	}
 	if keyperIndex == -1 {
-		log.Info().Msg("ignoring decryption trigger: we are not a keyper")
-		return nil, nil
+		return nil, errors.Wrap(ErrNotAKeyper, ErrIgnoreDecryptionRequest.Error())
 	}
 
-	// check if we already computed (and therefore most likely sent) our key share
-	// XXX this only works when we sent the share for exactly one epoch.
-	shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
-		Eon:         eon.Eon,
-		EpochID:     identityPreimages[0].Bytes(),
-		KeyperIndex: keyperIndex,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
+	// check if we already computed (and therefore most likely sent) our key shares
+	allSharesExist := true
+	for _, identityPreimage := range identityPreimages {
+		shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
+			Eon:         eon.Eon,
+			EpochID:     identityPreimage.Bytes(),
+			KeyperIndex: keyperIndex,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get decryption key share for epoch from db")
+		}
+		if !shareExists {
+			allSharesExist = false
+			break
+		}
 	}
-	if shareExists {
-		return nil, nil // we already sent our share
+	if allSharesExist {
+		// we already sent our shares
+		return nil, errors.Wrap(ErrSharesAlreadySent, ErrIgnoreDecryptionRequest.Error())
 	}
 
 	// fetch dkg result from db
@@ -72,8 +103,7 @@ func SendDecryptionKeyShare(
 		return nil, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon.Eon)
 	}
 	if !dkgResultDB.Success {
-		log.Info().Int64("eon", eon.Eon).Msg("ignoring decryption trigger: eon key generation failed")
-		return nil, nil
+		return nil, errors.Wrap(ErrEonDKGFailed, ErrIgnoreDecryptionRequest.Error())
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
@@ -81,9 +111,8 @@ func SendDecryptionKeyShare(
 	}
 
 	var shares []*p2pmsg.KeyShare
-	// compute the key share
+	// compute the key shares
 	epochKG := epochkg.NewEpochKG(pureDKGResult)
-
 	for _, identityPreimage := range identityPreimages {
 		share := epochKG.ComputeEpochSecretKeyShare(identityPreimage)
 
@@ -93,17 +122,23 @@ func SendDecryptionKeyShare(
 		})
 	}
 
+	keyperSetIndexUint, err := medley.Int64ToUint64Safe(eon.KeyperConfigIndex)
+	if err != nil {
+		return nil, err
+	}
+	keyperIndexUint, err := medley.Int64ToUint64Safe(keyperIndex)
+	if err != nil {
+		return nil, err
+	}
 	msg := &p2pmsg.DecryptionKeyShares{
-		InstanceID:  config.GetInstanceID(),
-		Eon:         uint64(eon.Eon),
-		KeyperIndex: uint64(keyperIndex),
+		InstanceID:  ksh.InstanceID,
+		Eon:         keyperSetIndexUint,
+		KeyperIndex: keyperIndexUint,
 		Shares:      shares,
 	}
 	err = db.InsertDecryptionKeySharesMsg(ctx, msg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
-	metricsEpochKGDecryptionKeySharesSent.Inc()
-	log.Info().Int64("block-number", blockNumber).Msg("sending decryption key share")
-	return []p2pmsg.Message{msg}, nil
+	return msg, nil
 }

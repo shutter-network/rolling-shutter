@@ -17,9 +17,12 @@ A collection of commands to run and interact with Rolling Shutter nodes
 * [rolling-shutter chain](rolling-shutter_chain.md)	 - Run a node for Shutter's Tendermint chain
 * [rolling-shutter collator](rolling-shutter_collator.md)	 - Run a collator node
 * [rolling-shutter crypto](rolling-shutter_crypto.md)	 - CLI tool to access crypto functions
+* [rolling-shutter gnosiskeyper](rolling-shutter_gnosiskeyper.md)	 - Run a Shutter keyper for Gnosis Chain
 * [rolling-shutter keyper](rolling-shutter_keyper.md)	 - Run a Shutter keyper node
 * [rolling-shutter mocknode](rolling-shutter_mocknode.md)	 - Run a Shutter mock node
 * [rolling-shutter mocksequencer](rolling-shutter_mocksequencer.md)	 - Run a Shutter mock sequencer
+* [rolling-shutter op-bootstrap](rolling-shutter_op-bootstrap.md)	 - Bootstrap validator utility functions for a shuttermint chain
+* [rolling-shutter op-keyper](rolling-shutter_op-keyper.md)	 - Run a Shutter optimism keyper node
 * [rolling-shutter p2pnode](rolling-shutter_p2pnode.md)	 - Run a Shutter p2p bootstrap node
 * [rolling-shutter proxy](rolling-shutter_proxy.md)	 - Run a Ethereum JSON RPC proxy
 * [rolling-shutter snapshot](rolling-shutter_snapshot.md)	 - Run the Snapshot Hub communication module
