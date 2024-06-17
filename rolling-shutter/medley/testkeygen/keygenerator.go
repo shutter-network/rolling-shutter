@@ -14,21 +14,20 @@ import (
 // TestKeyGenerator is a helper tool to generate secret and public eon and epoch keys and key
 // shares. It will generate a new eon key every eonInterval epochs.
 type TestKeyGenerator struct {
-	t           *testing.T
+	tb          testing.TB
 	eonInterval uint64
 	eonKeyGen   map[uint64]*EonKeys
 	NumKeypers  uint64
 	Threshold   uint64
 }
 
-func NewTestKeyGenerator(t *testing.T, numKeypers uint64, threshold uint64, infiniteInterval bool) *TestKeyGenerator {
-	t.Helper()
-	eonInterval := 100
+func NewTestKeyGenerator(tb testing.TB, numKeypers uint64, threshold uint64, infiniteInterval bool) *TestKeyGenerator {
+	tb.Helper()
 	if infiniteInterval {
 		eonInterval = 0 // 0 stands for infinity
 	}
 	return &TestKeyGenerator{
-		t:           t,
+		tb:          tb,
 		eonInterval: uint64(eonInterval),
 		eonKeyGen:   make(map[uint64]*EonKeys),
 		NumKeypers:  numKeypers,
@@ -47,7 +46,7 @@ func (tkg *TestKeyGenerator) getEonIndex(identityPreimage identitypreimage.Ident
 }
 
 func (tkg *TestKeyGenerator) EonKeysForEpoch(identityPreimage identitypreimage.IdentityPreimage) *EonKeys {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	var err error
 	eonIndex := tkg.getEonIndex(identityPreimage)
 	res, ok := tkg.eonKeyGen[eonIndex]
@@ -57,7 +56,7 @@ func (tkg *TestKeyGenerator) EonKeysForEpoch(identityPreimage identitypreimage.I
 			tkg.NumKeypers,
 			tkg.Threshold,
 		)
-		assert.NilError(tkg.t, err)
+		assert.NilError(tkg.tb, err)
 		tkg.eonKeyGen[eonIndex] = res
 	}
 	return res
@@ -66,32 +65,32 @@ func (tkg *TestKeyGenerator) EonKeysForEpoch(identityPreimage identitypreimage.I
 func (tkg *TestKeyGenerator) EonPublicKeyShare(identityPreimage identitypreimage.IdentityPreimage,
 	keyperIndex uint64,
 ) *shcrypto.EonPublicKeyShare {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].eonPublicKeyShare
 }
 
 func (tkg *TestKeyGenerator) EonPublicKey(identityPreimage identitypreimage.IdentityPreimage) *shcrypto.EonPublicKey {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	return tkg.EonKeysForEpoch(identityPreimage).publicKey
 }
 
 func (tkg *TestKeyGenerator) EonSecretKeyShare(identityPreimage identitypreimage.IdentityPreimage,
 	keyperIndex uint64,
 ) *shcrypto.EonSecretKeyShare {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].eonSecretKeyShare
 }
 
 func (tkg *TestKeyGenerator) EpochSecretKeyShare(identityPreimage identitypreimage.IdentityPreimage,
 	keyperIndex uint64,
 ) *shcrypto.EpochSecretKeyShare {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	return tkg.EonKeysForEpoch(identityPreimage).keyperShares[keyperIndex].ComputeEpochSecretKeyShare(identityPreimage)
 }
 
 func (tkg *TestKeyGenerator) EpochSecretKey(identityPreimage identitypreimage.IdentityPreimage) *shcrypto.EpochSecretKey {
-	tkg.t.Helper()
+	tkg.tb.Helper()
 	epochSecretKey, err := tkg.EonKeysForEpoch(identityPreimage).EpochSecretKey(identityPreimage)
-	assert.NilError(tkg.t, err)
+	assert.NilError(tkg.tb, err)
 	return epochSecretKey
 }
