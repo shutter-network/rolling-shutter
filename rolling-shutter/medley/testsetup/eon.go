@@ -3,6 +3,7 @@ package testsetup
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"database/sql"
 	"testing"
 
@@ -17,7 +18,6 @@ import (
 	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -35,7 +35,7 @@ func InitializeEon(
 	dbpool *pgxpool.Pool,
 	config TestConfig,
 	keyperIndex uint64,
-) *testkeygen.TestKeyGenerator {
+) *testkeygen.EonKeys {
 	tb.Helper()
 
 	err := dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
@@ -60,20 +60,21 @@ func InitializeEon(
 		assert.NilError(tb, err)
 	}
 
-	tkg := testkeygen.NewTestKeyGenerator(tb, 3, 2, false)
+	eonKeys, err := testkeygen.NewEonKeys(rand.Reader, 3, 2)
+	assert.NilError(tb, err)
+
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
-	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
-	for i := uint64(0); i < tkg.NumKeypers; i++ {
-		share := tkg.EonPublicKeyShare(identityPreimage, i)
+	for i := 0; i < int(eonKeys.NumKeypers); i++ {
+		share := eonKeys.EonPublicKeyShare(i)
 		publicKeyShares = append(publicKeyShares, share)
 	}
 	dkgResult := puredkg.Result{
-		Eon:             config.GetEon(),
-		NumKeypers:      tkg.NumKeypers,
-		Threshold:       tkg.Threshold,
+		Eon:             1,
+		NumKeypers:      eonKeys.NumKeypers,
+		Threshold:       eonKeys.Threshold,
 		Keyper:          keyperIndex,
-		SecretKeyShare:  tkg.EonSecretKeyShare(identityPreimage, keyperIndex),
-		PublicKey:       tkg.EonPublicKey(identityPreimage),
+		SecretKeyShare:  eonKeys.EonSecretKeyShare(int(keyperIndex)),
+		PublicKey:       eonKeys.EonPublicKey(),
 		PublicKeyShares: publicKeyShares,
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
@@ -83,7 +84,7 @@ func InitializeEon(
 		KeyperConfigIndex: 1,
 		Height:            0,
 		Keypers:           keypers,
-		Threshold:         int32(tkg.Threshold),
+		Threshold:         int32(eonKeys.Threshold),
 	})
 	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{
@@ -101,5 +102,5 @@ func InitializeEon(
 	})
 	assert.NilError(tb, err)
 
-	return tkg
+	return eonKeys
 }

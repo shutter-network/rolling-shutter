@@ -36,28 +36,30 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 	keyperConfigIndex := uint64(1)
 
-	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
 	encodedDecryptionKeys := [][]byte{}
 	for _, identityPreimage := range identityPreimages {
-		encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
+		decryptionKey, err := keys.EpochSecretKey(identityPreimage)
+		assert.NilError(t, err)
+		encodedDecryptionKey := decryptionKey.Marshal()
 		encodedDecryptionKeys = append(encodedDecryptionKeys, encodedDecryptionKey)
 	}
 
 	// send a decryption key and check that it gets inserted
-	keys := []*p2pmsg.Key{}
+	decryptionKeys := []*p2pmsg.Key{}
 	for i, identityPreimage := range identityPreimages {
 		key := &p2pmsg.Key{
 			Identity: identityPreimage.Bytes(),
 			Key:      encodedDecryptionKeys[i],
 		}
-		keys = append(keys, key)
+		decryptionKeys = append(decryptionKeys, key)
 	}
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeys{
 		InstanceID: config.GetInstanceID(),
 		Eon:        keyperConfigIndex,
-		Keys:       keys,
+		Keys:       decryptionKeys,
 	})
 	assert.Check(t, len(msgs) == 0)
 	for i, identityPreimage := range identityPreimages {
@@ -84,9 +86,11 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	secondIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
 	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big2)
-	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
-	secretKey := tkg.EpochSecretKey(identityPreimage).Marshal()
-	secondSecretKey := tkg.EpochSecretKey(secondIdentityPreimage).Marshal()
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+	secretKey, err := keys.EpochSecretKey(identityPreimage)
+	assert.NilError(t, err)
+	secondSecretKey, err := keys.EpochSecretKey(secondIdentityPreimage)
+	assert.NilError(t, err)
 
 	var handler p2p.MessageHandler = &DecryptionKeyHandler{config: config, dbpool: dbpool}
 	tests := []struct {
@@ -103,7 +107,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 				Keys: []*p2pmsg.Key{
 					{
 						Identity: identityPreimage.Bytes(),
-						Key:      secretKey,
+						Key:      secretKey.Marshal(),
 					},
 				},
 			},
@@ -117,7 +121,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 				Keys: []*p2pmsg.Key{
 					{
 						Identity: wrongIdentityPreimage.Bytes(),
-						Key:      secretKey,
+						Key:      secretKey.Marshal(),
 					},
 				},
 			},
@@ -131,7 +135,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 				Keys: []*p2pmsg.Key{
 					{
 						Identity: identityPreimage.Bytes(),
-						Key:      secretKey,
+						Key:      secretKey.Marshal(),
 					},
 				},
 			},
@@ -154,11 +158,11 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 				Keys: []*p2pmsg.Key{
 					{
 						Identity: secondIdentityPreimage.Bytes(),
-						Key:      secondSecretKey,
+						Key:      secondSecretKey.Marshal(),
 					},
 					{
 						Identity: identityPreimage.Bytes(),
-						Key:      secretKey,
+						Key:      secretKey.Marshal(),
 					},
 				},
 			},

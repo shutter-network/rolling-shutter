@@ -29,7 +29,6 @@ func BenchmarkDecryptionKeySharesValidationIntegration(b *testing.B) {
 		identityPreimage := identitypreimage.Uint64ToIdentityPreimage(uint64(i))
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
-	identityPreimages = sort
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 
 	shares := []*p2pmsg.KeyShare{}

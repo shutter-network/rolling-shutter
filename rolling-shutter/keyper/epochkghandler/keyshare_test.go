@@ -34,12 +34,13 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	keyperIndex := uint64(1)
 	keyperConfigIndex := uint64(1)
 
-	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 	encodedDecryptionKeys := [][]byte{}
 	for _, identityPreimage := range identityPreimages {
-		encodedDecryptionKey := tkg.EpochSecretKey(identityPreimage).Marshal()
-		encodedDecryptionKeys = append(encodedDecryptionKeys, encodedDecryptionKey)
+		encodedDecryptionKey, err := keys.EpochSecretKey(identityPreimage)
+		assert.NilError(t, err)
+		encodedDecryptionKeys = append(encodedDecryptionKeys, encodedDecryptionKey.Marshal())
 	}
 
 	// threshold is two, so no outgoing message after first input
@@ -47,7 +48,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
 			EpochID: identityPreimage.Bytes(),
-			Share:   tkg.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
+			Share:   keys.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
 		}
 		shares = append(shares, share)
 	}
@@ -65,7 +66,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
 			EpochID: identityPreimage.Bytes(),
-			Share:   tkg.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
+			Share:   keys.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
 		}
 		shares = append(shares, share)
 	}
@@ -101,9 +102,9 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
 	secondIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big1)
 	wrongIdentityPreimage := identitypreimage.BigToIdentityPreimage(common.Big2)
-	tkg := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
-	keyshare := tkg.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal()
-	secondKeyshare := tkg.EpochSecretKeyShare(secondIdentityPreimage, keyperIndex).Marshal()
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+	keyshare := keys.EpochSecretKeyShare(identityPreimage, int(keyperIndex)).Marshal()
+	secondKeyshare := keys.EpochSecretKeyShare(secondIdentityPreimage, int(keyperIndex)).Marshal()
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 
 	tests := []struct {

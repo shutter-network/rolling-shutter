@@ -1,6 +1,7 @@
 package p2pmsg
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -39,31 +40,34 @@ type testConfig struct {
 	identityPreimage identitypreimage.IdentityPreimage
 	blockNumber      uint64
 	instanceID       uint64
-	tkg              *testkeygen.TestKeyGenerator
+	keys             *testkeygen.EonKeys
 }
 
 func defaultTestConfig(t *testing.T) testConfig {
 	t.Helper()
 
 	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big2)
+	keys, err := testkeygen.NewEonKeys(rand.Reader, 1, 1)
+	assert.NilError(t, err)
 	return testConfig{
 		identityPreimage: identityPreimage,
 		blockNumber:      uint64(0),
 		instanceID:       uint64(42),
-		tkg:              testkeygen.NewTestKeyGenerator(t, 1, 1, false),
+		keys:             keys,
 	}
 }
 
 func TestDecryptionKeys(t *testing.T) {
 	cfg := defaultTestConfig(t)
-	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
+	validSecretKey, err := cfg.keys.EpochSecretKey(cfg.identityPreimage)
+	assert.NilError(t, err)
 
 	orig := &DecryptionKeys{
 		InstanceID: cfg.instanceID,
 		Keys: []*Key{
 			{
 				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey,
+				Key:      validSecretKey.Marshal(),
 			},
 		},
 	}
@@ -93,7 +97,7 @@ func TestDecryptionTrigger(t *testing.T) {
 func TestDecryptionKeyShare(t *testing.T) {
 	cfg := defaultTestConfig(t)
 	keyperIndex := uint64(0)
-	keyshare := cfg.tkg.EpochSecretKeyShare(cfg.identityPreimage, keyperIndex).Marshal()
+	keyshare := cfg.keys.EpochSecretKeyShare(cfg.identityPreimage, int(keyperIndex)).Marshal()
 
 	orig := &DecryptionKeyShares{
 		InstanceID:  cfg.instanceID,
@@ -110,7 +114,7 @@ func TestDecryptionKeyShare(t *testing.T) {
 
 func TestEonPublicKey(t *testing.T) {
 	cfg := defaultTestConfig(t)
-	eonPublicKey := cfg.tkg.EonPublicKey(cfg.identityPreimage).Marshal()
+	eonPublicKey := cfg.keys.EonPublicKey().Marshal()
 	activationBlock := uint64(2)
 
 	privKey, err := ethcrypto.GenerateKey()
@@ -138,13 +142,14 @@ func TestTraceContext(t *testing.T) {
 		TraceState: "tracestate",
 	}
 	cfg := defaultTestConfig(t)
-	validSecretKey := cfg.tkg.EpochSecretKey(cfg.identityPreimage).Marshal()
+	validSecretKey, err := cfg.keys.EpochSecretKey(cfg.identityPreimage)
+	assert.NilError(t, err)
 	msg := &DecryptionKeys{
 		InstanceID: cfg.instanceID,
 		Keys: []*Key{
 			{
 				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey,
+				Key:      validSecretKey.Marshal(),
 			},
 		},
 	}

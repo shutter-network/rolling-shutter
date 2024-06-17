@@ -315,8 +315,10 @@ var testSpecs = []struct {
 }
 
 func createJSONTests(enc testEncoder) {
-	keygen := testkeygen.NewKeyGenerator(12, 10)
-	var err error
+	keys, err := testkeygen.NewEonKeys(rand.Reader, 12, 10)
+	if err != nil {
+		panic(err)
+	}
 	for i := range testSpecs {
 		testSpec := testSpecs[i]
 
@@ -329,7 +331,7 @@ func createJSONTests(enc testEncoder) {
 			if err != nil {
 				panic(err)
 			}
-			et, err := createEncryptionTest(keygen, testSpec.payload)
+			et, err := createEncryptionTest(keys, testSpec.payload)
 			if err != nil {
 				panic(err)
 			}
@@ -345,7 +347,7 @@ func createJSONTests(enc testEncoder) {
 			}
 			enc.addTest(&testcase)
 
-			dt := createDecryptionTest(keygen, *et)
+			dt := createDecryptionTest(keys, *et)
 			testcase = testCase{
 				testCaseMeta: testCaseMeta{
 					Description: testSpec.description,
@@ -360,13 +362,13 @@ func createJSONTests(enc testEncoder) {
 			enc.addTest(&testcase)
 
 		case tampered:
-			et, err := createEncryptionTest(keygen, testSpec.payload)
+			et, err := createEncryptionTest(keys, testSpec.payload)
 			if err != nil {
 				panic(err)
 			}
-			tamperedEt := tamperEncryptedMessage(keygen, *et)
+			tamperedEt := tamperEncryptedMessage(keys, *et)
 
-			dt := createDecryptionTest(keygen, tamperedEt)
+			dt := createDecryptionTest(keys, tamperedEt)
 			dt.Expected, _ = hexutil.Decode("0x")
 			testcase := testCase{
 				testCaseMeta: testCaseMeta{
@@ -383,9 +385,9 @@ func createJSONTests(enc testEncoder) {
 			var err error
 			var vt verificationTest
 			if testSpec.style == verifying {
-				vt, err = createVerificationTest(keygen, testSpec.payload)
+				vt, err = createVerificationTest(keys, testSpec.payload)
 			} else {
-				vt, err = createFailedVerificationTest(keygen, testSpec.payload)
+				vt, err = createFailedVerificationTest(keys, testSpec.payload)
 			}
 			if err != nil {
 				panic(err)
@@ -415,16 +417,19 @@ func verifyTestCase(tc *testCase) error {
 	return tc.Test.Run()
 }
 
-func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*encryptionTest, error) {
-	epochID := keygen.RandomEpochID(make([]byte, 52))
+func createEncryptionTest(keys *testkeygen.EonKeys, message []byte) (*encryptionTest, error) {
+	epochID, err := randomEpochID()
+	if err != nil {
+		return nil, err
+	}
 
 	et := encryptionTest{}
 
 	et.Message = message
 
-	et.EonPublicKey = keygen.EonPublicKey(epochID)
+	et.EonPublicKey = keys.EonPublicKey()
 	et.EpochID = epochID
-	sigma, err := keygen.RandomSigma()
+	sigma, err := shcrypto.RandomSigma(rand.Reader)
 	if err != nil {
 		return &et, err
 	}
@@ -434,7 +439,7 @@ func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*enc
 
 	encryptedMessage := shcrypto.Encrypt(
 		et.Message,
-		keygen.EonPublicKey(epochID),
+		keys.EonPublicKey(),
 		epochIDPoint,
 		sigma,
 	)
@@ -450,11 +455,13 @@ func createEncryptionTest(keygen *testkeygen.KeyGenerator, message []byte) (*enc
 }
 
 // tamperEncryptedMessage changes the C1 value of EncryptedMessage, which allows to test for malleability issues.
-func tamperEncryptedMessage(keygen *testkeygen.KeyGenerator, et encryptionTest) encryptionTest {
-	decryptionKey := keygen.EpochSecretKey(et.EpochID)
+func tamperEncryptedMessage(keys *testkeygen.EonKeys, et encryptionTest) encryptionTest {
+	decryptionKey, err := keys.EpochSecretKey(et.EpochID)
+	if err != nil {
+		panic(err)
+	}
 	g2 := bls12381.NewG2()
 	var c1 *bls12381.PointG2
-	var err error
 
 	for i := 1; i <= 10000; i++ {
 		c1 = et.Expected.C1
@@ -471,9 +478,12 @@ func tamperEncryptedMessage(keygen *testkeygen.KeyGenerator, et encryptionTest) 
 	return et
 }
 
-func createDecryptionTest(keygen *testkeygen.KeyGenerator, et encryptionTest) decryptionTest {
+func createDecryptionTest(keys *testkeygen.EonKeys, et encryptionTest) decryptionTest {
 	dt := decryptionTest{}
-	epochSecretKey := keygen.EpochSecretKey(et.EpochID)
+	epochSecretKey, err := keys.EpochSecretKey(et.EpochID)
+	if err != nil {
+		panic(err)
+	}
 	dt.EpochSecretKey = *epochSecretKey
 
 	dt.Cipher = *et.Expected
@@ -483,13 +493,20 @@ func createDecryptionTest(keygen *testkeygen.KeyGenerator, et encryptionTest) de
 	return dt
 }
 
-func createVerificationTest(keygen *testkeygen.KeyGenerator, payload []byte) (verificationTest, error) {
+func createVerificationTest(keys *testkeygen.EonKeys, _ []byte) (verificationTest, error) {
 	var err error
 	vt := verificationTest{}
-	epochID := keygen.RandomEpochID(payload)
+	epochID, err := randomEpochID()
+	if err != nil {
+		return verificationTest{}, err
+	}
 	vt.EpochID = epochID
-	vt.EpochSecretKey = *keygen.EpochSecretKey(epochID)
-	vt.EonPublicKey = *keygen.EonPublicKey(epochID)
+	epochSecretKey, err := keys.EpochSecretKey(epochID)
+	if err != nil {
+		return verificationTest{}, err
+	}
+	vt.EpochSecretKey = *epochSecretKey
+	vt.EonPublicKey = *keys.EonPublicKey()
 	vt.Expected, err = shcrypto.VerifyEpochSecretKey(
 		&vt.EpochSecretKey,
 		&vt.EonPublicKey,
@@ -498,14 +515,25 @@ func createVerificationTest(keygen *testkeygen.KeyGenerator, payload []byte) (ve
 	return vt, err
 }
 
-func createFailedVerificationTest(keygen *testkeygen.KeyGenerator, _ []byte) (verificationTest, error) {
+func createFailedVerificationTest(keys *testkeygen.EonKeys, _ []byte) (verificationTest, error) {
 	var err error
 	vt := verificationTest{}
-	epochID := keygen.RandomEpochID(make([]byte, 52))
-	mismatch := keygen.RandomEpochID(make([]byte, 52))
+	epochID, err := randomEpochID()
+	if err != nil {
+		return verificationTest{}, err
+	}
 	vt.EpochID = epochID
-	vt.EpochSecretKey = *keygen.EpochSecretKey(epochID)
-	vt.EonPublicKey = *keygen.EonPublicKey(mismatch)
+	epochSecretKey, err := keys.EpochSecretKey(epochID)
+	if err != nil {
+		return verificationTest{}, err
+	}
+	vt.EpochSecretKey = *epochSecretKey
+
+	keysMismatch, err := testkeygen.NewEonKeys(rand.Reader, 12, 10)
+	if err != nil {
+		return verificationTest{}, err
+	}
+	vt.EonPublicKey = *keysMismatch.EonPublicKey()
 	vt.Expected, err = shcrypto.VerifyEpochSecretKey(
 		&vt.EpochSecretKey,
 		&vt.EonPublicKey,
@@ -597,4 +625,22 @@ func testMarshalingRoundtrip(tc *testCase) error {
 		return errors.New("roundtrip marshaling failed")
 	}
 	return nil
+}
+
+func randomEpochID() (identitypreimage.IdentityPreimage, error) {
+	epochID := make([]byte, 52)
+	_, err := rand.Read(epochID)
+	if err != nil {
+		return identitypreimage.IdentityPreimage{}, err
+	}
+	return identitypreimage.IdentityPreimage(epochID), nil
+}
+
+func randomSigma() shcrypto.Block {
+	sigma := make([]byte, 32)
+	_, err := rand.Read(sigma)
+	if err != nil {
+		panic(err)
+	}
+	return shcrypto.Block(sigma)
 }

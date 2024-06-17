@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	enctime "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/time"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -140,16 +140,14 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 	db := database.New(dbpool)
 
 	testConfig := newTestConfig(t)
-	tkgBefore := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
+	keysBefore, err := testkeygen.NewEonKeys(rand.Reader, 3, 2)
+	assert.NilError(t, err)
+	keys, err := testkeygen.NewEonKeys(rand.Reader, 3, 2)
+	assert.NilError(t, err)
 
-	identityPreimage1 := identitypreimage.Uint64ToIdentityPreimage(1)
-	identityPreimage1000 := identitypreimage.Uint64ToIdentityPreimage(1000)
-	identityPreimage2000 := identitypreimage.Uint64ToIdentityPreimage(2000)
-
-	eonPubKeyNoThreshold, _ = tkgBefore.EonPublicKey(identityPreimage1).GobEncode()
-	eonPubKeyBefore, _ = tkgBefore.EonPublicKey(identityPreimage1000).GobEncode()
-	eonPubKey, _ = tkg.EonPublicKey(identityPreimage2000).GobEncode()
+	eonPubKeyNoThreshold, _ = keysBefore.EonPublicKey().GobEncode()
+	eonPubKeyBefore, _ = keysBefore.EonPublicKey().GobEncode()
+	eonPubKey, _ = keys.EonPublicKey().GobEncode()
 
 	kpr1, _ := ethcrypto.GenerateKey()
 	kpr2, _ := ethcrypto.GenerateKey()
@@ -166,7 +164,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 		keyperConfigIndex: uint64(0),
 		activationBlock:   activationBlockNoThreshold,
 		eonPubKey:         eonPubKeyNoThreshold,
-		threshold:         tkg.Threshold,
+		threshold:         keys.Threshold,
 		keypers:           []*ecdsa.PrivateKey{kpr1},
 	})
 	assert.Check(t, len(keypersNoThreshold) > 0)
@@ -179,7 +177,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 		keyperConfigIndex: uint64(1),
 		activationBlock:   activationBlockBefore,
 		eonPubKey:         eonPubKeyBefore,
-		threshold:         tkg.Threshold,
+		threshold:         keys.Threshold,
 		keypers:           []*ecdsa.PrivateKey{kpr1, kpr2, kpr3},
 	})
 	assert.Check(t, len(keypersBefore) > 0)
@@ -190,7 +188,7 @@ func TestHandleEonKeyIntegration(t *testing.T) {
 		keyperConfigIndex: uint64(2),
 		activationBlock:   activationBlock,
 		eonPubKey:         eonPubKey,
-		threshold:         tkg.Threshold,
+		threshold:         keys.Threshold,
 		keypers:           []*ecdsa.PrivateKey{kpr3, kpr1, kpr2},
 	})
 	assert.Check(t, len(keypers) > 0)
