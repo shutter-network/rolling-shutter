@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	resourcesdk "go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.25.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
