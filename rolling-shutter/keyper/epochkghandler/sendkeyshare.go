@@ -57,22 +57,13 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	if len(identityPreimages) > MaxNumKeysPerMessage {
 		return nil, errors.Errorf("too many decryption key shares for message (%d > %d)", len(identityPreimages), MaxNumKeysPerMessage)
 	}
-	db := database.New(ksh.DBPool)
-	batchConfig, err := db.GetBatchConfig(ctx, int32(eon.KeyperConfigIndex))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get config %d from db", eon.KeyperConfigIndex)
-	}
 
-	// get our keyper index (and check that we in fact are a keyper)
-	encodedAddress := shdb.EncodeAddress(ksh.KeyperAddress)
-	keyperIndex := int64(-1)
-	for i, address := range batchConfig.Keypers {
-		if address == encodedAddress {
-			keyperIndex = int64(i)
-			break
-		}
+	db := database.New(ksh.DBPool)
+	keyperIndex, isKeyper, err := db.GetKeyperIndex(ctx, eon.KeyperConfigIndex, ksh.KeyperAddress)
+	if err != nil {
+		return nil, err
 	}
-	if keyperIndex == -1 {
+	if !isKeyper {
 		return nil, errors.Wrap(ErrNotAKeyper, ErrIgnoreDecryptionRequest.Error())
 	}
 

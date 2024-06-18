@@ -86,3 +86,20 @@ func (q *Queries) ScheduleShutterMessage(
 		Msg("scheduled shuttermint message")
 	return nil
 }
+
+// GetKeyperIndex returns the index of the keyper with the given address in the keyper set with
+// the given index. If the keyper is not found, the second return value is false.
+func (q *Queries) GetKeyperIndex(ctx context.Context, keyperConfigIndex int64, addr common.Address) (int64, bool, error) {
+	batchConfig, err := q.GetBatchConfig(ctx, int32(keyperConfigIndex))
+	if err != nil {
+		return -1, false, errors.Wrapf(err, "failed to get config %d from db", keyperConfigIndex)
+	}
+
+	encodedAddress := shdb.EncodeAddress(addr)
+	for i, address := range batchConfig.Keypers {
+		if address == encodedAddress {
+			return int64(i), true, nil
+		}
+	}
+	return -1, false, nil
+}

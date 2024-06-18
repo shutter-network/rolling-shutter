@@ -46,15 +46,9 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 	queries := database.New(handler.dbpool)
 
-	isKeyper, err := queries.GetKeyperStateForEon(ctx, database.GetKeyperStateForEonParams{
-		KeyperAddress: []string{handler.config.GetAddress().String()},
-		Eon:           int64(key.Eon),
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return pubsub.ValidationReject, errors.Errorf("eon %d does not exist", key.Eon)
-	}
+	_, isKeyper, err := queries.GetKeyperIndex(ctx, int64(key.Eon), handler.config.GetAddress())
 	if err != nil {
-		return pubsub.ValidationReject, errors.Errorf("failed to get keyper state for eon %d from db", key.Eon)
+		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
 		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
