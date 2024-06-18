@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
@@ -80,10 +79,9 @@ func NewAccusation(eon uint64, accused []common.Address) *Message {
 
 // NewPolyCommitment creates a new poly commitment message containing gamma values.
 func NewPolyCommitment(eon uint64, gammas *shcrypto.Gammas) *Message {
-	g2 := bls12381.NewG2()
 	gammaBytes := [][]byte{}
 	for _, gamma := range *gammas {
-		gammaBytes = append(gammaBytes, g2.ToBytes(gamma))
+		gammaBytes = append(gammaBytes, gamma.Compress())
 	}
 
 	return &Message{

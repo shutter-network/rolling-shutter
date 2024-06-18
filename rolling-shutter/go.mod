@@ -33,14 +33,14 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/shutter-network/gnosh-contracts v0.2.0
 	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
-	github.com/shutter-network/shutter/shlib v0.1.18
+	github.com/shutter-network/shutter/shlib v0.1.19
 	github.com/shutter-network/txtypes v0.1.0
 	github.com/spf13/afero v1.8.2
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.9.0
-	github.com/supranational/blst v0.3.11
+	github.com/supranational/blst v0.3.12
 	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.37.0-rc2
 	go.opentelemetry.io/otel v1.27.0

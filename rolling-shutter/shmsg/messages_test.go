@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"gotest.tools/v3/assert"
 
 	shcrypto "github.com/shutter-network/shutter/shlib/shcrypto"
@@ -25,10 +24,9 @@ func TestNewPolyCommitmentMsg(t *testing.T) {
 
 	assert.Equal(t, eon, msg.Eon)
 	assert.Equal(t, int(threshold)+1, len(msg.Gammas))
-	g2 := bls12381.NewG2()
 	for i := 0; i < int(threshold)+1; i++ {
 		gammaBytes := msg.Gammas[i]
-		assert.DeepEqual(t, gammaBytes, g2.ToBytes((*gammas)[i]))
+		assert.DeepEqual(t, gammaBytes, (*gammas)[i].Compress())
 	}
 }
 
