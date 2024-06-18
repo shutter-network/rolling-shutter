@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/base64"
 	"encoding/gob"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -17,6 +18,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents/shtxresp"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -332,7 +334,15 @@ func (app *ShutterApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 
 func makeErrorResponse(msg string) abcitypes.ResponseDeliverTx {
 	return abcitypes.ResponseDeliverTx{
-		Code:   1,
+		Code:   shtxresp.Error,
+		Log:    msg,
+		Events: []abcitypes.Event{},
+	}
+}
+
+func makeAlreadySeenResponse(msg string) abcitypes.ResponseDeliverTx {
+	return abcitypes.ResponseDeliverTx{
+		Code:   shtxresp.Seen,
 		Log:    msg,
 		Events: []abcitypes.Event{},
 	}
@@ -360,7 +370,7 @@ func (app *ShutterApp) deliverBatchConfig(msg *shmsg.BatchConfig, sender common.
 		// XXX We do not check if we're allowed to vote on config changes here
 		log.Info().Uint64("config-index", bc.KeyperConfigIndex).Msg("keyper config already accepted")
 		return abcitypes.ResponseDeliverTx{
-			Code: 0,
+			Code: shtxresp.Seen,
 		}
 	}
 	err = app.checkConfig(bc)
@@ -416,7 +426,7 @@ func (app *ShutterApp) isKeyper(a common.Address) bool {
 func (app *ShutterApp) deliverCheckIn(msg *shmsg.CheckIn, sender common.Address) abcitypes.ResponseDeliverTx {
 	_, ok := app.Identities[sender]
 	if ok {
-		return makeErrorResponse(fmt.Sprintf(
+		return makeAlreadySeenResponse(fmt.Sprintf(
 			"sender %s already checked in", sender.Hex()))
 	}
 	if !app.isKeyper(sender) {
@@ -473,7 +483,7 @@ func (app *ShutterApp) deliverDKGResult(msg *shmsg.DKGResult, sender common.Addr
 
 	err := dkginstance.SuccessVoting.AddVote(sender, msg.Success)
 	if err != nil {
-		return makeErrorResponse("already voted on dkg result")
+		return makeAlreadySeenResponse("already voted on dkg result")
 	}
 
 	dkg, started := app.maybeStartEon(msg.Eon)
@@ -528,6 +538,9 @@ func (app *ShutterApp) handlePolyEvalMsg(msg *shmsg.PolyEval, sender common.Addr
 
 	err = dkg.RegisterPolyEvalMsg(*appMsg)
 	if err != nil {
+		if stderrors.Is(err, ErrorPolyEvalAlreadyPresent) {
+			return makeAlreadySeenResponse("PolyEval message already present")
+		}
 		msg := fmt.Sprintf("Error: Failed to register PolyEval message: %+v", err)
 		log.Print(msg)
 		return makeErrorResponse(msg)
@@ -557,6 +570,9 @@ func (app *ShutterApp) handlePolyCommitmentMsg(msg *shmsg.PolyCommitment, sender
 
 	err = dkg.RegisterPolyCommitmentMsg(*appMsg)
 	if err != nil {
+		if stderrors.Is(err, ErrorPolyCommitAlreadyPresent) {
+			return makeAlreadySeenResponse("PolyCommitment message already present")
+		}
 		msg := fmt.Sprintf("Error: Failed to register PolyCommitment message: %+v", err)
 		log.Print(msg)
 		return makeErrorResponse(msg)
@@ -586,6 +602,9 @@ func (app *ShutterApp) handleAccusationMsg(msg *shmsg.Accusation, sender common.
 
 	err = dkg.RegisterAccusationMsg(*appMsg)
 	if err != nil {
+		if stderrors.Is(err, ErrorAccusationAlreadyPresent) {
+			return makeAlreadySeenResponse("Accusation message already present")
+		}
 		msg := fmt.Sprintf("Error: Failed to register Accusation message: %+v", err)
 		log.Print(msg)
 		return makeErrorResponse(msg)
@@ -615,6 +634,9 @@ func (app *ShutterApp) handleApologyMsg(msg *shmsg.Apology, sender common.Addres
 
 	err = dkg.RegisterApologyMsg(*appMsg)
 	if err != nil {
+		if stderrors.Is(err, ErrorApologyAlreadyPresent) {
+			return makeAlreadySeenResponse("Apology message already present")
+		}
 		msg := fmt.Sprintf("Error: Failed to register Apology message: %+v", err)
 		log.Print(msg)
 		return makeErrorResponse(msg)

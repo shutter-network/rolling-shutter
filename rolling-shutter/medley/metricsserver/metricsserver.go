@@ -6,11 +6,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
+
+func init() {
+	prometheus.MustRegister(collectors.NewBuildInfoCollector())
+}
 
 type MetricsServer struct {
 	mux        *http.ServeMux

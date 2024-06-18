@@ -56,6 +56,12 @@ SELECT COUNT(*)
 FROM tendermint_batch_config
 WHERE @start_block <= activation_block_number AND activation_block_number < @end_block;
 
+-- name: CountBatchConfigsInBlockRangeWithKeyper :one
+-- Due to https://github.com/sqlc-dev/sqlc/issues/3083 we need to use this awkward construction to pass and query for the keyper address parameter as a single element slice
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE (@keyper_address::TEXT[]) && keypers AND @start_block <= activation_block_number AND activation_block_number < @end_block;
+
 -- name: GetBatchConfigs :many
 SELECT *
 FROM tendermint_batch_config
@@ -206,3 +212,14 @@ SET block_number = $1;
 
 -- name: GetLastBlockSeen :one
 SELECT block_number FROM last_block_seen LIMIT 1;
+
+-- name: GetKeyperStateForEon :one
+SELECT (@keyper_address::TEXT[] && tbc.keypers)::BOOL AS is_keyper
+FROM tendermint_batch_config AS tbc
+LEFT JOIN eons ON eons.keyper_config_index =  tbc.keyper_config_index
+WHERE eons.eon = @eon;
+
+-- name: GetLatestEonForKeyperConfig :one
+SELECT max(eons.eon)::INT
+FROM eons
+WHERE eons.keyper_config_index = @keyper_config_index;

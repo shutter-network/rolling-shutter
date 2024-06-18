@@ -1,12 +1,15 @@
 {
   "name": "@shutter-network/shutter-crypto",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Core crypto primitives to interact with Shutter Network",
   "author": "Shutter Network <contact@shutter.network>",
   "license": "MIT",
   "homepage": "https://github.com/shutter-network/rolling-shutter/tree/main/js/shutter-crypto#readme",
   "repository": "github:shutter-network/rolling-shutter",
   "devDependencies": {
+    "eslint": "^8.56.0",
+    "ethers": "^6.11.1",
+    "jest": "^29.7.0",
     "webpack": "^5.72.1",
     "webpack-cli": "^4.9.2"
   },
@@ -14,23 +17,11 @@
   "files": [
     "dist"
   ],
-  "eslintConfig": {
-    "extends": "eslint:recommended",
-    "ignorePatterns": [
-      "derived/*.js"
-    ],
-    "parserOptions": {
-      "sourceType": "module"
-    },
-    "env": {
-      "browser": true,
-      "node": true
-    }
-  },
   "dependencies": {
     "browser-or-node": "^2.0.0"
   },
   "scripts": {
-    "prepare": "cp -L derived/shutter-crypto.wasm dist"
+    "prepare": "cp -L derived/shutter-crypto.wasm dist",
+    "test": "jest ./test/"
   }
 }

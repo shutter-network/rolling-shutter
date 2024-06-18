@@ -5,6 +5,7 @@ GOFLAGS		?=
 TINYGO		?= tinygo
 WASMOPT     ?= wasm-opt
 BINDIR		?= ./bin
+WASMDIR		?= ../js/shutter-crypto
 EXECUTABLE	?= ${BINDIR}/rolling-shutter
 GOPATH          ?= $(${GO} env GOPATH)
 
@@ -18,9 +19,15 @@ wasm:
 	${TINYGO} build -target wasm -size full -o ${BINDIR}/shutter-crypto.unopt.wasm ./shcryptowasm/shutter_crypto_wasm.go
 	${WASMOPT} -Oz --vacuum --strip-debug --strip-dwarf --strip-producers --strip-target-features -o ${BINDIR}/shutter-crypto.wasm ${BINDIR}/shutter-crypto.unopt.wasm
 	rm ${BINDIR}/shutter-crypto.unopt.wasm
+	rm -rf ${WASMDIR}/derived
+	mkdir -p ${WASMDIR}/derived
+	rsync ${BINDIR}/shutter-crypto.wasm ${WASMDIR}/derived/shutter-crypto.wasm
 
 wasm-js: wasm
-	$(MAKE) -C ../js/shutter-crypto build
+	$(MAKE) -C ${WASMDIR} build
+
+wasm-js-test: wasm
+	$(MAKE) -C ${WASMDIR} test
 
 protoc:
 	${GO} generate ./shmsg/ ./p2pmsg
@@ -99,7 +106,10 @@ install-asdf-plugins:
 	../tools/asdf-install-plugins.sh
 
 install-asdf: install-asdf-plugins
-	asdf install
+	# Various packages installed by asdf internally also use make and don't like if an external make has already
+	# tinkered with then environment.
+	# Therefore we unset MAKELEVEL here.
+	env -u MAKELEVEL asdf install
 
 lint:
 	golangci-lint run --tests

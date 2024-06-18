@@ -46,6 +46,23 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keyShare.Eon)
 	}
 
+	queries := database.New(handler.dbpool)
+
+	isKeyper, err := queries.GetKeyperStateForEon(ctx, database.GetKeyperStateForEonParams{
+		KeyperAddress: []string{handler.config.GetAddress().String()},
+		Eon:           int64(keyShare.Eon),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pubsub.ValidationReject, errors.Errorf("eon %d does not exist", keyShare.Eon)
+	}
+	if err != nil {
+		return pubsub.ValidationReject, errors.Errorf("failed to get keyper state for eon %d from db", keyShare.Eon)
+	}
+	if !isKeyper {
+		log.Debug().Uint64("eon", keyShare.Eon).Msg("ignoring KeyShare for eon; we're not a Keyper")
+		return pubsub.ValidationReject, nil
+	}
+
 	dkgResultDB, err := database.New(handler.dbpool).GetDKGResultForKeyperConfigIndex(ctx, int64(keyShare.Eon))
 	if err == pgx.ErrNoRows {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", keyShare.Eon)

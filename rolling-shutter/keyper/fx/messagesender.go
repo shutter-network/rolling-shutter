@@ -9,9 +9,11 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/tendermint/tendermint/rpc/client"
 	tmtypes "github.com/tendermint/tendermint/types"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents/shtxresp"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
@@ -120,7 +122,13 @@ func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message)
 		}
 	}
 
-	if res.DeliverTx.Code != 0 {
+	switch res.DeliverTx.Code {
+	case shtxresp.Ok:
+		return nil
+	case shtxresp.Seen:
+		log.Warn().Str("tx", res.DeliverTx.Log).Msg("delivertx: message already seen, ignoring")
+		return nil
+	case shtxresp.Error:
 		return &RemoteError{
 			msg: fmt.Sprintf("delivertx: %s", res.DeliverTx.Log),
 		}

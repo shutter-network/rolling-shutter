@@ -419,6 +419,24 @@ services:
       - dev
     logging: *logging
 
+  grafana:
+    image: grafana/grafana-oss
+    restart: always
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./data/grafana/data:/var/lib/grafana
+    profiles:
+      - dev
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: victoriametrics-datasource
+      GF_INSTALL_PLUGINS: https://github.com/VictoriaMetrics/grafana-datasource/releases/download/v0.8.1/victoriametrics-datasource-v0.8.1.zip;victoriametrics-datasource
+
   dockerize:
     image: jwilder/dockerize
     profiles:

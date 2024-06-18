@@ -14,9 +14,11 @@ import (
 	tmhttp "github.com/tendermint/tendermint/rpc/client/http"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
@@ -145,7 +147,9 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
 
 	if kpr.config.Metrics.Enabled {
+		keypermetrics.InitMetrics()
 		epochkghandler.InitMetrics()
+		deployment.InitMetrics()
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
 	}
 
@@ -222,10 +226,11 @@ func (kpr *KeyperCore) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockN
 		return err
 	}
 
-	count, err := q.CountBatchConfigsInBlockRange(ctx,
-		database.CountBatchConfigsInBlockRangeParams{
-			StartBlock: lastBlock,
-			EndBlock:   int64(l1BlockNumber),
+	count, err := q.CountBatchConfigsInBlockRangeWithKeyper(ctx,
+		database.CountBatchConfigsInBlockRangeWithKeyperParams{
+			KeyperAddress: []string{kpr.config.GetAddress().String()},
+			StartBlock:    lastBlock,
+			EndBlock:      int64(l1BlockNumber),
 		})
 	if err != nil {
 		return err
@@ -340,6 +345,7 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		if err != nil {
 			return err
 		}
+		keypermetrics.MetricsKeyperCurrentBlockL1.Set(float64(syncBlockNumber))
 
 		err = smobserver.SyncAppWithDB(ctx, kpr.shuttermintClient, kpr.dbpool, kpr.shuttermintState)
 		if err != nil {

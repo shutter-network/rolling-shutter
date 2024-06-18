@@ -243,7 +243,12 @@ func (c *Contracts) getDeployment(name string) (*Deployment, error) {
 	if !ok {
 		return nil, errors.Errorf("no deployment of %s contract found", name)
 	}
+	publishDeploymentMetric(d)
 	return d, nil
+}
+
+func publishDeploymentMetric(d *Deployment) {
+	metricsContractDeploymentInfo.WithLabelValues(d.Name, d.Address.String(), strconv.FormatUint(d.ChainID, 10), strconv.FormatUint(d.DeployBlockNumber, 10)).Set(1)
 }
 
 func LoadDeployments(dir string) (*Deployments, error) {

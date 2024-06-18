@@ -73,6 +73,8 @@ manually:
 BB_EXTERNAL_WD="$(pwd)" BB_EXTERNAL_COMMAND="../rolling-shutter/bin/rolling-shutter keyper --config work/keyper-dkg-external/keyper-2.toml" clojure -M:test keyper-dkg-external
 ```
 
+(You can do the same inside a docker container (see below)).
+
 ### Parameters in the environment
 
 You can find the test system parameters in the environment of the
@@ -98,6 +100,29 @@ Here you see, that the keyper implementation under tests, should use port
 `23102` for its `p2p` connection, the ethereum node is running at
 `http://127.0.0.1:8545/` etc. Not all of these may be relevant to your
 implementation.
+
+### Docker image
+
+There are ready to use docker images at
+https://ghcr.io/shutter-network/babashka-play
+
+To run a test inside a container, run:
+
+```
+docker run --platform=linux/amd64 --rm -it ghcr.io/shutter-network/babashka-play:latest
+
+process-compose -t=false up & # to start postgres
+
+# RUN TEST
+#e.g.
+bb test-system
+```
+
+Keep in mind that the configurations are generated within the container on first
+invocation. This means that things like private keys and peer addresses are
+changing when the container is started with the `docker run --rm` command. To
+keep those values persistent, either the configuration files have to be copied
+to the container, or the container should be reused throughout runs.
 
 ### Self contained testrunner
 

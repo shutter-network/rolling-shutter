@@ -1,3 +1,6 @@
+import os
+import signal
+
 import click
 from jsonrpcserver import method, Result, Success, serve
 from structlog import get_logger
@@ -21,6 +24,9 @@ def shutter_set_eon_pubkey(eonId: str, key: str) -> Result:
 @click.option('-h', '--host', default='0.0.0.0')
 @click.option('-p', '--port', default=5000)
 def main(host: str, port: int) -> None:
+    signal.signal(signal.SIGTERM, lambda sig, frame: os.exit(0))
+    signal.signal(signal.SIGINT, lambda sig, frame: os.exit(0))
+    log.info("Starting Snapshot dummyserver on %s:%d", host, port)
     serve(host, port)
 
 

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
@@ -43,7 +44,24 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
 	}
 
-	dkgResultDB, err := database.New(handler.dbpool).GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
+	queries := database.New(handler.dbpool)
+
+	isKeyper, err := queries.GetKeyperStateForEon(ctx, database.GetKeyperStateForEonParams{
+		KeyperAddress: []string{handler.config.GetAddress().String()},
+		Eon:           int64(key.Eon),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pubsub.ValidationReject, errors.Errorf("eon %d does not exist", key.Eon)
+	}
+	if err != nil {
+		return pubsub.ValidationReject, errors.Errorf("failed to get keyper state for eon %d from db", key.Eon)
+	}
+	if !isKeyper {
+		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
+		return pubsub.ValidationReject, nil
+	}
+
+	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
 	if err == pgx.ErrNoRows {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
 	}

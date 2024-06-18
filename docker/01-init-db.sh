@@ -2,6 +2,11 @@
 
 source ./common.sh
 
+mkdb() {
+    $DC exec -T db createdb -U postgres $1
+    $DC run -T --rm --no-deps $1 initdb --config /config/${1}.toml
+}
+
 $DC stop db
 $DC rm -f db
 
@@ -11,8 +16,9 @@ $DC up -d db
 $DC run --rm --no-deps dockerize -wait tcp://db:5432 -timeout 40s
 
 for cmd in snapshot keyper-0 keyper-1 keyper-2 keyper-3; do
-    $DC exec db createdb -U postgres $cmd
-    $DC run --rm --no-deps $cmd initdb --config /config/${cmd}.toml
+    mkdb $cmd &
 done
+
+wait
 
 $DC stop db
