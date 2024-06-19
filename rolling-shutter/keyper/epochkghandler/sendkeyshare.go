@@ -66,12 +66,16 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	if !isKeyper {
 		return nil, errors.Wrap(ErrNotAKeyper, ErrIgnoreDecryptionRequest.Error())
 	}
+	keyperConfigIndex, err := medley.Int64ToUint64Safe(eon.KeyperConfigIndex)
+	if err != nil {
+		return nil, err
+	}
 
 	// check if we already computed (and therefore most likely sent) our key shares
 	allSharesExist := true
 	for _, identityPreimage := range identityPreimages {
 		shareExists, err := db.ExistsDecryptionKeyShare(ctx, database.ExistsDecryptionKeyShareParams{
-			Eon:         eon.Eon,
+			Eon:         int64(keyperConfigIndex),
 			EpochID:     identityPreimage.Bytes(),
 			KeyperIndex: keyperIndex,
 		})
@@ -113,17 +117,13 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 		})
 	}
 
-	keyperSetIndexUint, err := medley.Int64ToUint64Safe(eon.KeyperConfigIndex)
-	if err != nil {
-		return nil, err
-	}
 	keyperIndexUint, err := medley.Int64ToUint64Safe(keyperIndex)
 	if err != nil {
 		return nil, err
 	}
 	msg := &p2pmsg.DecryptionKeyShares{
 		InstanceID:  ksh.InstanceID,
-		Eon:         keyperSetIndexUint,
+		Eon:         keyperConfigIndex,
 		KeyperIndex: keyperIndexUint,
 		Shares:      shares,
 	}
