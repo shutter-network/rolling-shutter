@@ -44,25 +44,18 @@ func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.New("tx pointer too large")
 	}
 
-	keyperDB := corekeyperdatabase.New(h.dbpool)
-	eon, err := keyperDB.GetEon(ctx, int64(keyShares.Eon))
-	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get eon from database for eon %d", keyShares.Eon)
-	}
 	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
-	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keyShares.Eon))
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrapf(err,
-			"failed to get keyper set from database for keyper set index %d (eon %d)",
-			eon.KeyperConfigIndex,
+			"failed to get keyper set from database for keyper set index %d",
 			keyShares.Eon,
 		)
 	}
 	if keyShares.KeyperIndex >= uint64(len(keyperSet.Keypers)) {
 		return pubsub.ValidationReject, errors.Errorf(
-			"keyper index %d out of range for keyper set %d (eon %d)",
+			"keyper index %d out of range for keyper set %d",
 			keyShares.KeyperIndex,
-			eon.KeyperConfigIndex,
 			keyShares.Eon,
 		)
 	}
@@ -119,13 +112,9 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 		return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert tx pointer vote")
 	}
 
-	eonData, err := keyperCoreDB.GetEon(ctx, int64(keyShares.Eon))
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keyShares.Eon))
 	if err != nil {
-		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get eon data from database for eon %d", keyShares.Eon)
-	}
-	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, eonData.KeyperConfigIndex)
-	if err != nil {
-		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keyShares.Eon)
+		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get keyper set from database for index %d", keyShares.Eon)
 	}
 
 	signaturesDB, err := gnosisDB.GetSlotDecryptionSignatures(ctx, database.GetSlotDecryptionSignaturesParams{
