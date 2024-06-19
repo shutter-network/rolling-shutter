@@ -38,12 +38,12 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	key := msg.(*p2pmsg.DecryptionKeys)
-	if key.GetInstanceID() != handler.config.GetInstanceID() {
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
+	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
 	}
-	eon, err := medley.Uint64ToInt64Safe(key.Eon)
+	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", eon)
 	}
@@ -54,7 +54,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
-		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
+		log.Debug().Uint64("eon", decryptionKeys.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
 		return pubsub.ValidationReject, nil
 	}
 	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
@@ -72,14 +72,14 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
-	if len(key.Keys) == 0 {
+	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
-		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), handler.config.GetMaxNumKeysPerMessage())
+	if len(decryptionKeys.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
+		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(decryptionKeys.Keys), handler.config.GetMaxNumKeysPerMessage())
 	}
 
-	for i, k := range key.Keys {
+	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
@@ -98,7 +98,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		if !ok {
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
-		if i > 0 && bytes.Compare(k.Identity, key.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
@@ -107,10 +107,10 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
 	metricsEpochKGDecryptionKeysReceived.Inc()
-	key := msg.(*p2pmsg.DecryptionKeys)
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
 	// We assume that it's valid as it already passed the libp2p validator.
 	// Insert the key into the cache.
-	for _, k := range key.Keys {
+	for _, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return nil, err
@@ -118,5 +118,5 @@ func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pm
 		handler.cache.Add(*epochSecretKey, k.Identity)
 	}
 	// Insert the key into the db.
-	return nil, database.New(handler.dbpool).InsertDecryptionKeysMsg(ctx, key)
+	return nil, database.New(handler.dbpool).InsertDecryptionKeysMsg(ctx, decryptionKeys)
 }
