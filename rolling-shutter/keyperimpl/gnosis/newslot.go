@@ -3,6 +3,7 @@ package gnosis
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -26,8 +28,6 @@ import (
 
 // Maximum age of a tx pointer in blocks before it is considered outdated.
 const maxTxPointerAge = 2
-
-var errZeroTxPointerAge = errors.New("tx pointer has age 0")
 
 func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) error {
 	return kpr.maybeTriggerDecryption(ctx, slot.Number)
@@ -98,16 +98,32 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 			Uint64("slot", slot).
 			Uint64("proposer-index", proposerIndex).
 			Msg("skipping slot as proposer is not registered")
-		// Even if we don't trigger decryption, we still need to update the tx pointer or it will
-		// become outdated.
-		err := gnosisKeyperDB.SetTxPointerSlot(ctx, gnosisdatabase.SetTxPointerSlotParams{
-			Eon:  keyperSet.KeyperConfigIndex,
-			Slot: int64(slot),
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to update tx pointer slot")
-		}
 		return nil
+	}
+
+	// For each block with a proposer, the tx pointer age has to be incremented. If keys for
+	// this slot are successfully produced, it will be reset to 0. If for some reason the key
+	// has already been produced and the tx pointer has been subsequently reset (e.g. because
+	// we are lagging behind), the tx pointer age will end up being 1. Being off by 1 doesn't
+	// matter much though because it will only become relevant once it reaches maxTxPointerAge
+	// which is arbitrary and locally chosen anyway.
+	age, err := gnosisKeyperDB.IncrementTxPointerAge(ctx, keyperSet.KeyperConfigIndex)
+	if err != nil && err != pgx.ErrNoRows {
+		return errors.Wrap(err, "failed to increment tx pointer age")
+	}
+	if age.Valid {
+		log.Debug().
+			Uint64("slot", slot).
+			Int64("block-number", nextBlock).
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Int64("new-tx-pointer-age", age.Int64).
+			Msg("incremented tx pointer age")
+	} else {
+		log.Warn().
+			Uint64("slot", slot).
+			Int64("block-number", nextBlock).
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Msg("tx pointer age is infinite")
 	}
 
 	return kpr.triggerDecryption(ctx, slot, nextBlock, &keyperSet)
@@ -145,57 +161,56 @@ func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64, block 
 	return isRegistered, proposerDuty.ValidatorIndex, nil
 }
 
-func (kpr *Keyper) getTxPointer(ctx context.Context, eon int64, slot int64, keyperConfigIndex int64) (int64, error) {
-	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
-	var txPointer, txPointerAge int64
+func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64) (int64, error) {
+	gnosisKeyperDB := gnosisdatabase.New(db)
+	var txPointer int64
+	var txPointerAge int64
+	var txPointerOutdated bool
 	txPointerDB, err := gnosisKeyperDB.GetTxPointer(ctx, eon)
 	if err == pgx.ErrNoRows {
-		// The tx pointer is expected to be missing from the db if the eon has just started. In
-		// this case, we should initialize it to zero with an age of 1, ie decrypt starting with
-		// the first transaction.
-		// The tx pointer may also be missing if the keyper has been started late and no decryption
-		// key has been generated or received yet (receiving the keys message would update the
-		// pointer). In this case, the true age is unknown, as we only know the start block but
-		// not the start slot of the eon. However, we can ignore this edge case as it will be
-		// resolved automatically when the first keys message is received. If key generation
-		// continues to fail, eventually our tx pointer age will exceed the maximum value and we
-		// will start participating in the recovery process, albeit a bit late.
-		err := gnosisKeyperDB.SetTxPointer(ctx, gnosisdatabase.SetTxPointerParams{
-			Eon:   eon,
-			Slot:  slot,
+		log.Info().Int64("eon", eon).Msg("initializing tx pointer")
+		// If there is no tx pointer in the db, we initialize it to 0. This is the intended case
+		// for newly started eons. We might also end up doing that if the keyper has been started
+		// late for an eon. In this case, we would ideally set it to infinity (as we would do on a
+		// restart). 0 is ok though too.
+		err = gnosisKeyperDB.SetTxPointer(ctx, gnosisdatabase.SetTxPointerParams{
+			Eon: eon,
+			Age: sql.NullInt64{
+				Int64: 0,
+				Valid: true,
+			},
 			Value: 0,
 		})
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to initialize tx pointer")
+			return 0, errors.Wrapf(err, "failed to initialize tx pointer for eon %d", eon)
 		}
 		txPointer = 0
-		txPointerAge = 1
+		txPointerAge = 0
+		txPointerOutdated = false
 	} else if err != nil {
 		return 0, errors.Wrap(err, "failed to query tx pointer from db")
 	} else {
 		txPointer = txPointerDB.Value
-		txPointerAge = slot - txPointerDB.Slot
+		txPointerAge = txPointerDB.Age.Int64
+		if txPointerDB.Age.Valid {
+			txPointerOutdated = txPointerAge > maxTxPointerAge
+		} else {
+			txPointerOutdated = true
+		}
 	}
-	if txPointerAge == 0 {
-		// A pointer of age 0 means we already received the pointer from a DecryptionKeys message
-		// even though we haven't sent our shares yet. In that case, sending our shares is
-		// unnecessary.
-		return 0, errZeroTxPointerAge
-	}
+
 	// If the tx pointer is outdated, the system has failed to generate decryption keys (or at
 	// least we haven't received them). This either means not enough keypers are online or they
 	// don't agree on the current value of the tx pointer. In order to recover, we choose the
 	// current length of the transaction queue as the new tx pointer, as this is a value
 	// everyone can agree on.
-	isOutdated := txPointerAge > maxTxPointerAge
-	if isOutdated {
+	if txPointerOutdated {
 		log.Warn().
-			Int64("slot", slot).
 			Int64("eon", eon).
 			Int64("tx-pointer", txPointer).
 			Int64("tx-pointer-age", txPointerAge).
 			Msg("outdated tx pointer")
-		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, keyperConfigIndex)
+		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, eon)
 		if err == pgx.ErrNoRows {
 			txPointer = 0
 		} else if err != nil {
@@ -220,16 +235,8 @@ func (kpr *Keyper) triggerDecryption(
 	}
 	keyperConfigIndex := eonStruct.KeyperConfigIndex
 
-	txPointer, err := kpr.getTxPointer(ctx, keyperConfigIndex, int64(slot), keyperSet.KeyperConfigIndex)
-	if err == errZeroTxPointerAge {
-		log.Warn().
-			Uint64("slot", slot).
-			Int64("block-number", nextBlock).
-			Int64("eon", keyperConfigIndex).
-			Int64("tx-pointer", txPointer).
-			Msg("skipping trigger as tx pointer age is 0")
-		return nil
-	} else if err != nil {
+	txPointer, err := getTxPointer(ctx, kpr.dbpool, keyperConfigIndex)
+	if err != nil {
 		return err
 	}
 

@@ -3,6 +3,7 @@ package gnosis
 import (
 	"bytes"
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -283,8 +284,11 @@ func (i *MessagingMiddleware) advanceTxPointer(ctx context.Context, msg *p2pmsg.
 		Int64("tx-pointer-updated", newTxPointer).
 		Msg("updating tx pointer")
 	err := gnosisDB.SetTxPointer(ctx, database.SetTxPointerParams{
-		Eon:   int64(msg.Eon),
-		Slot:  int64(extra.Slot),
+		Eon: int64(msg.Eon),
+		Age: sql.NullInt64{
+			Int64: 0,
+			Valid: true,
+		},
 		Value: newTxPointer,
 	})
 	if err != nil {
