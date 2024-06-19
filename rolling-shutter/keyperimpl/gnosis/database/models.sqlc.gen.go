@@ -4,7 +4,9 @@
 
 package database
 
-import ()
+import (
+	"database/sql"
+)
 
 type CurrentDecryptionTrigger struct {
 	Eon            int64
@@ -48,7 +50,7 @@ type TransactionSubmittedEventsSyncedUntil struct {
 
 type TxPointer struct {
 	Eon   int64
-	Slot  int64
+	Age   sql.NullInt64
 	Value int64
 }
 

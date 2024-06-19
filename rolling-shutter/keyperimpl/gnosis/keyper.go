@@ -164,6 +164,16 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	// Set all transaction pointer ages to infinity. They will be reset to zero when the next
+	// decryption keys arrive, telling us the agreed upon pointer value. Pointer values that are
+	// not in the db yet are not affected. They will be initialized to zero when we first access
+	// them. This is most importantly the case for the pointer value of not yet started eons.
+	gnosisDB := database.New(kpr.dbpool)
+	err = gnosisDB.ResetAllTxPointerAges(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to reset transaction pointer age")
+	}
+
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
 }

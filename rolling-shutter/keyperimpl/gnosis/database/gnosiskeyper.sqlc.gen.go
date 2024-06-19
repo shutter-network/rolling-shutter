@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgconn"
 )
@@ -149,14 +150,14 @@ func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) 
 }
 
 const getTxPointer = `-- name: GetTxPointer :one
-SELECT eon, slot, value FROM tx_pointer
+SELECT eon, age, value FROM tx_pointer
 WHERE eon = $1
 `
 
 func (q *Queries) GetTxPointer(ctx context.Context, eon int64) (TxPointer, error) {
 	row := q.db.QueryRow(ctx, getTxPointer, eon)
 	var i TxPointer
-	err := row.Scan(&i.Eon, &i.Slot, &i.Value)
+	err := row.Scan(&i.Eon, &i.Age, &i.Value)
 	return i, err
 }
 
@@ -197,19 +198,34 @@ func (q *Queries) GetValidatorRegistrationsSyncedUntil(ctx context.Context) (Val
 	return i, err
 }
 
+const incrementTxPointerAge = `-- name: IncrementTxPointerAge :one
+UPDATE tx_pointer
+SET age = age + 1
+WHERE eon = $1
+RETURNING age
+`
+
+func (q *Queries) IncrementTxPointerAge(ctx context.Context, eon int64) (sql.NullInt64, error) {
+	row := q.db.QueryRow(ctx, incrementTxPointerAge, eon)
+	var age sql.NullInt64
+	err := row.Scan(&age)
+	return age, err
+}
+
 const initTxPointer = `-- name: InitTxPointer :exec
-INSERT INTO tx_pointer (eon, slot, value)
-VALUES ($1, $2, 0)
+INSERT INTO tx_pointer (eon, age, value)
+VALUES ($1, $2, $3)
 ON CONFLICT DO NOTHING
 `
 
 type InitTxPointerParams struct {
-	Eon  int64
-	Slot int64
+	Eon   int64
+	Age   sql.NullInt64
+	Value int64
 }
 
 func (q *Queries) InitTxPointer(ctx context.Context, arg InitTxPointerParams) error {
-	_, err := q.db.Exec(ctx, initTxPointer, arg.Eon, arg.Slot)
+	_, err := q.db.Exec(ctx, initTxPointer, arg.Eon, arg.Age, arg.Value)
 	return err
 }
 
@@ -335,6 +351,16 @@ func (q *Queries) IsValidatorRegistered(ctx context.Context, arg IsValidatorRegi
 	return is_registration, err
 }
 
+const resetAllTxPointerAges = `-- name: ResetAllTxPointerAges :exec
+UPDATE tx_pointer
+SET age = NULL
+`
+
+func (q *Queries) ResetAllTxPointerAges(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, resetAllTxPointerAges)
+	return err
+}
+
 const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)
 VALUES ($1, $2, $3, $4)
@@ -394,36 +420,20 @@ func (q *Queries) SetTransactionSubmittedEventsSyncedUntil(ctx context.Context, 
 }
 
 const setTxPointer = `-- name: SetTxPointer :exec
-INSERT INTO tx_pointer (eon, slot, value)
+INSERT INTO tx_pointer (eon, age, value)
 VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
-SET slot = $2, value = $3
+SET age = $2, value = $3
 `
 
 type SetTxPointerParams struct {
 	Eon   int64
-	Slot  int64
+	Age   sql.NullInt64
 	Value int64
 }
 
 func (q *Queries) SetTxPointer(ctx context.Context, arg SetTxPointerParams) error {
-	_, err := q.db.Exec(ctx, setTxPointer, arg.Eon, arg.Slot, arg.Value)
-	return err
-}
-
-const setTxPointerSlot = `-- name: SetTxPointerSlot :exec
-UPDATE tx_pointer
-SET slot = $2
-WHERE eon = $1
-`
-
-type SetTxPointerSlotParams struct {
-	Eon  int64
-	Slot int64
-}
-
-func (q *Queries) SetTxPointerSlot(ctx context.Context, arg SetTxPointerSlotParams) error {
-	_, err := q.db.Exec(ctx, setTxPointerSlot, arg.Eon, arg.Slot)
+	_, err := q.db.Exec(ctx, setTxPointer, arg.Eon, arg.Age, arg.Value)
 	return err
 }
 

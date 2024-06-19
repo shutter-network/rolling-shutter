@@ -43,20 +43,25 @@ SELECT * FROM tx_pointer
 WHERE eon = $1;
 
 -- name: InitTxPointer :exec
-INSERT INTO tx_pointer (eon, slot, value)
-VALUES ($1, $2, 0)
+INSERT INTO tx_pointer (eon, age, value)
+VALUES ($1, $2, $3)
 ON CONFLICT DO NOTHING;
 
 -- name: SetTxPointer :exec
-INSERT INTO tx_pointer (eon, slot, value)
+INSERT INTO tx_pointer (eon, age, value)
 VALUES ($1, $2, $3)
 ON CONFLICT (eon) DO UPDATE
-SET slot = $2, value = $3;
+SET age = $2, value = $3;
 
--- name: SetTxPointerSlot :exec
+-- name: IncrementTxPointerAge :one
 UPDATE tx_pointer
-SET slot = $2
-WHERE eon = $1;
+SET age = age + 1
+WHERE eon = $1
+RETURNING age;
+
+-- name: ResetAllTxPointerAges :exec
+UPDATE tx_pointer
+SET age = NULL;
 
 -- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, slot, tx_pointer, identities_hash)

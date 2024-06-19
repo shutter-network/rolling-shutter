@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"database/sql"
 	"math"
 
 	"github.com/jackc/pgx/v4"
@@ -279,8 +280,11 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 		Int64("tx-pointer-updated", newTxPointer).
 		Msg("updating tx pointer")
 	err := gnosisDB.SetTxPointer(ctx, database.SetTxPointerParams{
-		Eon:   int64(keys.Eon),
-		Slot:  int64(extra.Slot),
+		Eon: int64(keys.Eon),
+		Age: sql.NullInt64{
+			Int64: 0,
+			Valid: true,
+		},
 		Value: newTxPointer,
 	})
 	if err != nil {
