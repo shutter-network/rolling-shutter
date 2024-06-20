@@ -47,7 +47,7 @@ func newDBPoolTeardown(ctx context.Context, tb testing.TB) (*pgxpool.Pool, func(
 
 	testDBURL, exists := os.LookupEnv(testDBURLVar)
 	if !exists {
-		tb.Skipf("no test db specified, please set %s", testDBURLVar)
+		tb.Fatalf("no test db specified, please set %s", testDBURLVar)
 	}
 
 	dbpool, err := pgxpool.Connect(ctx, testDBURL)
