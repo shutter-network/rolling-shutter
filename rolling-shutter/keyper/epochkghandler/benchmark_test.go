@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -23,6 +24,7 @@ const numIdentityPreimages = 100
 
 func prepareBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Pool) (*testkeygen.EonKeys, []identitypreimage.IdentityPreimage) {
 	b.Helper()
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	keyperIndex := uint64(1)
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for i := 0; i < numIdentityPreimages; i++ {
@@ -38,6 +40,7 @@ func prepareBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Pool) (
 
 func prepareKeysBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Pool) (p2p.MessageHandler, *p2pmsg.DecryptionKeys) {
 	b.Helper()
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	keys, identityPreimages := prepareBenchmark(ctx, b, dbpool)
 
 	encodedDecryptionKeys := [][]byte{}
@@ -73,6 +76,7 @@ func prepareKeySharesBenchmark(
 	isSecond bool,
 ) (p2p.MessageHandler, *p2pmsg.DecryptionKeyShares) {
 	b.Helper()
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	keys, identityPreimages := prepareBenchmark(ctx, b, dbpool)
 	var handler p2p.MessageHandler = &DecryptionKeyShareHandler{config: config, dbpool: dbpool}
 
@@ -125,10 +129,13 @@ func BenchmarkValidateKeysIntegration(b *testing.B) {
 	handler, msg := prepareKeysBenchmark(ctx, b, dbpool)
 
 	b.ResetTimer()
-	validationResult, err := handler.ValidateMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
-	assert.Check(b, validationResult == pubsub.ValidationAccept)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		validationResult, err := handler.ValidateMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+		assert.Check(b, validationResult == pubsub.ValidationAccept)
+	}
 }
 
 func BenchmarkHandleKeysIntegration(b *testing.B) {
@@ -142,9 +149,12 @@ func BenchmarkHandleKeysIntegration(b *testing.B) {
 	assert.Check(b, validationResult == pubsub.ValidationAccept)
 
 	b.ResetTimer()
-	_, err = handler.HandleMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		_, err = handler.HandleMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+	}
 }
 
 func BenchmarkValidateFirstKeySharesIntegration(b *testing.B) {
@@ -154,10 +164,13 @@ func BenchmarkValidateFirstKeySharesIntegration(b *testing.B) {
 	handler, msg := prepareKeySharesBenchmark(ctx, b, dbpool, false)
 
 	b.ResetTimer()
-	validationResult, err := handler.ValidateMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
-	assert.Check(b, validationResult == pubsub.ValidationAccept)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		validationResult, err := handler.ValidateMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+		assert.Check(b, validationResult == pubsub.ValidationAccept)
+	}
 }
 
 func BenchmarkHandleFirstKeySharesIntegration(b *testing.B) {
@@ -171,9 +184,12 @@ func BenchmarkHandleFirstKeySharesIntegration(b *testing.B) {
 	assert.Check(b, validationResult == pubsub.ValidationAccept)
 
 	b.ResetTimer()
-	_, err = handler.HandleMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		_, err = handler.HandleMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+	}
 }
 
 func BenchmarkValidateSecondKeySharesIntegration(b *testing.B) {
@@ -183,10 +199,13 @@ func BenchmarkValidateSecondKeySharesIntegration(b *testing.B) {
 	handler, msg := prepareKeySharesBenchmark(ctx, b, dbpool, true)
 
 	b.ResetTimer()
-	validationResult, err := handler.ValidateMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
-	assert.Check(b, validationResult == pubsub.ValidationAccept)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		validationResult, err := handler.ValidateMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+		assert.Check(b, validationResult == pubsub.ValidationAccept)
+	}
 }
 
 func BenchmarkHandleSecondKeySharesIntegration(b *testing.B) {
@@ -200,7 +219,10 @@ func BenchmarkHandleSecondKeySharesIntegration(b *testing.B) {
 	assert.Check(b, validationResult == pubsub.ValidationAccept)
 
 	b.ResetTimer()
-	_, err = handler.HandleMessage(ctx, msg)
-	b.StopTimer()
-	assert.NilError(b, err)
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		_, err = handler.HandleMessage(ctx, msg)
+		b.StopTimer()
+		assert.NilError(b, err)
+	}
 }
