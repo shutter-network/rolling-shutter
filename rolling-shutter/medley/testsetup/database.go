@@ -42,24 +42,24 @@ var testDBSuffix = "-test"
 // newDBPoolTeardown connects to a test db specified an environment variable and clears it from all
 // schemas we might have created. It returns the db connection pool and a close function. Call the
 // close function at the end of the test to reset the db again and close the connection.
-func newDBPoolTeardown(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()) {
-	t.Helper()
+func newDBPoolTeardown(ctx context.Context, tb testing.TB) (*pgxpool.Pool, func()) {
+	tb.Helper()
 
 	testDBURL, exists := os.LookupEnv(testDBURLVar)
 	if !exists {
-		t.Skipf("no test db specified, please set %s", testDBURLVar)
+		tb.Fatalf("no test db specified, please set %s", testDBURLVar)
 	}
 
 	dbpool, err := pgxpool.Connect(ctx, testDBURL)
 	if err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
+		tb.Fatalf("failed to connect to test db: %v", err)
 	}
 
 	closedb := func() {
 		_, err = dbpool.Exec(ctx, dropEverything)
 		dbpool.Close() // close db no matter if dropping failed
 		if err != nil {
-			t.Fatalf("failed to reset test db: %v", err)
+			tb.Fatalf("failed to reset test db: %v", err)
 		}
 	}
 
@@ -67,22 +67,22 @@ func newDBPoolTeardown(ctx context.Context, t *testing.T) (*pgxpool.Pool, func()
 	_, err = dbpool.Exec(ctx, dropEverything)
 	if err != nil {
 		dbpool.Close()
-		t.Fatalf("failed to reset test db: %v", err)
+		tb.Fatalf("failed to reset test db: %v", err)
 	}
 
 	return dbpool, closedb
 }
 
-func NewTestDBPool(ctx context.Context, t *testing.T, definition db.Definition) (*pgxpool.Pool, func()) {
-	t.Helper()
+func NewTestDBPool(ctx context.Context, tb testing.TB, definition db.Definition) (*pgxpool.Pool, func()) {
+	tb.Helper()
 
-	dbpool, closedb := newDBPoolTeardown(ctx, t)
+	dbpool, closedb := newDBPoolTeardown(ctx, tb)
 
 	err := db.InitDB(ctx, dbpool, definition.Name()+testDBSuffix, definition)
 	if err != nil {
 		log.Error().Err(err).Str("db-definition", definition.Name()).Msg("Initializing DB failed")
 		closedb()
-		t.Fatalf("failed to initialize '%s' db", definition.Name())
+		tb.Fatalf("failed to initialize '%s' db", definition.Name())
 	}
 	return dbpool, closedb
 }

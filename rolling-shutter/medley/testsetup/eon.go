@@ -3,6 +3,7 @@ package testsetup
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"database/sql"
 	"testing"
 
@@ -17,7 +18,6 @@ import (
 	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -31,15 +31,15 @@ type TestConfig interface {
 
 func InitializeEon(
 	ctx context.Context,
-	t *testing.T,
+	tb testing.TB,
 	dbpool *pgxpool.Pool,
 	config TestConfig,
 	keyperIndex uint64,
-) *testkeygen.TestKeyGenerator {
-	t.Helper()
+) *testkeygen.EonKeys {
+	tb.Helper()
 
 	err := dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
 	keyperDB := database.New(dbpool)
 	keypers := []string{
@@ -51,55 +51,56 @@ func InitializeEon(
 	collatorKey := config.GetCollatorKey()
 	if collatorKey != nil {
 		err := dbpool.BeginFunc(db.WrapContext(ctx, chainobsdb.Definition.Validate))
-		assert.NilError(t, err)
+		assert.NilError(tb, err)
 		chdb := chainobsdb.New(dbpool)
 		err = chdb.InsertChainCollator(ctx, chainobsdb.InsertChainCollatorParams{
 			ActivationBlockNumber: 0,
 			Collator:              shdb.EncodeAddress(ethcrypto.PubkeyToAddress(config.GetCollatorKey().PublicKey)),
 		})
-		assert.NilError(t, err)
+		assert.NilError(tb, err)
 	}
 
-	tkg := testkeygen.NewTestKeyGenerator(t, 3, 2, false)
+	eonKeys, err := testkeygen.NewEonKeys(rand.Reader, 3, 2)
+	assert.NilError(tb, err)
+
 	publicKeyShares := []*shcrypto.EonPublicKeyShare{}
-	identityPreimage := identitypreimage.BigToIdentityPreimage(common.Big0)
-	for i := uint64(0); i < tkg.NumKeypers; i++ {
-		share := tkg.EonPublicKeyShare(identityPreimage, i)
+	for i := 0; i < int(eonKeys.NumKeypers); i++ {
+		share := eonKeys.EonPublicKeyShare(i)
 		publicKeyShares = append(publicKeyShares, share)
 	}
 	dkgResult := puredkg.Result{
-		Eon:             config.GetEon(),
-		NumKeypers:      tkg.NumKeypers,
-		Threshold:       tkg.Threshold,
+		Eon:             1,
+		NumKeypers:      eonKeys.NumKeypers,
+		Threshold:       eonKeys.Threshold,
 		Keyper:          keyperIndex,
-		SecretKeyShare:  tkg.EonSecretKeyShare(identityPreimage, keyperIndex),
-		PublicKey:       tkg.EonPublicKey(identityPreimage),
+		SecretKeyShare:  eonKeys.EonSecretKeyShare(int(keyperIndex)),
+		PublicKey:       eonKeys.EonPublicKey(),
 		PublicKeyShares: publicKeyShares,
 	}
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
 	err = keyperDB.InsertBatchConfig(ctx, database.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Height:            0,
 		Keypers:           keypers,
-		Threshold:         int32(tkg.Threshold),
+		Threshold:         int32(eonKeys.Threshold),
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{
 		Eon:                   int64(config.GetEon()),
 		Height:                0,
 		ActivationBlockNumber: 0,
 		KeyperConfigIndex:     1,
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 	err = keyperDB.InsertDKGResult(ctx, database.InsertDKGResultParams{
 		Eon:        int64(config.GetEon()),
 		Success:    true,
 		Error:      sql.NullString{},
 		PureResult: dkgResultEncoded,
 	})
-	assert.NilError(t, err)
+	assert.NilError(tb, err)
 
-	return tkg
+	return eonKeys
 }

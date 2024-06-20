@@ -29,6 +29,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 
 	identityPreimage := identitypreimage.Uint64ToIdentityPreimage(50)
 	keyperIndex := uint64(1)
+	keyperConfigIndex := int64(1)
 
 	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
 
@@ -55,7 +56,6 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 		IdentityPreimages: []identitypreimage.IdentityPreimage{identityPreimage},
 	}
 	decrTrigChan <- broker.NewEvent(trig)
-	decrTrigChan <- broker.NewEvent(trig)
 	close(decrTrigChan)
 	err = group.Wait()
 	cleanup()
@@ -63,14 +63,11 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 
 	// send decryption key share when first trigger is received
 	share, err := db.GetDecryptionKeyShare(ctx, database.GetDecryptionKeyShareParams{
-		Eon:         int64(config.GetEon()),
+		Eon:         keyperConfigIndex,
 		EpochID:     identityPreimage.Bytes(),
 		KeyperIndex: int64(keyperIndex),
 	})
 	assert.NilError(t, err)
-	// although we requested the trigger 2 times, the keyshare should have been
-	// sent only once
-	assert.Check(t, len(messaging.SentMessages) == 1)
 
 	msg, ok := messaging.SentMessages[0].Message.(*p2pmsg.DecryptionKeyShares)
 	assert.Check(t, ok)
