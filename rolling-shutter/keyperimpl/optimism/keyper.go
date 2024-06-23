@@ -60,14 +60,15 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	ethConfig.PrivateKey = kpr.config.Optimism.PrivateKey
 	kpr.core, err = keyper.New(
 		&kprconfig.Config{
-			InstanceID:        kpr.config.InstanceID,
-			DatabaseURL:       kpr.config.DatabaseURL,
-			HTTPEnabled:       kpr.config.HTTPEnabled,
-			HTTPListenAddress: kpr.config.HTTPListenAddress,
-			P2P:               kpr.config.P2P,
-			Ethereum:          ethConfig,
-			Shuttermint:       kpr.config.Shuttermint,
-			Metrics:           kpr.config.Metrics,
+			InstanceID:           kpr.config.InstanceID,
+			DatabaseURL:          kpr.config.DatabaseURL,
+			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPListenAddress:    kpr.config.HTTPListenAddress,
+			P2P:                  kpr.config.P2P,
+			Ethereum:             ethConfig,
+			Shuttermint:          kpr.config.Shuttermint,
+			Metrics:              kpr.config.Metrics,
+			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
 		},
 		trigger,
 		keyper.WithDBPool(dbpool),

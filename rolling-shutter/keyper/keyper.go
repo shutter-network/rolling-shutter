@@ -185,11 +185,12 @@ func (kpr *KeyperCore) getServices() []service.Service {
 		keyTrigger = fanIn.C
 	}
 	keyShareHandler := &epochkghandler.KeyShareHandler{
-		InstanceID:    kpr.config.GetInstanceID(),
-		KeyperAddress: kpr.config.GetAddress(),
-		DBPool:        kpr.dbpool,
-		Messaging:     kpr.messaging,
-		Trigger:       keyTrigger,
+		InstanceID:           kpr.config.GetInstanceID(),
+		KeyperAddress:        kpr.config.GetAddress(),
+		MaxNumKeysPerMessage: kpr.config.GetMaxNumKeysPerMessage(),
+		DBPool:               kpr.dbpool,
+		Messaging:            kpr.messaging,
+		Trigger:              keyTrigger,
 	}
 	services = append(services, keyShareHandler)
 	if kpr.config.Metrics.Enabled {

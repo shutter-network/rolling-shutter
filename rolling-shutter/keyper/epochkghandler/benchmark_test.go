@@ -18,8 +18,8 @@ import (
 )
 
 // The number of identity preimages to generate for each of the benchmark runs. Note that this must
-// be smaller than MaxNumKeysPerMessage, otherwise the benchmarks will fail.
-const numIdentityPreimages = 100
+// be smaller than config.GetMaxNumKeysPerMessage(), otherwise the benchmarks will fail.
+const numIdentityPreimages = 1000
 
 func prepareBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Pool) (*testkeygen.EonKeys, []identitypreimage.IdentityPreimage) {
 	b.Helper()

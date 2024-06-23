@@ -29,6 +29,8 @@ type Config struct {
 	Shuttermint *ShuttermintConfig
 	Ethereum    *configuration.EthnodeConfig
 	Metrics     *metricsserver.MetricsConfig
+
+	MaxNumKeysPerMessage uint64
 }
 
 func (c *Config) GetAddress() common.Address {
@@ -55,6 +57,10 @@ func (c *Config) GetInstanceID() uint64 {
 
 func (c *Config) GetHTTPListenAddress() string {
 	return c.HTTPListenAddress
+}
+
+func (c *Config) GetMaxNumKeysPerMessage() uint64 {
+	return c.MaxNumKeysPerMessage
 }
 
 func NewShuttermintConfig() *ShuttermintConfig {

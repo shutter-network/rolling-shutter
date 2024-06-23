@@ -49,6 +49,8 @@ type Config struct {
 	P2P         *p2p.Config
 	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
+
+	MaxNumKeysPerMessage uint64
 }
 
 func (c *Config) Validate() error {
@@ -71,6 +73,7 @@ func (c *Config) SetDefaultValues() error {
 	c.HTTPListenAddress = ":3000"
 	c.Gnosis.EncryptedGasLimit = 1_000_000
 	c.Gnosis.MinGasPerTransaction = 21_000
+	c.MaxNumKeysPerMessage = 500
 	return nil
 }
 

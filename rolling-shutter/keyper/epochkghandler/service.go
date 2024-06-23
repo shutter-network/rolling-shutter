@@ -18,9 +18,10 @@ import (
 var DefaultKeyShareHandlerRetryOpts = []retry.Option{}
 
 type KeyShareHandler struct {
-	InstanceID    uint64
-	KeyperAddress common.Address
-	DBPool        *pgxpool.Pool
+	InstanceID           uint64
+	KeyperAddress        common.Address
+	MaxNumKeysPerMessage uint64
+	DBPool               *pgxpool.Pool
 
 	Messaging p2p.Messaging
 	Trigger   <-chan *broker.Event[*DecryptionTrigger]

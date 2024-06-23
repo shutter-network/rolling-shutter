@@ -73,8 +73,8 @@ func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, m
 	if len(keyShare.Shares) == 0 {
 		return pubsub.ValidationReject, errors.New("no key shares in message")
 	}
-	if len(keyShare.Shares) > MaxNumKeysPerMessage {
-		return pubsub.ValidationReject, errors.Errorf("too many key shares in message (%d > %d)", len(keyShare.Shares), MaxNumKeysPerMessage)
+	if len(keyShare.Shares) > int(handler.config.GetMaxNumKeysPerMessage()) {
+		return pubsub.ValidationReject, errors.Errorf("too many key shares in message (%d > %d)", len(keyShare.Shares), handler.config.GetMaxNumKeysPerMessage())
 	}
 	shares := keyShare.GetShares()
 	for i, share := range shares {

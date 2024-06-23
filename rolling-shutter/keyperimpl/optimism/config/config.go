@@ -37,6 +37,8 @@ type Config struct {
 	Optimism    *OptimismConfig
 	Shuttermint *kprconfig.ShuttermintConfig
 	Metrics     *metricsserver.MetricsConfig
+
+	MaxNumKeysPerMessage uint64
 }
 
 func (c *Config) Validate() error {
@@ -50,6 +52,7 @@ func (c *Config) Name() string {
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
+	c.MaxNumKeysPerMessage = 500
 	return nil
 }
 

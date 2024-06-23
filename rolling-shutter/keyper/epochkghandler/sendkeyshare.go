@@ -17,6 +17,7 @@ import (
 type Config interface {
 	GetAddress() common.Address
 	GetInstanceID() uint64
+	GetMaxNumKeysPerMessage() uint64
 }
 
 type DecryptionTrigger struct {
@@ -54,8 +55,8 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	if len(identityPreimages) == 0 {
 		return nil, errors.New("cannot generate empty decryption key share")
 	}
-	if len(identityPreimages) > MaxNumKeysPerMessage {
-		return nil, errors.Errorf("too many decryption key shares for message (%d > %d)", len(identityPreimages), MaxNumKeysPerMessage)
+	if len(identityPreimages) > int(ksh.MaxNumKeysPerMessage) {
+		return nil, errors.Errorf("too many decryption key shares for message (%d > %d)", len(identityPreimages), ksh.MaxNumKeysPerMessage)
 	}
 
 	db := database.New(ksh.DBPool)

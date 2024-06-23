@@ -19,8 +19,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-const MaxNumKeysPerMessage = 128
-
 func NewDecryptionKeyHandler(config Config, dbpool *pgxpool.Pool) p2p.MessageHandler {
 	return &DecryptionKeyHandler{config: config, dbpool: dbpool}
 }
@@ -73,8 +71,8 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	if len(key.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > MaxNumKeysPerMessage {
-		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), MaxNumKeysPerMessage)
+	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
+		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), handler.config.GetMaxNumKeysPerMessage())
 	}
 	for i, k := range key.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()

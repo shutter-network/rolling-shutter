@@ -39,11 +39,12 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.NilError(t, err)
 
 	ksh := &KeyShareHandler{
-		InstanceID:    config.GetInstanceID(),
-		KeyperAddress: config.GetAddress(),
-		DBPool:        dbpool,
-		Messaging:     messaging,
-		Trigger:       decrTrigChan,
+		InstanceID:           config.GetInstanceID(),
+		KeyperAddress:        config.GetAddress(),
+		MaxNumKeysPerMessage: config.GetMaxNumKeysPerMessage(),
+		DBPool:               dbpool,
+		Messaging:            messaging,
+		Trigger:              decrTrigChan,
 	}
 	group, cleanup := service.RunBackground(
 		ctx,

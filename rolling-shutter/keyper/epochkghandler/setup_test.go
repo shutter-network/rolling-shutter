@@ -28,4 +28,8 @@ func (c *TestConfig) GetCollatorKey() *ecdsa.PrivateKey {
 	return nil
 }
 
+func (c *TestConfig) GetMaxNumKeysPerMessage() uint64 {
+	return 1024
+}
+
 var _ testsetup.TestConfig = &TestConfig{}
