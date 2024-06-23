@@ -17,6 +17,7 @@ func TestGetTxPointerBasicIntegration(t *testing.T) {
 	t.Cleanup(dbclose)
 	db := gnosisDatabase.New(dbpool)
 
+	maxTxPointerAge := int64(5)
 	err := db.SetTxPointer(ctx, gnosisDatabase.SetTxPointerParams{
 		Eon: 2,
 		Age: sql.NullInt64{
@@ -27,7 +28,7 @@ func TestGetTxPointerBasicIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	txPointer, err := getTxPointer(ctx, dbpool, 2)
+	txPointer, err := getTxPointer(ctx, dbpool, 2, maxTxPointerAge)
 	assert.NilError(t, err)
 	assert.Equal(t, txPointer, int64(5))
 }
@@ -53,7 +54,7 @@ func TestGetTxPointerInfiniteIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	txPointer, err := getTxPointer(ctx, dbpool, 2)
+	txPointer, err := getTxPointer(ctx, dbpool, 2, 5)
 	assert.NilError(t, err)
 	assert.Equal(t, txPointer, int64(10))
 }
@@ -64,6 +65,7 @@ func TestGetTxPointerOutdatedIntegration(t *testing.T) {
 	t.Cleanup(dbclose)
 	db := gnosisDatabase.New(dbpool)
 
+	maxTxPointerAge := int64(5)
 	err := db.SetTxPointer(ctx, gnosisDatabase.SetTxPointerParams{
 		Eon: 2,
 		Age: sql.NullInt64{
@@ -79,7 +81,7 @@ func TestGetTxPointerOutdatedIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	txPointer, err := getTxPointer(ctx, dbpool, 2)
+	txPointer, err := getTxPointer(ctx, dbpool, 2, maxTxPointerAge)
 	assert.NilError(t, err)
 	assert.Equal(t, txPointer, int64(10))
 }
@@ -89,7 +91,7 @@ func TestGetTxPointerMissingIntegration(t *testing.T) {
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, gnosisDatabase.Definition)
 	t.Cleanup(dbclose)
 
-	txPointer, err := getTxPointer(ctx, dbpool, 2)
+	txPointer, err := getTxPointer(ctx, dbpool, 2, 5)
 	assert.NilError(t, err)
 	assert.Equal(t, txPointer, int64(0))
 

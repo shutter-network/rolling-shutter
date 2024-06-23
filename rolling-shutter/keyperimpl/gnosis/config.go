@@ -102,6 +102,7 @@ type GnosisConfig struct {
 	Contracts            *GnosisContractsConfig       `shconfig:",required"`
 	EncryptedGasLimit    uint64                       `shconfig:",required"`
 	MinGasPerTransaction uint64                       `shconfig:",required"`
+	MaxTxPointerAge      uint64                       `shconfig:",required"`
 	SecondsPerSlot       uint64                       `shconfig:",required"`
 	SlotsPerEpoch        uint64                       `shconfig:",required"`
 	GenesisSlotTimestamp uint64                       `shconfig:",required"`
@@ -113,6 +114,7 @@ func NewGnosisConfig() *GnosisConfig {
 		Contracts:            NewGnosisContractsConfig(),
 		EncryptedGasLimit:    0,
 		MinGasPerTransaction: 0,
+		MaxTxPointerAge:      0,
 		SecondsPerSlot:       0,
 		SlotsPerEpoch:        0,
 		GenesisSlotTimestamp: 0,
@@ -134,6 +136,9 @@ func (c *GnosisConfig) Validate() error {
 	if c.SecondsPerSlot == 0 {
 		return errors.Errorf("seconds per slot must not be zero")
 	}
+	if c.MaxTxPointerAge > math.MaxInt64 {
+		return errors.Errorf("max tx pointer age is too big")
+	}
 	return nil
 }
 
@@ -144,6 +149,7 @@ func (c *GnosisConfig) SetDefaultValues() error {
 func (c *GnosisConfig) SetExampleValues() error {
 	c.EncryptedGasLimit = 1_000_000
 	c.MinGasPerTransaction = 21_000
+	c.MaxTxPointerAge = 5
 	c.SecondsPerSlot = 5
 	c.SlotsPerEpoch = 16
 	c.GenesisSlotTimestamp = 1665410700

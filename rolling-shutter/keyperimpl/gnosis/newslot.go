@@ -26,9 +26,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// Maximum age of a tx pointer in blocks before it is considered outdated.
-const maxTxPointerAge = 2
-
 func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) error {
 	return kpr.maybeTriggerDecryption(ctx, slot.Number)
 }
@@ -161,7 +158,7 @@ func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64, block 
 	return isRegistered, proposerDuty.ValidatorIndex, nil
 }
 
-func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64) (int64, error) {
+func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointerAge int64) (int64, error) {
 	gnosisKeyperDB := gnosisdatabase.New(db)
 	var txPointer int64
 	var txPointerAge int64
@@ -235,7 +232,7 @@ func (kpr *Keyper) triggerDecryption(
 	}
 	keyperConfigIndex := eonStruct.KeyperConfigIndex
 
-	txPointer, err := getTxPointer(ctx, kpr.dbpool, keyperConfigIndex)
+	txPointer, err := getTxPointer(ctx, kpr.dbpool, keyperConfigIndex, int64(kpr.config.Gnosis.MaxTxPointerAge))
 	if err != nil {
 		return err
 	}
