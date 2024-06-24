@@ -9,9 +9,9 @@ RUN --mount=type=cache,target=/root/.cache go mod download
 # Build binary
 COPY / /src
 WORKDIR /src/rolling-shutter
-RUN --mount=type=cache,target=/root/.cache CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-v make build
+RUN --mount=type=cache,target=/root/.cache CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOFLAGS=-v make build
 
-FROM scratch as runner
+FROM golang:1.21 as runner
 
 COPY --from=builder /src/rolling-shutter/bin/rolling-shutter /rolling-shutter
 

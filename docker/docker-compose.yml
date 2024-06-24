@@ -6,9 +6,9 @@ x-logging: &logging
 services:
   rs-build:
     build:
-      dockerfile: docker/build-src/snapshot/Dockerfile
+      dockerfile: docker/build-src/rolling-shutter/Dockerfile
       context: ..
-    image: snapshutter
+    image: rolling-shutter
     command: "-v"
 
   db:
@@ -63,7 +63,7 @@ services:
     logging: *logging
 
   chain-0-validator:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -80,7 +80,7 @@ services:
     logging: *logging
 
   chain-0-sentry:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -95,7 +95,7 @@ services:
     logging: *logging
 
   chain-1-validator:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -112,7 +112,7 @@ services:
     logging: *logging
 
   chain-1-sentry:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -127,7 +127,7 @@ services:
     logging: *logging
 
   chain-2-validator:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -144,7 +144,7 @@ services:
     logging: *logging
 
   chain-2-sentry:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -159,7 +159,7 @@ services:
     logging: *logging
 
   chain-3-validator:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -176,7 +176,7 @@ services:
     logging: *logging
 
   chain-3-sentry:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -191,7 +191,7 @@ services:
     logging: *logging
 
   chain-seed:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -202,7 +202,7 @@ services:
     logging: *logging
 
   snapshot:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -230,7 +230,7 @@ services:
       caddy.reverse_proxy: "{{upstreams 8754}}"
 
   bootnode-0:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -255,7 +255,7 @@ services:
     logging: *logging
 
   bootnode-1:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -280,7 +280,7 @@ services:
     logging: *logging
 
   keyper-0:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -306,7 +306,7 @@ services:
     logging: *logging
 
   keyper-1:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -332,7 +332,7 @@ services:
     logging: *logging
 
   keyper-2:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -358,7 +358,7 @@ services:
     logging: *logging
 
   keyper-3:
-    image: snapshutter
+    image: rolling-shutter
     restart: always
     entrypoint:
       - /rolling-shutter
@@ -393,7 +393,7 @@ services:
     profiles:
       - live
     environment:
-      CADDY_INGRESS_NETWORKS: snapshutter_default
+      CADDY_INGRESS_NETWORKS: rolling-shutter_default
     labels:
       caddy.email: devops@brainbot.com
     logging: *logging
