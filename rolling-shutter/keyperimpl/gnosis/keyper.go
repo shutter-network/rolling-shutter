@@ -201,6 +201,7 @@ func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
 		ExecutionClient:      client,
 		GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
 		SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
+		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular
@@ -234,11 +235,12 @@ func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
 		return errors.Wrap(err, "failed to instantiate validator registry contract")
 	}
 	kpr.validatorSyncer = &ValidatorSyncer{
-		Contract:        validatorRegistryContract,
-		DBPool:          kpr.dbpool,
-		BeaconAPIClient: kpr.beaconAPIClient,
-		ExecutionClient: validatorSyncerClient,
-		ChainID:         chainID.Uint64(),
+		Contract:             validatorRegistryContract,
+		DBPool:               kpr.dbpool,
+		BeaconAPIClient:      kpr.beaconAPIClient,
+		ExecutionClient:      validatorSyncerClient,
+		ChainID:              chainID.Uint64(),
+		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular

@@ -29,11 +29,12 @@ const (
 )
 
 type ValidatorSyncer struct {
-	Contract        *validatorRegistryBindings.Validatorregistry
-	DBPool          *pgxpool.Pool
-	BeaconAPIClient *beaconapiclient.Client
-	ExecutionClient *ethclient.Client
-	ChainID         uint64
+	Contract             *validatorRegistryBindings.Validatorregistry
+	DBPool               *pgxpool.Pool
+	BeaconAPIClient      *beaconapiclient.Client
+	ExecutionClient      *ethclient.Client
+	ChainID              uint64
+	SyncStartBlockNumber uint64
 }
 
 func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error {
@@ -44,7 +45,7 @@ func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error 
 	}
 	var start uint64
 	if err == pgx.ErrNoRows {
-		start = 0
+		start = v.SyncStartBlockNumber
 	} else {
 		start = uint64(syncedUntil.BlockNumber + 1)
 	}
