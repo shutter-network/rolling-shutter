@@ -107,7 +107,7 @@ func (s *SequencerSyncer) fetchEvents(
 		End:     &end,
 		Context: ctx,
 	}
-	it, err := s.Contract.SequencerFilterer.FilterTransactionSubmitted(&opts, []uint64{}, []uint64{})
+	it, err := s.Contract.SequencerFilterer.FilterTransactionSubmitted(&opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query transaction submitted events")
 	}
