@@ -6,7 +6,7 @@ INSERT INTO keyper_set (
     threshold
 ) VALUES (
     $1, $2, $3, $4
-);
+) ON CONFLICT DO NOTHING;
 
 -- name: GetKeyperSetByKeyperConfigIndex :one
 SELECT * FROM keyper_set WHERE keyper_config_index=$1;
