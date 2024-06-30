@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -294,5 +295,8 @@ func (i *MessagingMiddleware) advanceTxPointer(ctx context.Context, msg *p2pmsg.
 	if err != nil {
 		return errors.Wrap(err, "failed to set tx pointer")
 	}
+	eonString := fmt.Sprint(msg.Eon)
+	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
+	metricsTxPointerAge.WithLabelValues(eonString).Set(0)
 	return nil
 }

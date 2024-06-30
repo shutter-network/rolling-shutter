@@ -94,6 +94,7 @@ func (s *SequencerSyncer) syncRange(
 		Int("num-inserted-events", len(filteredEvents)).
 		Int("num-discarded-events", len(events)-len(filteredEvents)).
 		Msg("synced sequencer contract")
+	metricsTxSubmittedEventsSyncedUntil.Set(float64(end))
 	return nil
 }
 
@@ -178,6 +179,7 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 		if err != nil {
 			return errors.Wrap(err, "failed to insert transaction submitted event into db")
 		}
+		metricsLatestTxSubmittedEventIndex.WithLabelValues(string(event.Eon)).Set(float64(nextEventIndex))
 		nextEventIndices[event.Eon]++
 		log.Debug().
 			Int64("index", nextEventIndex).
