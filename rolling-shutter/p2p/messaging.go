@@ -34,10 +34,7 @@ func (r *ValidatorRegistry) GetCombinedValidator(topic string) pubsub.ValidatorE
 		startTime := time.Now()
 		defer func() {
 			elapsedTime := time.Since(startTime)
-			log.Debug().
-				Str("topic", topic).
-				Str("duration", elapsedTime.String()).
-				Msg("validated message")
+			metricsP2PMessageValidationTime.WithLabelValues(topic).Observe(elapsedTime.Seconds())
 		}()
 
 		ignored := false
@@ -275,6 +272,7 @@ func (m *P2PMessaging) runHandleMessages(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			startTime := time.Now()
 			if err := m.handle(ctx, msg); err != nil {
 				log.Info().
 					Err(err).
@@ -282,6 +280,8 @@ func (m *P2PMessaging) runHandleMessages(ctx context.Context) error {
 					Str("sender-id", msg.GetFrom().String()).
 					Msg("failed to handle message")
 			}
+			elapsedTime := time.Since(startTime)
+			metricsP2PMessageHandlingTime.WithLabelValues(msg.GetTopic()).Observe(elapsedTime.Seconds())
 		case <-ctx.Done():
 			return ctx.Err()
 		}
