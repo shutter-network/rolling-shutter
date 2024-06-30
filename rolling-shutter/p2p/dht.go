@@ -93,7 +93,10 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
-						log.Error().Err(err).Str("peer", p.ID.String()).Msg("error dialing peer")
+						log.Debug().
+							Err(err).
+							Str("peer", p.ID.String()).
+							Msg("error dialing peer")
 						failedDials++
 					}
 					newConnections++
