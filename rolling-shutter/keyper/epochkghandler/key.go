@@ -3,8 +3,8 @@ package epochkghandler
 import (
 	"bytes"
 	"context"
-	"math"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -14,18 +14,23 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func NewDecryptionKeyHandler(config Config, dbpool *pgxpool.Pool) p2p.MessageHandler {
-	return &DecryptionKeyHandler{config: config, dbpool: dbpool}
+	// Not catching the error as it only can happen if non-positive size was applied
+	cache, _ := lru.New[shcrypto.EpochSecretKey, []byte](1024)
+	return &DecryptionKeyHandler{config: config, dbpool: dbpool, cache: cache}
 }
 
 type DecryptionKeyHandler struct {
 	config Config
 	dbpool *pgxpool.Pool
+	// keep 1024 verified keys in Cache to skip additional verifications
+	cache *lru.Cache[shcrypto.EpochSecretKey, []byte]
 }
 
 func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
@@ -33,51 +38,58 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	key := msg.(*p2pmsg.DecryptionKeys)
-	if key.GetInstanceID() != handler.config.GetInstanceID() {
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
+	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
 	}
-	if key.Eon > math.MaxInt64 {
-		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
+	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", eon)
 	}
 
 	queries := database.New(handler.dbpool)
-
-	_, isKeyper, err := queries.GetKeyperIndex(ctx, int64(key.Eon), handler.config.GetAddress())
+	_, isKeyper, err := queries.GetKeyperIndex(ctx, eon, handler.config.GetAddress())
 	if err != nil {
 		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
-		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
+		log.Debug().Uint64("eon", decryptionKeys.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
 		return pubsub.ValidationReject, nil
 	}
-
-	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
-	if err == pgx.ErrNoRows {
-		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
+	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon)
 	}
 	if !dkgResultDB.Success {
-		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
-	if len(key.Keys) == 0 {
+	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
-		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), handler.config.GetMaxNumKeysPerMessage())
+	if len(decryptionKeys.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
+		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(decryptionKeys.Keys), handler.config.GetMaxNumKeysPerMessage())
 	}
-	for i, k := range key.Keys {
+
+	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
+		}
+		identity, exists := handler.cache.Get(*epochSecretKey)
+		if exists {
+			if bytes.Equal(k.Identity, identity) {
+				continue
+			}
+			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
 		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
 		if err != nil {
@@ -86,8 +98,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		if !ok {
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
-
-		if i > 0 && bytes.Compare(k.Identity, key.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
@@ -96,8 +107,16 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
 	metricsEpochKGDecryptionKeysReceived.Inc()
-	key := msg.(*p2pmsg.DecryptionKeys)
-	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
-	// validator.
-	return nil, database.New(handler.dbpool).InsertDecryptionKeysMsg(ctx, key)
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
+	// We assume that it's valid as it already passed the libp2p validator.
+	// Insert the key into the cache.
+	for _, k := range decryptionKeys.Keys {
+		epochSecretKey, err := k.GetEpochSecretKey()
+		if err != nil {
+			return nil, err
+		}
+		handler.cache.Add(*epochSecretKey, k.Identity)
+	}
+	// Insert the key into the db.
+	return nil, database.New(handler.dbpool).InsertDecryptionKeysMsg(ctx, decryptionKeys)
 }
