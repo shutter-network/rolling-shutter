@@ -24,7 +24,7 @@ var noopLogger = &logger.NoopLogger{}
 var ErrServiceNotInstantiated = errors.New("service is not instantiated, pass a handler function option")
 
 type Client struct {
-	client.Client
+	client.SyncEthereumClient
 	log log.Logger
 
 	options *options
@@ -136,7 +136,7 @@ func (s *Client) BroadcastEonKey(ctx context.Context, eon uint64, eonPubKey []by
 // This value is cached, since it is not expected to change.
 func (s *Client) ChainID(ctx context.Context) (*big.Int, error) {
 	if s.chainID == nil {
-		cid, err := s.Client.ChainID(ctx)
+		cid, err := s.SyncEthereumClient.ChainID(ctx)
 		if err != nil {
 			return nil, err
 		}

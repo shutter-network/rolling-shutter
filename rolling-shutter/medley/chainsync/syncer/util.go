@@ -18,6 +18,11 @@ var (
 	errLatestBlock        = errors.New("'nil' latest block")
 )
 
+type ManualFilterHandler interface {
+	QueryAndHandle(ctx context.Context, block uint64) error
+	HandleVirtualEvent(ctx context.Context, block *number.BlockNumber) error
+}
+
 func logToCallOpts(ctx context.Context, log *types.Log) *bind.CallOpts {
 	block := new(big.Int)
 	block.SetUint64(log.BlockNumber)
@@ -40,7 +45,7 @@ func guardCallOpts(opts *bind.CallOpts, allowLatest bool) error {
 	return nil
 }
 
-func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
+func fixCallOpts(ctx context.Context, c client.SyncEthereumClient, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
 	err := guardCallOpts(opts, false)
 	if err == nil {
 		return opts, nil, nil

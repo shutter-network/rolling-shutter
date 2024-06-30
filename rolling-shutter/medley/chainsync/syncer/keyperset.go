@@ -12,7 +12,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 func makeCallError(attrName string, err error) error {
@@ -21,37 +20,45 @@ func makeCallError(attrName string, err error) error {
 
 const channelSize = 10
 
-type KeyperSetSyncer struct {
-	Client     client.Client
-	Contract   *bindings.KeyperSetManager
-	Log        log.Logger
-	StartBlock *number.BlockNumber
-	Handler    event.KeyperSetHandler
+var _ ManualFilterHandler = &KeyperSetSyncer{}
 
-	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
+type KeyperSetSyncer struct {
+	Client   client.FullEthereumClient
+	Contract *bindings.KeyperSetManager
+	Log      log.Logger
+	Handler  event.KeyperSetHandler
 }
 
-func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) error {
-	if s.Handler == nil {
-		return errors.New("no handler registered")
-	}
-
-	// the latest block still has to be fixed.
-	// otherwise we could skip some block events
-	// between the initial poll and the subscription.
-	if s.StartBlock.IsLatest() {
-		latest, err := s.Client.BlockNumber(ctx)
-		if err != nil {
-			return err
-		}
-		s.StartBlock.SetUint64(latest)
-	}
-
-	watchOpts := &bind.WatchOpts{
-		Start:   s.StartBlock.ToUInt64Ptr(),
+func (s *KeyperSetSyncer) QueryAndHandle(ctx context.Context, block uint64) error {
+	opts := &bind.FilterOpts{
+		Start:   block,
+		End:     &block,
 		Context: ctx,
 	}
-	initial, err := s.getInitialKeyperSets(ctx)
+	iter, err := s.Contract.FilterKeyperSetAdded(opts)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.Next() {
+		err := s.handle(ctx, iter.Event)
+		if err != nil {
+			s.Log.Error(
+				"handler for `NewKeyperSet` errored",
+				"error",
+				err.Error(),
+			)
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return errors.Wrap(err, "filter iterator error")
+	}
+	return nil
+}
+
+func (s *KeyperSetSyncer) HandleVirtualEvent(ctx context.Context, block *number.BlockNumber) error {
+	initial, err := s.getInitialKeyperSets(ctx, block)
 	if err != nil {
 		return err
 	}
@@ -65,31 +72,18 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 			)
 		}
 	}
-	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
-	runner.Defer(func() {
-		close(s.keyperAddedCh)
-	})
-	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
-	// FIXME: what to do on subs.Error()
-	if err != nil {
-		return err
-	}
-	runner.Defer(subs.Unsubscribe)
-	runner.Go(func() error {
-		return s.watchNewKeypersService(ctx)
-	})
 	return nil
 }
 
-func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
+func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context, block *number.BlockNumber) ([]*event.KeyperSet, error) {
 	opts := &bind.CallOpts{
 		Context:     ctx,
-		BlockNumber: s.StartBlock.Int,
+		BlockNumber: block.Int,
 	}
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	bn := s.StartBlock.ToUInt64Ptr()
+	bn := block.ToUInt64Ptr()
 	if bn == nil {
 		// this should not be the case
 		return nil, errors.New("start block is 'latest'")
@@ -98,7 +92,7 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 	initialKeyperSets := []*event.KeyperSet{}
 	// this blocknumber specifies the argument to the contract
 	// getter
-	ks, err := s.GetKeyperSetForBlock(ctx, opts, s.StartBlock)
+	ks, err := s.GetKeyperSetForBlock(ctx, opts, block)
 	if err != nil {
 		return nil, err
 	}
@@ -208,38 +202,20 @@ func (s *KeyperSetSyncer) newEvent(
 	}, nil
 }
 
-func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context) error {
-	for {
-		select {
-		case newKeypers, ok := <-s.keyperAddedCh:
-			if !ok {
-				return nil
-			}
-			opts := logToCallOpts(ctx, &newKeypers.Raw)
-			newKeyperSet, err := s.newEvent(
-				ctx,
-				opts,
-				newKeypers.KeyperSetContract,
-				newKeypers.ActivationBlock,
-			)
-			if err != nil {
-				s.Log.Error(
-					"error while fetching new event",
-					"error",
-					err.Error(),
-				)
-				continue
-			}
-			err = s.Handler(ctx, newKeyperSet)
-			if err != nil {
-				s.Log.Error(
-					"handler for `NewKeyperSet` errored",
-					"error",
-					err.Error(),
-				)
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+func (s *KeyperSetSyncer) handle(ctx context.Context, ev *bindings.KeyperSetManagerKeyperSetAdded) error {
+	opts := logToCallOpts(ctx, &ev.Raw)
+	newKeyperSet, err := s.newEvent(
+		ctx,
+		opts,
+		ev.KeyperSetContract,
+		ev.ActivationBlock,
+	)
+	if err != nil {
+		return errors.Wrap(err, "fetch new event")
 	}
+	err = s.Handler(ctx, newKeyperSet)
+	if err != nil {
+		return errors.Wrap(err, "call handler")
+	}
+	return nil
 }

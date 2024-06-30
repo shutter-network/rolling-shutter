@@ -24,10 +24,11 @@ type options struct {
 	keyperSetManagerAddress     *common.Address
 	keyBroadcastContractAddress *common.Address
 	clientURL                   string
-	client                      syncclient.Client
+	ethClient                   syncclient.FullEthereumClient
 	logger                      log.Logger
 	runner                      service.Runner
 	syncStart                   *number.BlockNumber
+	fetchActivesAtSyncStart     bool
 	privKey                     *ecdsa.PrivateKey
 
 	handlerShutterState event.ShutterStateHandler
@@ -37,16 +38,81 @@ type options struct {
 }
 
 func (o *options) verify() error {
-	if o.clientURL != "" && o.client != nil {
-		// TODO: error message
-		return errors.New("can't use client and client url")
+	if o.clientURL != "" && o.ethClient != nil {
+		return errors.New("'WithClient' and 'WithClientURL' options are mutually exclusive")
 	}
-	if o.clientURL == "" && o.client == nil {
-		// TODO: error message
-		return errors.New("have to provide either url or client")
+	if o.clientURL == "" && o.ethClient == nil {
+		return errors.New("either 'WithClient' or 'WithClientURL' options are expected")
 	}
 	// TODO: check for the existence of the contract addresses depending on
 	// what handlers are not nil
+	return nil
+}
+
+func (o *options) applyHandler(c *Client) error {
+	var err error
+	syncedServices := []syncer.ManualFilterHandler{}
+
+	c.KeyperSetManager, err = bindings.NewKeyperSetManager(*o.keyperSetManagerAddress, o.ethClient)
+	if err != nil {
+		return err
+	}
+	c.kssync = &syncer.KeyperSetSyncer{
+		Client:   o.ethClient,
+		Contract: c.KeyperSetManager,
+		Log:      c.log,
+		Handler:  o.handlerKeyperSet,
+	}
+	if o.handlerKeyperSet != nil {
+		syncedServices = append(syncedServices, c.kssync)
+	}
+
+	c.KeyBroadcast, err = bindings.NewKeyBroadcastContract(*o.keyBroadcastContractAddress, o.ethClient)
+	if err != nil {
+		return err
+	}
+	c.epksync = &syncer.EonPubKeySyncer{
+		Client:           o.ethClient,
+		Log:              c.log,
+		KeyBroadcast:     c.KeyBroadcast,
+		KeyperSetManager: c.KeyperSetManager,
+		Handler:          o.handlerEonPublicKey,
+	}
+	if o.handlerEonPublicKey != nil {
+		syncedServices = append(syncedServices, c.epksync)
+	}
+	c.sssync = &syncer.ShutterStateSyncer{
+		Client:   o.ethClient,
+		Contract: c.KeyperSetManager,
+		Log:      c.log,
+		Handler:  o.handlerShutterState,
+	}
+	if o.handlerShutterState != nil {
+		syncedServices = append(syncedServices, c.sssync)
+	}
+
+	if o.handlerBlock == nil {
+		// Even if the user is not interested in handling new block events,
+		// the streaming block handler must be running in order to
+		// synchronize polling of new contract events.
+		// Since the handler function is always called, we need to
+		// inject a noop-handler
+		o.handlerBlock = func(ctx context.Context, lb *event.LatestBlock) error {
+			return nil
+		}
+	}
+
+	c.uhsync = &syncer.UnsafeHeadSyncer{
+		Client:             o.ethClient,
+		Log:                c.log,
+		Handler:            o.handlerBlock,
+		SyncedHandler:      syncedServices,
+		FetchActiveAtStart: o.fetchActivesAtSyncStart,
+		SyncStartBlock:     o.syncStart,
+	}
+	if o.handlerBlock != nil {
+		c.services = append(c.services, c.uhsync)
+	}
 	return nil
 }
 
@@ -56,84 +122,34 @@ func (o *options) verify() error {
 // of shutter clients background workers.
 func (o *options) apply(ctx context.Context, c *Client) error {
 	var (
-		client syncclient.Client
+		client syncclient.SyncEthereumClient
 		err    error
 	)
 	if o.clientURL != "" {
-		o.client, err = ethclient.DialContext(ctx, o.clientURL)
+		o.ethClient, err = ethclient.DialContext(ctx, o.clientURL)
 		if err != nil {
 			return err
 		}
 	}
-	client = o.client
-	c.log = o.logger
-
-	c.Client = client
+	client = o.ethClient
+	c.SyncEthereumClient = client
 
 	// the nil passthrough will use "latest" for each call,
 	// but we want to harmonize and fix the sync start to a specific block.
 	if o.syncStart.IsLatest() {
-		latestBlock, err := c.Client.BlockNumber(ctx)
+		latestBlock, err := c.SyncEthereumClient.BlockNumber(ctx)
 		if err != nil {
 			return errors.Wrap(err, "polling latest block")
 		}
 		o.syncStart = number.NewBlockNumber(&latestBlock)
 	}
 
-	c.KeyperSetManager, err = bindings.NewKeyperSetManager(*o.keyperSetManagerAddress, client)
-	if err != nil {
-		return err
-	}
-	c.kssync = &syncer.KeyperSetSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		StartBlock: o.syncStart,
-		Handler:    o.handlerKeyperSet,
-	}
-	if o.handlerKeyperSet != nil {
-		c.services = append(c.services, c.kssync)
+	if o.logger != nil {
+		c.log = o.logger
 	}
 
-	c.KeyBroadcast, err = bindings.NewKeyBroadcastContract(*o.keyBroadcastContractAddress, client)
-	if err != nil {
-		return err
-	}
-	c.epksync = &syncer.EonPubKeySyncer{
-		Client:           client,
-		Log:              c.log,
-		KeyBroadcast:     c.KeyBroadcast,
-		KeyperSetManager: c.KeyperSetManager,
-		Handler:          o.handlerEonPublicKey,
-		StartBlock:       o.syncStart,
-	}
-	if o.handlerEonPublicKey != nil {
-		c.services = append(c.services, c.epksync)
-	}
-
-	c.sssync = &syncer.ShutterStateSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		Handler:    o.handlerShutterState,
-		StartBlock: o.syncStart,
-	}
-	if o.handlerShutterState != nil {
-		c.services = append(c.services, c.sssync)
-	}
-
-	if o.handlerBlock != nil {
-		c.uhsync = &syncer.UnsafeHeadSyncer{
-			Client:  client,
-			Log:     c.log,
-			Handler: o.handlerBlock,
-		}
-	}
-	if o.handlerBlock != nil {
-		c.services = append(c.services, c.uhsync)
-	}
 	c.privKey = o.privKey
-	return nil
+	return o.applyHandler(c)
 }
 
 func defaultOptions() *options {
@@ -141,14 +157,24 @@ func defaultOptions() *options {
 		keyperSetManagerAddress:     &predeploy.KeyperSetManagerAddr,
 		keyBroadcastContractAddress: &predeploy.KeyBroadcastContractAddr,
 		clientURL:                   "",
-		client:                      nil,
+		ethClient:                   nil,
 		logger:                      noopLogger,
 		runner:                      nil,
+		fetchActivesAtSyncStart:     true,
 		syncStart:                   number.NewBlockNumber(nil),
 	}
 }
 
-func WithSyncStartBlock(blockNumber *number.BlockNumber) Option {
+func WithNoFetchActivesBeforeStart() Option {
+	return func(o *options) error {
+		o.fetchActivesAtSyncStart = false
+		return nil
+	}
+}
+
+func WithSyncStartBlock(
+	blockNumber *number.BlockNumber,
+) Option {
 	if blockNumber == nil {
 		blockNumber = number.NewBlockNumber(nil)
 	}
@@ -193,9 +219,9 @@ func WithLogger(l log.Logger) Option {
 	}
 }
 
-func WithClient(client syncclient.Client) Option {
+func WithClient(client syncclient.FullEthereumClient) Option {
 	return func(o *options) error {
-		o.client = client
+		o.ethClient = client
 		return nil
 	}
 }
