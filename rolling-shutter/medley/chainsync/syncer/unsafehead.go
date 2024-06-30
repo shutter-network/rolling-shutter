@@ -33,9 +33,6 @@ func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) err
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
-	runner.Defer(func() {
-		close(s.newLatestHeadCh)
-	})
 	runner.Go(func() error {
 		return s.watchLatestUnsafeHead(ctx)
 	})

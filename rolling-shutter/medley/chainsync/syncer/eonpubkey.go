@@ -56,9 +56,6 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		Context: ctx,
 	}
 	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, channelSize)
-	runner.Defer(func() {
-		close(s.keyBroadcastCh)
-	})
 	subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
