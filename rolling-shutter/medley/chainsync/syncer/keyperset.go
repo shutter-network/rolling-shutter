@@ -66,9 +66,6 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		}
 	}
 	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
-	runner.Defer(func() {
-		close(s.keyperAddedCh)
-	})
 	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {

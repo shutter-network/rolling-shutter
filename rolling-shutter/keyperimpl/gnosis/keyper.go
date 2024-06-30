@@ -73,10 +73,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
 	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
-	runner.Defer(func() { close(kpr.newBlocks) })
-	runner.Defer(func() { close(kpr.newKeyperSets) })
-	runner.Defer(func() { close(kpr.newEonPublicKeys) })
-	runner.Defer(func() { close(kpr.decryptionTriggerChannel) })
 
 	kpr.latestTriggeredSlot = nil
 

@@ -55,9 +55,6 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
-	runner.Defer(func() {
-		close(s.pausedCh)
-	})
 
 	s.unpausedCh = make(chan *bindings.KeyperSetManagerUnpaused)
 	subs, err = s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
@@ -66,9 +63,6 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
-	runner.Defer(func() {
-		close(s.unpausedCh)
-	})
 
 	runner.Go(func() error {
 		return s.watchPaused(ctx)
