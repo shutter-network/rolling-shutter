@@ -358,7 +358,9 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		if err != nil {
 			return err
 		}
-
+		if !kpr.messageSender.AllowedToSend {
+			allowSendIfInKeyperSet(ctx, database.New(kpr.dbpool), syncBlockNumber, kpr)
+		}
 		err = fx.SendShutterMessages(ctx, database.New(kpr.dbpool), &kpr.messageSender)
 		if err != nil {
 			return err
@@ -368,5 +370,20 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 			return ctx.Err()
 		case <-time.After(2 * time.Second):
 		}
+	}
+}
+
+func allowSendIfInKeyperSet(ctx context.Context, queries *database.Queries, syncBlockNumber uint64, kpr *KeyperCore) {
+	count, err := queries.CountBatchConfigsInBlockRangeWithKeyper(ctx,
+		database.CountBatchConfigsInBlockRangeWithKeyperParams{
+			KeyperAddress: []string{kpr.config.GetAddress().String()},
+			StartBlock:    0,
+			EndBlock:      int64(syncBlockNumber),
+		})
+	if err != nil {
+		log.Err(err).Msg("could not query if in keyper set")
+	}
+	if count > 0 {
+		kpr.messageSender.AllowedToSend = true
 	}
 }

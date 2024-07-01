@@ -74,9 +74,10 @@ type MessageSender interface {
 
 // RPCMessageSender signs messages and sends them via RPC to shuttermint.
 type RPCMessageSender struct {
-	rpcclient  client.Client
-	chainID    string
-	signingKey *ecdsa.PrivateKey
+	rpcclient     client.Client
+	chainID       string
+	signingKey    *ecdsa.PrivateKey
+	AllowedToSend bool
 }
 
 var _ MessageSender = &RPCMessageSender{}
@@ -93,14 +94,19 @@ var mockMessageSenderBufferSize = 0x10000
 // NewRPCMessageSender creates a new RPCMessageSender.
 func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMessageSender {
 	return RPCMessageSender{
-		rpcclient:  cl,
-		chainID:    "",
-		signingKey: signingKey,
+		rpcclient:     cl,
+		chainID:       "",
+		signingKey:    signingKey,
+		AllowedToSend: false,
 	}
 }
 
 // SendMessage signs the given shmsg.Message and sends the message to shuttermint.
 func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message) error {
+	if !ms.AllowedToSend {
+		log.Info().Str("msg", msg.String()).Msg("not allowed to send")
+		return nil
+	}
 	if err := ms.maybeFetchChainID(ctx); err != nil {
 		return err
 	}
