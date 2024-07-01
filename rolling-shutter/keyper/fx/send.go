@@ -34,10 +34,9 @@ func SendShutterMessages(
 			if !isRetrieable(msg) {
 				log.Err(err).Str("msg", msg.String()).Msg("sending non-retrieable msg failed")
 				return err
-			} else {
-				log.Info().Str("msg", msg.String()).Msg("msg not accepted, will be retried")
-				return nil
 			}
+			log.Info().Str("msg", msg.String()).Msg("msg not accepted, will be retried")
+			return nil
 		}
 		log.Info().Int32("id", outgoing.ID).
 			Str("description", outgoing.Description).
@@ -49,7 +48,7 @@ func SendShutterMessages(
 	}
 }
 
-// isRetrieable is a no-op so far
-func isRetrieable(msg *shmsg.Message) bool {
+// isRetrieable is a no-op so far.
+func isRetrieable(_ *shmsg.Message) bool {
 	return true
 }
