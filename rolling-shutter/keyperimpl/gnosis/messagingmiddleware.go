@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -16,6 +18,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -172,14 +175,21 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 		)
 	}
 
-	msg := proto.Clone(originalMsg).(*p2pmsg.DecryptionKeyShares)
-	msg.Extra = &p2pmsg.DecryptionKeyShares_Gnosis{
-		Gnosis: &p2pmsg.GnosisDecryptionKeySharesExtra{
-			Slot:      uint64(currentDecryptionTrigger.Slot),
-			TxPointer: uint64(currentDecryptionTrigger.TxPointer),
-			Signature: signature,
-		},
+	extra := &p2pmsg.GnosisDecryptionKeySharesExtra{
+		Slot:      uint64(currentDecryptionTrigger.Slot),
+		TxPointer: uint64(currentDecryptionTrigger.TxPointer),
+		Signature: signature,
 	}
+	msg := proto.Clone(originalMsg).(*p2pmsg.DecryptionKeyShares)
+	msg.Extra = &p2pmsg.DecryptionKeyShares_Gnosis{Gnosis: extra}
+	slotStartTimestamp := medley.SlotToTimestamp(
+		extra.Slot,
+		i.config.Gnosis.GenesisSlotTimestamp,
+		i.config.Gnosis.SecondsPerSlot,
+	)
+	slotStartTime := time.Unix(int64(slotStartTimestamp), 0)
+	delta := time.Since(slotStartTime)
+	metricsKeySharesSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
 	return msg, nil
 }
 
@@ -266,6 +276,15 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		Int("num-signatures", len(signaturesDB)).
 		Int("num-keys", len(msg.Keys)).
 		Msg("sending keys")
+
+	slotStartTimestamp := medley.SlotToTimestamp(
+		extra.Slot,
+		i.config.Gnosis.GenesisSlotTimestamp,
+		i.config.Gnosis.SecondsPerSlot,
+	)
+	slotStartTime := time.Unix(int64(slotStartTimestamp), 0)
+	delta := time.Since(slotStartTime)
+	metricsKeysSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
 	return msg, nil
 }
 
@@ -294,5 +313,8 @@ func (i *MessagingMiddleware) advanceTxPointer(ctx context.Context, msg *p2pmsg.
 	if err != nil {
 		return errors.Wrap(err, "failed to set tx pointer")
 	}
+	eonString := fmt.Sprint(msg.Eon)
+	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
+	metricsTxPointerAge.WithLabelValues(eonString).Set(0)
 	return nil
 }

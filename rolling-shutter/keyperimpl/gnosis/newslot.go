@@ -163,6 +163,7 @@ func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointer
 	var txPointer int64
 	var txPointerAge int64
 	var txPointerOutdated bool
+	eonString := fmt.Sprint(eon)
 	txPointerDB, err := gnosisKeyperDB.GetTxPointer(ctx, eon)
 	if err == pgx.ErrNoRows {
 		log.Info().Int64("eon", eon).Msg("initializing tx pointer")
@@ -192,6 +193,7 @@ func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointer
 		if txPointerDB.Age.Valid {
 			txPointerOutdated = txPointerAge > maxTxPointerAge
 		} else {
+			txPointerAge = math.MaxInt64
 			txPointerOutdated = true
 		}
 	}
@@ -214,6 +216,8 @@ func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointer
 			return 0, errors.Wrap(err, "failed to query transaction submitted event count from db")
 		}
 	}
+	metricsTxPointer.WithLabelValues(eonString).Set(float64(txPointer))
+	metricsTxPointerAge.WithLabelValues(eonString).Set(float64(txPointerAge))
 	return txPointer, nil
 }
 

@@ -113,3 +113,6 @@ SELECT nonce FROM validator_registrations
 WHERE validator_index = $1 AND block_number <= $2 AND tx_index <= $3 AND log_index <= $4
 ORDER BY block_number DESC, tx_index DESC, log_index DESC
 LIMIT 1;
+
+-- name: GetNumValidatorRegistrations :one
+SELECT COUNT(*) FROM validator_registrations;

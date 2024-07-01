@@ -3,6 +3,7 @@ package gnosis
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math"
 
 	"github.com/jackc/pgx/v4"
@@ -290,5 +291,8 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	if err != nil {
 		return []p2pmsg.Message{}, errors.Wrap(err, "failed to set tx pointer")
 	}
+	eonString := fmt.Sprint(keys.Eon)
+	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
+	metricsTxPointerAge.WithLabelValues(eonString).Set(0)
 	return []p2pmsg.Message{}, nil
 }

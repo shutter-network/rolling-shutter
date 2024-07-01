@@ -96,12 +96,19 @@ func (v *ValidatorSyncer) syncRange(ctx context.Context, start, end uint64) erro
 	if err != nil {
 		return err
 	}
+	numRegistrations, err := db.GetNumValidatorRegistrations(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get number of validator registrations")
+	}
 	log.Info().
 		Uint64("start-block", start).
 		Uint64("end-block", end).
 		Int("num-inserted-events", len(filteredEvents)).
 		Int("num-discarded-events", len(events)-len(filteredEvents)).
+		Int64("num-registrations", numRegistrations).
 		Msg("synced validator registry")
+	metricsNumValidatorRegistrations.Set(float64(numRegistrations))
+	metricsValidatorRegistrationsSyncedUntil.Set(float64(end))
 	return nil
 }
 

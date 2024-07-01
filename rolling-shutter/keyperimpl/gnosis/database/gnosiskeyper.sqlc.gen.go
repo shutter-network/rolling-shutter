@@ -29,6 +29,17 @@ func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (C
 	return i, err
 }
 
+const getNumValidatorRegistrations = `-- name: GetNumValidatorRegistrations :one
+SELECT COUNT(*) FROM validator_registrations
+`
+
+func (q *Queries) GetNumValidatorRegistrations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getNumValidatorRegistrations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getSlotDecryptionSignatures = `-- name: GetSlotDecryptionSignatures :many
 SELECT eon, slot, keyper_index, tx_pointer, identities_hash, signature FROM slot_decryption_signatures
 WHERE eon = $1 AND slot = $2 AND tx_pointer = $3 AND identities_hash = $4
