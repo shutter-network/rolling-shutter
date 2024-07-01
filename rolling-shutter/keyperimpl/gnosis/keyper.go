@@ -106,24 +106,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
 	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
-	kpr.core, err = keyper.New(
-		&kprconfig.Config{
-			InstanceID:           kpr.config.InstanceID,
-			DatabaseURL:          kpr.config.DatabaseURL,
-			HTTPEnabled:          kpr.config.HTTPEnabled,
-			HTTPListenAddress:    kpr.config.HTTPListenAddress,
-			P2P:                  kpr.config.P2P,
-			Ethereum:             kpr.config.Gnosis.Node,
-			Shuttermint:          kpr.config.Shuttermint,
-			Metrics:              kpr.config.Metrics,
-			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
-		},
-		kpr.decryptionTriggerChannel,
-		keyper.WithDBPool(kpr.dbpool),
-		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
-		keyper.WithMessaging(messagingMiddleware),
-	)
+	kpr.core, err = NewKeyper(kpr, messagingMiddleware)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
@@ -177,6 +160,28 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
+}
+
+func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
+	core, err := keyper.New(
+		&kprconfig.Config{
+			InstanceID:           kpr.config.InstanceID,
+			DatabaseURL:          kpr.config.DatabaseURL,
+			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPListenAddress:    kpr.config.HTTPListenAddress,
+			P2P:                  kpr.config.P2P,
+			Ethereum:             kpr.config.Gnosis.Node,
+			Shuttermint:          kpr.config.Shuttermint,
+			Metrics:              kpr.config.Metrics,
+			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
+		},
+		kpr.decryptionTriggerChannel,
+		keyper.WithDBPool(kpr.dbpool),
+		keyper.NoBroadcastEonPublicKey(),
+		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
+		keyper.WithMessaging(messagingMiddleware),
+	)
+	return core, err
 }
 
 // initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
