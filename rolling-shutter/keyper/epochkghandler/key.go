@@ -73,7 +73,11 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
 	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
-		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), handler.config.GetMaxNumKeysPerMessage())
+		return pubsub.ValidationReject, errors.Errorf(
+			"too many keys in message (%d > %d)",
+			len(key.Keys),
+			handler.config.GetMaxNumKeysPerMessage(),
+		)
 	}
 
 	validationResult, err := checkKeysErrors(key.Keys, pureDKGResult)
