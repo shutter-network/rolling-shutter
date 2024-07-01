@@ -59,6 +59,30 @@ var metricsNumValidatorRegistrations = prometheus.NewGauge(
 	},
 )
 
+var slotTimeDeltaBuckets = []float64{-5, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, -0, 1.0, 100}
+
+var metricsKeysSentTimeDelta = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "shutter",
+		Subsystem: "gnosis",
+		Name:      "keys_sent_time_delta_seconds",
+		Help:      "Time at which keys are sent relative to slot",
+		Buckets:   slotTimeDeltaBuckets,
+	},
+	[]string{"eon"},
+)
+
+var metricsKeySharesSentTimeDelta = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "shutter",
+		Subsystem: "gnosis",
+		Name:      "key_shares_sent_time_delta_seconds",
+		Help:      "Time at which key shares are sent relative to slot",
+		Buckets:   slotTimeDeltaBuckets,
+	},
+	[]string{"eon"},
+)
+
 func init() {
 	prometheus.MustRegister(metricsTxPointer)
 	prometheus.MustRegister(metricsTxPointerAge)
@@ -66,4 +90,6 @@ func init() {
 	prometheus.MustRegister(metricsTxSubmittedEventsSyncedUntil)
 	prometheus.MustRegister(metricsValidatorRegistrationsSyncedUntil)
 	prometheus.MustRegister(metricsNumValidatorRegistrations)
+	prometheus.MustRegister(metricsKeysSentTimeDelta)
+	prometheus.MustRegister(metricsKeySharesSentTimeDelta)
 }
