@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -74,7 +75,13 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
 		return pubsub.ValidationReject, errors.Errorf("too many keys in message (%d > %d)", len(key.Keys), handler.config.GetMaxNumKeysPerMessage())
 	}
-	for i, k := range key.Keys {
+
+	validationResult, err := checkKeysErrors(key.Keys, pureDKGResult)
+	return validationResult, err
+}
+
+func checkKeysErrors(keys []*p2pmsg.Key, pureDKGResult *puredkg.Result) (pubsub.ValidationResult, error) {
+	for i, k := range keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
@@ -87,7 +94,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, key.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.Identity, keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
