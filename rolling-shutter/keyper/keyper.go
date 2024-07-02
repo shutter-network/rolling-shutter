@@ -289,6 +289,9 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return err
 	}
 	if lastSent == keyperSet.KeyperConfigIndex {
+		log.Debug().
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Msg("batch config already sent (scheduled).")
 		return nil
 	}
 
@@ -309,6 +312,10 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 
 	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
+		log.Warn().Err(err).
+			Interface("keyper-set", keyperSet).
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Msg("error when setting last batch config sent. Returning nil.")
 		return nil
 	}
 
@@ -358,7 +365,9 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		if err != nil {
 			return err
 		}
-
+		if !kpr.messageSender.AllowedToSend.Load() {
+			allowSendIfInKeyperSet(ctx, database.New(kpr.dbpool), syncBlockNumber, kpr)
+		}
 		err = fx.SendShutterMessages(ctx, database.New(kpr.dbpool), &kpr.messageSender)
 		if err != nil {
 			return err
@@ -368,5 +377,20 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 			return ctx.Err()
 		case <-time.After(2 * time.Second):
 		}
+	}
+}
+
+func allowSendIfInKeyperSet(ctx context.Context, queries *database.Queries, syncBlockNumber uint64, kpr *KeyperCore) {
+	count, err := queries.CountBatchConfigsInBlockRangeWithKeyper(ctx,
+		database.CountBatchConfigsInBlockRangeWithKeyperParams{
+			KeyperAddress: []string{kpr.config.GetAddress().String()},
+			StartBlock:    0,
+			EndBlock:      int64(syncBlockNumber),
+		})
+	if err != nil {
+		log.Err(err).Msg("could not query if in keyper set")
+	}
+	if count > 0 {
+		kpr.messageSender.AllowedToSend.Store(true)
 	}
 }

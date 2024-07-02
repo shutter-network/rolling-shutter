@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -31,34 +32,6 @@ type RemoteError struct {
 
 var _ IRetriable = &RemoteError{}
 
-type NonRetriableError struct {
-	Err error
-}
-
-func (*NonRetriableError) IsRetriable() bool {
-	return false
-}
-
-func (e *NonRetriableError) Error() string {
-	return e.Err.Error()
-}
-
-func (e *NonRetriableError) Unwrap() error {
-	return e.Err
-}
-
-var _ IRetriable = &NonRetriableError{}
-
-// IsRetriable checks if we should retry an action that resulted in the given error.
-func IsRetriable(err error) bool {
-	switch e := err.(type) {
-	case IRetriable:
-		return e.IsRetriable()
-	default:
-		return true
-	}
-}
-
 func (remoteError *RemoteError) Error() string {
 	return fmt.Sprintf("remote error: %s", remoteError.msg)
 }
@@ -74,9 +47,10 @@ type MessageSender interface {
 
 // RPCMessageSender signs messages and sends them via RPC to shuttermint.
 type RPCMessageSender struct {
-	rpcclient  client.Client
-	chainID    string
-	signingKey *ecdsa.PrivateKey
+	rpcclient     client.Client
+	chainID       string
+	signingKey    *ecdsa.PrivateKey
+	AllowedToSend *atomic.Bool
 }
 
 var _ MessageSender = &RPCMessageSender{}
@@ -92,15 +66,21 @@ var mockMessageSenderBufferSize = 0x10000
 
 // NewRPCMessageSender creates a new RPCMessageSender.
 func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMessageSender {
-	return RPCMessageSender{
+	ms := RPCMessageSender{
 		rpcclient:  cl,
 		chainID:    "",
 		signingKey: signingKey,
 	}
+	ms.AllowedToSend.Store(false)
+	return ms
 }
 
 // SendMessage signs the given shmsg.Message and sends the message to shuttermint.
 func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message) error {
+	if !ms.AllowedToSend.Load() {
+		log.Info().Str("msg", msg.String()).Msg("not allowed to send")
+		return nil
+	}
 	if err := ms.maybeFetchChainID(ctx); err != nil {
 		return err
 	}
