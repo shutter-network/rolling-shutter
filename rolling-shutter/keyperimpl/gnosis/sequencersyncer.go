@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/big"
 
@@ -179,7 +180,7 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 		if err != nil {
 			return errors.Wrap(err, "failed to insert transaction submitted event into db")
 		}
-		metricsLatestTxSubmittedEventIndex.WithLabelValues(string(event.Eon)).Set(float64(nextEventIndex))
+		metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(nextEventIndex))
 		nextEventIndices[event.Eon]++
 		log.Debug().
 			Int64("index", nextEventIndex).
