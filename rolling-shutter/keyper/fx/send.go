@@ -48,7 +48,7 @@ func SendShutterMessages(
 	}
 }
 
-// isRetrieable is a no-op so far.
+// FIXME: isRetrieable is a no-op so far.
 func isRetrieable(_ *shmsg.Message) bool {
 	return true
 }
