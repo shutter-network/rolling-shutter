@@ -64,7 +64,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	queries := obskeyper.New(kpr.dbpool)
 	keyperSet, err := queries.GetKeyperSet(ctx, nextBlock)
 	if err == pgx.ErrNoRows {
-		log.Debug().
+		log.Info().
 			Uint64("slot", slot).
 			Int64("block-number", nextBlock).
 			Msg("skipping slot as no keyper set has been found for it")
@@ -76,7 +76,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 
 	// don't trigger if we're not part of the keyper set
 	if !keyperSet.Contains(kpr.config.GetAddress()) {
-		log.Debug().
+		log.Info().
 			Uint64("slot", slot).
 			Int64("block-number", nextBlock).
 			Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
@@ -91,7 +91,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 		return err
 	}
 	if !isRegistered {
-		log.Debug().
+		log.Info().
 			Uint64("slot", slot).
 			Uint64("proposer-index", proposerIndex).
 			Msg("skipping slot as proposer is not registered")
