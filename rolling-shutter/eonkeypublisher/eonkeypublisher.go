@@ -30,10 +30,10 @@ const (
 
 // EonKeyPublisher is a service that publishes eon keys via a eon key publisher contract.
 type EonKeyPublisher struct {
-	dbpool     *pgxpool.Pool
-	client     *ethclient.Client
-	contract   *bindings.EonKeyPublish
-	privateKey *ecdsa.PrivateKey
+	dbpool           *pgxpool.Pool
+	client           *ethclient.Client
+	keyperSetManager *bindings.KeyperSetManager
+	privateKey       *ecdsa.PrivateKey
 
 	keys chan keyper.EonPublicKey
 }
@@ -41,18 +41,18 @@ type EonKeyPublisher struct {
 func NewEonKeyPublisher(
 	dbpool *pgxpool.Pool,
 	client *ethclient.Client,
-	eonKeyPublishAddress common.Address,
+	keyperSetManagerAddress common.Address,
 	privateKey *ecdsa.PrivateKey,
 ) (*EonKeyPublisher, error) {
-	contract, err := bindings.NewEonKeyPublish(eonKeyPublishAddress, client)
+	keyperSetManager, err := bindings.NewKeyperSetManager(keyperSetManagerAddress, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to instantiate eon key publisher contract")
+		return nil, errors.Wrapf(err, "failed to instantiate keyper set manager contract at address %s", keyperSetManagerAddress.Hex())
 	}
 	return &EonKeyPublisher{
-		dbpool:     dbpool,
-		client:     client,
-		contract:   contract,
-		privateKey: privateKey,
+		dbpool:           dbpool,
+		client:           client,
+		keyperSetManager: keyperSetManager,
+		privateKey:       privateKey,
 
 		keys: make(chan keyper.EonPublicKey, eonKeyChannelSize),
 	}, nil
@@ -155,8 +155,12 @@ func (p *EonKeyPublisher) publish(ctx context.Context, key []byte, keyperSetInde
 }
 
 func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetIndex uint64, keyperIndex uint64) error {
+	contract, err := p.getEonKeyPublisherContract(keyperSetIndex)
+	if err != nil {
+		return err
+	}
 	keyperAddress := ethcrypto.PubkeyToAddress(p.privateKey.PublicKey)
-	hasAlreadyVoted, err := p.contract.HasKeyperVoted(&bind.CallOpts{}, keyperAddress)
+	hasAlreadyVoted, err := contract.HasKeyperVoted(&bind.CallOpts{}, keyperAddress)
 	if err != nil {
 		return errors.Wrap(err, "failed to query eon key publisher contract if keyper has already voted")
 	}
@@ -168,7 +172,7 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetI
 			Msg("not publishing eon key as keyper has already voted")
 		return nil
 	}
-	isAlreadyConfirmed, err := p.contract.EonKeyConfirmed(&bind.CallOpts{}, key)
+	isAlreadyConfirmed, err := contract.EonKeyConfirmed(&bind.CallOpts{}, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to query eon key publisher contract if eon key is confirmed")
 	}
@@ -188,7 +192,7 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetI
 	if err != nil {
 		return errors.Wrap(err, "failed to construct tx opts")
 	}
-	tx, err := p.contract.PublishEonKey(opts, key, keyperIndex)
+	tx, err := contract.PublishEonKey(opts, key, keyperIndex)
 	if err != nil {
 		return errors.Wrap(err, "failed to send publish eon key tx")
 	}
@@ -215,4 +219,25 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetI
 		Hex("tx-hash", tx.Hash().Bytes()).
 		Msg("successfully published eon key")
 	return nil
+}
+
+func (p *EonKeyPublisher) getEonKeyPublisherContract(keyperSetIndex uint64) (*bindings.EonKeyPublish, error) {
+	opts := &bind.CallOpts{}
+	keyperSetAddress, err := p.keyperSetManager.GetKeyperSetAddress(opts, keyperSetIndex)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get keyper set address from manager for index %d", keyperSetIndex)
+	}
+	keyperSet, err := bindings.NewKeyperSet(keyperSetAddress, p.client)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to instantiate keyper set contract at address %s", keyperSetAddress.Hex())
+	}
+	eonKeyPublisherAddress, err := keyperSet.GetPublisher(opts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get eon key publisher contract from keyper set at address %s", keyperSetAddress.Hex())
+	}
+	eonKeyPublisher, err := bindings.NewEonKeyPublish(eonKeyPublisherAddress, p.client)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to instantiate eon key publisher contract at address %s", eonKeyPublisherAddress.Hex())
+	}
+	return eonKeyPublisher, nil
 }

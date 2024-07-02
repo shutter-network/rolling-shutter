@@ -128,7 +128,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.eonKeyPublisher, err = eonkeypublisher.NewEonKeyPublisher(
 		kpr.dbpool,
 		eonKeyPublisherClient,
-		kpr.config.Gnosis.Contracts.EonKeyPublish,
+		kpr.config.Gnosis.Contracts.KeyperSetManager,
 		kpr.config.Gnosis.Node.PrivateKey.Key,
 	)
 	if err != nil {
