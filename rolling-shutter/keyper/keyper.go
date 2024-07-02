@@ -358,7 +358,7 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		if err != nil {
 			return err
 		}
-		if !kpr.messageSender.AllowedToSend {
+		if !kpr.messageSender.AllowedToSend.Load() {
 			allowSendIfInKeyperSet(ctx, database.New(kpr.dbpool), syncBlockNumber, kpr)
 		}
 		err = fx.SendShutterMessages(ctx, database.New(kpr.dbpool), &kpr.messageSender)
@@ -384,6 +384,6 @@ func allowSendIfInKeyperSet(ctx context.Context, queries *database.Queries, sync
 		log.Err(err).Msg("could not query if in keyper set")
 	}
 	if count > 0 {
-		kpr.messageSender.AllowedToSend = true
+		kpr.messageSender.AllowedToSend.Store(true)
 	}
 }

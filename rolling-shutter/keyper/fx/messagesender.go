@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -49,7 +50,7 @@ type RPCMessageSender struct {
 	rpcclient     client.Client
 	chainID       string
 	signingKey    *ecdsa.PrivateKey
-	AllowedToSend bool
+	AllowedToSend *atomic.Bool
 }
 
 var _ MessageSender = &RPCMessageSender{}
@@ -65,17 +66,18 @@ var mockMessageSenderBufferSize = 0x10000
 
 // NewRPCMessageSender creates a new RPCMessageSender.
 func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMessageSender {
-	return RPCMessageSender{
-		rpcclient:     cl,
-		chainID:       "",
-		signingKey:    signingKey,
-		AllowedToSend: false,
+	ms := RPCMessageSender{
+		rpcclient:  cl,
+		chainID:    "",
+		signingKey: signingKey,
 	}
+	ms.AllowedToSend.Store(false)
+	return ms
 }
 
 // SendMessage signs the given shmsg.Message and sends the message to shuttermint.
 func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message) error {
-	if !ms.AllowedToSend {
+	if !ms.AllowedToSend.Load() {
 		log.Info().Str("msg", msg.String()).Msg("not allowed to send")
 		return nil
 	}
