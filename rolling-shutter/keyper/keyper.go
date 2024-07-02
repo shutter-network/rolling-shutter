@@ -289,6 +289,9 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return err
 	}
 	if lastSent == keyperSet.KeyperConfigIndex {
+		log.Debug().
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Msg("batch config already sent (scheduled).")
 		return nil
 	}
 
@@ -309,6 +312,10 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 
 	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
+		log.Warn().Err(err).
+			Interface("keyper-set", keyperSet).
+			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
+			Msg("error when setting last batch config sent. Returning nil.")
 		return nil
 	}
 
