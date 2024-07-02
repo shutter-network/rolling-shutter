@@ -83,7 +83,7 @@ func (p *EonKeyPublisher) Publish(key keyper.EonPublicKey) {
 // set, unless the key is already confirmed or the keyper has already voted on it.
 func (p *EonKeyPublisher) publishIfResponsible(ctx context.Context, key keyper.EonPublicKey) {
 	db := obskeyperdb.New(p.dbpool)
-	keyperSet, err := db.GetKeyperSetByKeyperConfigIndex(ctx, int64(key.Eon))
+	keyperSet, err := db.GetKeyperSetByKeyperConfigIndex(ctx, int64(key.KeyperConfigIndex))
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -121,11 +121,21 @@ func (p *EonKeyPublisher) publishOldKeys(ctx context.Context) {
 		}
 		dkgResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 		if err != nil {
-			err := errors.Wrapf(err, "failed to decode DKG result of eon %d", dkgResultDB.Eon)
-			log.Error().Err(err).Msg("failed to publish old eon keys")
+			log.Error().
+				Err(err).
+				Int64("eon", dkgResultDB.Eon).
+				Msg("failed to decode DKG result to publish old eon key")
 			continue
 		}
-		p.publish(ctx, dkgResult.PublicKey.Marshal(), dkgResult.Eon, dkgResult.Keyper)
+		eon, err := db.GetEon(ctx, dkgResultDB.Eon)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Int64("eon", dkgResultDB.Eon).
+				Msg("failed to fetch eon to publish old eon public key")
+			continue
+		}
+		p.publish(ctx, dkgResult.PublicKey.Marshal(), uint64(eon.KeyperConfigIndex), dkgResult.Keyper)
 	}
 }
 
