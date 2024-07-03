@@ -67,9 +67,10 @@ var mockMessageSenderBufferSize = 0x10000
 // NewRPCMessageSender creates a new RPCMessageSender.
 func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMessageSender {
 	ms := RPCMessageSender{
-		rpcclient:  cl,
-		chainID:    "",
-		signingKey: signingKey,
+		rpcclient:     cl,
+		chainID:       "",
+		signingKey:    signingKey,
+		AllowedToSend: new(atomic.Bool),
 	}
 	ms.AllowedToSend.Store(false)
 	return ms
