@@ -81,33 +81,42 @@ func TestSlotDecryptionSignatureTxPointer(t *testing.T) {
 	signatures = append(signatures, _sig)
 	var validCount int
 
-	var i uint64
-	// to check if tx-pointer was changed between signing time and sending time, we iterate over tx-pointer.
-	for i = 0; i < 50000; i++ {
-		validCount = 0
-		slotDecryptionSignatureData, _ = gnosisssztypes.NewSlotDecryptionSignatureData(
-			42,
-			2,
-			10683832,
-			i,
-			identities,
-		)
-		// to check if there was some data mixup, we check the signatures against all keypers
-		for _, keyperAddress := range keyperAddresses {
-			for _, sig := range signatures {
-				signatureValid, err := slotDecryptionSignatureData.CheckSignature(sig, keyperAddress)
-				assert.NilError(t, err, "signature check failed")
-				log.Println("keyper", keyperAddress, "valid", signatureValid)
-				if signatureValid {
-					validCount++
+	var s int64
+	var slotnumber uint64
+	// to check if slot number was changed between signing time and sending time, we iterate over slot number.
+	for s = -200; s < 10; s++ {
+		slotnumber = uint64(10683832 + s)
+		var i uint64
+		// to check if tx-pointer was changed between signing time and sending time, we iterate over tx-pointer.
+		for i = 0; i < 500; i++ {
+			validCount = 0
+			slotDecryptionSignatureData, _ = gnosisssztypes.NewSlotDecryptionSignatureData(
+				42,
+				2,
+				slotnumber,
+				i,
+				identities,
+			)
+			// to check if there was some data mixup, we check the signatures against all keypers
+			for _, keyperAddress := range keyperAddresses {
+				for _, sig := range signatures {
+					signatureValid, err := slotDecryptionSignatureData.CheckSignature(sig, keyperAddress)
+					assert.NilError(t, err, "signature check failed")
+					log.Println("keyper", keyperAddress, "valid", signatureValid)
+					if signatureValid {
+						log.Printf("tx-pointer was %v", i)
+						log.Printf("slot was %v", slotnumber)
+						validCount++
+						break
+					}
 				}
 			}
+			if validCount == 2 {
+				log.Printf("tx-pointer was %v", i)
+				log.Printf("slot was %v", slotnumber)
+				break
+			}
 		}
-		if validCount == 2 {
-			log.Printf("tx-pointer was %v", i)
-			break
-		}
-
 	}
 
 	assert.Equal(t, validCount, 2, "not enough valid signatures")

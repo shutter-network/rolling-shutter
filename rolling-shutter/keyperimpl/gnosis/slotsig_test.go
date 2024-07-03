@@ -109,54 +109,73 @@ func TestSlotDecryptionSignature(t *testing.T) {
 	signatures = append(signatures, _sig)
 	var validCount int
 
-	// to check if there was some data mixup, we check the signatures against all keypers
-	var i uint64
-	for i = 0; i < 2; i++ {
-		validCount = 0
-		slotDecryptionSignatureData, _ = gnosisssztypes.NewSlotDecryptionSignatureData(
-			42,
-			2,
-			10683832,
-			i,
-			identities,
-		)
-		for _, keyperAddress := range keyperAddresses {
-			for _, sig := range signatures {
-				signatureValid, err := slotDecryptionSignatureData.CheckSignature(sig, keyperAddress)
-				assert.NilError(t, err, "signature check failed")
+	var counter int
+	var s int64
+	var slot uint64
+	for s = -10; s < 1; s++ {
+		var e uint64
+		for e = 0; e < 4; e++ {
+			// to check if there was some data mixup, we check the signatures against all keypers
+			var p uint64
+			for p = 0; p < 14050; p++ {
+				validCount = 0
+				slot = uint64(10683832 + s)
+				slotDecryptionSignatureData, err = gnosisssztypes.NewSlotDecryptionSignatureData(
+					42,
+					e,
+					slot,
+					p,
+					identities,
+				)
+				assert.NilError(t, err, "error when creating slotdecryptionsignaturedata")
+				for _, keyperAddress := range keyperAddresses {
+					for _, sig := range signatures {
+						counter++
+						signatureValid, err := slotDecryptionSignatureData.CheckSignature(sig, keyperAddress)
+						assert.NilError(t, err, "signature check failed")
+						/*
+							sig0, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[0])
+							assert.NilError(t, err, "signature failed")
+							sig1, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[1])
+							assert.NilError(t, err, "signature failed")
+							sig2, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[2])
+							assert.NilError(t, err, "signature failed")
+							log.Println("equal found", p, bytes.Equal(sig, sig0), bytes.Equal(sig, sig1), bytes.Equal(sig, sig2))
 
-				sig0, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[0])
-				assert.NilError(t, err, "signature failed")
-				sig1, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[1])
-				assert.NilError(t, err, "signature failed")
-				sig2, err := slotDecryptionSignatureData.ComputeSignature(keyperPrivateKeys[2])
-				assert.NilError(t, err, "signature failed")
-				log.Println("equal found", i, bytes.Equal(sig, sig0), bytes.Equal(sig, sig1), bytes.Equal(sig, sig2))
+							log.Println("keyper", keyperAddress, "valid", signatureValid)
 
-				log.Println("keyper", keyperAddress, "valid", signatureValid)
+							valid0, err := slotDecryptionSignatureData.CheckSignature(sig0, keyperAddresses[0])
+							assert.NilError(t, err, "check failed")
+							valid1, err := slotDecryptionSignatureData.CheckSignature(sig1, keyperAddresses[1])
+							assert.NilError(t, err, "check failed")
+							valid2, err := slotDecryptionSignatureData.CheckSignature(sig2, keyperAddresses[2])
+							assert.NilError(t, err, "check failed")
 
-				valid0, err := slotDecryptionSignatureData.CheckSignature(sig0, keyperAddresses[0])
-				assert.NilError(t, err, "check failed")
-				valid1, err := slotDecryptionSignatureData.CheckSignature(sig1, keyperAddresses[1])
-				assert.NilError(t, err, "check failed")
-				valid2, err := slotDecryptionSignatureData.CheckSignature(sig2, keyperAddresses[2])
-				assert.NilError(t, err, "check failed")
+							log.Println("valid computed", p, valid0, valid1, valid2)
 
-				log.Println("valid computed", i, valid0, valid1, valid2)
-
-				log.Println(hex.EncodeToString(sig0))
-				log.Println(hex.EncodeToString(sig1))
-				log.Println(hex.EncodeToString(sig2))
-				if signatureValid {
-					validCount++
+							log.Println(hex.EncodeToString(sig0))
+							log.Println(hex.EncodeToString(sig1))
+							log.Println(hex.EncodeToString(sig2))
+						*/
+						if counter%10000 == 0 {
+							log.Printf("checked %v signatures", counter)
+						}
+						if signatureValid {
+							validCount++
+							log.Printf("tx-pointer was %v", p)
+							log.Printf("slot was %v", slot)
+							log.Printf("eon was %v", e)
+							panic("ooooo")
+						}
+					}
 				}
+				if validCount == 2 {
+					panic("oooooooooo")
+					break
+				}
+
 			}
 		}
-		if validCount == 2 {
-			log.Printf("tx-pointer was %v", i)
-			break
-		}
-
 	}
 
 	assert.Equal(t, validCount, 2, "not enough valid signatures")
