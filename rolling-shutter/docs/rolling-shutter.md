@@ -17,6 +17,7 @@ A collection of commands to run and interact with Rolling Shutter nodes
 * [rolling-shutter chain](rolling-shutter_chain.md)	 - Run a node for Shutter's Tendermint chain
 * [rolling-shutter collator](rolling-shutter_collator.md)	 - Run a collator node
 * [rolling-shutter crypto](rolling-shutter_crypto.md)	 - CLI tool to access crypto functions
+* [rolling-shutter gnosis-access-node](rolling-shutter_gnosis-access-node.md)	 - Run an access node for the keyper network of Shutterized Gnosis Chain
 * [rolling-shutter gnosiskeyper](rolling-shutter_gnosiskeyper.md)	 - Run a Shutter keyper for Gnosis Chain
 * [rolling-shutter keyper](rolling-shutter_keyper.md)	 - Run a Shutter keyper node
 * [rolling-shutter mocknode](rolling-shutter_mocknode.md)	 - Run a Shutter mock node
