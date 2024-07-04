@@ -7,13 +7,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 
+	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
-)
-
-const (
-	// TODO: pull these from keyper set manager
-	n         = 7
-	threshold = 5
 )
 
 type DecryptionKeysHandler struct {
@@ -66,13 +62,23 @@ func (handler *DecryptionKeysHandler) validateCommonFields(key *p2pmsg.Decryptio
 }
 
 func (handler *DecryptionKeysHandler) validateGnosisFields(keys *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
-	extraWrapped, ok := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis)
-	if !ok {
-		return pubsub.ValidationReject, errors.Errorf("unexpected extra type %T, expected Gnosis", keys.Extra)
+	res, err := gnosis.ValidateDecryptionKeysBasic(keys)
+	if res != pubsub.ValidationAccept || err != nil {
+		return res, err
 	}
-	extra := extraWrapped.Gnosis
-	if extra == nil {
-		return pubsub.ValidationReject, errors.New("missing extra Gnosis data")
+	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis).Gnosis
+
+	// TODO: populate this from the contract
+	keyperSet := &obskeyperdatabase.KeyperSet{
+		KeyperConfigIndex:     0,
+		ActivationBlockNumber: 0,
+		Keypers:               []string{},
+		Threshold:             0,
+	}
+
+	res, err = gnosis.ValidateDecryptionKeysSignatures(keys, extra, keyperSet)
+	if res != pubsub.ValidationAccept || err != nil {
+		return res, err
 	}
 
 	return pubsub.ValidationAccept, nil
