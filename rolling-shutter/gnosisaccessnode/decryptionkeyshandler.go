@@ -10,7 +10,6 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
@@ -97,12 +96,9 @@ func (handler *DecryptionKeysHandler) validateGnosisFields(keys *p2pmsg.Decrypti
 	}
 	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis).Gnosis
 
-	// TODO: populate this from the contract
-	keyperSet := &obskeyperdatabase.KeyperSet{
-		KeyperConfigIndex:     0,
-		ActivationBlockNumber: 0,
-		Keypers:               []string{},
-		Threshold:             0,
+	keyperSet, ok := handler.storage.GetKeyperSet(keys.Eon)
+	if !ok {
+		return pubsub.ValidationReject, errors.Errorf("no keyper set found for eon %d", keys.Eon)
 	}
 
 	res, err = gnosis.ValidateDecryptionKeysSignatures(keys, extra, keyperSet)
