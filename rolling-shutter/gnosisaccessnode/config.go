@@ -3,6 +3,8 @@ package gnosisaccessnode
 import (
 	"io"
 
+	gnosiskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
@@ -10,13 +12,17 @@ import (
 type Config struct {
 	InstanceID uint64
 
-	P2P     *p2p.Config
-	Metrics *metricsserver.MetricsConfig
+	GnosisNode *configuration.EthnodeConfig
+	Contracts  *gnosiskeyper.GnosisContractsConfig
+	P2P        *p2p.Config
+	Metrics    *metricsserver.MetricsConfig
 
 	MaxNumKeysPerMessage uint64
 }
 
 func (c *Config) Init() {
+	c.GnosisNode = configuration.NewEthnodeConfig()
+	c.Contracts = gnosiskeyper.NewGnosisContractsConfig()
 	c.P2P = p2p.NewConfig()
 	c.Metrics = metricsserver.NewConfig()
 }
