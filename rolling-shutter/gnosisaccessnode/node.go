@@ -33,7 +33,7 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
 	}
-	messageSender.AddMessageHandler(NewDecryptionKeysHandler(node.config))
+	messageSender.AddMessageHandler(NewDecryptionKeysHandler(node.config, node.storage))
 
 	chainSyncClient, err := chainsync.NewClient(
 		ctx,

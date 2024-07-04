@@ -1,11 +1,14 @@
 package gnosisaccessnode
 
 import (
+	"bytes"
 	"context"
 	"math"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+
+	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
@@ -13,12 +16,14 @@ import (
 )
 
 type DecryptionKeysHandler struct {
-	config *Config
+	config  *Config
+	storage *Storage
 }
 
-func NewDecryptionKeysHandler(config *Config) *DecryptionKeysHandler {
+func NewDecryptionKeysHandler(config *Config, storage *Storage) *DecryptionKeysHandler {
 	return &DecryptionKeysHandler{
-		config: config,
+		config:  config,
+		storage: storage,
 	}
 }
 
@@ -39,25 +44,49 @@ func (handler *DecryptionKeysHandler) ValidateMessage(_ context.Context, msg p2p
 	return pubsub.ValidationAccept, nil
 }
 
-func (handler *DecryptionKeysHandler) validateCommonFields(key *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
-	if key.InstanceID != handler.config.InstanceID {
+func (handler *DecryptionKeysHandler) validateCommonFields(keys *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
+	if keys.InstanceID != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, key.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceID())
 	}
-	if key.Eon > math.MaxInt64 {
-		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
+	if keys.Eon > math.MaxInt64 {
+		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keys.Eon)
 	}
 
-	if len(key.Keys) == 0 {
+	if len(keys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > int(handler.config.MaxNumKeysPerMessage) {
+	if len(keys.Keys) > int(handler.config.MaxNumKeysPerMessage) {
 		return pubsub.ValidationReject, errors.Errorf(
 			"too many keys in message (%d > %d)",
-			len(key.Keys),
+			len(keys.Keys),
 			handler.config.MaxNumKeysPerMessage,
 		)
 	}
+
+	eonKey, ok := handler.storage.GetEonKey(keys.Eon)
+	if !ok {
+		return pubsub.ValidationReject, errors.Errorf("no eon key found for eon %d", keys.Eon)
+	}
+
+	for i, k := range keys.Keys {
+		epochSecretKey, err := k.GetEpochSecretKey()
+		if err != nil {
+			return pubsub.ValidationReject, err
+		}
+		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, eonKey, k.Identity)
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
+		}
+		if !ok {
+			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
+		}
+
+		if i > 0 && bytes.Compare(k.Identity, keys.Keys[i-1].Identity) < 0 {
+			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
+		}
+	}
+
 	return pubsub.ValidationAccept, nil
 }
 
