@@ -180,10 +180,10 @@ func (h *DecryptionKeysHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeys{}}
 }
 
-func validateSignerIndices(extra *p2pmsg.DecryptionKeys_Gnosis, n int) (pubsub.ValidationResult, error) {
-	for i, signerIndex := range extra.Gnosis.SignerIndices {
+func validateSignerIndices(extra *p2pmsg.GnosisDecryptionKeysExtra, n int) (pubsub.ValidationResult, error) {
+	for i, signerIndex := range extra.SignerIndices {
 		if i >= 1 {
-			prevSignerIndex := extra.Gnosis.SignerIndices[i-1]
+			prevSignerIndex := extra.SignerIndices[i-1]
 			if signerIndex == prevSignerIndex {
 				return pubsub.ValidationReject, errors.New("duplicate signer index found")
 			}
@@ -198,8 +198,7 @@ func validateSignerIndices(extra *p2pmsg.DecryptionKeys_Gnosis, n int) (pubsub.V
 	return pubsub.ValidationAccept, nil
 }
 
-func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	keys := msg.(*p2pmsg.DecryptionKeys)
+func ValidateDecryptionKeysBasic(keys *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
 	extra, ok := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis)
 	if !ok {
 		return pubsub.ValidationReject, errors.Errorf("unexpected extra type %T, expected Gnosis", keys.Extra)
@@ -218,21 +217,23 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 		return pubsub.ValidationReject, errors.New("msg does not contain any keys")
 	}
 
-	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
-	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keys.Eon))
-	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keys.Eon)
-	}
+	return pubsub.ValidationAccept, nil
+}
 
-	if int32(len(extra.Gnosis.SignerIndices)) != keyperSet.Threshold {
-		return pubsub.ValidationReject, errors.Errorf("expected %d signers, got %d", keyperSet.Threshold, len(extra.Gnosis.SignerIndices))
+func ValidateDecryptionKeysSignatures(
+	keys *p2pmsg.DecryptionKeys,
+	extra *p2pmsg.GnosisDecryptionKeysExtra,
+	keyperSet *obskeyperdatabase.KeyperSet,
+) (pubsub.ValidationResult, error) {
+	if int32(len(extra.SignerIndices)) != keyperSet.Threshold {
+		return pubsub.ValidationReject, errors.Errorf("expected %d signers, got %d", keyperSet.Threshold, len(extra.SignerIndices))
 	}
 
 	res, err := validateSignerIndices(extra, len(keyperSet.Keypers))
 	if res != pubsub.ValidationAccept {
 		return res, err
 	}
-	signers, err := keyperSet.GetSubset(extra.Gnosis.SignerIndices)
+	signers, err := keyperSet.GetSubset(extra.SignerIndices)
 	if err != nil {
 		return pubsub.ValidationReject, err
 	}
@@ -245,15 +246,15 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
 		keys.InstanceID,
 		keys.Eon,
-		extra.Gnosis.Slot,
-		extra.Gnosis.TxPointer,
+		extra.Slot,
+		extra.TxPointer,
 		identityPreimages,
 	)
 	if err != nil {
 		return pubsub.ValidationReject, errors.Wrap(err, "failed to create slot decryption signature data object")
 	}
-	for signatureIndex := 0; signatureIndex < len(extra.Gnosis.Signatures); signatureIndex++ {
-		signature := extra.Gnosis.Signatures[signatureIndex]
+	for signatureIndex := 0; signatureIndex < len(extra.Signatures); signatureIndex++ {
+		signature := extra.Signatures[signatureIndex]
 		signer := signers[signatureIndex]
 		signatureValid, err := slotDecryptionSignatureData.CheckSignature(signature, signer)
 		if err != nil {
@@ -262,6 +263,30 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 		if !signatureValid {
 			return pubsub.ValidationReject, errors.New("slot decryption signature invalid")
 		}
+	}
+
+	return pubsub.ValidationAccept, nil
+}
+
+func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
+	keys := msg.(*p2pmsg.DecryptionKeys)
+
+	res, err := ValidateDecryptionKeysBasic(keys)
+	if res != pubsub.ValidationAccept || err != nil {
+		return res, err
+	}
+
+	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis).Gnosis
+
+	obsKeyperDB := obskeyperdatabase.New(h.dbpool)
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keys.Eon))
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get keyper set from database for eon %d", keys.Eon)
+	}
+
+	res, err = ValidateDecryptionKeysSignatures(keys, extra, &keyperSet)
+	if res != pubsub.ValidationAccept || err != nil {
+		return res, err
 	}
 
 	return pubsub.ValidationAccept, nil
