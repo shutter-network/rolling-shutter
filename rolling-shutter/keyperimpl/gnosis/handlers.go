@@ -316,6 +316,27 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	if err != nil {
 		return []p2pmsg.Message{}, errors.Wrap(err, "failed to set tx pointer")
 	}
+
+	identityPreimages := []identitypreimage.IdentityPreimage{}
+	for _, key := range keys.Keys {
+		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+	identitiesHash := computeIdentitiesHash(identityPreimages)
+	for i, keyperIndex := range extra.SignerIndices {
+		err = gnosisDB.InsertSlotDecryptionSignature(ctx, database.InsertSlotDecryptionSignatureParams{
+			Eon:            int64(keys.Eon),
+			Slot:           int64(extra.Slot),
+			KeyperIndex:    int64(keyperIndex),
+			TxPointer:      int64(extra.TxPointer),
+			IdentitiesHash: identitiesHash,
+			Signature:      extra.Signatures[i],
+		})
+		if err != nil {
+			return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert slot decryption signature")
+		}
+	}
+
 	eonString := fmt.Sprint(keys.Eon)
 	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
 	metricsTxPointerAge.WithLabelValues(eonString).Set(0)

@@ -15,7 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
-	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -206,7 +205,6 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	}
 
 	gnosisDB := database.New(i.dbpool)
-	keyperCoreDB := corekeyperdatabase.New(i.dbpool)
 	obsKeyperDB := obskeyperdatabase.New(i.dbpool)
 
 	trigger, err := gnosisDB.GetCurrentDecryptionTrigger(ctx, int64(originalMsg.Eon))
@@ -220,11 +218,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		return nil, errors.Wrapf(err, "failed to get current decryption trigger for eon %d", originalMsg.Eon)
 	}
 
-	eonData, err := keyperCoreDB.GetEon(ctx, int64(originalMsg.Eon))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get eon data from database for eon %d", originalMsg.Eon)
-	}
-	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, eonData.KeyperConfigIndex)
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(originalMsg.Eon))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get keyper set from database for eon %d", originalMsg.Eon)
 	}
