@@ -243,6 +243,7 @@ func (q *Queries) InitTxPointer(ctx context.Context, arg InitTxPointerParams) er
 const insertSlotDecryptionSignature = `-- name: InsertSlotDecryptionSignature :exec
 INSERT INTO slot_decryption_signatures (eon, slot, keyper_index, tx_pointer, identities_hash, signature)
 VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT DO NOTHING
 `
 
 type InsertSlotDecryptionSignatureParams struct {
