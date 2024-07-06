@@ -110,5 +110,9 @@ func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, msg p2pm
 	key := msg.(*p2pmsg.DecryptionKeys)
 	// Insert the key into the db. We assume that it's valid as it already passed the libp2p
 	// validator.
+	log.Debug().
+		Uint64("keyper-set-index", key.Eon).
+		Str("msg", msg.String()).
+		Msg("handling decryption key")
 	return nil, database.New(handler.dbpool).InsertDecryptionKeysMsg(ctx, key)
 }

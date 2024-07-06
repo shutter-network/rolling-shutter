@@ -166,7 +166,18 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 				},
 			},
 		}
+		log.Debug().
+			Int("num-signatures", len(signaturesDB)).
+			Int32("threshold", keyperSet.Threshold).
+			Uint64("slot", extra.Slot).
+			Msg("sending keys from gnosis handler")
 		return []p2pmsg.Message{decryptionKeysMsg}, nil
+	} else {
+		log.Debug().
+			Int("num-signatures", len(signaturesDB)).
+			Int32("threshold", keyperSet.Threshold).
+			Uint64("slot", extra.Slot).
+			Msg("not enough shares yet")
 	}
 
 	return []p2pmsg.Message{}, nil
@@ -293,6 +304,8 @@ func (h *DecryptionKeysHandler) ValidateMessage(ctx context.Context, msg p2pmsg.
 }
 
 func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
+	log.Debug().
+		Msg("handling decryption keys in gnosis")
 	keys := msg.(*p2pmsg.DecryptionKeys)
 	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Gnosis).Gnosis
 	gnosisDB := database.New(h.dbpool)

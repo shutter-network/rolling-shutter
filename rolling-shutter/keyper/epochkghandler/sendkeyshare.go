@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkg"
@@ -132,5 +133,12 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert decryption key share")
 	}
+
+	log.Debug().
+		Int64("keyper-config-index", eon.KeyperConfigIndex).
+		Int64("eon", eon.Eon).
+		Uint64("threshold", pureDKGResult.Threshold).
+		Msg("sending key share")
+
 	return msg, nil
 }

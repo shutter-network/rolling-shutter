@@ -138,6 +138,9 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		}
 	}
 	if allKeysExist {
+		log.Debug().
+			Uint64("keyper-config-index", msg.Eon).
+			Msg("all keys exist")
 		return nil, nil
 	}
 
@@ -174,6 +177,11 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		if !ok {
 			numShares := uint64(len(epochKG.SecretShares))
 			if numShares < pureDKGResult.Threshold {
+				log.Debug().
+					Uint64("num-shares", numShares).
+					Uint64("threshold", pureDKGResult.Threshold).
+					Uint64("keyper-config-index", msg.Eon).
+					Msg("not enough key shares yet")
 				// not enough shares yet for at least on identity
 				return nil, nil
 			}
@@ -183,10 +191,17 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 			)
 		}
 
+		if decryptionKey == nil {
+			log.Error().Msg("decryption key is nil")
+		}
 		keys = append(keys, &p2pmsg.Key{
 			Identity: identityPreimage.Bytes(),
 			Key:      decryptionKey.Marshal(),
 		})
+		log.Debug().
+			Hex("identity", identityPreimage.Bytes()).
+			Hex("key", decryptionKey.Marshal()).
+			Msg("generated decryption key")
 	}
 	message := &p2pmsg.DecryptionKeys{
 		InstanceID: handler.config.GetInstanceID(),
@@ -198,6 +213,10 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		return nil, err
 	}
 	metricsEpochKGDecryptionKeysGenerated.Inc()
+	log.Debug().
+		Uint64("keyper-config-index", msg.Eon).
+		Uint64("threshold", pureDKGResult.Threshold).
+		Msg("sending keys")
 	return []p2pmsg.Message{message}, nil
 }
 

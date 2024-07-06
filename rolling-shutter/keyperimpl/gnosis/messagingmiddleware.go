@@ -190,6 +190,10 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 	slotStartTime := time.Unix(int64(slotStartTimestamp), 0)
 	delta := time.Since(slotStartTime)
 	metricsKeySharesSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
+	log.Debug().
+		Uint64("slot", extra.Slot).
+		Uint64("keyper-set-index", msg.Eon).
+		Msg("sending key shares from interceptor")
 	return msg, nil
 }
 
