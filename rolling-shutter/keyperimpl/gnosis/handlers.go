@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/lib/pq"
 	"math"
 
 	"github.com/jackc/pgx/v4"
@@ -110,10 +111,14 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 		IdentitiesHash: identitiesHash,
 		Signature:      extra.Signature,
 	})
-	if err != nil {
-		return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert tx pointer vote")
-	}
 
+	if err != nil {
+		pgErr, ok := err.(*pq.Error)
+		if !ok || pgErr.Code != "23505" {
+			return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert slot decryption signature")
+		}
+	}
+	
 	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(keyShares.Eon))
 	if err != nil {
 		return []p2pmsg.Message{}, errors.Wrapf(err, "failed to get keyper set from database for index %d", keyShares.Eon)
@@ -332,8 +337,12 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 			IdentitiesHash: identitiesHash,
 			Signature:      extra.Signatures[i],
 		})
+
 		if err != nil {
-			return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert slot decryption signature")
+			pgErr, ok := err.(*pq.Error)
+			if !ok || pgErr.Code != "23505" {
+				return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert slot decryption signature")
+			}
 		}
 	}
 
