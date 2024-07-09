@@ -14,6 +14,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/optimism"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/p2pnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/roguenode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/rollupkeyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/snapshot"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/snapshotkeyper"
@@ -33,6 +34,7 @@ func Subcommands() []*cobra.Command {
 		snapshotkeyper.Cmd(),
 		gnosiskeyper.Cmd(),
 		gnosisaccessnode.Cmd(),
+		roguenode.Cmd(),
 		cryptocmd.Cmd(),
 		proxy.Cmd(),
 		mocksequencer.Cmd(),
