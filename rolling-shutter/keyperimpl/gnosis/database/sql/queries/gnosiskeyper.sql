@@ -38,6 +38,9 @@ SELECT event_count FROM transaction_submitted_event_count
 WHERE eon = $1
 LIMIT 1;
 
+-- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
+DELETE FROM transaction_submitted_event WHERE block_number >= $1;
+
 -- name: GetTxPointer :one
 SELECT * FROM tx_pointer
 WHERE eon = $1;
