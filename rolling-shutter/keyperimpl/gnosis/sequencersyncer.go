@@ -152,7 +152,6 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 	events []*sequencerBindings.SequencerTransactionSubmitted,
 ) error {
 	queries := database.New(tx)
-	nextEventIndices := make(map[uint64]int64)
 	for _, event := range events {
 		_, err := queries.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
 			Index:          int64(event.TxIndex),
@@ -169,7 +168,6 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 			return errors.Wrap(err, "failed to insert transaction submitted event into db")
 		}
 		metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
-		nextEventIndices[event.Eon]++
 		log.Debug().
 			Uint64("index", event.TxIndex).
 			Uint64("block", event.Raw.BlockNumber).
@@ -178,15 +176,6 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 			Hex("sender", event.Sender.Bytes()).
 			Uint64("gasLimit", event.GasLimit.Uint64()).
 			Msg("synced new transaction submitted event")
-	}
-	for eon, nextEventIndex := range nextEventIndices {
-		err := queries.SetTransactionSubmittedEventCount(ctx, database.SetTransactionSubmittedEventCountParams{
-			Eon:        int64(eon),
-			EventCount: nextEventIndex,
-		})
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

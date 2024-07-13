@@ -89,16 +89,15 @@ func (q *Queries) GetSlotDecryptionSignatures(ctx context.Context, arg GetSlotDe
 }
 
 const getTransactionSubmittedEventCount = `-- name: GetTransactionSubmittedEventCount :one
-SELECT event_count FROM transaction_submitted_event_count
+SELECT max(index) + 1 FROM transaction_submitted_event
 WHERE eon = $1
-LIMIT 1
 `
 
-func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int64) (int64, error) {
+func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int64) (int32, error) {
 	row := q.db.QueryRow(ctx, getTransactionSubmittedEventCount, eon)
-	var event_count int64
-	err := row.Scan(&event_count)
-	return event_count, err
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getTransactionSubmittedEvents = `-- name: GetTransactionSubmittedEvents :many
@@ -401,23 +400,6 @@ func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurren
 		arg.TxPointer,
 		arg.IdentitiesHash,
 	)
-	return err
-}
-
-const setTransactionSubmittedEventCount = `-- name: SetTransactionSubmittedEventCount :exec
-INSERT INTO transaction_submitted_event_count (eon, event_count)
-VALUES ($1, $2)
-ON CONFLICT (eon) DO UPDATE
-SET event_count = $2
-`
-
-type SetTransactionSubmittedEventCountParams struct {
-	Eon        int64
-	EventCount int64
-}
-
-func (q *Queries) SetTransactionSubmittedEventCount(ctx context.Context, arg SetTransactionSubmittedEventCountParams) error {
-	_, err := q.db.Exec(ctx, setTransactionSubmittedEventCount, arg.Eon, arg.EventCount)
 	return err
 }
 
