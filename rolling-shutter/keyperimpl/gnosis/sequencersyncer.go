@@ -154,20 +154,8 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 	queries := database.New(tx)
 	nextEventIndices := make(map[uint64]int64)
 	for _, event := range events {
-		nextEventIndex, ok := nextEventIndices[event.Eon]
-		if !ok {
-			nextEventIndexFromDB, err := queries.GetTransactionSubmittedEventCount(ctx, int64(event.Eon))
-			if err == pgx.ErrNoRows {
-				nextEventIndexFromDB = 0
-			} else if err != nil {
-				return errors.Wrapf(err, "failed to query count of transaction submitted events for eon %d", event.Eon)
-			}
-			nextEventIndices[event.Eon] = nextEventIndexFromDB
-			nextEventIndex = nextEventIndexFromDB
-		}
-
 		_, err := queries.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
-			Index:          nextEventIndex,
+			Index:          int64(event.TxIndex),
 			BlockNumber:    int64(event.Raw.BlockNumber),
 			BlockHash:      event.Raw.BlockHash[:],
 			TxIndex:        int64(event.Raw.TxIndex),
@@ -180,10 +168,10 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 		if err != nil {
 			return errors.Wrap(err, "failed to insert transaction submitted event into db")
 		}
-		metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(nextEventIndex))
+		metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
 		nextEventIndices[event.Eon]++
 		log.Debug().
-			Int64("index", nextEventIndex).
+			Uint64("index", event.TxIndex).
 			Uint64("block", event.Raw.BlockNumber).
 			Uint64("eon", event.Eon).
 			Hex("identityPrefix", event.IdentityPrefix[:]).

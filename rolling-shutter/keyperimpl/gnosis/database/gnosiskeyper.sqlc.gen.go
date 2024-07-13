@@ -103,7 +103,7 @@ func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int
 
 const getTransactionSubmittedEvents = `-- name: GetTransactionSubmittedEvents :many
 SELECT index, block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, gas_limit FROM transaction_submitted_event
-WHERE eon = $1 AND index >= $2
+WHERE eon = $1 AND index >= $2 AND index < $2 + $3
 ORDER BY index ASC
 LIMIT $3
 `
@@ -280,7 +280,14 @@ INSERT INTO transaction_submitted_event (
     gas_limit
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-ON CONFLICT DO NOTHING
+ON CONFLICT (index, eon) DO UPDATE SET
+block_number = $2,
+block_hash = $3,
+tx_index = $4,
+log_index = $5,
+identity_prefix = $7,
+sender = $8,
+gas_limit = $9
 `
 
 type InsertTransactionSubmittedEventParams struct {
