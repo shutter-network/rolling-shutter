@@ -3,7 +3,6 @@ package epochkghandler
 import (
 	"bytes"
 	"context"
-	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -15,6 +14,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -34,72 +34,89 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	key := msg.(*p2pmsg.DecryptionKeys)
-	if key.GetInstanceID() != handler.config.GetInstanceID() {
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
+	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
 	}
-	if key.Eon > math.MaxInt64 {
-		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
+
+	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", decryptionKeys.Eon)
 	}
 
 	queries := database.New(handler.dbpool)
 
-	_, isKeyper, err := queries.GetKeyperIndex(ctx, int64(key.Eon), handler.config.GetAddress())
+	_, isKeyper, err := queries.GetKeyperIndex(ctx, eon, handler.config.GetAddress())
 	if err != nil {
 		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
-		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
+		log.Debug().Int64("eon", eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
 		return pubsub.ValidationReject, nil
 	}
 
-	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
-	if err == pgx.ErrNoRows {
-		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
+	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon)
 	}
 	if !dkgResultDB.Success {
-		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
-	if len(key.Keys) == 0 {
+	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
+	if len(decryptionKeys.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
 		return pubsub.ValidationReject, errors.Errorf(
 			"too many keys in message (%d > %d)",
-			len(key.Keys),
+			len(decryptionKeys.Keys),
 			handler.config.GetMaxNumKeysPerMessage(),
 		)
 	}
 
-	validationResult, err := checkKeysErrors(key.Keys, pureDKGResult)
+	validationResult, err := checkKeysErrors(ctx, decryptionKeys, pureDKGResult, queries)
 	return validationResult, err
 }
 
-func checkKeysErrors(keys []*p2pmsg.Key, pureDKGResult *puredkg.Result) (pubsub.ValidationResult, error) {
-	for i, k := range keys {
+func checkKeysErrors(ctx context.Context, decryptionKeys *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
+	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
+		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
+			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
+		}
+
+		eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", decryptionKeys.Eon)
+		}
+		existingDecryptionKey, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
+			Eon:     eon,
+			EpochID: k.GetIdentity(),
+		})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.Identity)
+		}
+		if !errors.Is(err, pgx.ErrNoRows) && bytes.Equal(k.Key, existingDecryptionKey.DecryptionKey) {
+			continue
+		}
+
 		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
 		if err != nil {
 			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
 		}
 		if !ok {
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
-		}
-
-		if i > 0 && bytes.Compare(k.Identity, keys[i-1].Identity) < 0 {
-			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
 	return pubsub.ValidationAccept, nil
