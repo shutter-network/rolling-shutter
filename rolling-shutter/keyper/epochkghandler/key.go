@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
-
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
@@ -56,7 +55,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	}
 
 	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
@@ -81,15 +80,30 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		)
 	}
 
-	validationResult, err := checkKeysErrors(key.Keys, pureDKGResult)
+	validationResult, err := checkKeysErrors(ctx, key, pureDKGResult, queries)
 	return validationResult, err
 }
 
-func checkKeysErrors(keys []*p2pmsg.Key, pureDKGResult *puredkg.Result) (pubsub.ValidationResult, error) {
-	for i, k := range keys {
+func checkKeysErrors(ctx context.Context, msg *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
+
+	for i, k := range msg.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
+		}
+		eon, err := medley.Uint64ToInt64Safe(msg.Eon)
+		if err != nil {
+			return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", msg.Eon)
+		}
+		decryptionKey, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
+			Eon:     eon,
+			EpochID: k.GetIdentity(),
+		})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.Identity)
+		}
+		if bytes.Equal(k.Key, decryptionKey.DecryptionKey) {
+			continue
 		}
 		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
 		if err != nil {
@@ -99,7 +113,7 @@ func checkKeysErrors(keys []*p2pmsg.Key, pureDKGResult *puredkg.Result) (pubsub.
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.Identity, msg.Keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
