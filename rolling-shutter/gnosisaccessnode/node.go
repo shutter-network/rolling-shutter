@@ -11,6 +11,7 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -29,11 +30,14 @@ func New(config *Config) *GnosisAccessNode {
 }
 
 func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) error {
+	services := []service.Service{}
+
 	messageSender, err := p2p.New(node.config.P2P)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
 	}
 	messageSender.AddMessageHandler(NewDecryptionKeysHandler(node.config, node.storage))
+	services = append(services, messageSender)
 
 	chainSyncClient, err := chainsync.NewClient(
 		ctx,
@@ -46,8 +50,14 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize chain sync client")
 	}
+	services = append(services, chainSyncClient)
 
-	return runner.StartService(messageSender, chainSyncClient)
+	if node.config.Metrics.Enabled {
+		metricsServer := metricsserver.New(node.config.Metrics)
+		services = append(services, metricsServer)
+	}
+
+	return runner.StartService(services...)
 }
 
 func (node *GnosisAccessNode) onNewKeyperSet(_ context.Context, keyperSet *syncevent.KeyperSet) error {
