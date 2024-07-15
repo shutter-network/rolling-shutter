@@ -3,16 +3,18 @@ package epochkghandler
 import (
 	"bytes"
 	"context"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -85,12 +87,15 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 }
 
 func checkKeysErrors(ctx context.Context, decryptionKeys *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
-
 	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
+		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
+			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
+		}
+
 		eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
 		if err != nil {
 			return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", decryptionKeys.Eon)
@@ -102,19 +107,16 @@ func checkKeysErrors(ctx context.Context, decryptionKeys *p2pmsg.DecryptionKeys,
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.Identity)
 		}
-		if bytes.Equal(k.Key, existingDecryptionKey.DecryptionKey) {
+		if !errors.Is(err, pgx.ErrNoRows) && bytes.Equal(k.Key, existingDecryptionKey.DecryptionKey) {
 			continue
 		}
+
 		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
 		if err != nil {
 			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
 		}
 		if !ok {
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
-		}
-
-		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
-			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
 	return pubsub.ValidationAccept, nil
