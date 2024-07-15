@@ -32,15 +32,15 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	key := msg.(*p2pmsg.DecryptionKeys)
-	if key.GetInstanceID() != handler.config.GetInstanceID() {
+	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
+	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
 	}
 
-	eon, err := medley.Uint64ToInt64Safe(key.Eon)
+	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", decryptionKeys.Eon)
 	}
 
 	queries := database.New(handler.dbpool)
@@ -69,40 +69,40 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
-	if len(key.Keys) == 0 {
+	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
-	if len(key.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
+	if len(decryptionKeys.Keys) > int(handler.config.GetMaxNumKeysPerMessage()) {
 		return pubsub.ValidationReject, errors.Errorf(
 			"too many keys in message (%d > %d)",
-			len(key.Keys),
+			len(decryptionKeys.Keys),
 			handler.config.GetMaxNumKeysPerMessage(),
 		)
 	}
 
-	validationResult, err := checkKeysErrors(ctx, key, pureDKGResult, queries)
+	validationResult, err := checkKeysErrors(ctx, decryptionKeys, pureDKGResult, queries)
 	return validationResult, err
 }
 
-func checkKeysErrors(ctx context.Context, msg *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
+func checkKeysErrors(ctx context.Context, decryptionKeys *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
 
-	for i, k := range msg.Keys {
+	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
-		eon, err := medley.Uint64ToInt64Safe(msg.Eon)
+		eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
 		if err != nil {
-			return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", msg.Eon)
+			return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", decryptionKeys.Eon)
 		}
-		decryptionKey, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
+		existingDecryptionKey, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
 			Eon:     eon,
 			EpochID: k.GetIdentity(),
 		})
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.Identity)
 		}
-		if bytes.Equal(k.Key, decryptionKey.DecryptionKey) {
+		if bytes.Equal(k.Key, existingDecryptionKey.DecryptionKey) {
 			continue
 		}
 		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
@@ -113,7 +113,7 @@ func checkKeysErrors(ctx context.Context, msg *p2pmsg.DecryptionKeys, pureDKGRes
 			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, msg.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
