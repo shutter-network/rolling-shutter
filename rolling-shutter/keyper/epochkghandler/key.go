@@ -3,13 +3,12 @@ package epochkghandler
 import (
 	"bytes"
 	"context"
-	"math"
-
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -39,34 +38,36 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject,
 			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), key.GetInstanceID())
 	}
-	if key.Eon > math.MaxInt64 {
-		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", key.Eon)
+
+	eon, err := medley.Uint64ToInt64Safe(key.Eon)
+	if err != nil {
+		return pubsub.ValidationReject, errors.Wrapf(err, "overflow error while converting eon to int64 %d", key.Eon)
 	}
 
 	queries := database.New(handler.dbpool)
 
-	_, isKeyper, err := queries.GetKeyperIndex(ctx, int64(key.Eon), handler.config.GetAddress())
+	_, isKeyper, err := queries.GetKeyperIndex(ctx, eon, handler.config.GetAddress())
 	if err != nil {
 		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
-		log.Debug().Uint64("eon", key.Eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
+		log.Debug().Int64("eon", eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
 		return pubsub.ValidationReject, nil
 	}
 
-	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, int64(key.Eon))
+	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
 	if err == pgx.ErrNoRows {
-		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon)
 	}
 	if !dkgResultDB.Success {
-		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", key.Eon)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
 	if len(key.Keys) == 0 {
