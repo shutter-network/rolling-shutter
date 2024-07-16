@@ -307,7 +307,9 @@ func (kpr *Keyper) getDecryptionIdentityPreimages(
 	gas := uint64(0)
 	for _, event := range events {
 		gas += uint64(event.GasLimit)
-		if gas > kpr.config.Gnosis.EncryptedGasLimit {
+		// We need to add at least one transaction otherwise the tx-pointer will get stuck
+		// if the next tx has a gas limit higher than the configured gas limit
+		if gas > kpr.config.Gnosis.EncryptedGasLimit && len(identityPreimages) > 0 {
 			break
 		}
 		identityPreimage, err := transactionSubmittedEventToIdentityPreimage(event)
