@@ -31,10 +31,19 @@ var metricsP2PPeerTuples = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "p2p",
-		Name:      "dialed_peer",
-		Help:      "Collection of the encountered peer tuples",
+		Name:      "peer_candidate",
+		Help:      "Collection of the encountered peer tuples.",
 	},
 	[]string{"peer_id", "peer_ip"})
+
+var metricsP2PPeerConnectedness = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "p2p",
+		Name:      "peer_connectedness",
+		Help:      "Collection of the connectedness (0=NotConnected; 1=Connected; 2=CanConnect; 3=CannotConnect) to a peer ID.",
+	},
+	[]string{"peer_id"})
 
 func collectPeerAddresses(peer peer.AddrInfo) {
 	for _, multiAddr := range peer.Addrs {

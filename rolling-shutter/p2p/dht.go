@@ -92,6 +92,7 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 				if p.ID == h.ID() {
 					continue
 				}
+				metricsP2PPeerConnectedness.WithLabelValues(p.ID.String()).Add(float64(h.Network().Connectedness(p.ID)))
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
