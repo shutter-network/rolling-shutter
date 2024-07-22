@@ -76,6 +76,7 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 		case <-ticker.C:
 			peersBefore := len(h.Network().Peers())
 			if peersBefore >= peerTarget {
+				log.Debug().Int("peers-before", peersBefore).Int("peer-target", peerTarget).Msg("have enough peers")
 				continue
 			}
 
