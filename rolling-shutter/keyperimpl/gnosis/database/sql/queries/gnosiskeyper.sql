@@ -11,11 +11,18 @@ INSERT INTO transaction_submitted_event (
     gas_limit
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (index, eon) DO UPDATE SET
+block_number = $2,
+block_hash = $3,
+tx_index = $4,
+log_index = $5,
+identity_prefix = $7,
+sender = $8,
+gas_limit = $9;
 
 -- name: GetTransactionSubmittedEvents :many
 SELECT * FROM transaction_submitted_event
-WHERE eon = $1 AND index >= $2
+WHERE eon = $1 AND index >= $2 AND index < $2 + $3
 ORDER BY index ASC
 LIMIT $3;
 
@@ -27,16 +34,9 @@ SET block_hash = $1, block_number = $2, slot = $3;
 -- name: GetTransactionSubmittedEventsSyncedUntil :one
 SELECT * FROM transaction_submitted_events_synced_until LIMIT 1;
 
--- name: SetTransactionSubmittedEventCount :exec
-INSERT INTO transaction_submitted_event_count (eon, event_count)
-VALUES ($1, $2)
-ON CONFLICT (eon) DO UPDATE
-SET event_count = $2;
-
 -- name: GetTransactionSubmittedEventCount :one
-SELECT event_count FROM transaction_submitted_event_count
-WHERE eon = $1
-LIMIT 1;
+SELECT max(index) + 1 FROM transaction_submitted_event
+WHERE eon = $1;
 
 -- name: GetTxPointer :one
 SELECT * FROM tx_pointer

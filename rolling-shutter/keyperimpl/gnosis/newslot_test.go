@@ -48,9 +48,11 @@ func TestGetTxPointerInfiniteIntegration(t *testing.T) {
 		Value: 5,
 	})
 	assert.NilError(t, err)
-	err = db.SetTransactionSubmittedEventCount(ctx, gnosisDatabase.SetTransactionSubmittedEventCountParams{
-		Eon:        2,
-		EventCount: 10,
+	_, err = db.InsertTransactionSubmittedEvent(ctx, gnosisDatabase.InsertTransactionSubmittedEventParams{
+		Index:          9,
+		Eon:            2,
+		BlockHash:      []byte{},
+		IdentityPrefix: []byte{},
 	})
 	assert.NilError(t, err)
 
@@ -75,9 +77,11 @@ func TestGetTxPointerOutdatedIntegration(t *testing.T) {
 		Value: 5,
 	})
 	assert.NilError(t, err)
-	err = db.SetTransactionSubmittedEventCount(ctx, gnosisDatabase.SetTransactionSubmittedEventCountParams{
-		Eon:        2,
-		EventCount: 10,
+	_, err = db.InsertTransactionSubmittedEvent(ctx, gnosisDatabase.InsertTransactionSubmittedEventParams{
+		Index:          9,
+		Eon:            2,
+		BlockHash:      []byte{},
+		IdentityPrefix: []byte{},
 	})
 	assert.NilError(t, err)
 
