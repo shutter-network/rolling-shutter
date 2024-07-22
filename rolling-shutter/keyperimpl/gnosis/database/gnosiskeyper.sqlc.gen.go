@@ -12,6 +12,15 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const deleteTransactionSubmittedEventsFromBlockNumber = `-- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
+DELETE FROM transaction_submitted_event WHERE block_number >= $1
+`
+
+func (q *Queries) DeleteTransactionSubmittedEventsFromBlockNumber(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, deleteTransactionSubmittedEventsFromBlockNumber, blockNumber)
+	return err
+}
+
 const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
 SELECT eon, slot, tx_pointer, identities_hash FROM current_decryption_trigger
 WHERE eon = $1

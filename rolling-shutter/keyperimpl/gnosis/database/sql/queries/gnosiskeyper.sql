@@ -38,6 +38,9 @@ SELECT * FROM transaction_submitted_events_synced_until LIMIT 1;
 SELECT max(index) + 1 FROM transaction_submitted_event
 WHERE eon = $1;
 
+-- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
+DELETE FROM transaction_submitted_event WHERE block_number >= $1;
+
 -- name: GetTxPointer :one
 SELECT * FROM tx_pointer
 WHERE eon = $1;
