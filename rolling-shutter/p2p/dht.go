@@ -87,6 +87,7 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 			newConnections := 0
 			failedDials := 0
 			for _, p := range peers {
+				collectPeerAddresses(p)
 				if p.ID == h.ID() {
 					continue
 				}
