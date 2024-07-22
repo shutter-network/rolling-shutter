@@ -45,9 +45,9 @@ var metricsP2PPeerConnectedness = prometheus.NewGaugeVec(
 	},
 	[]string{"peer_id"})
 
-func collectPeerAddresses(peer peer.AddrInfo) {
-	for _, multiAddr := range peer.Addrs {
-		metricsP2PPeerTuples.WithLabelValues(peer.ID.String(), multiAddr.String()).Add(1)
+func collectPeerAddresses(p peer.AddrInfo) {
+	for _, multiAddr := range p.Addrs {
+		metricsP2PPeerTuples.WithLabelValues(p.ID.String(), multiAddr.String()).Add(1)
 	}
 }
 

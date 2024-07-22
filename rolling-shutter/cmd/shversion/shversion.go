@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 )
 
-// This gets set via ldflags when building via the Makefile
+// This gets set via ldflags when building via the Makefile.
 var version string
 
 // Version returns shuttermint's version string.
