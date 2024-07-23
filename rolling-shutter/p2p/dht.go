@@ -93,7 +93,7 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 				if p.ID == h.ID() {
 					continue
 				}
-				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Add(float64(h.Network().Connectedness(p.ID)))
+				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Set(float64(h.Network().Connectedness(p.ID)))
 				peerPing := h.Peerstore().LatencyEWMA(p.ID)
 				if peerPing != 0 {
 					metricsP2PPeerPing.WithLabelValues(ourId, p.ID.String()).Set(peerPing.Seconds())
