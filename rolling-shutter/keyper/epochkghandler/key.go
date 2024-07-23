@@ -86,7 +86,12 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	return validationResult, err
 }
 
-func checkKeysErrors(ctx context.Context, decryptionKeys *p2pmsg.DecryptionKeys, pureDKGResult *puredkg.Result, queries *database.Queries) (pubsub.ValidationResult, error) {
+func checkKeysErrors(
+	ctx context.Context,
+	decryptionKeys *p2pmsg.DecryptionKeys,
+	pureDKGResult *puredkg.Result,
+	queries *database.Queries,
+) (pubsub.ValidationResult, error) {
 	for i, k := range decryptionKeys.Keys {
 		epochSecretKey, err := k.GetEpochSecretKey()
 		if err != nil {

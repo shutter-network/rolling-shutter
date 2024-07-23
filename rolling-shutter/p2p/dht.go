@@ -76,6 +76,7 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 		case <-ticker.C:
 			peersBefore := len(h.Network().Peers())
 			if peersBefore >= peerTarget {
+				log.Debug().Int("peers-before", peersBefore).Int("peer-target", peerTarget).Msg("have enough peers")
 				continue
 			}
 
@@ -86,9 +87,16 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 
 			newConnections := 0
 			failedDials := 0
+			ourId := h.ID().String()
 			for _, p := range peers {
+				collectPeerAddresses(p)
 				if p.ID == h.ID() {
 					continue
+				}
+				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Add(float64(h.Network().Connectedness(p.ID)))
+				peerPing := h.Peerstore().LatencyEWMA(p.ID)
+				if peerPing != 0 {
+					metricsP2PPeerPing.WithLabelValues(ourId, p.ID.String()).Set(peerPing.Seconds())
 				}
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
