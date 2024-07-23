@@ -4,8 +4,10 @@ import (
 	"context"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -35,13 +37,33 @@ func (dummyMessageHandler) MessagePrototypes() []p2pmsg.Message {
 	}
 }
 
-func New(config *Config) (service.Service, error) {
-	p2pHandler, err := p2p.New(config.P2P)
-	if err != nil {
-		return nil, err
+type P2PNode struct {
+	config *Config
+}
+
+func New(config *Config) *P2PNode {
+	return &P2PNode{
+		config: config,
 	}
-	if config.ListenMessages {
+}
+
+func (node *P2PNode) Start(ctx context.Context, runner service.Runner) error {
+	services := []service.Service{}
+
+	p2pHandler, err := p2p.New(node.config.P2P)
+	if err != nil {
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize p2p messaging")
+		}
+	}
+	if node.config.ListenMessages {
 		p2pHandler.AddMessageHandler(dummyMessageHandler{})
 	}
-	return p2pHandler, nil
+	services = append(services, p2pHandler)
+
+	if node.config.Metrics.Enabled {
+		metricsServer := metricsserver.New(node.config.Metrics)
+		services = append(services, metricsServer)
+	}
+	return runner.StartService(services...)
 }
