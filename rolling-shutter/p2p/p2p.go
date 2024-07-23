@@ -200,6 +200,7 @@ func createHost(
 		libp2p.ListenAddrs(config.ListenAddrs...),
 		libp2p.ConnectionManager(connectionManager),
 		libp2p.ProtocolVersion(protocolVersion),
+		libp2p.Ping(true),
 	}
 
 	localNetworking := bool(config.Environment == env.EnvironmentLocal)

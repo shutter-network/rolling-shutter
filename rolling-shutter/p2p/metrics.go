@@ -45,6 +45,16 @@ var metricsP2PPeerConnectedness = prometheus.NewGaugeVec(
 	},
 	[]string{"our_id", "peer_id"})
 
+var metricsP2PPeerPing = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "p2p",
+		Name:      "peer_ping_time_seconds",
+		Help:      "Collection of the ping time to a peer ID.",
+	},
+	[]string{"our_id", "peer_id"},
+)
+
 func collectPeerAddresses(p peer.AddrInfo) {
 	for _, multiAddr := range p.Addrs {
 		metricsP2PPeerTuples.WithLabelValues(p.ID.String(), multiAddr.String()).Add(1)
@@ -56,4 +66,5 @@ func init() {
 	prometheus.MustRegister(metricsP2PMessageHandlingTime)
 	prometheus.MustRegister(metricsP2PPeerTuples)
 	prometheus.MustRegister(metricsP2PPeerConnectedness)
+	prometheus.MustRegister(metricsP2PPeerPing)
 }

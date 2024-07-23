@@ -94,6 +94,10 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 					continue
 				}
 				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Add(float64(h.Network().Connectedness(p.ID)))
+				peerPing := h.Peerstore().LatencyEWMA(p.ID)
+				if peerPing != 0 {
+					metricsP2PPeerPing.WithLabelValues(ourId, p.ID.String()).Set(peerPing.Seconds())
+				}
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
