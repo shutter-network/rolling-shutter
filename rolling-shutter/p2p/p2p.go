@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
@@ -198,8 +199,10 @@ func createHost(
 	options := []libp2p.Option{
 		libp2p.Identity(&config.PrivKey.Key),
 		libp2p.ListenAddrs(config.ListenAddrs...),
+		libp2p.UserAgent(fmt.Sprintf("shutter-network/%s", shversion.VersionShort())),
 		libp2p.ConnectionManager(connectionManager),
 		libp2p.ProtocolVersion(protocolVersion),
+		libp2p.EnableRelay(),
 		libp2p.Ping(true),
 	}
 
@@ -213,6 +216,17 @@ func createHost(
 			// Attempt to open ports using uPNP for NATed hosts.
 			libp2p.NATPortMap(),
 		)
+		if len(config.BootstrapPeers) > 0 {
+			options = append(options,
+				libp2p.EnableAutoRelayWithStaticRelays(config.BootstrapPeers),
+			)
+		}
+		if config.IsBootstrapNode {
+			// Enable the Relay service on bootstrap nodes so other peers can connect through us
+			options = append(options,
+				libp2p.EnableRelayService(),
+			)
+		}
 	}
 
 	p2pHost, err := libp2p.New(options...)
