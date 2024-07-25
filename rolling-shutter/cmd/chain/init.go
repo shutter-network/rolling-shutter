@@ -255,12 +255,18 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		log.Info().Str("path", nodeKeyFile).Str("id", string(nodeid)).Msg("Generated node key")
 	}
 
-	a := app.NewShutterApp()
-	a.Gobpath = filepath.Join(tendermintConfig.DBDir(), "shutter.gob")
-	a.DevMode = config.DevMode
-	err = a.PersistToDisk()
-	if err != nil {
-		return err
+	gobPath := filepath.Join(tendermintConfig.DBDir(), "shutter.gob")
+
+	if tmos.FileExists(gobPath) {
+		log.Warn().Str("path", gobPath).Msg("Shutter app state file already exists")
+	} else {
+		a := app.NewShutterApp()
+		a.Gobpath = gobPath
+		a.DevMode = config.DevMode
+		err = a.PersistToDisk()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
