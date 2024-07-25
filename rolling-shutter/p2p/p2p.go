@@ -64,6 +64,7 @@ type P2PNode struct {
 
 type p2pNodeConfig struct {
 	ListenAddrs        []multiaddr.Multiaddr
+	AdvertiseAddrs     []multiaddr.Multiaddr
 	BootstrapPeers     []peer.AddrInfo
 	PrivKey            keys.Libp2pPrivate
 	Environment        env.Environment
@@ -216,6 +217,14 @@ func createHost(
 			// Attempt to open ports using uPNP for NATed hosts.
 			libp2p.NATPortMap(),
 		)
+		if len(config.AdvertiseAddrs) > 0 {
+			// If advertise addresses are set, only advertise those
+			options = append(options,
+				libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+					return config.AdvertiseAddrs
+				}),
+			)
+		}
 		if len(config.BootstrapPeers) > 0 {
 			options = append(options,
 				libp2p.EnableAutoRelayWithStaticRelays(config.BootstrapPeers),
