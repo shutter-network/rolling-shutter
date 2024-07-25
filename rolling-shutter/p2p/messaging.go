@@ -88,8 +88,13 @@ func New(config *Config) (*P2PMessaging, error) {
 	for _, addr := range config.ListenAddresses {
 		listenAddresses = append(listenAddresses, addr.Multiaddr)
 	}
+	advertiseAddresses := []multiaddr.Multiaddr{}
+	for _, addr := range config.AdvertiseAddresses {
+		advertiseAddresses = append(advertiseAddresses, addr.Multiaddr)
+	}
 	cfg := &p2pNodeConfig{
 		ListenAddrs:        listenAddresses,
+		AdvertiseAddrs:     advertiseAddresses,
 		PrivKey:            *config.P2PKey,
 		Environment:        config.Environment,
 		DiscoveryNamespace: config.DiscoveryNamespace,
