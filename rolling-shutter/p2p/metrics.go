@@ -41,7 +41,7 @@ var metricsP2PPeerConnectedness = prometheus.NewGaugeVec(
 		Namespace: "shutter",
 		Subsystem: "p2p",
 		Name:      "peer_connectedness",
-		Help:      "Collection of the connectedness (0=NotConnected; 1=Connected; 2=CanConnect; 3=CannotConnect) to a peer ID.",
+		Help:      "Collection of the connectedness (0=NotConnected; 1=Connected; 2=CanConnect; 3=CannotConnect; 4=Limited) to a peer ID.",
 	},
 	[]string{"our_id", "peer_id"})
 
