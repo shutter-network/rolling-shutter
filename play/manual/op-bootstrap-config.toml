@@ -1,0 +1,7 @@
+InstanceID = 42
+JSONRPCURL = 'https://rpc.chiadochain.net/'
+KeyperSetManager = '0x058062B7d74ba6B4Af1eE22833579C67adC17175'
+ByIndex = 1
+KeyperSetFilePath = 'keyperset.json'
+ShuttermintURL = 'http://127.0.0.1:26657'
+SigningKey = '479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad'
