@@ -93,9 +93,9 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 			failedDials := 0
 			ourId := h.ID().String()
 
-			randomisedPeers := randomisePeers(peers)
+			randomizedPeers := randomizePeers(peers)
 
-			for _, p := range randomisedPeers {
+			for _, p := range randomizedPeers {
 				collectPeerAddresses(p)
 				if p.ID == h.ID() {
 					continue
@@ -129,11 +129,11 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 	}
 }
 
-func randomisePeers(peers []peer.AddrInfo) []peer.AddrInfo {
+func randomizePeers(peers []peer.AddrInfo) []peer.AddrInfo {
 	randomIndexes := rand.Perm(len(peers))
-	randomised := make([]peer.AddrInfo, len(peers))
+	randomized := make([]peer.AddrInfo, len(peers))
 	for _, index := range randomIndexes {
-		randomised = append(randomised, peers[index])
+		randomized = append(randomized, peers[index])
 	}
-	return randomised
+	return randomized
 }
