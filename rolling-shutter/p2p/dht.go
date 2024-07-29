@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -9,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/rs/zerolog/log"
@@ -58,6 +60,8 @@ func dhtRoutingOptions(config *p2pNodeConfig) []dht.Option {
 
 	if config.IsBootstrapNode {
 		opts = append(opts, dht.Mode(dht.ModeServer))
+	} else {
+		opts = append(opts, dht.Mode(dht.ModeAutoServer))
 	}
 
 	return opts
@@ -88,17 +92,21 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 			newConnections := 0
 			failedDials := 0
 			ourId := h.ID().String()
-			for _, p := range peers {
+
+			randomizedPeers := randomizePeers(peers)
+
+			for _, p := range randomizedPeers {
 				collectPeerAddresses(p)
 				if p.ID == h.ID() {
 					continue
 				}
-				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Set(float64(h.Network().Connectedness(p.ID)))
+				connectedness := h.Network().Connectedness(p.ID)
+				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Set(float64(connectedness))
 				peerPing := h.Peerstore().LatencyEWMA(p.ID)
 				if peerPing != 0 {
 					metricsP2PPeerPing.WithLabelValues(ourId, p.ID.String()).Set(peerPing.Seconds())
 				}
-				if h.Network().Connectedness(p.ID) != network.Connected {
+				if connectedness != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
 						log.Debug().
@@ -119,4 +127,13 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 				Msg("looking for peers")
 		}
 	}
+}
+
+func randomizePeers(peers []peer.AddrInfo) []peer.AddrInfo {
+	randomIndexes := rand.Perm(len(peers))
+	randomized := make([]peer.AddrInfo, len(peers))
+	for _, index := range randomIndexes {
+		randomized = append(randomized, peers[index])
+	}
+	return randomized
 }
