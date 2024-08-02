@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/big"
 	"sort"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -96,11 +95,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 			Uint64("slot", slot).
 			Uint64("proposer-index", proposerIndex).
 			Msg("skipping slot as proposer is not registered")
-		if kpr.isPreRelease() {
-			log.Info().Msg("scratch that, generating key anyway because we're in pre-release mode")
-		} else {
-			return nil
-		}
+		return nil
 	}
 
 	// For each block with a proposer, the tx pointer age has to be incremented. If keys for
@@ -161,11 +156,6 @@ func (kpr *Keyper) isProposerRegistered(ctx context.Context, slot uint64, block 
 		return false, 0, errors.Wrapf(err, "failed to query registration status for validator %d", proposerDuty.ValidatorIndex)
 	}
 	return isRegistered, proposerDuty.ValidatorIndex, nil
-}
-
-func (kpr *Keyper) isPreRelease() bool {
-	return (kpr.config.InstanceID == 1000 &&
-		time.Now().Before(time.Date(2024, 7, 7, 23, 59, 59, 0, time.UTC)))
 }
 
 func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointerAge int64) (int64, error) {
