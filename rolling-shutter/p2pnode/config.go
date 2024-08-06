@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -18,11 +19,13 @@ func NewConfig() *Config {
 type Config struct {
 	ListenMessages bool `comment:"whether to register handlers on the messages and log them"`
 
-	P2P *p2p.Config
+	P2P     *p2p.Config
+	Metrics *metricsserver.MetricsConfig
 }
 
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
+	c.Metrics = metricsserver.NewConfig()
 }
 
 func (c *Config) Name() string {

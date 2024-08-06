@@ -14,6 +14,7 @@ import (
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 )
 
@@ -71,6 +72,8 @@ func (smdrv *ShuttermintDriver) sync(ctx context.Context) error {
 	if lastCommittedHeight == currentBlock {
 		return nil
 	}
+
+	keypermetrics.MetricsKeyperCurrentBlockShuttermint.Set(float64(lastCommittedHeight))
 
 	err = smdrv.fetchEvents2(ctx, currentBlock, lastCommittedHeight)
 	return err

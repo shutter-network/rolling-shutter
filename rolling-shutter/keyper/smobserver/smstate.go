@@ -10,9 +10,12 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/icza/gog"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -20,6 +23,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/dkgphase"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/shutterevents"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -244,10 +248,12 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 func (st *ShuttermintState) handleBatchConfig(
 	ctx context.Context, queries *database.Queries, e *shutterevents.BatchConfig,
 ) error {
-	if !st.isKeyper {
-		if !e.IsKeyper(st.config.GetAddress()) {
-			return nil
-		}
+	if !e.IsKeyper(st.config.GetAddress()) {
+		keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10)).Set(0)
+	}
+	if e.IsKeyper(st.config.GetAddress()) {
+		// In case we transition to a superset of the current Keyper set or this node was a Keyper before in an older set
+		// the check-in message will be a duplicate, but this isn't a problem, it will be ignored.
 		st.isKeyper = true
 		pubKey := st.config.GetValidatorPublicKey()
 		err := queries.ScheduleShutterMessage(
@@ -261,11 +267,13 @@ func (st *ShuttermintState) handleBatchConfig(
 		if err != nil {
 			return err
 		}
+		keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10)).Set(1)
 	}
 	keypers := []string{}
 	for _, k := range e.Keypers {
 		keypers = append(keypers, shdb.EncodeAddress(k))
 	}
+	keypermetrics.MetricsKeyperBatchConfigInfo.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10), strings.Join(keypers, ",")).Set(1)
 	return queries.InsertBatchConfig(
 		ctx,
 		database.InsertBatchConfigParams{
@@ -284,15 +292,19 @@ func (st *ShuttermintState) handleBatchConfigStarted(
 	queries *database.Queries,
 	e *shutterevents.BatchConfigStarted,
 ) error {
+	eon, err := queries.GetLatestEonForKeyperConfig(ctx, int64(e.KeyperConfigIndex))
+	if err != nil {
+		log.Warn().Uint64("keyperConfig", e.KeyperConfigIndex).Err(err).Msg("Couldn't get latest eon for keyper config index")
+	} else {
+		keypermetrics.MetricsKeyperCurrentEon.Set(float64(eon))
+	}
+	keypermetrics.MetricsKeyperCurrentBatchConfigIndex.Set(float64(e.KeyperConfigIndex))
 	return queries.SetBatchConfigStarted(ctx, int32(e.KeyperConfigIndex))
 }
 
 func (st *ShuttermintState) handleEonStarted(
 	ctx context.Context, queries *database.Queries, e *shutterevents.EonStarted,
 ) error {
-	if !st.isKeyper {
-		return nil
-	}
 	if e.ActivationBlockNumber > math.MaxInt64 {
 		return errors.Errorf("activation block number %d of eon start would overflow int64", e.ActivationBlockNumber)
 	}
@@ -305,6 +317,11 @@ func (st *ShuttermintState) handleEonStarted(
 	if err != nil {
 		return err
 	}
+
+	if !st.isKeyper {
+		return nil
+	}
+
 	batchConfig, err := queries.GetBatchConfig(ctx, int32(e.KeyperConfigIndex))
 	if err != nil {
 		return err
@@ -323,6 +340,8 @@ func (st *ShuttermintState) handleEonStarted(
 	if err != nil {
 		return nil
 	}
+
+	keypermetrics.MetricsKeyperEonStartBlock.WithLabelValues(strconv.FormatUint(e.Eon, 10)).Set(float64(e.ActivationBlockNumber))
 
 	lastCommittedHeight, err := queries.GetLastCommittedHeight(ctx)
 	if err != nil {
@@ -510,6 +529,7 @@ func (st *ShuttermintState) shiftPhase(
 		log.Info().
 			Uint64("eon", eon).
 			Int64("height", height).
+			Str("phaseAtHeight", phase.String()).
 			Str("current-phase", currentPhase.String()).
 			Str("next-phase", (currentPhase + 1).String()).
 			Msg("phase transition")
@@ -532,6 +552,13 @@ func (st *ShuttermintState) shiftPhase(
 		}
 		if dkg.pure.Phase == currentPhase {
 			panic("phase did not change")
+		}
+		for i := 0; i <= int(puredkg.Finalized); i++ { // <- WTF Go
+			keypermetrics.MetricsKeyperCurrentPhase.
+				WithLabelValues(
+					strconv.FormatUint(eon, 10),
+					fmt.Sprintf("%d-%s", i, puredkg.Phase(i).String())).
+				Set(gog.If[float64](int(dkg.pure.Phase) == i, 1, 0))
 		}
 	}
 	return nil

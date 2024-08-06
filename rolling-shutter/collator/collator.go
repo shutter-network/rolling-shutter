@@ -28,7 +28,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/collator/oapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -52,7 +51,7 @@ type collator struct {
 	l2Client  *rpc.Client
 	contracts *deployment.Contracts
 	batcher   *batcher.Batcher
-	p2p       *p2p.P2PHandler
+	p2p       *p2p.P2PMessaging
 	dbpool    *pgxpool.Pool
 	submitter *Submitter
 	signals   signals
@@ -122,6 +121,16 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 	c.submitter.collator = c
 	c.setupP2PHandler()
 
+	chainobs := chainobserver.New(l1Client, c.dbpool)
+
+	// FIXME:why doesn't the collator listen for the collator contract?
+	err = chainobs.AddListenEvent(
+		c.contracts.KeypersConfigsListNewConfig,
+	)
+	if err != nil {
+		return err
+	}
+
 	httpServer := &http.Server{
 		Addr:              c.Config.HTTPListenAddress,
 		Handler:           c.setupRouter(),
@@ -144,10 +153,7 @@ func (c *collator) Start(ctx context.Context, runner service.Runner) error {
 		defer cancel()
 		return httpServer.Shutdown(shutdownCtx)
 	})
-	runner.Go(func() error {
-		return c.handleContractEvents(ctx)
-	})
-	err = runner.StartService(c.p2p)
+	err = runner.StartService(c.p2p, chainobs)
 	if err != nil {
 		return err
 	}
@@ -261,13 +267,6 @@ func (c *collator) handleDatabaseNotifications(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-}
-
-func (c *collator) handleContractEvents(ctx context.Context) error {
-	events := []*eventsyncer.EventType{
-		c.contracts.KeypersConfigsListNewConfig,
-	}
-	return chainobserver.New(c.contracts, c.dbpool).Observe(ctx, events)
 }
 
 func getNextEpochID(ctx context.Context, queries *database.Queries) (identitypreimage.IdentityPreimage, error) {

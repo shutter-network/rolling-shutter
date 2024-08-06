@@ -26,7 +26,7 @@ var zeroTXHash = make([]byte, 32)
 type Snapshot struct {
 	Config *Config
 
-	p2p           *p2p.P2PHandler
+	p2p           *p2p.P2PMessaging
 	dbpool        *pgxpool.Pool
 	db            *database.Queries
 	l1Client      *ethclient.Client

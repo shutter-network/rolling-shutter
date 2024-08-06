@@ -4,23 +4,11 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
-func init() {
-	var err error
-	config.collatorKey, err = ethcrypto.GenerateKey()
-	if err != nil {
-		panic(errors.Wrap(err, "ethcrypto.GenerateKey failed"))
-	}
-}
-
-type TestConfig struct {
-	collatorKey *ecdsa.PrivateKey
-}
+type TestConfig struct{}
 
 var config = &TestConfig{}
 
@@ -37,7 +25,11 @@ func (TestConfig) GetEon() uint64 {
 }
 
 func (c *TestConfig) GetCollatorKey() *ecdsa.PrivateKey {
-	return config.collatorKey
+	return nil
+}
+
+func (c *TestConfig) GetMaxNumKeysPerMessage() uint64 {
+	return 1024
 }
 
 var _ testsetup.TestConfig = &TestConfig{}

@@ -16,7 +16,8 @@ SELECT EXISTS (
 
 -- name: InsertDecryptionKeyShare :exec
 INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
-VALUES ($1, $2, $3, $4);
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING;
 
 -- name: SelectDecryptionKeyShares :many
 SELECT * FROM decryption_key_share
@@ -54,6 +55,12 @@ LIMIT 1;
 SELECT COUNT(*)
 FROM tendermint_batch_config
 WHERE @start_block <= activation_block_number AND activation_block_number < @end_block;
+
+-- name: CountBatchConfigsInBlockRangeWithKeyper :one
+-- Due to https://github.com/sqlc-dev/sqlc/issues/3083 we need to use this awkward construction to pass and query for the keyper address parameter as a single element slice
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE (@keyper_address::TEXT[]) && keypers AND @start_block <= activation_block_number AND activation_block_number < @end_block;
 
 -- name: GetBatchConfigs :many
 SELECT *
@@ -168,6 +175,14 @@ WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(bloc
 ORDER BY activation_block_number DESC, height DESC
 LIMIT 1);
 
+-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT * FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1);
+
+-- name: GetAllDKGResults :many
+SELECT * FROM dkg_result
+ORDER BY eon ASC;
+
 -- name: InsertEonPublicKey :exec
 INSERT INTO outgoing_eon_keys (eon_public_key, eon)
 VALUES ($1, $2);
@@ -197,3 +212,14 @@ SET block_number = $1;
 
 -- name: GetLastBlockSeen :one
 SELECT block_number FROM last_block_seen LIMIT 1;
+
+-- name: GetKeyperStateForEon :one
+SELECT (@keyper_address::TEXT[] && tbc.keypers)::BOOL AS is_keyper
+FROM tendermint_batch_config AS tbc
+LEFT JOIN eons ON eons.keyper_config_index =  tbc.keyper_config_index
+WHERE eons.eon = @eon;
+
+-- name: GetLatestEonForKeyperConfig :one
+SELECT max(eons.eon)::INT
+FROM eons
+WHERE eons.keyper_config_index = @keyper_config_index;

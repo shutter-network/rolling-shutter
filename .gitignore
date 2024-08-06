@@ -3,7 +3,7 @@
 .direnv
 .lsp
 .vscode
-docker/data
+docker/data*
 log
 node_modules
 result

@@ -1,0 +1,50 @@
+# Peer identity: /p2p/12D3KooWLyURWEKUX9uGnx8wMTR7svUneR7GqE7SzRVU5Gs2cdk6
+# Ethereum address: 0x9A1ba2D523AAB8f7784870B639924103d25Bb714
+
+InstanceID = 42
+DatabaseURL = "postgres:///keyper-db-0"
+BeaconAPIURL = 'https://chiado-node.staging.shutter.network/consensus'
+HTTPEnabled = true
+HTTPListenAddress = ":24000"
+MaxNumKeysPerMessage = 500
+
+[P2P]
+P2PKey = 'CAESQAn5BbjgcwTR6bjlU+txNoG1fPlBbuwpd7uQdn1DRCCLpcXa/mKi0yp3zZinCHYopr5nWylcTDdfIpWPrgXUT1s='
+ListenAddresses = ["/ip4/127.0.0.1/tcp/23103"]
+CustomBootstrapAddresses = ['/ip4/127.0.0.1/tcp/2001/p2p/12D3KooWMyutShWdqYj7fre4Vjuq2QnCTb26Ki1KpyDyVsrmKeki']
+Environment = "local"
+DiscoveryNamespace = "shutter-42"
+
+[Gnosis]
+EncryptedGasLimit = 1000000
+MinGasPerTransaction = 21000
+MaxTxPointerAge = 5
+SecondsPerSlot = 5
+SlotsPerEpoch = 16
+GenesisSlotTimestamp = 1665396300
+SyncStartBlockNumber = 0
+
+[Gnosis.Node]
+PrivateKey = 'dcb23da56656b3c8a11e2b4cdd92f430c500862f7f7fc762807d11b734e9500c'
+ContractsURL = "https://chiado-node.staging.shutter.network/execution"
+DeploymentDir = './deployments/localhost/'
+EthereumURL = "wss://chiado-node.staging.shutter.network/execution"
+
+[Gnosis.Contracts]
+KeyperSetManager = '0x058062B7d74ba6B4Af1eE22833579C67adC17175'
+KeyBroadcastContract = '0x74060a34F6ac647C29735A245617d36caD94d02C'
+Sequencer = '0x62c70cf31AD1005944b66A2e539a11792D930998'
+ValidatorRegistry = '0x716Be4F8C84989efF385277dad4f27B393330b99'
+EonKeyPublish = '0xF087BfBC3D7820B23298f7a7b77387BfC55eD9C6'
+
+[Shuttermint]
+ShuttermintURL = 'http://localhost:26657'
+ValidatorPublicKey = 'e8555b1be0a27e05498793aa65e2630b43916bacfa6b09a73594c3aec35c6f6c'
+EncryptionKey = '5fa2346f12abb947c1cda3b6a91d7f4702b524c64f35fe07e20b913d5fa8d914'
+DKGPhaseLength = 8
+DKGStartBlockDelta = 5
+
+[Metrics]
+Enabled = true
+Host = '[::]'
+Port = 9100

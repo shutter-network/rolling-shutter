@@ -26,7 +26,7 @@ func TestNewPolyCommitmentMsg(t *testing.T) {
 	assert.Equal(t, int(threshold)+1, len(msg.Gammas))
 	for i := 0; i < int(threshold)+1; i++ {
 		gammaBytes := msg.Gammas[i]
-		assert.DeepEqual(t, gammaBytes, (*gammas)[i].Marshal())
+		assert.DeepEqual(t, gammaBytes, (*gammas)[i].Compress())
 	}
 }
 

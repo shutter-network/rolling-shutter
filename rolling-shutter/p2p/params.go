@@ -17,6 +17,13 @@ func makePubSubParams(
 ) (*pubsub.GossipSubParams, *pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
 	gsDefault := pubsub.DefaultGossipSubParams()
 	gossipSubParams := &gsDefault
+
+	// modified defaults from ethereum consensus spec
+	// https://github.com/ethereum/consensus-specs/blob/5d80b1954a4b7a121aa36143d50b366727b66cbc/\
+	//   specs/phase0/p2p-interface.md#why-are-these-specific-gossip-parameters-chosen //nolint:lll
+	gossipSubParams.HeartbeatInterval = 700 * time.Millisecond
+	gossipSubParams.HistoryLength = 6
+
 	// From the spec:
 	// to allow bootstrapping via PeerExchange (PX),
 	// the bootstrappers should not form a mesh, thus D=D_lo=D_hi=D_out=0

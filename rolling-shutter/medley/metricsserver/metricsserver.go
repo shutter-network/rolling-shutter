@@ -6,11 +6,30 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
+
+var metricsGoBuildInfo = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "go",
+		Subsystem: "build",
+		Name:      "info",
+		Help:      "A metric with a constant '1' value labeled by version from which the binary was built.",
+		ConstLabels: prometheus.Labels{
+			"version": shversion.VersionShort(),
+		},
+	},
+)
+
+func init() {
+	metricsGoBuildInfo.Set(1)
+	prometheus.MustRegister(metricsGoBuildInfo)
+}
 
 type MetricsServer struct {
 	mux        *http.ServeMux

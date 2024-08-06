@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -12,16 +11,18 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 var DefaultBootstrapPeers []*address.P2PAddress
@@ -51,10 +52,10 @@ type Notifee interface {
 type P2PNode struct {
 	config p2pNodeConfig
 
-	connmngr    *connmgr.BasicConnMgr
 	mux         sync.Mutex
 	host        host.Host
 	dht         *dht.IpfsDHT
+	discovery   *routing.RoutingDiscovery
 	pubSub      *pubsub.PubSub
 	gossipRooms map[string]*gossipRoom
 
@@ -62,19 +63,18 @@ type P2PNode struct {
 }
 
 type p2pNodeConfig struct {
-	ListenAddrs       []multiaddr.Multiaddr
-	BootstrapPeers    []peer.AddrInfo
-	PrivKey           keys.Libp2pPrivate
-	Environment       env.Environment
-	IsBootstrapNode   bool
-	DisableTopicDHT   bool
-	DisableRoutingDHT bool
+	ListenAddrs        []multiaddr.Multiaddr
+	AdvertiseAddrs     []multiaddr.Multiaddr
+	BootstrapPeers     []peer.AddrInfo
+	PrivKey            keys.Libp2pPrivate
+	Environment        env.Environment
+	IsBootstrapNode    bool
+	DiscoveryNamespace string
 }
 
 func NewP2PNode(config p2pNodeConfig) *P2PNode {
 	p := P2PNode{
 		config:         config,
-		connmngr:       nil,
 		host:           nil,
 		pubSub:         nil,
 		gossipRooms:    make(map[string]*gossipRoom),
@@ -85,52 +85,53 @@ func NewP2PNode(config p2pNodeConfig) *P2PNode {
 
 func (p *P2PNode) Run(
 	ctx context.Context,
+	runner service.Runner,
 	topicNames []string,
 	topicValidators ValidatorRegistry,
 ) error {
-	defer func() {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	runner.Defer(func() {
 		close(p.GossipMessages)
-	}()
-
-	errorgroup, errorgroupctx := errgroup.WithContext(ctx)
-	errorgroup.Go(func() error {
-		p.mux.Lock()
-		defer p.mux.Unlock()
-		if err := p.init(ctx); err != nil {
-			return err
-		}
-
-		for topicName, validator := range topicValidators {
-			if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
-				return err
-			}
-		}
-
-		if err := p.joinTopics(topicNames); err != nil {
-			return err
-		}
-
-		// listen to gossip on all topics
-		for _, room := range p.gossipRooms {
-			room := room
-			errorgroup.Go(func() error {
-				return room.readLoop(errorgroupctx, p.GossipMessages)
-			})
-		}
-
-		err := bootstrap(ctx, p.host, p.config, p.dht)
-		if err != nil {
-			return err
-		}
-
-		// block the function until the context is canceled
-		errorgroup.Go(func() error {
-			<-errorgroupctx.Done()
-			return ctx.Err()
-		})
-		return nil
 	})
-	return errorgroup.Wait()
+
+	if err := p.init(ctx); err != nil {
+		return err
+	}
+
+	for topicName := range topicValidators {
+		validator := topicValidators.GetCombinedValidator(topicName)
+		if err := p.pubSub.RegisterTopicValidator(topicName, validator); err != nil {
+			return err
+		}
+	}
+
+	if err := p.joinTopics(topicNames); err != nil {
+		return err
+	}
+
+	err := bootstrap(ctx, p.host, p.config, p.dht)
+	if err != nil {
+		return err
+	}
+	// listen to gossip on all topics
+	for _, room := range p.gossipRooms {
+		room := room
+		runner.Go(func() error {
+			return room.readLoop(ctx, p.GossipMessages)
+		})
+	}
+	runner.Go(func() error {
+		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")
+		util.Advertise(ctx, p.discovery, p.config.DiscoveryNamespace)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	runner.Go(func() error {
+		return findPeers(ctx, p.host, p.discovery, p.config.DiscoveryNamespace)
+	})
+	return nil
 }
 
 func (p *P2PNode) Publish(ctx context.Context, topic string, message []byte) error {
@@ -149,45 +150,61 @@ func (p *P2PNode) init(ctx context.Context) error {
 	if p.host != nil {
 		return errors.New("Cannot create host on p2p with existing host")
 	}
-	p2pHost, hashTable, connectionManager, err := createHost(ctx, p.config)
+	p2pHost, hashTable, err := createHost(ctx, p.config)
 	if err != nil {
 		return err
 	}
-	p2pPubSub, err := createPubSub(ctx, p2pHost, p.config, hashTable)
+	discovery := routing.NewRoutingDiscovery(hashTable)
+	p2pPubSub, err := createPubSub(ctx, p2pHost, p.config, discovery)
 	if err != nil {
 		return err
 	}
 
 	p.host = p2pHost
 	p.dht = hashTable
-	p.connmngr = connectionManager
+	p.discovery = discovery
 	p.pubSub = p2pPubSub
 	log.Info().Str("address", p.p2pAddress()).Msg("created libp2p host")
 	return nil
 }
 
+func createConnectionManager() (*connmgr.BasicConnMgr, error) {
+	// TODO: This starts a background goroutine. It works, but it's better to do that later in
+	// P2PNode.Run() when we have a proper context.
+	m, err := connmgr.NewConnManager(peerLow, peerHigh)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create connection manager")
+	}
+
+	return m, nil
+}
+
 func createHost(
 	ctx context.Context,
 	config p2pNodeConfig,
-) (host.Host, *dht.IpfsDHT, *connmgr.BasicConnMgr, error) {
+) (host.Host, *dht.IpfsDHT, error) {
 	var err error
 
-	connectionManager, err := connmgr.NewConnManager(
-		160, // Lowwater
-		192, // HighWater,
-		connmgr.WithGracePeriod(time.Minute),
-	)
+	// NOTE:
+	// Upon initialization, we are seeing log warnings:
+	// "rcmgr limit conflicts with connmgr limit: conn manager high watermark limit: 192, exceeds the system connection limit of: 1"
+	//
+	// This was a bug in the check function, reading the wrong config value to check against:
+	// https://github.com/libp2p/go-libp2p/issues/2628
+
+	connectionManager, err := createConnectionManager()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	options := []libp2p.Option{
 		libp2p.Identity(&config.PrivKey.Key),
 		libp2p.ListenAddrs(config.ListenAddrs...),
-		libp2p.DefaultTransports,
-		libp2p.DefaultSecurity,
+		libp2p.UserAgent(fmt.Sprintf("shutter-network/%s", shversion.VersionShort())),
 		libp2p.ConnectionManager(connectionManager),
 		libp2p.ProtocolVersion(protocolVersion),
+		libp2p.EnableRelay(),
+		libp2p.Ping(true),
 	}
 
 	localNetworking := bool(config.Environment == env.EnvironmentLocal)
@@ -200,34 +217,49 @@ func createHost(
 			// Attempt to open ports using uPNP for NATed hosts.
 			libp2p.NATPortMap(),
 		)
+		if len(config.AdvertiseAddrs) > 0 {
+			// If advertise addresses are set, only advertise those
+			options = append(options,
+				libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+					return config.AdvertiseAddrs
+				}),
+			)
+		}
+		if len(config.BootstrapPeers) > 0 {
+			options = append(options,
+				libp2p.EnableAutoRelayWithStaticRelays(config.BootstrapPeers),
+			)
+		}
+		if config.IsBootstrapNode {
+			// Enable the Relay service on bootstrap nodes so other peers can connect through us
+			options = append(options,
+				libp2p.EnableRelayService(),
+			)
+		}
 	}
 
 	p2pHost, err := libp2p.New(options...)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	if config.DisableRoutingDHT {
-		return p2pHost, nil, connectionManager, err
-	}
-
-	opts := dhtRoutingOptions(config.Environment, config.BootstrapPeers...)
+	opts := dhtRoutingOptions(&config)
 	idht, err := dht.New(ctx, p2pHost, opts...)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// the wrapped host will try to query the routing table (dht)/
 	// whenever it doesn't have the full routed address for a peer id
 	routedHost := rhost.Wrap(p2pHost, idht)
 
-	return routedHost, idht, connectionManager, nil
+	return routedHost, idht, nil
 }
 
 func createPubSub(
 	ctx context.Context,
 	p2pHost host.Host,
 	config p2pNodeConfig,
-	hashTable *dht.IpfsDHT,
+	discovery *routing.RoutingDiscovery,
 ) (*pubsub.PubSub, error) {
 	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
 		isBootstrapNode: config.IsBootstrapNode,
@@ -237,14 +269,9 @@ func createPubSub(
 	pubsubOptions := []pubsub.Option{
 		pubsub.WithGossipSubParams(*gossipSubParams),
 		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
+		pubsub.WithDiscovery(discovery),
 	}
 
-	if !config.DisableTopicDHT {
-		pubsubOptions = append(
-			pubsubOptions,
-			pubsub.WithDiscovery(routing.NewRoutingDiscovery(hashTable)),
-		)
-	}
 	if config.IsBootstrapNode {
 		// enables the pubsub v1.1 feature to handle discovery and
 		// connection management over the PubSub protocol

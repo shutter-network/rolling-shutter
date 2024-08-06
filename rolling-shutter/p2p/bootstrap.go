@@ -73,9 +73,9 @@ func bootstrap(
 
 	f := func(c context.Context) (bool, error) {
 		if err := connectBootstrapNodes(c, h, config.BootstrapPeers); err != nil {
-			return true, err
+			return false, err
 		}
-		return false, nil
+		return true, nil
 	}
 
 	if config.IsBootstrapNode {
@@ -83,12 +83,14 @@ func bootstrap(
 			// A bootstrap node is not required to connect to other bootstrap nodes.
 			// If however we did configure a list of bootstrap nodes,
 			// we should try a long time to connect to at least one other bootstrapper first.
+			backoffMult := float64(1.01)
 			_, err := retry.FunctionCall(
 				ctx,
 				f,
-				retry.MaxInterval(5*time.Hour),
+				retry.MaxInterval(1*time.Minute),
 				retry.StopOnErrors(errInsufficientBootstrpConfigured),
-				retry.Interval(2*time.Minute))
+				retry.Interval(2*time.Second),
+				retry.ExponentialBackoff(&backoffMult))
 			if err != nil {
 				log.Error().Err(err).
 					Msg("failed to bootstrap, continuing without peer connections.")
@@ -98,9 +100,8 @@ func bootstrap(
 		_, err := retry.FunctionCall(
 			ctx,
 			f,
-			retry.MaxInterval(5*time.Minute),
 			retry.StopOnErrors(errInsufficientBootstrpConfigured),
-			retry.Interval(30*time.Second))
+			retry.Interval(2*time.Second))
 		if err != nil {
 			// For normal peers, after trying some time it is reasonable to halt.
 			// If we don't get an initial connection to a bootsrap node,

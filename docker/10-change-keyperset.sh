@@ -2,4 +2,6 @@
 
 source ./common.sh
 
-$DC run --rm --no-deps deploy-contracts run scripts/change-keypers.js
+TARGET_INDEX=${1:-1}
+
+$DC run --rm --no-deps -e KEYPER_SET_INDEX=${TARGET_INDEX} deploy-contracts run scripts/change-keypers.js

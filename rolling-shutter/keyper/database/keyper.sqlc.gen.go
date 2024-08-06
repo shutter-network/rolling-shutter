@@ -42,6 +42,26 @@ func (q *Queries) CountBatchConfigsInBlockRange(ctx context.Context, arg CountBa
 	return count, err
 }
 
+const countBatchConfigsInBlockRangeWithKeyper = `-- name: CountBatchConfigsInBlockRangeWithKeyper :one
+SELECT COUNT(*)
+FROM tendermint_batch_config
+WHERE ($1::TEXT[]) && keypers AND $2 <= activation_block_number AND activation_block_number < $3
+`
+
+type CountBatchConfigsInBlockRangeWithKeyperParams struct {
+	KeyperAddress []string
+	StartBlock    int64
+	EndBlock      int64
+}
+
+// Due to https://github.com/sqlc-dev/sqlc/issues/3083 we need to use this awkward construction to pass and query for the keyper address parameter as a single element slice
+func (q *Queries) CountBatchConfigsInBlockRangeWithKeyper(ctx context.Context, arg CountBatchConfigsInBlockRangeWithKeyperParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countBatchConfigsInBlockRangeWithKeyper, arg.KeyperAddress, arg.StartBlock, arg.EndBlock)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
 SELECT count(*) FROM decryption_key_share
 WHERE eon = $1 AND epoch_id = $2
@@ -141,6 +161,36 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const getAllDKGResults = `-- name: GetAllDKGResults :many
+SELECT eon, success, error, pure_result FROM dkg_result
+ORDER BY eon ASC
+`
+
+func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
+	rows, err := q.db.Query(ctx, getAllDKGResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgResult
+	for rows.Next() {
+		var i DkgResult
+		if err := rows.Scan(
+			&i.Eon,
+			&i.Success,
+			&i.Error,
+			&i.PureResult,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAllEons = `-- name: GetAllEons :many
@@ -305,6 +355,23 @@ func (q *Queries) GetDKGResultForBlockNumber(ctx context.Context, blockNumber in
 	return i, err
 }
 
+const getDKGResultForKeyperConfigIndex = `-- name: GetDKGResultForKeyperConfigIndex :one
+SELECT eon, success, error, pure_result FROM dkg_result
+WHERE eon = (SELECT max(eon) FROM eons WHERE keyper_config_index = $1)
+`
+
+func (q *Queries) GetDKGResultForKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (DkgResult, error) {
+	row := q.db.QueryRow(ctx, getDKGResultForKeyperConfigIndex, keyperConfigIndex)
+	var i DkgResult
+	err := row.Scan(
+		&i.Eon,
+		&i.Success,
+		&i.Error,
+		&i.PureResult,
+	)
+	return i, err
+}
+
 const getDecryptionKey = `-- name: GetDecryptionKey :one
 SELECT eon, epoch_id, decryption_key FROM decryption_key
 WHERE eon = $1 AND epoch_id = $2
@@ -404,6 +471,25 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 	return i, err
 }
 
+const getKeyperStateForEon = `-- name: GetKeyperStateForEon :one
+SELECT ($1::TEXT[] && tbc.keypers)::BOOL AS is_keyper
+FROM tendermint_batch_config AS tbc
+LEFT JOIN eons ON eons.keyper_config_index =  tbc.keyper_config_index
+WHERE eons.eon = $2
+`
+
+type GetKeyperStateForEonParams struct {
+	KeyperAddress []string
+	Eon           int64
+}
+
+func (q *Queries) GetKeyperStateForEon(ctx context.Context, arg GetKeyperStateForEonParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getKeyperStateForEon, arg.KeyperAddress, arg.Eon)
+	var is_keyper bool
+	err := row.Scan(&is_keyper)
+	return is_keyper, err
+}
+
 const getLastBatchConfigSent = `-- name: GetLastBatchConfigSent :one
 SELECT keyper_config_index FROM last_batch_config_sent LIMIT 1
 `
@@ -459,6 +545,19 @@ func (q *Queries) GetLatestBatchConfig(ctx context.Context) (TendermintBatchConf
 		&i.ActivationBlockNumber,
 	)
 	return i, err
+}
+
+const getLatestEonForKeyperConfig = `-- name: GetLatestEonForKeyperConfig :one
+SELECT max(eons.eon)::INT
+FROM eons
+WHERE eons.keyper_config_index = $1
+`
+
+func (q *Queries) GetLatestEonForKeyperConfig(ctx context.Context, keyperConfigIndex int64) (int32, error) {
+	row := q.db.QueryRow(ctx, getLatestEonForKeyperConfig, keyperConfigIndex)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one
@@ -541,6 +640,7 @@ func (q *Queries) InsertDecryptionKey(ctx context.Context, arg InsertDecryptionK
 const insertDecryptionKeyShare = `-- name: InsertDecryptionKeyShare :exec
 INSERT INTO decryption_key_share (eon, epoch_id, keyper_index, decryption_key_share)
 VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
 `
 
 type InsertDecryptionKeyShareParams struct {

@@ -29,7 +29,6 @@ func init() {
 		"keyper",
 		&KeyperDB{sqlcDB},
 		chainobsdb.KeyperDefinition,
-		chainobsdb.CollatorDefinition,
 	)
 }
 

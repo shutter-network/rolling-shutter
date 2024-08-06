@@ -28,19 +28,21 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 	return GetKeyperIndex(addr, bc.Keypers)
 }
 
-func (q *Queries) InsertDecryptionKeyMsg(ctx context.Context, msg *p2pmsg.DecryptionKey) error {
-	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
-	tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
-		Eon:           int64(msg.Eon),
-		EpochID:       identityPreimage.Bytes(),
-		DecryptionKey: msg.Key,
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to insert decryption key for epoch %s", identityPreimage)
-	}
-	if tag.RowsAffected() == 0 {
-		log.Info().Str("epoch-id", identityPreimage.Hex()).
-			Msg("attempted to insert decryption key in db, but it already exists")
+func (q *Queries) InsertDecryptionKeysMsg(ctx context.Context, msg *p2pmsg.DecryptionKeys) error {
+	for _, key := range msg.Keys {
+		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
+			Eon:           int64(msg.Eon),
+			EpochID:       identityPreimage.Bytes(),
+			DecryptionKey: key.Key,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert decryption key for identity %s", identityPreimage)
+		}
+		if tag.RowsAffected() == 0 {
+			log.Debug().Str("identity", identityPreimage.Hex()).
+				Msg("attempted to insert decryption key in db, but it already exists")
+		}
 	}
 	return nil
 }
@@ -83,4 +85,21 @@ func (q *Queries) ScheduleShutterMessage(
 	log.Info().Int32("id", msgid).Str("description", description).
 		Msg("scheduled shuttermint message")
 	return nil
+}
+
+// GetKeyperIndex returns the index of the keyper with the given address in the keyper set with
+// the given index. If the keyper is not found, the second return value is false.
+func (q *Queries) GetKeyperIndex(ctx context.Context, keyperConfigIndex int64, addr common.Address) (int64, bool, error) {
+	batchConfig, err := q.GetBatchConfig(ctx, int32(keyperConfigIndex))
+	if err != nil {
+		return -1, false, errors.Wrapf(err, "failed to get config %d from db", keyperConfigIndex)
+	}
+
+	encodedAddress := shdb.EncodeAddress(addr)
+	for i, address := range batchConfig.Keypers {
+		if address == encodedAddress {
+			return int64(i), true, nil
+		}
+	}
+	return -1, false, nil
 }

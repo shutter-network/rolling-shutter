@@ -1,8 +1,8 @@
 contracts/combined.json
 contracts/node_modules
 contracts/deployments
-docker/data
+docker/data*
 play/work
-play/Dockerfile
-rolling-shutter/bin
+rolling-shutter/bin/rolling-shutter
+rolling-shutter/bin/shutter-crypto.wasm
 tools/snapshot/dummyserver/dist

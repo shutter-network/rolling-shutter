@@ -10,7 +10,7 @@ EXECUTABLE	?= ${BINDIR}/rolling-shutter
 GOPATH          ?= $(${GO} env GOPATH)
 
 build:
-	${GO} build ${GOFLAGS} -o ${EXECUTABLE}
+	${GO} build ${GOFLAGS} -ldflags="-X github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion.version=$(shell git describe --always --dirty)" -o ${EXECUTABLE}
 
 shcryptowasm: wasm
 	echo "The 'shcryptowasm' target is deprecated, use 'wasm' instead."
@@ -106,10 +106,10 @@ install-asdf-plugins:
 	../tools/asdf-install-plugins.sh
 
 install-asdf: install-asdf-plugins
-	# Various packages installed by asdf internally also use make and don't like if an external make has already
-	# tinkered with then environment.
-	# Therefore we unset MAKELEVEL here.
-	env -u MAKELEVEL asdf install
+	@# Various packages installed by asdf internally also use make and don't like if an external make has already
+	@# tinkered with then environment.
+	@# Therefore we unset MAKELEVEL here.
+	@env -u MAKELEVEL asdf install
 
 lint:
 	golangci-lint run --tests

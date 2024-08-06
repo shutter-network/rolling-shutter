@@ -23,7 +23,7 @@ type DecryptionKey string
 
 // DecryptionTrigger defines model for DecryptionTrigger.
 type DecryptionTrigger struct {
-	BlockNumber int    `json:"block_number"`
+	BlockNumber uint64 `json:"block_number"`
 	EpochId     string `json:"epoch_id"`
 }
 
@@ -68,6 +68,9 @@ type ServerInterface interface {
 
 	// (GET /ping)
 	Ping(w http.ResponseWriter, r *http.Request)
+
+	// (POST /shutdown)
+	Shutdown(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -150,6 +153,21 @@ func (siw *ServerInterfaceWrapper) Ping(w http.ResponseWriter, r *http.Request) 
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Ping(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// Shutdown operation middleware
+func (siw *ServerInterfaceWrapper) Shutdown(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Shutdown(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -284,6 +302,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ping", wrapper.Ping)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/shutdown", wrapper.Shutdown)
+	})
 
 	return r
 }
@@ -291,20 +312,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"fwEAAP//Z4KpqakLAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

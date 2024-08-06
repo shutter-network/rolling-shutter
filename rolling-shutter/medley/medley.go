@@ -26,6 +26,8 @@ const receiptPollInterval = 500 * time.Millisecond
 
 var errAddressNotFound = errors.New("address not found")
 
+var ErrShutdownRequested = errors.New("shutdown requested from user")
+
 // FindAddressIndex returns the index of the given address inside the slice of addresses or returns
 // an error, if the slice does not contain the given address.
 func FindAddressIndex(addresses []common.Address, addr common.Address) (int, error) {
@@ -212,6 +214,13 @@ func Uint64ToInt64Safe(u uint64) (int64, error) {
 func Int64ToUint64Safe(i int64) (uint64, error) {
 	if i < 0 {
 		return 0, errors.New("uint64 can't be negative")
+	}
+	return uint64(i), nil
+}
+
+func Int32ToUint64Safe(i int32) (uint64, error) {
+	if i < 0 {
+		return 0, errors.New("uint32 can't be negative")
 	}
 	return uint64(i), nil
 }

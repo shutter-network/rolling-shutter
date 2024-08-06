@@ -81,7 +81,7 @@ func NewAccusation(eon uint64, accused []common.Address) *Message {
 func NewPolyCommitment(eon uint64, gammas *shcrypto.Gammas) *Message {
 	gammaBytes := [][]byte{}
 	for _, gamma := range *gammas {
-		gammaBytes = append(gammaBytes, gamma.Marshal())
+		gammaBytes = append(gammaBytes, gamma.Compress())
 	}
 
 	return &Message{

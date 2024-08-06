@@ -43,8 +43,10 @@ func (c *Config) Init() {
 type Config struct {
 	P2PKey                   *keys.Libp2pPrivate `shconfig:",required"`
 	ListenAddresses          []*address.P2PAddress
+	AdvertiseAddresses       []*address.P2PAddress `comment:"Optional, addresses to be advertised to other peers instead of auto-detected ones."`
 	CustomBootstrapAddresses []*address.P2PAddress `comment:"Overwrite p2p boostrap nodes"`
 	Environment              env.Environment
+	DiscoveryNamespace       string `shconfig:",required" comment:"Must be unique for each instance id."`
 }
 
 func (c *Config) Name() string {
@@ -76,6 +78,7 @@ func (c *Config) SetExampleValues() error {
 		),
 	}
 	c.Environment = env.EnvironmentProduction
+	c.DiscoveryNamespace = "shutter-42"
 
 	p2pkey, err := keys.GenerateLibp2pPrivate(rand.Reader)
 	if err != nil {

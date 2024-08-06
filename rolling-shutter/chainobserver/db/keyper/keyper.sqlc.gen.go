@@ -43,6 +43,36 @@ func (q *Queries) GetKeyperSetByKeyperConfigIndex(ctx context.Context, keyperCon
 	return i, err
 }
 
+const getKeyperSets = `-- name: GetKeyperSets :many
+SELECT keyper_config_index, activation_block_number, keypers, threshold FROM keyper_set
+ORDER BY activation_block_number ASC
+`
+
+func (q *Queries) GetKeyperSets(ctx context.Context) ([]KeyperSet, error) {
+	rows, err := q.db.Query(ctx, getKeyperSets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KeyperSet
+	for rows.Next() {
+		var i KeyperSet
+		if err := rows.Scan(
+			&i.KeyperConfigIndex,
+			&i.ActivationBlockNumber,
+			&i.Keypers,
+			&i.Threshold,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
     keyper_config_index,
@@ -51,7 +81,7 @@ INSERT INTO keyper_set (
     threshold
 ) VALUES (
     $1, $2, $3, $4
-)
+) ON CONFLICT DO NOTHING
 `
 
 type InsertKeyperSetParams struct {

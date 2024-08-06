@@ -3,7 +3,6 @@ package p2pnode
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -31,9 +30,6 @@ func main(config *p2pnode.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Msg("starting p2pnode")
-	p2pService, err := p2pnode.New(config)
-	if err != nil {
-		return errors.Wrapf(err, "failed to instantiate p2pnode")
-	}
-	return service.RunWithSighandler(context.Background(), p2pService)
+	p2pNode := p2pnode.New(config)
+	return service.RunWithSighandler(context.Background(), p2pNode)
 }

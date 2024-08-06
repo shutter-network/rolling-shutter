@@ -1,8 +1,18 @@
 package app
 
 import (
+	stderrors "errors"
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+)
+
+var (
+	ErrorPolyEvalAlreadyPresent   = stderrors.New("poly evaluation already present")
+	ErrorPolyCommitAlreadyPresent = stderrors.New("poly commitment already present")
+	ErrorAccusationAlreadyPresent = stderrors.New("accusation already present")
+	ErrorApologyAlreadyPresent    = stderrors.New("apology already present")
 )
 
 // NewDKGInstance creates a new DKGInstance.
@@ -40,7 +50,7 @@ func (dkg *DKGInstance) RegisterPolyEvalMsg(msg PolyEval) error {
 		}
 		_, ok := dkg.PolyEvalsSeen[SenderReceiverPair{sender, receiver}]
 		if ok {
-			return errors.Errorf("polynomial evaluation from keyper %s for receiver %s already present", sender.Hex(), receiver.Hex())
+			return fmt.Errorf("%w: from keyper %s for receiver %s", ErrorPolyEvalAlreadyPresent, sender.Hex(), receiver.Hex())
 		}
 	}
 
@@ -61,7 +71,7 @@ func (dkg *DKGInstance) RegisterPolyCommitmentMsg(msg PolyCommitment) error {
 	}
 
 	if _, ok := dkg.PolyCommitmentsSeen[msg.Sender]; ok {
-		return errors.Errorf("polynomial commitment from keyper %s already present", msg.Sender.Hex())
+		return fmt.Errorf("%w from keyper %s", ErrorPolyCommitAlreadyPresent, msg.Sender.Hex())
 	}
 	dkg.PolyCommitmentsSeen[msg.Sender] = struct{}{}
 
@@ -86,7 +96,7 @@ func (dkg *DKGInstance) RegisterAccusationMsg(msg Accusation) error {
 	}
 
 	if _, ok := dkg.AccusationsSeen[msg.Sender]; ok {
-		return errors.Errorf("accusation from keyper %s already present", msg.Sender.Hex())
+		return fmt.Errorf("%w from keyper %s", ErrorAccusationAlreadyPresent, msg.Sender.Hex())
 	}
 	dkg.AccusationsSeen[msg.Sender] = struct{}{}
 
@@ -111,7 +121,7 @@ func (dkg *DKGInstance) RegisterApologyMsg(msg Apology) error {
 	}
 
 	if _, ok := dkg.ApologiesSeen[msg.Sender]; ok {
-		return errors.Errorf("apology from keyper %s already present", msg.Sender.Hex())
+		return fmt.Errorf("%w from keyper %s already present", ErrorApologyAlreadyPresent, msg.Sender.Hex())
 	}
 	dkg.ApologiesSeen[msg.Sender] = struct{}{}
 

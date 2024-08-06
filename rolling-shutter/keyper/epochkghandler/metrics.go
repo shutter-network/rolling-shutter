@@ -38,7 +38,7 @@ var metricsEpochKGDecryptionKeySharesSent = prometheus.NewCounter(
 	},
 )
 
-var metricsEpochKGDectyptionTriggersReceived = prometheus.NewCounter(
+var metricsEpochKGDecryptionTriggersReceived = prometheus.NewCounter(
 	prometheus.CounterOpts{
 		Namespace: "shutter",
 		Subsystem: "epochkg",
@@ -52,5 +52,5 @@ func InitMetrics() {
 	prometheus.MustRegister(metricsEpochKGDecryptionKeysGenerated)
 	prometheus.MustRegister(metricsEpochKGDecryptionKeySharesReceived)
 	prometheus.MustRegister(metricsEpochKGDecryptionKeySharesSent)
-	prometheus.MustRegister(metricsEpochKGDectyptionTriggersReceived)
+	prometheus.MustRegister(metricsEpochKGDecryptionTriggersReceived)
 }

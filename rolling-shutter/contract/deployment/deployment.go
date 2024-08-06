@@ -22,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
+	obscollator "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/eventsyncer"
 )
@@ -160,6 +162,11 @@ func (c *Contracts) initKeypers() error {
 	if err != nil {
 		return err
 	}
+	kprHandler := &obskeyper.Handler{
+		KeyperContract: c.Keypers,
+	}
+	c.KeypersConfigsListNewConfig.Handler = eventsyncer.MakeHandler(kprHandler.PutDB)
+
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.KeypersAdded = &eventsyncer.EventType{
 		FromBlockNumber: d.DeployBlockNumber,
@@ -198,6 +205,11 @@ func (c *Contracts) initCollator() error {
 	if err != nil {
 		return err
 	}
+	cltHandler := &obscollator.Handler{
+		CollatorContract: c.Collators,
+	}
+	c.CollatorConfigsListNewConfig.Handler = eventsyncer.MakeHandler(cltHandler.PutDB)
+
 	boundContract := bind.NewBoundContract(d.Address, d.ABI, c.Client, c.Client, c.Client)
 	c.CollatorsAdded = &eventsyncer.EventType{
 		FromBlockNumber: d.DeployBlockNumber,
@@ -231,7 +243,17 @@ func (c *Contracts) getDeployment(name string) (*Deployment, error) {
 	if !ok {
 		return nil, errors.Errorf("no deployment of %s contract found", name)
 	}
+	publishDeploymentMetric(d)
 	return d, nil
+}
+
+func publishDeploymentMetric(d *Deployment) {
+	metricsContractDeploymentInfo.WithLabelValues(
+		d.Name,
+		d.Address.String(),
+		strconv.FormatUint(d.ChainID, 10),
+		strconv.FormatUint(d.DeployBlockNumber, 10),
+	).Set(1)
 }
 
 func LoadDeployments(dir string) (*Deployments, error) {
@@ -322,7 +344,8 @@ func LoadChainID(dir string) (uint64, error) {
 		return 0, errors.Wrapf(err, "failed to load chain id file at %s", path)
 	}
 
-	chainID, err := strconv.ParseInt(string(data), 10, 64)
+	chainIDStr := strings.TrimSpace(string(data))
+	chainID, err := strconv.ParseInt(chainIDStr, 10, 64)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to parse chain id in %s", path)
 	}

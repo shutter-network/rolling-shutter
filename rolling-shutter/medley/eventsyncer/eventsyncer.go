@@ -14,10 +14,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 const (
@@ -31,6 +34,29 @@ var (
 	ErrNotRunning     = errors.New("event syncer not running")
 )
 
+type database interface {
+	db.Definition
+	HandleEvent(context.Context, pgx.Tx, any) error
+}
+
+type (
+	EventHandlerFunc               func(context.Context, pgx.Tx, any) error
+	EventHandlerFuncGeneric[T any] func(context.Context, pgx.Tx, T) error
+)
+
+// MakeHandler converts a handler function with specific type to a handler
+// with type any. The handler is wrapped with a type assertion on the specific type.
+func MakeHandler[T any](handler EventHandlerFuncGeneric[T]) EventHandlerFunc {
+	anyHandler := func(ctx context.Context, tx pgx.Tx, anyEvent any) error {
+		event, ok := anyEvent.(T)
+		if !ok {
+			return errors.New("event does not match the type for the target handler function")
+		}
+		return handler(ctx, tx, event)
+	}
+	return anyHandler
+}
+
 // EventType defines a single event type to filter for.
 type EventType struct {
 	Contract        *bind.BoundContract
@@ -39,6 +65,7 @@ type EventType struct {
 	ABI             abi.ABI
 	Name            string
 	Type            reflect.Type
+	Handler         EventHandlerFunc
 }
 
 // logChannelItem is what is put on the (internal) channel of found logs. It can either contain a
@@ -125,13 +152,17 @@ func (s *EventSyncer) Next(ctx context.Context) (EventSyncUpdate, error) {
 }
 
 // Run the syncer.
-func (s *EventSyncer) Run(ctx context.Context) error {
+func (s *EventSyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.started {
 		return ErrAlreadyRunning
 	}
 	s.started = true
 
-	return s.sync(ctx)
+	runner.Go(
+		func() error {
+			return s.sync(ctx)
+		})
+	return nil
 }
 
 // sync continuously searches for events.

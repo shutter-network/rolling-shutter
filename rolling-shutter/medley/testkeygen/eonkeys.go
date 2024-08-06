@@ -11,8 +11,8 @@ import (
 
 // KeyperKeyShares holds the public and private key shares of a single keyper.
 type KeyperKeyShares struct {
-	eonPublicKeyShare *shcrypto.EonPublicKeyShare
-	eonSecretKeyShare *shcrypto.EonSecretKeyShare
+	EonPublicKeyShare *shcrypto.EonPublicKeyShare
+	EonSecretKeyShare *shcrypto.EonSecretKeyShare
 }
 
 // ComputeEpochSecretKeyShare computes the secret key share for the given epoch.
@@ -20,7 +20,7 @@ func (kks *KeyperKeyShares) ComputeEpochSecretKeyShare(
 	identityPreimage identitypreimage.IdentityPreimage,
 ) *shcrypto.EpochSecretKeyShare {
 	epochIDG1 := shcrypto.ComputeEpochID(identityPreimage.Bytes())
-	return shcrypto.ComputeEpochSecretKeyShare(kks.eonSecretKeyShare, epochIDG1)
+	return shcrypto.ComputeEpochSecretKeyShare(kks.EonSecretKeyShare, epochIDG1)
 }
 
 // EonKeys holds all keys for one eon.
@@ -54,8 +54,8 @@ func NewEonKeys(random io.Reader, numKeypers uint64, threshold uint64) (*EonKeys
 			vs = append(vs, v)
 		}
 		shares = append(shares, KeyperKeyShares{
-			eonSecretKeyShare: shcrypto.ComputeEonSecretKeyShare(vs),
-			eonPublicKeyShare: shcrypto.ComputeEonPublicKeyShare(i, gammas),
+			EonSecretKeyShare: shcrypto.ComputeEonSecretKeyShare(vs),
+			EonPublicKeyShare: shcrypto.ComputeEonPublicKeyShare(i, gammas),
 		})
 	}
 
@@ -65,6 +65,18 @@ func NewEonKeys(random io.Reader, numKeypers uint64, threshold uint64) (*EonKeys
 		NumKeypers:   numKeypers,
 		Threshold:    threshold,
 	}, nil
+}
+
+func (eonkeys *EonKeys) EonPublicKey() *shcrypto.EonPublicKey {
+	return eonkeys.publicKey
+}
+
+func (eonkeys *EonKeys) EonPublicKeyShare(keyperIndex int) *shcrypto.EonPublicKeyShare {
+	return eonkeys.keyperShares[keyperIndex].EonPublicKeyShare
+}
+
+func (eonkeys *EonKeys) EonSecretKeyShare(keyperIndex int) *shcrypto.EonSecretKeyShare {
+	return eonkeys.keyperShares[keyperIndex].EonSecretKeyShare
 }
 
 func (eonkeys *EonKeys) getEpochSecretKeyShares(
@@ -78,12 +90,21 @@ func (eonkeys *EonKeys) getEpochSecretKeyShares(
 	return res
 }
 
+func (eonkeys *EonKeys) EpochSecretKeyShare(
+	identityPreimage identitypreimage.IdentityPreimage,
+	keyperIndex int,
+) *shcrypto.EpochSecretKeyShare {
+	return eonkeys.keyperShares[keyperIndex].ComputeEpochSecretKeyShare(identityPreimage)
+}
+
 func (eonkeys *EonKeys) EpochSecretKey(identityPreimage identitypreimage.IdentityPreimage) (*shcrypto.EpochSecretKey, error) {
 	keyperIndices := []int{}
+	epochSecretKeyShares := []*shcrypto.EpochSecretKeyShare{}
 	for i := uint64(0); i < eonkeys.Threshold; i++ {
 		keyperIndices = append(keyperIndices, int(i))
+		epochSecretKeyShare := eonkeys.EpochSecretKeyShare(identityPreimage, int(i))
+		epochSecretKeyShares = append(epochSecretKeyShares, epochSecretKeyShare)
 	}
-	epochSecretKeyShares := eonkeys.getEpochSecretKeyShares(identityPreimage, keyperIndices)
 	return shcrypto.ComputeEpochSecretKey(
 		keyperIndices,
 		epochSecretKeyShares,

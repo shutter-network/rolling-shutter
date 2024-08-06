@@ -12,3 +12,11 @@ type KeyperSet struct {
 	Keypers               []string
 	Threshold             int32
 }
+
+type RecentBlock struct {
+	BlockHash   []byte
+	BlockNumber int64
+	ParentHash  []byte
+	Timestamp   int64
+	Header      []byte
+}
