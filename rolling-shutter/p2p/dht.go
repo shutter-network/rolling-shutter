@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/discovery"
@@ -78,9 +79,15 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
+			allPeerIDs := mapset.NewSet[peer.ID]()
+			for _, peerID := range h.Network().Peers() {
+				allPeerIDs.Add(peerID)
+			}
+
 			peersBefore := len(h.Network().Peers())
 			if peersBefore >= peerTarget {
 				log.Debug().Int("peers-before", peersBefore).Int("peer-target", peerTarget).Msg("have enough peers")
+				updatePeersMetrics(h, allPeerIDs)
 				continue
 			}
 
@@ -91,22 +98,19 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 
 			newConnections := 0
 			failedDials := 0
-			ourId := h.ID().String()
+
+			for _, p := range peers {
+				allPeerIDs.Add(p.ID)
+			}
+			updatePeersMetrics(h, allPeerIDs)
 
 			randomizedPeers := randomizePeers(peers)
-
 			for _, p := range randomizedPeers {
 				collectPeerAddresses(p)
 				if p.ID == h.ID() {
 					continue
 				}
-				connectedness := h.Network().Connectedness(p.ID)
-				metricsP2PPeerConnectedness.WithLabelValues(ourId, p.ID.String()).Set(float64(connectedness))
-				peerPing := h.Peerstore().LatencyEWMA(p.ID)
-				if peerPing != 0 {
-					metricsP2PPeerPing.WithLabelValues(ourId, p.ID.String()).Set(peerPing.Seconds())
-				}
-				if connectedness != network.Connected {
+				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
 						log.Debug().

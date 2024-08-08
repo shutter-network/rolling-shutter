@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -67,4 +69,16 @@ func init() {
 	prometheus.MustRegister(metricsP2PPeerTuples)
 	prometheus.MustRegister(metricsP2PPeerConnectedness)
 	prometheus.MustRegister(metricsP2PPeerPing)
+}
+
+func updatePeersMetrics(h host.Host, peerIds mapset.Set[peer.ID]) {
+	ourID := h.ID().String()
+	for p := range peerIds.Iterator().C {
+		connectedness := h.Network().Connectedness(p)
+		metricsP2PPeerConnectedness.WithLabelValues(ourID, p.String()).Set(float64(connectedness))
+		peerPing := h.Peerstore().LatencyEWMA(p)
+		if peerPing != 0 {
+			metricsP2PPeerPing.WithLabelValues(ourID, p.String()).Set(peerPing.Seconds())
+		}
+	}
 }
