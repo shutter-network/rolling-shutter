@@ -184,7 +184,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
-	client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
+	client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial Ethereum execution node")
 	}
