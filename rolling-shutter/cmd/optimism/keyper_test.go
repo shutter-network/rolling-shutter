@@ -5,21 +5,21 @@ import (
 
 	"gotest.tools/assert"
 
-	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/rollup"
+	config "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/test"
 )
 
 func TestSmokeGenerateConfig(t *testing.T) {
-	config := keyper.NewConfig()
-	test.SmokeGenerateConfig(t, config)
+	c := config.NewConfig()
+	test.SmokeGenerateConfig(t, c)
 }
 
 func TestParsedConfig(t *testing.T) {
-	config := keyper.NewConfig()
+	c := config.NewConfig()
 
-	err := configuration.SetExampleValuesRecursive(config)
+	err := configuration.SetExampleValuesRecursive(c)
 	assert.NilError(t, err)
-	parsedConfig := test.RoundtripParseConfig(t, config)
-	assert.DeepEqual(t, config, parsedConfig)
+	parsedConfig := test.RoundtripParseConfig(t, c)
+	assert.DeepEqual(t, c, parsedConfig)
 }
