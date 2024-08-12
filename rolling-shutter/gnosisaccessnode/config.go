@@ -42,10 +42,15 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) SetDefaultValues() error {
+	c.P2P.IsAccessNode = true
 	return nil
 }
 
 func (c *Config) SetExampleValues() error { //nolint:unparam
+	err := c.SetDefaultValues()
+	if err != nil {
+		return err
+	}
 	c.InstanceID = 1000
 	c.MaxNumKeysPerMessage = 500
 	return nil
