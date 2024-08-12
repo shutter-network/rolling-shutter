@@ -69,6 +69,7 @@ type p2pNodeConfig struct {
 	PrivKey            keys.Libp2pPrivate
 	Environment        env.Environment
 	IsBootstrapNode    bool
+	IsAccessNode       bool
 	DiscoveryNamespace string
 }
 
@@ -264,6 +265,7 @@ func createPubSub(
 	gossipSubParams, peerScoreParams, peerScoreThresholds := makePubSubParams(pubSubParamsOptions{
 		isBootstrapNode: config.IsBootstrapNode,
 		bootstrapPeers:  config.BootstrapPeers,
+		isAccessNode:    config.IsAccessNode,
 	})
 
 	pubsubOptions := []pubsub.Option{

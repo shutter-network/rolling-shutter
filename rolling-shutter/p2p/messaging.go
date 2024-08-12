@@ -98,6 +98,7 @@ func New(config *Config) (*P2PMessaging, error) {
 		PrivKey:            *config.P2PKey,
 		Environment:        config.Environment,
 		DiscoveryNamespace: config.DiscoveryNamespace,
+		IsAccessNode:       config.IsAccessNode,
 	}
 
 	bootstrapAddresses := config.CustomBootstrapAddresses

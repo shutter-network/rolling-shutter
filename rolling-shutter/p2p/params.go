@@ -9,6 +9,7 @@ import (
 
 type pubSubParamsOptions struct {
 	isBootstrapNode bool
+	isAccessNode    bool
 	bootstrapPeers  []peer.AddrInfo
 }
 
@@ -33,6 +34,10 @@ func makePubSubParams(
 		gossipSubParams.Dhi = 0
 		gossipSubParams.Dout = 0
 		gossipSubParams.Dscore = 0
+	}
+
+	if options.isAccessNode {
+		gossipSubParams.Dhi = 30
 	}
 
 	peerScoreThresholds := &pubsub.PeerScoreThresholds{
