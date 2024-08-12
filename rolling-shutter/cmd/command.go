@@ -5,11 +5,9 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/collator"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/cryptocmd"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/gnosisaccessnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/gnosiskeyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocksequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/optimism"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/p2pnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
@@ -22,7 +20,6 @@ func Subcommands() []*cobra.Command {
 	return []*cobra.Command{
 		bootstrap.Cmd(),
 		chain.Cmd(),
-		collator.Cmd(),
 		optimism.Cmd(),
 		optimism.OPBootstrapCmd(),
 		snapshot.Cmd(),
@@ -31,7 +28,6 @@ func Subcommands() []*cobra.Command {
 		gnosisaccessnode.Cmd(),
 		cryptocmd.Cmd(),
 		proxy.Cmd(),
-		mocksequencer.Cmd(),
 		p2pnode.Cmd(),
 	}
 }
