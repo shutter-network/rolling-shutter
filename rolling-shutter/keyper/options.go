@@ -5,12 +5,19 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
+
+type ContractAddresses struct {
+	KeyperSetManager common.Address
+	KeyBroadcast     common.Address
+}
 
 type Option func(*options) error
 
@@ -21,15 +28,18 @@ type options struct {
 	blockSyncClient    *ethclient.Client
 	messageHandler     []p2p.MessageHandler
 	eonPubkeyHandler   EonPublicKeyHandlerFunc
+	contractAddressses ContractAddresses
+	chainHandler       []syncer.ChainUpdateHandler
+	eventHandler       []syncer.ContractEventHandler
 }
 
 func newDefaultOptions() *options {
 	return &options{
-		dbpool:             nil,
 		broadcastEonPubKey: true,
-		blockSyncClient:    nil,
 		messageHandler:     []p2p.MessageHandler{},
-		eonPubkeyHandler:   nil,
+		contractAddressses: ContractAddresses{},
+		chainHandler:       []syncer.ChainUpdateHandler{},
+		eventHandler:       []syncer.ContractEventHandler{},
 	}
 }
 
@@ -40,6 +50,7 @@ func validateOptions(o *options) error {
 		return errors.New("no eon public key broadcast nor handler function provided. " +
 			"newly negotiated eon public-keys would not be forwarded")
 	}
+	//TODO: check for non-nil contract addresses
 	return nil
 }
 
@@ -103,6 +114,30 @@ func WithBlockSyncClient(client *ethclient.Client) Option {
 func WithMessaging(sender p2p.Messaging) Option {
 	return func(o *options) error {
 		o.messaging = sender
+		return nil
+	}
+}
+
+// TODO: docs
+func WithContractAddresses(addresses ContractAddresses) Option {
+	return func(o *options) error {
+		o.contractAddressses = addresses
+		return nil
+	}
+}
+
+// TODO: docs
+func WithContractEventHandler(h syncer.ContractEventHandler) Option {
+	return func(o *options) error {
+		o.eventHandler = append(o.eventHandler, h)
+		return nil
+	}
+}
+
+// TODO: docs
+func WithChainUpdateHandler(h syncer.ChainUpdateHandler) Option {
+	return func(o *options) error {
+		o.chainHandler = append(o.chainHandler, h)
 		return nil
 	}
 }
