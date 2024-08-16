@@ -2,179 +2,81 @@ package chainsync
 
 import (
 	"context"
-	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shop-contracts/bindings"
-	"github.com/shutter-network/shop-contracts/predeploy"
 
-	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
+
+const defaultMemoryBlockCacheSize = 50
 
 type Option func(*options) error
 
 type options struct {
-	keyperSetManagerAddress     *common.Address
-	keyBroadcastContractAddress *common.Address
-	clientURL                   string
-	client                      syncclient.Client
-	logger                      log.Logger
-	runner                      service.Runner
-	syncStart                   *number.BlockNumber
-	privKey                     *ecdsa.PrivateKey
-
-	handlerShutterState event.ShutterStateHandler
-	handlerKeyperSet    event.KeyperSetHandler
-	handlerEonPublicKey event.EonPublicKeyHandler
-	handlerBlock        event.BlockHandler
+	clientURL    string
+	ethClient    client.Sync
+	syncStart    *number.BlockNumber
+	chainCache   syncer.ChainCache
+	eventHandler []syncer.ContractEventHandler
+	chainHandler []syncer.ChainUpdateHandler
 }
 
 func (o *options) verify() error {
-	if o.clientURL != "" && o.client != nil {
-		// TODO: error message
-		return errors.New("can't use client and client url")
+	if o.clientURL != "" && o.ethClient != nil {
+		return errors.New("'WithClient' and 'WithClientURL' options are mutually exclusive")
 	}
-	if o.clientURL == "" && o.client == nil {
-		// TODO: error message
-		return errors.New("have to provide either url or client")
+	if o.clientURL == "" && o.ethClient == nil {
+		return errors.New("either 'WithClient' or 'WithClientURL' options are expected")
 	}
-	// TODO: check for the existence of the contract addresses depending on
-	// what handlers are not nil
 	return nil
 }
 
-// initialize the shutter client and apply the options.
-// the context is only the initialisation context,
+// initFetcher applies the options and initializes the fetcher.
+// The context is only the initialisation context,
 // and should not be considered to handle the lifecycle
 // of shutter clients background workers.
-func (o *options) apply(ctx context.Context, c *Client) error {
-	var (
-		client syncclient.Client
-		err    error
-	)
+func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
+	var err error
 	if o.clientURL != "" {
-		o.client, err = ethclient.DialContext(ctx, o.clientURL)
+		o.ethClient, err = ethclient.DialContext(ctx, o.clientURL)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	client = o.client
-	c.log = o.logger
 
-	c.Client = client
+	if o.chainCache == nil {
+		o.chainCache = syncer.NewMemoryChainCache(int(defaultMemoryBlockCacheSize), nil)
+	}
+	f := syncer.NewFetcher(o.ethClient, o.chainCache)
 
-	// the nil passthrough will use "latest" for each call,
-	// but we want to harmonize and fix the sync start to a specific block.
-	if o.syncStart.IsLatest() {
-		latestBlock, err := c.Client.BlockNumber(ctx)
-		if err != nil {
-			return errors.Wrap(err, "polling latest block")
-		}
-		o.syncStart = number.NewBlockNumber(&latestBlock)
+	for _, h := range o.chainHandler {
+		f.RegisterChainUpdateHandler(h)
 	}
-
-	c.KeyperSetManager, err = bindings.NewKeyperSetManager(*o.keyperSetManagerAddress, client)
-	if err != nil {
-		return err
+	for _, h := range o.eventHandler {
+		f.RegisterContractEventHandler(h)
 	}
-	c.kssync = &syncer.KeyperSetSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		StartBlock: o.syncStart,
-		Handler:    o.handlerKeyperSet,
-	}
-	if o.handlerKeyperSet != nil {
-		c.services = append(c.services, c.kssync)
-	}
-
-	c.KeyBroadcast, err = bindings.NewKeyBroadcastContract(*o.keyBroadcastContractAddress, client)
-	if err != nil {
-		return err
-	}
-	c.epksync = &syncer.EonPubKeySyncer{
-		Client:           client,
-		Log:              c.log,
-		KeyBroadcast:     c.KeyBroadcast,
-		KeyperSetManager: c.KeyperSetManager,
-		Handler:          o.handlerEonPublicKey,
-		StartBlock:       o.syncStart,
-	}
-	if o.handlerEonPublicKey != nil {
-		c.services = append(c.services, c.epksync)
-	}
-
-	c.sssync = &syncer.ShutterStateSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		Handler:    o.handlerShutterState,
-		StartBlock: o.syncStart,
-	}
-	if o.handlerShutterState != nil {
-		c.services = append(c.services, c.sssync)
-	}
-
-	if o.handlerBlock != nil {
-		c.uhsync = &syncer.UnsafeHeadSyncer{
-			Client:  client,
-			Log:     c.log,
-			Handler: o.handlerBlock,
-		}
-	}
-	if o.handlerBlock != nil {
-		c.services = append(c.services, c.uhsync)
-	}
-	c.privKey = o.privKey
-	return nil
+	return f, nil
 }
 
 func defaultOptions() *options {
 	return &options{
-		keyperSetManagerAddress:     &predeploy.KeyperSetManagerAddr,
-		keyBroadcastContractAddress: &predeploy.KeyBroadcastContractAddr,
-		clientURL:                   "",
-		client:                      nil,
-		logger:                      noopLogger,
-		runner:                      nil,
-		syncStart:                   number.NewBlockNumber(nil),
+		syncStart:    number.NewBlockNumber(nil),
+		eventHandler: []syncer.ContractEventHandler{},
+		chainHandler: []syncer.ChainUpdateHandler{},
 	}
 }
 
-func WithSyncStartBlock(blockNumber *number.BlockNumber) Option {
+func WithSyncStartBlock(
+	blockNumber *number.BlockNumber,
+) Option {
 	if blockNumber == nil {
 		blockNumber = number.NewBlockNumber(nil)
 	}
 	return func(o *options) error {
 		o.syncStart = blockNumber
-		return nil
-	}
-}
-
-func WithRunner(runner service.Runner) Option {
-	return func(o *options) error {
-		o.runner = runner
-		return nil
-	}
-}
-
-func WithKeyBroadcastContract(address common.Address) Option {
-	return func(o *options) error {
-		o.keyBroadcastContractAddress = &address
-		return nil
-	}
-}
-
-func WithKeyperSetManager(address common.Address) Option {
-	return func(o *options) error {
-		o.keyperSetManagerAddress = &address
 		return nil
 	}
 }
@@ -186,51 +88,40 @@ func WithClientURL(url string) Option {
 	}
 }
 
-func WithLogger(l log.Logger) Option {
+// NOTE: The Latest() of the chaincache determines what is the starting
+// point of the chainsync.
+// In case of an empty chaincache, we will initialize the cache
+// with the current latest block.
+// If we have a very old (persistent) chaincache, we will sync EVERY block
+// since the latest known block of the cache due to consistency considerations.
+// If that is unfeasible, the cache has to be emptied beforehand and the
+// gap in state-updates has to be dealt with or accepted.
+// If NO chaincache is passed with this option, an empty in-memory
+// chain-cache with a capped cachesize will be used.
+func WithChainCache(c syncer.ChainCache) Option {
 	return func(o *options) error {
-		o.logger = l
+		o.chainCache = c
 		return nil
 	}
 }
 
-func WithClient(client syncclient.Client) Option {
+func WithClient(c client.Sync) Option {
 	return func(o *options) error {
-		o.client = client
+		o.ethClient = c
 		return nil
 	}
 }
 
-func WithPrivateKey(key *ecdsa.PrivateKey) Option {
+func WithContractEventHandler(h syncer.ContractEventHandler) Option {
 	return func(o *options) error {
-		o.privKey = key
+		o.eventHandler = append(o.eventHandler, h)
 		return nil
 	}
 }
 
-func WithSyncNewKeyperSet(handler event.KeyperSetHandler) Option {
+func WithChainUpdateHandler(h syncer.ChainUpdateHandler) Option {
 	return func(o *options) error {
-		o.handlerKeyperSet = handler
-		return nil
-	}
-}
-
-func WithSyncNewBlock(handler event.BlockHandler) Option {
-	return func(o *options) error {
-		o.handlerBlock = handler
-		return nil
-	}
-}
-
-func WithSyncNewEonKey(handler event.EonPublicKeyHandler) Option {
-	return func(o *options) error {
-		o.handlerEonPublicKey = handler
-		return nil
-	}
-}
-
-func WithSyncNewShutterState(handler event.ShutterStateHandler) Option {
-	return func(o *options) error {
-		o.handlerShutterState = handler
+		o.chainHandler = append(o.chainHandler, h)
 		return nil
 	}
 }
