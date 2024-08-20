@@ -8,6 +8,7 @@ require (
 	github.com/AdamSLevy/jsonrpc2/v14 v14.1.0
 	github.com/benbjohnson/clock v1.3.5
 	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
+	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/deepmap/oapi-codegen v1.9.1
 	github.com/ethereum/go-ethereum v1.13.11
 	github.com/ferranbt/fastssz v0.1.3
@@ -85,7 +86,6 @@ require (
 	github.com/creachadair/taskgroup v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
-	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
