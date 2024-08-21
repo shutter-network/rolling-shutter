@@ -91,14 +91,14 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 	for _, key := range keys.Keys {
 		k, err := key.GetEpochSecretKey()
 		if err != nil {
-			return pubsub.ValidationReject, errors.Wrapf(err, "error getting epochSecretKey for identity: %d", key.Identity)
+			return pubsub.ValidationReject, errors.Wrapf(err, "error getting epochSecretKey for identity: %d", key.IdentityPreimage)
 		}
-		ok, err := shcrypto.VerifyEpochSecretKey(k, &eonPublicKey, key.Identity)
+		ok, err := shcrypto.VerifyEpochSecretKey(k, &eonPublicKey, key.IdentityPreimage)
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
 		if !ok {
-			return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for identity %s", key.Identity)
+			return pubsub.ValidationReject, errors.Errorf("recovery of epoch secret key failed for identity %s", key.IdentityPreimage)
 		}
 	}
 
@@ -127,7 +127,7 @@ func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg
 	for _, key := range keys.Keys {
 		rows, err := db.InsertDecryptionKey(
 			ctx, database.InsertDecryptionKeyParams{
-				EpochID: key.Identity,
+				EpochID: key.IdentityPreimage,
 				Key:     key.Key,
 			},
 		)
@@ -142,8 +142,8 @@ func (handler *DecryptionKeyHandler) HandleMessage(ctx context.Context, m p2pmsg
 	}
 
 	for _, key := range newKeys {
-		log.Printf("Sending key %X for proposal %X to hub", key.Key, key.Identity)
-		err := handler.snapshot.hubapi.SubmitProposalKey(key.Identity, key.Key)
+		log.Printf("Sending key %X for proposal %X to hub", key.Key, key.IdentityPreimage)
+		err := handler.snapshot.hubapi.SubmitProposalKey(key.IdentityPreimage, key.Key)
 		if err != nil {
 			return result, err
 		}

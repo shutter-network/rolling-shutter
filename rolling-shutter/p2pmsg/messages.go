@@ -122,7 +122,7 @@ func (keys *DecryptionKeys) LogInfo() string {
 	if len(keys.Keys) == 0 {
 		firstIdentity = "none"
 	} else {
-		id := identitypreimage.IdentityPreimage(keys.Keys[0].Identity)
+		id := identitypreimage.IdentityPreimage(keys.Keys[0].IdentityPreimage)
 		firstIdentity = id.Hex()
 	}
 	return fmt.Sprintf("DecryptionKeys{firstIdentity=%s, numKeys=%d}", firstIdentity, len(keys.Keys))

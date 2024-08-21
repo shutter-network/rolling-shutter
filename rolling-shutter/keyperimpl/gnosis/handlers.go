@@ -142,8 +142,8 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 				return []p2pmsg.Message{}, nil
 			}
 			key := &p2pmsg.Key{
-				Identity: share.IdentityPreimage,
-				Key:      decryptionKeyDB.DecryptionKey,
+				IdentityPreimage: share.IdentityPreimage,
+				Key:              decryptionKeyDB.DecryptionKey,
 			}
 			keys = append(keys, key)
 		}
@@ -240,7 +240,7 @@ func ValidateDecryptionKeysSignatures(
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, key := range keys.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
@@ -319,7 +319,7 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, key := range keys.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	identitiesHash := computeIdentitiesHash(identityPreimages)

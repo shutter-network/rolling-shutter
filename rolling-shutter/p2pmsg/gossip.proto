@@ -39,7 +39,7 @@ message DecryptionKeyShares {
 }
 
 message Key {
-  bytes identity = 1;
+  bytes identity_preimage = 1;
   bytes key = 2;
 }
 

@@ -53,8 +53,8 @@ func prepareKeysBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Poo
 	decryptionKeys := []*p2pmsg.Key{}
 	for i, identityPreimage := range identityPreimages {
 		key := &p2pmsg.Key{
-			Identity: identityPreimage.Bytes(),
-			Key:      encodedDecryptionKeys[i],
+			IdentityPreimage: identityPreimage.Bytes(),
+			Key:              encodedDecryptionKeys[i],
 		}
 		decryptionKeys = append(decryptionKeys, key)
 	}
