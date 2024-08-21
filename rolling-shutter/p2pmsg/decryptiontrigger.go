@@ -16,7 +16,7 @@ func NewSignedDecryptionTrigger(
 ) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
 		InstanceId:       instanceID,
-		EpochId:          identityPreimage.Bytes(),
+		IdentityPreimage: identityPreimage.Bytes(),
 		BlockNumber:      blockNumber,
 		TransactionsHash: txHash,
 	}
@@ -35,7 +35,7 @@ func (trigger *DecryptionTrigger) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(triggerHashPrefix)
 	_ = binary.Write(hash, binary.BigEndian, trigger.InstanceId)
-	_ = binary.Write(hash, binary.BigEndian, trigger.EpochId)
+	_ = binary.Write(hash, binary.BigEndian, trigger.IdentityPreimage)
 	hash.Write(trigger.TransactionsHash)
 	return hash.Sum(nil)
 }

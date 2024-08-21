@@ -85,8 +85,8 @@ func prepareKeySharesBenchmark(
 		keyperIndex := 0
 		for _, identityPreimage := range identityPreimages {
 			share := &p2pmsg.KeyShare{
-				EpochId: identityPreimage.Bytes(),
-				Share:   keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
+				IdentityPreimage: identityPreimage.Bytes(),
+				Share:            keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
 			}
 			shares = append(shares, share)
 		}
@@ -107,8 +107,8 @@ func prepareKeySharesBenchmark(
 	shares := []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochId: identityPreimage.Bytes(),
-			Share:   keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
 		}
 		shares = append(shares, share)
 	}

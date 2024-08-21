@@ -141,7 +141,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, share := range originalMsg.Shares {
-		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(share.EpochId))
+		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(share.IdentityPreimage))
 	}
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
 		i.config.InstanceID,

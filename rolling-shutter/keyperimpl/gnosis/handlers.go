@@ -69,7 +69,7 @@ func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, share := range keyShares.Shares {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochId)
+		identityPreimage := identitypreimage.IdentityPreimage(share.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
@@ -136,13 +136,13 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 		for _, share := range keyShares.GetShares() {
 			decryptionKeyDB, err := keyperCoreDB.GetDecryptionKey(ctx, corekeyperdatabase.GetDecryptionKeyParams{
 				Eon:     int64(keyShares.Eon),
-				EpochID: share.EpochId,
+				EpochID: share.IdentityPreimage,
 			})
 			if err == pgx.ErrNoRows {
 				return []p2pmsg.Message{}, nil
 			}
 			key := &p2pmsg.Key{
-				Identity: share.EpochId,
+				Identity: share.IdentityPreimage,
 				Key:      decryptionKeyDB.DecryptionKey,
 			}
 			keys = append(keys, key)

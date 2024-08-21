@@ -95,12 +95,12 @@ func checkKeyShares(keyShare *p2pmsg.DecryptionKeyShares, pureDKGResult *puredkg
 		if !shcrypto.VerifyEpochSecretKeyShare(
 			epochSecretKeyShare,
 			pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
-			shcrypto.ComputeEpochID(share.EpochId),
+			shcrypto.ComputeEpochID(share.IdentityPreimage),
 		) {
 			return pubsub.ValidationReject, errors.Errorf("cannot verify secret key share")
 		}
 
-		if i > 0 && bytes.Compare(share.EpochId, shares[i-1].EpochId) < 0 {
+		if i > 0 && bytes.Compare(share.IdentityPreimage, shares[i-1].IdentityPreimage) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keyshares not ordered")
 		}
 	}
@@ -124,7 +124,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 	allKeysExist := true
 	for _, share := range msg.GetShares() {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochId)
+		identityPreimage := identitypreimage.IdentityPreimage(share.IdentityPreimage)
 		keyExists, err := db.ExistsDecryptionKey(ctx, database.ExistsDecryptionKeyParams{
 			Eon:     eon,
 			EpochID: identityPreimage.Bytes(),
@@ -159,7 +159,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	// aggregate epoch secret keys
 	keys := []*p2pmsg.Key{}
 	for _, share := range msg.GetShares() {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochId)
+		identityPreimage := identitypreimage.IdentityPreimage(share.IdentityPreimage)
 
 		epochKG, err := handler.aggregateDecryptionKeySharesFromDB(
 			ctx,

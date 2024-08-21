@@ -103,8 +103,8 @@ func TestDecryptionKeyShare(t *testing.T) {
 		InstanceId:  cfg.instanceID,
 		KeyperIndex: keyperIndex,
 		Shares: []*KeyShare{{
-			EpochId: cfg.identityPreimage.Bytes(),
-			Share:   keyshare,
+			IdentityPreimage: cfg.identityPreimage.Bytes(),
+			Share:            keyshare,
 		}},
 	}
 	m, tc := marshalUnmarshalMessage(t, orig, nil)

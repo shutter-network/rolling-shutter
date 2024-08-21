@@ -76,7 +76,7 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	identityPreimage := identitypreimage.IdentityPreimage(trigger.EpochId)
+	identityPreimage := identitypreimage.IdentityPreimage(trigger.IdentityPreimage)
 	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", identityPreimage.String())
 }
 
