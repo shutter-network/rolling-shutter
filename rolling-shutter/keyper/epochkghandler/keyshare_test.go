@@ -47,8 +47,8 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	shares := []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochId: identityPreimage.Bytes(),
-			Share:   keys.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            keys.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
 		}
 		shares = append(shares, share)
 	}
@@ -65,8 +65,8 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	shares = []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochId: identityPreimage.Bytes(),
-			Share:   keys.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            keys.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
 		}
 		shares = append(shares, share)
 	}
@@ -121,12 +121,12 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochId: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 					{
-						EpochId: secondIdentityPreimage.Bytes(),
-						Share:   secondKeyshare,
+						IdentityPreimage: secondIdentityPreimage.Bytes(),
+						Share:            secondKeyshare,
 					},
 				},
 			},
@@ -140,8 +140,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochId: wrongIdentityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: wrongIdentityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -155,8 +155,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochId: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -170,8 +170,8 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex + 1,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochId: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -195,12 +195,12 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochId: secondIdentityPreimage.Bytes(),
-						Share:   secondKeyshare,
+						IdentityPreimage: secondIdentityPreimage.Bytes(),
+						Share:            secondKeyshare,
 					},
 					{
-						EpochId: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},

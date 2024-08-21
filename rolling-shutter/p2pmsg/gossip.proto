@@ -8,14 +8,14 @@ option go_package = "./;p2pmsg";
 
 message DecryptionTrigger {
   uint64 instance_id = 1;
-  bytes epoch_id = 2;
+  bytes identity_preimage = 2;
   uint64 block_number = 3;
   bytes transactions_hash = 4;
   bytes signature = 5;
 }
 
 message KeyShare {
-  bytes epoch_id = 1;
+  bytes identity_preimage = 1;
   bytes share = 2;
 }
 

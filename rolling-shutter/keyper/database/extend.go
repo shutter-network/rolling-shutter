@@ -51,7 +51,7 @@ func (q *Queries) InsertDecryptionKeySharesMsg(ctx context.Context, msg *p2pmsg.
 	for _, share := range msg.GetShares() {
 		err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
 			Eon:                int64(msg.Eon),
-			EpochID:            share.EpochId,
+			EpochID:            share.IdentityPreimage,
 			KeyperIndex:        int64(msg.KeyperIndex),
 			DecryptionKeyShare: share.Share,
 		})

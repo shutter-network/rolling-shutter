@@ -113,8 +113,8 @@ func (ksh *KeyShareHandler) ConstructDecryptionKeyShares(
 		share := epochKG.ComputeEpochSecretKeyShare(identityPreimage)
 
 		shares = append(shares, &p2pmsg.KeyShare{
-			EpochId: identityPreimage.Bytes(),
-			Share:   share.Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            share.Marshal(),
 		})
 	}
 
