@@ -75,7 +75,7 @@ func TestHandleDecryptionTriggerIntegration(t *testing.T) {
 	assert.DeepEqual(t, msg.GetShares(),
 		[]*p2pmsg.KeyShare{
 			{
-				EpochID: identityPreimage.Bytes(),
+				EpochId: identityPreimage.Bytes(),
 				Share:   share.DecryptionKeyShare,
 			},
 		},

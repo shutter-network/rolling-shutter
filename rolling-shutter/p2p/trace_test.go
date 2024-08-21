@@ -45,8 +45,8 @@ func TestTraceContextIntegration(t *testing.T) {
 	tc := &p2pmsg.TraceContext{}
 	InjectTraceContext(sctx, tc)
 	// make sure the message is filled with an actual value
-	assert.Assert(t, len(tc.GetTraceID()) == 16)
-	assert.Assert(t, len(tc.GetSpanID()) == 8)
+	assert.Assert(t, len(tc.GetTraceId()) == 16)
+	assert.Assert(t, len(tc.GetSpanId()) == 8)
 	assert.Assert(t, len(tc.GetTraceFlags()) == 1)
 
 	// extract the trace context from the message

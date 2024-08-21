@@ -19,7 +19,7 @@ func NewSignedEonPublicKey(
 	privKey *ecdsa.PrivateKey,
 ) (*EonPublicKey, error) {
 	candidate := &EonPublicKey{
-		InstanceID:        instanceID,
+		InstanceId:        instanceID,
 		PublicKey:         eonPublicKey,
 		ActivationBlock:   activationBlock,
 		KeyperConfigIndex: keyperConfigIndex,
@@ -39,7 +39,7 @@ func (e *EonPublicKey) SetSignature(s []byte) {
 func (e *EonPublicKey) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(eonPubKeyHashPrefix)
-	_ = binary.Write(hash, binary.BigEndian, e.InstanceID)
+	_ = binary.Write(hash, binary.BigEndian, e.InstanceId)
 	_ = binary.Write(hash, binary.BigEndian, e.ActivationBlock)
 	_ = binary.Write(hash, binary.BigEndian, e.KeyperConfigIndex)
 	_ = binary.Write(hash, binary.BigEndian, e.Eon)

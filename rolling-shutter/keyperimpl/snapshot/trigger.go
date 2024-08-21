@@ -43,9 +43,9 @@ func (*DecryptionTriggerHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	trigger := msg.(*p2pmsg.DecryptionTrigger)
-	if trigger.GetInstanceID() != handler.config.InstanceID {
+	if trigger.GetInstanceId() != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, trigger.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, trigger.GetInstanceId())
 	}
 
 	blk := trigger.BlockNumber
@@ -67,10 +67,10 @@ func (handler *DecryptionTriggerHandler) ValidateMessage(ctx context.Context, ms
 
 	signatureValid, err := p2pmsg.VerifySignature(trigger, collator)
 	if err != nil {
-		return pubsub.ValidationReject, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %x", trigger.EpochID)
+		return pubsub.ValidationReject, errors.Wrapf(err, "error while verifying decryption trigger signature for epoch: %x", trigger.EpochId)
 	}
 	if !signatureValid {
-		return pubsub.ValidationReject, errors.Errorf("decryption trigger signature invalid for epoch: %x", trigger.EpochID)
+		return pubsub.ValidationReject, errors.Errorf("decryption trigger signature invalid for epoch: %x", trigger.EpochId)
 	}
 	return pubsub.ValidationAccept, nil
 }
@@ -81,7 +81,7 @@ func (handler *DecryptionTriggerHandler) HandleMessage(ctx context.Context, m p2
 		return nil, errors.New("Message type assertion mismatch")
 	}
 	log.Info().Str("message", msg.LogInfo()).Msg("received decryption trigger")
-	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(msg.EpochId)
 
 	trig := &epochkghandler.DecryptionTrigger{
 		BlockNumber:       msg.BlockNumber,
