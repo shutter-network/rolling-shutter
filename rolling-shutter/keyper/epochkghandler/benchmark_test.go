@@ -59,7 +59,7 @@ func prepareKeysBenchmark(ctx context.Context, b *testing.B, dbpool *pgxpool.Poo
 		decryptionKeys = append(decryptionKeys, key)
 	}
 	msg := &p2pmsg.DecryptionKeys{
-		InstanceID: config.GetInstanceID(),
+		InstanceId: config.GetInstanceID(),
 		Eon:        1,
 		Keys:       decryptionKeys,
 	}
@@ -85,13 +85,13 @@ func prepareKeySharesBenchmark(
 		keyperIndex := 0
 		for _, identityPreimage := range identityPreimages {
 			share := &p2pmsg.KeyShare{
-				EpochID: identityPreimage.Bytes(),
+				EpochId: identityPreimage.Bytes(),
 				Share:   keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
 			}
 			shares = append(shares, share)
 		}
 		msg := &p2pmsg.DecryptionKeyShares{
-			InstanceID:  config.GetInstanceID(),
+			InstanceId:  config.GetInstanceID(),
 			Eon:         1,
 			KeyperIndex: uint64(keyperIndex),
 			Shares:      shares,
@@ -107,13 +107,13 @@ func prepareKeySharesBenchmark(
 	shares := []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochID: identityPreimage.Bytes(),
+			EpochId: identityPreimage.Bytes(),
 			Share:   keys.EpochSecretKeyShare(identityPreimage, keyperIndex).Marshal(),
 		}
 		shares = append(shares, share)
 	}
 	msg := &p2pmsg.DecryptionKeyShares{
-		InstanceID:  config.GetInstanceID(),
+		InstanceId:  config.GetInstanceID(),
 		Eon:         1,
 		KeyperIndex: uint64(keyperIndex),
 		Shares:      shares,

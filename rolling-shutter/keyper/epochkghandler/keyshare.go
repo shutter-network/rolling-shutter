@@ -38,9 +38,9 @@ func (*DecryptionKeyShareHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionKeyShareHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	keyShare := msg.(*p2pmsg.DecryptionKeyShares)
-	if keyShare.GetInstanceID() != handler.config.GetInstanceID() {
+	if keyShare.GetInstanceId() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), keyShare.GetInstanceId())
 	}
 	if keyShare.Eon > math.MaxInt64 {
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keyShare.Eon)
@@ -95,12 +95,12 @@ func checkKeyShares(keyShare *p2pmsg.DecryptionKeyShares, pureDKGResult *puredkg
 		if !shcrypto.VerifyEpochSecretKeyShare(
 			epochSecretKeyShare,
 			pureDKGResult.PublicKeyShares[keyShare.KeyperIndex],
-			shcrypto.ComputeEpochID(share.EpochID),
+			shcrypto.ComputeEpochID(share.EpochId),
 		) {
 			return pubsub.ValidationReject, errors.Errorf("cannot verify secret key share")
 		}
 
-		if i > 0 && bytes.Compare(share.EpochID, shares[i-1].EpochID) < 0 {
+		if i > 0 && bytes.Compare(share.EpochId, shares[i-1].EpochId) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keyshares not ordered")
 		}
 	}
@@ -124,7 +124,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	}
 	allKeysExist := true
 	for _, share := range msg.GetShares() {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
+		identityPreimage := identitypreimage.IdentityPreimage(share.EpochId)
 		keyExists, err := db.ExistsDecryptionKey(ctx, database.ExistsDecryptionKeyParams{
 			Eon:     eon,
 			EpochID: identityPreimage.Bytes(),
@@ -159,7 +159,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 	// aggregate epoch secret keys
 	keys := []*p2pmsg.Key{}
 	for _, share := range msg.GetShares() {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
+		identityPreimage := identitypreimage.IdentityPreimage(share.EpochId)
 
 		epochKG, err := handler.aggregateDecryptionKeySharesFromDB(
 			ctx,
@@ -189,7 +189,7 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		})
 	}
 	message := &p2pmsg.DecryptionKeys{
-		InstanceID: handler.config.GetInstanceID(),
+		InstanceId: handler.config.GetInstanceID(),
 		Eon:        msg.Eon,
 		Keys:       keys,
 	}

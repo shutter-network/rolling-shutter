@@ -57,7 +57,7 @@ func TestHandleDecryptionKeyIntegration(t *testing.T) {
 		decryptionKeys = append(decryptionKeys, key)
 	}
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeys{
-		InstanceID: config.GetInstanceID(),
+		InstanceId: config.GetInstanceID(),
 		Eon:        keyperConfigIndex,
 		Keys:       decryptionKeys,
 	})
@@ -102,7 +102,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:             "valid decryption key",
 			validationResult: pubsub.ValidationAccept,
 			msg: &p2pmsg.DecryptionKeys{
-				InstanceID: config.GetInstanceID(),
+				InstanceId: config.GetInstanceID(),
 				Eon:        keyperConfigIndex,
 				Keys: []*p2pmsg.Key{
 					{
@@ -116,7 +116,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key wrong epoch",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeys{
-				InstanceID: config.GetInstanceID(),
+				InstanceId: config.GetInstanceID(),
 				Eon:        keyperConfigIndex,
 				Keys: []*p2pmsg.Key{
 					{
@@ -130,7 +130,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key wrong instance ID",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeys{
-				InstanceID: config.GetInstanceID() + 1,
+				InstanceId: config.GetInstanceID() + 1,
 				Eon:        keyperConfigIndex,
 				Keys: []*p2pmsg.Key{
 					{
@@ -144,7 +144,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key empty",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeys{
-				InstanceID: config.GetInstanceID(),
+				InstanceId: config.GetInstanceID(),
 				Eon:        keyperConfigIndex,
 				Keys:       []*p2pmsg.Key{},
 			},
@@ -153,7 +153,7 @@ func TestDecryptionKeyValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key unordered",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeys{
-				InstanceID: config.GetInstanceID(),
+				InstanceId: config.GetInstanceID(),
 				Eon:        keyperConfigIndex,
 				Keys: []*p2pmsg.Key{
 					{

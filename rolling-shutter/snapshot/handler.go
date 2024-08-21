@@ -61,9 +61,9 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 	keys := msg.(*p2pmsg.DecryptionKeys)
 	// FIXME: check snapshot business logic for decryptionKeyMsg validation
-	if keys.GetInstanceID() != handler.config.InstanceID {
+	if keys.GetInstanceId() != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceId())
 	}
 
 	if len(keys.Keys) == 0 {
@@ -107,9 +107,9 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 func (handler *EonPublicKeyHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	eonKeyMsg := msg.(*p2pmsg.EonPublicKey)
-	if eonKeyMsg.GetInstanceID() != handler.config.InstanceID {
+	if eonKeyMsg.GetInstanceId() != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, eonKeyMsg.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, eonKeyMsg.GetInstanceId())
 	}
 	eon := eonKeyMsg.GetEon()
 	if eon == 0 {

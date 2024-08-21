@@ -44,9 +44,9 @@ func (handler *DecryptionKeysHandler) ValidateMessage(_ context.Context, msg p2p
 }
 
 func (handler *DecryptionKeysHandler) validateCommonFields(keys *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
-	if keys.InstanceID != handler.config.InstanceID {
+	if keys.InstanceId != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceId())
 	}
 	if keys.Eon > math.MaxInt64 {
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keys.Eon)

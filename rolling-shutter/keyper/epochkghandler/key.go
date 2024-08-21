@@ -35,9 +35,9 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
-	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
+	if decryptionKeys.GetInstanceId() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceId())
 	}
 
 	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
