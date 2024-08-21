@@ -184,8 +184,8 @@ func (handler *DecryptionKeyShareHandler) HandleMessage(ctx context.Context, m p
 		}
 
 		keys = append(keys, &p2pmsg.Key{
-			Identity: identityPreimage.Bytes(),
-			Key:      decryptionKey.Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Key:              decryptionKey.Marshal(),
 		})
 	}
 	message := &p2pmsg.DecryptionKeys{

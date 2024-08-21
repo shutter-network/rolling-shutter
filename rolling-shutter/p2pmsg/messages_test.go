@@ -66,8 +66,8 @@ func TestDecryptionKeys(t *testing.T) {
 		InstanceId: cfg.instanceID,
 		Keys: []*Key{
 			{
-				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey.Marshal(),
+				IdentityPreimage: cfg.identityPreimage.Bytes(),
+				Key:              validSecretKey.Marshal(),
 			},
 		},
 	}
@@ -148,8 +148,8 @@ func TestTraceContext(t *testing.T) {
 		InstanceId: cfg.instanceID,
 		Keys: []*Key{
 			{
-				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey.Marshal(),
+				IdentityPreimage: cfg.identityPreimage.Bytes(),
+				Key:              validSecretKey.Marshal(),
 			},
 		},
 	}

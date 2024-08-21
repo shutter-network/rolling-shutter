@@ -82,7 +82,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	assert.Check(t, msg.InstanceId == config.GetInstanceID())
 	assert.Check(t, len(msg.Keys) == len(identityPreimages))
 	for i, key := range msg.Keys {
-		assert.Check(t, bytes.Equal(key.Identity, identityPreimages[i].Bytes()))
+		assert.Check(t, bytes.Equal(key.IdentityPreimage, identityPreimages[i].Bytes()))
 		assert.Check(t, bytes.Equal(key.Key, encodedDecryptionKeys[i]))
 	}
 }

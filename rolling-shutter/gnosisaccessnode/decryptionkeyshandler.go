@@ -73,15 +73,15 @@ func (handler *DecryptionKeysHandler) validateCommonFields(keys *p2pmsg.Decrypti
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
-		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, eonKey, k.Identity)
+		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, eonKey, k.IdentityPreimage)
 		if err != nil {
-			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
+			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.IdentityPreimage)
 		}
 		if !ok {
-			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
+			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.IdentityPreimage)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, keys.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.IdentityPreimage, keys.Keys[i-1].IdentityPreimage) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}
