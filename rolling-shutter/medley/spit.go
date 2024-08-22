@@ -7,10 +7,14 @@ import (
 )
 
 // SecureSpit creates a new file with the given path and writes the given content to it. The file
-// is created with with mode 0600. SecureSpit will not overwrite an existing file.
-func SecureSpit(fs afero.Fs, path string, content []byte) error {
+// is created with with mode 0600. SecureSpit will not overwrite an existing file unless asked.
+func SecureSpit(fs afero.Fs, path string, content []byte, overwrite bool) error {
 	var err error
-	file, err := fs.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+	flags := os.O_RDWR | os.O_CREATE
+	if !overwrite {
+		flags |= os.O_EXCL
+	}
+	file, err := fs.OpenFile(path, flags, 0o600)
 	if err != nil {
 		return err
 	}

@@ -45,7 +45,7 @@ func TestConfiguration(t *testing.T) {
 	err = afs.MkdirAll(dirPath, os.ModeDir)
 	assert.NilError(t, err)
 
-	err = command.WriteConfig(afs, config, configFile)
+	err = command.WriteConfig(afs, config, configFile, false)
 	assert.NilError(t, err)
 
 	file, err := afero.ReadFile(afs, configFile)
