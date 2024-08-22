@@ -126,7 +126,7 @@ func Build[T configuration.Config](
 		}
 		genConfigCmd.PersistentFlags().String("output", "", "output file")
 		genConfigCmd.MarkPersistentFlagRequired("output")
-		genConfigCmd.PersistentFlags().BoolP("force", "f", false, "Overwrite existing file")
+		genConfigCmd.PersistentFlags().BoolP("force", "f", false, "overwrite existing file")
 		cb.cobraCommand.AddCommand(genConfigCmd)
 	}
 	if builder.dumpConfig {
@@ -161,7 +161,7 @@ func Build[T configuration.Config](
 		dumpConfigCmd.MarkPersistentFlagRequired("output")
 		dumpConfigCmd.PersistentFlags().String("config", "", "config file")
 		dumpConfigCmd.MarkPersistentFlagFilename("config")
-		dumpConfigCmd.PersistentFlags().BoolP("force", "f", false, "Overwrite existing file")
+		dumpConfigCmd.PersistentFlags().BoolP("force", "f", false, "overwrite existing file")
 		cb.cobraCommand.AddCommand(dumpConfigCmd)
 	}
 	return cb
