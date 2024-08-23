@@ -105,7 +105,13 @@ func (handler *KeyperSetAdded) Handle(
 	query syncer.QueryContext,
 	events []bindings.KeyperSetManagerKeyperSetAdded,
 ) error {
-	// TODO: handle qCtx.Remove, if possible?
+	// TODO: we don't handle reorgs here.
+	// This is because we don't have a good way to deal with
+	// them:
+	// When we originally insert the event, We would have to save
+	// the insert block-hash in the db and upon a reorg delete the keypersets
+	// by insert block-hash.
+
 	for _, ev := range events {
 		opts := &bind.CallOpts{
 			BlockHash: ev.Raw.BlockHash,
@@ -132,14 +138,14 @@ type keyperSet struct {
 	AtBlockNumber *number.BlockNumber
 }
 
-// NOTE: unfortunately we have to poll
-// some data from the blockchain here, because they are not all
-// available from the event direcly.
 func (handler *KeyperSetAdded) queryKeyperSetData(
 	opts *bind.CallOpts,
 	keyperSetContract common.Address,
 	activationBlock uint64,
 ) (*keyperSet, error) {
+	// NOTE: unfortunately we have to poll
+	// some data from the blockchain here, because they are not all
+	// available from the event direcly.
 	ks, err := bindings.NewKeyperSet(keyperSetContract, handler.ethClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not bind to KeyperSet contract")

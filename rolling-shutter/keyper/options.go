@@ -16,7 +16,6 @@ import (
 
 type ContractAddresses struct {
 	KeyperSetManager common.Address
-	KeyBroadcast     common.Address
 }
 
 type Option func(*options) error
@@ -29,6 +28,7 @@ type options struct {
 	messageHandler     []p2p.MessageHandler
 	eonPubkeyHandler   EonPublicKeyHandlerFunc
 	contractAddressses ContractAddresses
+	ethereumAddress    common.Address
 	chainHandler       []syncer.ChainUpdateHandler
 	eventHandler       []syncer.ContractEventHandler
 }
@@ -51,6 +51,7 @@ func validateOptions(o *options) error {
 			"newly negotiated eon public-keys would not be forwarded")
 	}
 	//TODO: check for non-nil contract addresses
+	// TODO: ethereum address required
 	return nil
 }
 
@@ -138,6 +139,14 @@ func WithContractEventHandler(h syncer.ContractEventHandler) Option {
 func WithChainUpdateHandler(h syncer.ChainUpdateHandler) Option {
 	return func(o *options) error {
 		o.chainHandler = append(o.chainHandler, h)
+		return nil
+	}
+}
+
+// TODO: docs
+func WithEthereumAddress(address common.Address) Option {
+	return func(o *options) error {
+		o.ethereumAddress = address
 		return nil
 	}
 }

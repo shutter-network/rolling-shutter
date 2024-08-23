@@ -46,6 +46,7 @@ type KeyperCore struct {
 	messaging         p2p.Messaging
 	messageSender     fx.RPCMessageSender
 	blockSyncClient   *ethclient.Client
+	chainsyncer       *chainsync.Chainsync
 
 	shuttermintState *smobserver.ShuttermintState
 	metricsServer    *metricsserver.MetricsServer
@@ -125,26 +126,32 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 		kpr.blockSyncClient = kpr.opts.blockSyncClient
 	}
 
-	ksa, err := synchandler.NewKeyperSetAdded(
+	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
 		kpr.dbpool,
 		kpr.blockSyncClient,
+		kpr.opts.contractAddressses.KeyperSetManager,
+		kpr.opts.ethereumAddress,
 	)
 	if err != nil {
 		return err
 	}
 
-	chainsync.New(
+	chainsyncOpts := []chainsync.Option{
 		chainsync.WithClient(kpr.blockSyncClient),
 		chainsync.WithBlockCacheSize(200),
 		// TODO: do the stuff from kpr.operateShuttermint in a chainupdate-handler instead
+		// of polling in a separate goroutine
 		// chainsync.WithChainUpdateHandler(),
-		chainsync.WithContractEventHandler(),
-
-		//TODO: pass in the list of additional contract-event-handlers
-		//TODO: pass in the list of additional chain-update-handlers
-
-	)
-	return nil
+		chainsync.WithContractEventHandler(keyperSetAdded),
+	}
+	for _, eh := range kpr.opts.eventHandler {
+		chainsyncOpts = append(chainsyncOpts, chainsync.WithContractEventHandler(eh))
+	}
+	for _, ch := range kpr.opts.chainHandler {
+		chainsyncOpts = append(chainsyncOpts, chainsync.WithChainUpdateHandler(ch))
+	}
+	kpr.chainsyncer, err = chainsync.New(chainsyncOpts...)
+	return err
 }
 
 func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
@@ -190,10 +197,9 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (kpr *KeyperCore) getServices() []service.Service {
-	// FIXME: add the chainsync service here
 	services := []service.Service{
+		kpr.chainsyncer,
 		kpr.messaging,
-		// FIXME: couple this with the chainsync instead of polling!
 		service.Function{Func: kpr.operateShuttermint},
 		newEonPubKeyHandler(kpr),
 	}
@@ -370,7 +376,9 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 }
 
 // TODO: we need a better block syncing mechanism!
-// Also this is doing too much work sequentially in one routine.
+// Now that we have the chainsync, we could put this in a ChainUpdateHandler.
+// However we have to take care of what happens when the node restarts
+// and is quickly syncing non-latest historic, but unknown blocks.
 func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner) error {
 	for {
 		syncBlockNumber, err := retry.FunctionCall(ctx, kpr.blockSyncClient.BlockNumber)
