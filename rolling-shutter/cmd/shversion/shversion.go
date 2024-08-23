@@ -24,15 +24,15 @@ func VersionShort() string {
 	if version == "" {
 		info, ok := debug.ReadBuildInfo()
 		if ok {
-			version = info.Main.Version
-			if version == "(devel)" {
+			versionShort := info.Main.Version
+			if versionShort == "(devel)" {
 				for _, s := range info.Settings {
 					if s.Key == "vcs.revision" {
-						version = fmt.Sprintf("(devel-%s)", s.Value)
-						break
+						return fmt.Sprintf("(devel-%s)", s.Value)
 					}
 				}
 			}
+			return versionShort
 		}
 	}
 	return version
