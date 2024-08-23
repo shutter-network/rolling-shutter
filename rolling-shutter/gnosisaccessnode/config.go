@@ -46,7 +46,7 @@ func (c *Config) SetDefaultValues() error {
 	return nil
 }
 
-func (c *Config) SetExampleValues() error { //nolint:unparam
+func (c *Config) SetExampleValues() error {
 	err := c.SetDefaultValues()
 	if err != nil {
 		return err

@@ -47,7 +47,7 @@ func New(config *Config) *P2PNode {
 	}
 }
 
-func (node *P2PNode) Start(ctx context.Context, runner service.Runner) error {
+func (node *P2PNode) Start(_ context.Context, runner service.Runner) error {
 	services := []service.Service{}
 
 	p2pHandler, err := p2p.New(node.config.P2P)

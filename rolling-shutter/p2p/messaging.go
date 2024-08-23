@@ -155,7 +155,7 @@ type P2PMessaging struct {
 // P2PMessage interface, processes it and returns a slice of resulting P2PMessages.
 // If the handler is registered on the P2Phandler via the AddHandlerFunc function,
 // the passed in handler will be called automatically when a message of type M is received,
-// AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler
+// AFTER it has been successefully validated by the ValidatorFunc, if one is registered on the P2PHandler.
 func (m *P2PMessaging) AddHandlerFunc(handlerFunc HandlerFunc, protos ...p2pmsg.Message) {
 	for _, p := range protos {
 		messageType := proto.MessageName(p)

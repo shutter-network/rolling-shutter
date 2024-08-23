@@ -47,8 +47,7 @@ type Ed25519Private struct {
 func (k *Ed25519Private) Public() Public {
 	pub, ok := k.Key.Public().(ed25519.PublicKey)
 	if !ok {
-		panic("crypto/ed25519's Public() did return unexpected type, " +
-			"indicating an upstream API change")
+		panic(makeUpstreamAPIChangeMessage("crypto/ed25519's Public()"))
 	}
 	return &Ed25519Public{Key: pub}
 }

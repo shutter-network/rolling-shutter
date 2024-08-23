@@ -211,7 +211,7 @@ where one DeliverTx is called for each transaction in the block. The result is a
 application state. Cryptographic commitments to the results of DeliverTx, EndBlock, and Commit are
 included in the header of the next block.
 */
-func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain { //nolint:unparam
 	genesisState := GenesisAppState{}
 	err := amino.NewCodec().UnmarshalJSON(req.AppStateBytes, &genesisState)
 	if err != nil {
@@ -841,7 +841,7 @@ func (app *ShutterApp) maybePersistToDisk() error {
 	return app.PersistToDisk()
 }
 
-func (app *ShutterApp) Commit() abcitypes.ResponseCommit {
+func (app *ShutterApp) Commit() abcitypes.ResponseCommit { //nolint:unparam
 	app.CheckTxState.Reset()
 
 	err := app.maybePersistToDisk()

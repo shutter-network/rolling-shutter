@@ -314,7 +314,7 @@ var testSpecs = []struct {
 	},
 }
 
-func createJSONTests(enc testEncoder) {
+func createJSONTests(enc testEncoder) { //nolint:gocyclo
 	keys, err := testkeygen.NewEonKeys(rand.Reader, 12, 10)
 	if err != nil {
 		panic(err)

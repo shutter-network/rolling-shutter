@@ -62,7 +62,7 @@ func NewConfigForFunc[T configuration.Config](fn ConfigurableFunc[T]) T {
 // The configuration parsing is inferred by main's only argument, which
 // has to be a configuration struct that complies with the configuration.Config
 // interface.
-func Build[T configuration.Config](
+func Build[T configuration.Config]( //nolint:funlen
 	main ConfigurableFunc[T],
 	options ...Option,
 ) *CommandBuilder[T] {
