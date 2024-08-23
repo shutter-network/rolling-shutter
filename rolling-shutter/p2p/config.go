@@ -38,6 +38,7 @@ func NewConfig() *Config {
 
 func (c *Config) Init() {
 	c.P2PKey = &keys.Libp2pPrivate{}
+	c.AdvertiseAddresses = []*address.P2PAddress{}
 }
 
 type Config struct {
