@@ -24,12 +24,12 @@ func CommandAddConfigFileFlag(cmd *cobra.Command) {
 	cmd.MarkPersistentFlagFilename("config")
 }
 
-func WriteConfig(fs afero.Fs, config configuration.Config, outPath string) error {
+func WriteConfig(fs afero.Fs, config configuration.Config, outPath string, overwrite bool) error {
 	buf := &bytes.Buffer{}
 	if err := configuration.WriteTOML(buf, config); err != nil {
 		return errors.Wrap(err, "failed to write config file")
 	}
-	return medley.SecureSpit(fs, outPath, buf.Bytes())
+	return medley.SecureSpit(fs, outPath, buf.Bytes(), overwrite)
 }
 
 // ParseCLI reads in the CLI argument context from the

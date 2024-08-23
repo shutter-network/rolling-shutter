@@ -28,7 +28,7 @@ func RoundtripParseConfig[T configuration.Config](
 	err := afs.MkdirAll(dirPath, os.ModeDir)
 	assert.NilError(t, err)
 
-	err = command.WriteConfig(afs, config, configFile)
+	err = command.WriteConfig(afs, config, configFile, false)
 	assert.NilError(t, err)
 
 	var parsedConfig T

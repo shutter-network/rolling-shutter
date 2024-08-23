@@ -117,11 +117,16 @@ func Build[T configuration.Config](
 				if err != nil {
 					return err
 				}
-				return WriteConfig(builder.filesystem, cfg, outPath)
+				overwrite, err := cmd.Flags().GetBool("force")
+				if err != nil {
+					return err
+				}
+				return WriteConfig(builder.filesystem, cfg, outPath, overwrite)
 			},
 		}
 		genConfigCmd.PersistentFlags().String("output", "", "output file")
 		genConfigCmd.MarkPersistentFlagRequired("output")
+		genConfigCmd.PersistentFlags().BoolP("force", "f", false, "overwrite existing file")
 		cb.cobraCommand.AddCommand(genConfigCmd)
 	}
 	if builder.dumpConfig {
@@ -145,13 +150,18 @@ func Build[T configuration.Config](
 				log.Debug().
 					Interface("config", cfg).
 					Msg("dumping config")
-				return WriteConfig(builder.filesystem, cfg, outPath)
+				overwrite, err := cmd.Flags().GetBool("force")
+				if err != nil {
+					return err
+				}
+				return WriteConfig(builder.filesystem, cfg, outPath, overwrite)
 			},
 		}
 		dumpConfigCmd.PersistentFlags().String("output", "", "output file")
 		dumpConfigCmd.MarkPersistentFlagRequired("output")
 		dumpConfigCmd.PersistentFlags().String("config", "", "config file")
 		dumpConfigCmd.MarkPersistentFlagFilename("config")
+		dumpConfigCmd.PersistentFlags().BoolP("force", "f", false, "overwrite existing file")
 		cb.cobraCommand.AddCommand(dumpConfigCmd)
 	}
 	return cb
