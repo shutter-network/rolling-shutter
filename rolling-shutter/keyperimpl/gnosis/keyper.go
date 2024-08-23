@@ -4,24 +4,22 @@ import (
 	"context"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
-	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
-	"golang.org/x/exp/slog"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/synchandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/slotticker"
@@ -40,19 +38,13 @@ const (
 
 type Keyper struct {
 	core            *keyper.KeyperCore
-	config          *Config
+	config          *config.Config
 	dbpool          *pgxpool.Pool
 	beaconAPIClient *beaconapiclient.Client
 
-	chainSyncClient     *chainsync.Client
-	sequencerSyncer     *SequencerSyncer
-	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
 
-	// input events
-	newBlocks        chan *syncevent.LatestBlock
-	newKeyperSets    chan *syncevent.KeyperSet
 	newEonPublicKeys chan keyper.EonPublicKey
 	slotTicker       *slotticker.SlotTicker
 
@@ -60,7 +52,7 @@ type Keyper struct {
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
 }
 
-func New(c *Config) *Keyper {
+func New(c *config.Config) *Keyper {
 	return &Keyper{
 		config: c,
 	}
@@ -69,11 +61,8 @@ func New(c *Config) *Keyper {
 func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
 
-	kpr.newBlocks = make(chan *syncevent.LatestBlock)
-	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
 	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
-
 	kpr.latestTriggeredSlot = nil
 
 	offset := -(time.Duration(kpr.config.Gnosis.SecondsPerSlot) * time.Second) *
@@ -102,24 +91,27 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
 	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
-	kpr.core, err = NewKeyper(kpr, messagingMiddleware)
+	kpr.core, err = NewKeyperCore(ctx, kpr, messagingMiddleware)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 
-	kpr.chainSyncClient, err = chainsync.NewClient(
-		ctx,
-		chainsync.WithClientURL(kpr.config.Gnosis.Node.EthereumURL),
-		chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
-		chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
-		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
-		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
-		chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
-		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
-	)
-	if err != nil {
-		return err
-	}
+	// TODO: parts are now part of the keypercore,
+	// parts are passed in with the event handler
+	// kpr.chainSyncClient, err = chainsync.NewClient(
+	// 	ctx,
+	// 	chainsync.WithClientURL(kpr.config.Gnosis.Node.EthereumURL),
+	// 	chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
+	// 	chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
+
+	// 	chainsync.WithSyncNewBlock(kpr.channelNewBlock),
+	// chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
+	// 	chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
+	// 	chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
+	// )
+	// if err != nil {
+	// 	return err
+	// }
 
 	eonKeyPublisherClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
 	if err != nil {
@@ -135,15 +127,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to initialize eon key publisher")
 	}
 
-	err = kpr.initSequencerSyncer(ctx)
-	if err != nil {
-		return err
-	}
-	err = kpr.initValidatorSyncer(ctx)
-	if err != nil {
-		return err
-	}
-
 	// Set all transaction pointer ages to infinity. They will be reset to zero when the next
 	// decryption keys arrive, telling us the agreed upon pointer value. Pointer values that are
 	// not in the db yet are not affected. They will be initialized to zero when we first access
@@ -155,10 +138,36 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
+	return runner.StartService(kpr.core, kpr.slotTicker, kpr.eonKeyPublisher)
 }
 
-func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
+func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
+	ethClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to dial ethereum node")
+	}
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get chain ID")
+	}
+	validatorUpdated, err := synchandler.NewValidatorUpdated(
+		kpr.dbpool,
+		ethClient,
+		kpr.beaconAPIClient,
+		kpr.config.Gnosis.Contracts.ValidatorRegistry,
+		chainID.Uint64(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	sequencerTxSubmitted, err := synchandler.NewSequencerTransactionSubmitted(
+		kpr.dbpool,
+		kpr.config.Gnosis.Contracts.Sequencer,
+	)
+	if err != nil {
+		return nil, err
+	}
+	chainUpdate := synchandler.NewChainUpdate(kpr.newBlockHandlerFunc)
 	core, err := keyper.New(
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
@@ -174,99 +183,40 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 		kpr.decryptionTriggerChannel,
 		keyper.WithDBPool(kpr.dbpool),
 		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
 		keyper.WithMessaging(messagingMiddleware),
+		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
+
+		keyper.WithChainUpdateHandler(chainUpdate),
+		keyper.WithContractEventHandler(sequencerTxSubmitted),
+		keyper.WithContractEventHandler(validatorUpdated),
 	)
 	return core, err
 }
 
+// // FIXME: is the described "once" behavior still the same with the handler implementation?
 // initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
-	client, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.ContractsURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to dial Ethereum execution node")
-	}
-
-	log.Info().
-		Str("contract-address", kpr.config.Gnosis.Contracts.KeyperSetManager.Hex()).
-		Msg("initializing sequencer syncer")
-	contract, err := sequencerBindings.NewSequencer(kpr.config.Gnosis.Contracts.Sequencer, client)
-	if err != nil {
-		return err
-	}
-	kpr.sequencerSyncer = &SequencerSyncer{
-		Contract:             contract,
-		DBPool:               kpr.dbpool,
-		ExecutionClient:      client,
-		GenesisSlotTimestamp: kpr.config.Gnosis.GenesisSlotTimestamp,
-		SecondsPerSlot:       kpr.config.Gnosis.SecondsPerSlot,
-		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
-	}
-
-	// Perform an initial sync now because it might take some time and doing so during regular
-	// slot processing might hold up things
-	latestHeader, err := client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get latest block header")
-	}
-	err = kpr.sequencerSyncer.Sync(ctx, latestHeader)
-	if err != nil {
-		return err
-	}
-
+	// TODO: logger
 	return nil
 }
 
-func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
-	validatorSyncerClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to dial ethereum node")
-	}
-	chainID, err := validatorSyncerClient.ChainID(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to get chain ID")
-	}
-	validatorRegistryContract, err := validatorRegistryBindings.NewValidatorregistry(
-		kpr.config.Gnosis.Contracts.ValidatorRegistry,
-		validatorSyncerClient,
+func (kpr *Keyper) newBlockHandlerFunc(ctx context.Context, header *types.Header) error {
+	slot := medley.BlockTimestampToSlot(
+		header.Time,
+		kpr.config.Gnosis.GenesisSlotTimestamp,
+		kpr.config.Gnosis.SecondsPerSlot,
 	)
-	if err != nil {
-		return errors.Wrap(err, "failed to instantiate validator registry contract")
-	}
-	kpr.validatorSyncer = &ValidatorSyncer{
-		Contract:             validatorRegistryContract,
-		DBPool:               kpr.dbpool,
-		BeaconAPIClient:      kpr.beaconAPIClient,
-		ExecutionClient:      validatorSyncerClient,
-		ChainID:              chainID.Uint64(),
-		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
-	}
-
-	// Perform an initial sync now because it might take some time and doing so during regular
-	// slot processing might hold up things
-	latestHeader, err := validatorSyncerClient.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get latest block header")
-	}
-	err = kpr.validatorSyncer.Sync(ctx, latestHeader)
-	if err != nil {
-		return err
-	}
-	return nil
+	return kpr.maybeTriggerDecryption(ctx, slot+1)
 }
 
 func (kpr *Keyper) processInputs(ctx context.Context) error {
 	var err error
 	for {
 		select {
-		case ev := <-kpr.newBlocks:
-			err = kpr.processNewBlock(ctx, ev)
-		case ev := <-kpr.newKeyperSets:
-			err = kpr.processNewKeyperSet(ctx, ev)
-		case ev := <-kpr.newEonPublicKeys:
-			err = kpr.processNewEonPublicKey(ctx, ev)
+		// TODO: this is the SEND to the contract
+		// err = kpr.processNewEonPublicKey(ctx, ev)
 		case slot := <-kpr.slotTicker.C:
 			err = kpr.processNewSlot(ctx, slot)
 		case <-ctx.Done():
@@ -280,16 +230,6 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			log.Error().Err(err).Msg("error processing event")
 		}
 	}
-}
-
-func (kpr *Keyper) channelNewBlock(_ context.Context, ev *syncevent.LatestBlock) error {
-	kpr.newBlocks <- ev
-	return nil
-}
-
-func (kpr *Keyper) channelNewKeyperSet(_ context.Context, ev *syncevent.KeyperSet) error {
-	kpr.newKeyperSets <- ev
-	return nil
 }
 
 func (kpr *Keyper) channelNewEonPublicKey(_ context.Context, key keyper.EonPublicKey) error {

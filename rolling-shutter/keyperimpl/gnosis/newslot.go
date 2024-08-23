@@ -39,13 +39,11 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	}
 	kpr.latestTriggeredSlot = &slot
 
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Println(slot)
-	fmt.Println("")
-	fmt.Println("")
+	fmt.Printf("\n\n%d\n\n\n", slot)
 
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
+	// FIXME: retrieve that from the actual SubmittedEvents highest blocknum and THEN calculate it
+	// slot := medley.BlockTimestampToSlot(qCtx.Update.Latest().Time, sts.GenesisSlotTimestamp, sts.SecondsPerSlot)
 	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).

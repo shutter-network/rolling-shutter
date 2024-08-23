@@ -22,8 +22,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/synchandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/channel"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -122,6 +124,26 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 	} else {
 		kpr.blockSyncClient = kpr.opts.blockSyncClient
 	}
+
+	ksa, err := synchandler.NewKeyperSetAdded(
+		kpr.dbpool,
+		kpr.blockSyncClient,
+	)
+	if err != nil {
+		return err
+	}
+
+	chainsync.New(
+		chainsync.WithClient(kpr.blockSyncClient),
+		chainsync.WithBlockCacheSize(200),
+		// TODO: do the stuff from kpr.operateShuttermint in a chainupdate-handler instead
+		// chainsync.WithChainUpdateHandler(),
+		chainsync.WithContractEventHandler(),
+
+		//TODO: pass in the list of additional contract-event-handlers
+		//TODO: pass in the list of additional chain-update-handlers
+
+	)
 	return nil
 }
 
@@ -168,8 +190,10 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 }
 
 func (kpr *KeyperCore) getServices() []service.Service {
+	// FIXME: add the chainsync service here
 	services := []service.Service{
 		kpr.messaging,
+		// FIXME: couple this with the chainsync instead of polling!
 		service.Function{Func: kpr.operateShuttermint},
 		newEonPubKeyHandler(kpr),
 	}

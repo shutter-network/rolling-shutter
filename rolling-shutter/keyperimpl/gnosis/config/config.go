@@ -1,4 +1,4 @@
-package gnosis
+package config
 
 import (
 	"io"

@@ -12,6 +12,15 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const deleteTransactionSubmittedEventsFromBlockHash = `-- name: DeleteTransactionSubmittedEventsFromBlockHash :exec
+DELETE FROM transaction_submitted_event WHERE block_hash == $1
+`
+
+func (q *Queries) DeleteTransactionSubmittedEventsFromBlockHash(ctx context.Context, blockHash []byte) error {
+	_, err := q.db.Exec(ctx, deleteTransactionSubmittedEventsFromBlockHash, blockHash)
+	return err
+}
+
 const deleteTransactionSubmittedEventsFromBlockNumber = `-- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
 DELETE FROM transaction_submitted_event WHERE block_number >= $1
 `

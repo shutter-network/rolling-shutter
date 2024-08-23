@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
@@ -26,7 +27,7 @@ import (
 )
 
 type MessagingMiddleware struct {
-	config    *Config
+	config    *config.Config
 	messaging p2p.Messaging
 	dbpool    *pgxpool.Pool
 }
@@ -62,7 +63,7 @@ func (h *WrappedMessageHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	return replacedMsgs, nil
 }
 
-func NewMessagingMiddleware(messaging p2p.Messaging, dbpool *pgxpool.Pool, config *Config) *MessagingMiddleware {
+func NewMessagingMiddleware(messaging p2p.Messaging, dbpool *pgxpool.Pool, config *config.Config) *MessagingMiddleware {
 	return &MessagingMiddleware{messaging: messaging, dbpool: dbpool, config: config}
 }
 

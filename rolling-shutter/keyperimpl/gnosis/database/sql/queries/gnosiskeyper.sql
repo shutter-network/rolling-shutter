@@ -41,6 +41,9 @@ WHERE eon = $1;
 -- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
 DELETE FROM transaction_submitted_event WHERE block_number >= $1;
 
+-- name: DeleteTransactionSubmittedEventsFromBlockHash :exec
+DELETE FROM transaction_submitted_event WHERE block_hash == $1;
+
 -- name: GetTxPointer :one
 SELECT * FROM tx_pointer
 WHERE eon = $1;

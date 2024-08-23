@@ -3,6 +3,8 @@ package syncer
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,4 +45,17 @@ type IContractEventHandler[T any] interface {
 
 	Accept(context.Context, types.Header, T) (bool, error)
 	Handle(context.Context, QueryContext, []T) error
+}
+
+// WrapHandler wraps the generic implementation into
+// a dynamically typed handler complying to the
+// `ContractEventHandler` interface.
+func WrapHandler[T any](h IContractEventHandler[T]) (ContractEventHandler, error) {
+	var t T
+	if reflect.TypeOf(t).Kind() == reflect.Pointer {
+		return nil, fmt.Errorf("Handler must not receive pointer values for the event types.")
+	}
+	return contractEventHandler[T]{
+		h: h,
+	}, nil
 }
