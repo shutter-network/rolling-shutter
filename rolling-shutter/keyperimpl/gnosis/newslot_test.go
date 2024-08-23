@@ -12,6 +12,9 @@ import (
 )
 
 func TestGetTxPointerBasicIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, gnosisDatabase.Definition)
 	t.Cleanup(dbclose)
@@ -34,6 +37,9 @@ func TestGetTxPointerBasicIntegration(t *testing.T) {
 }
 
 func TestGetTxPointerInfiniteIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, gnosisDatabase.Definition)
 	t.Cleanup(dbclose)
@@ -62,6 +68,9 @@ func TestGetTxPointerInfiniteIntegration(t *testing.T) {
 }
 
 func TestGetTxPointerOutdatedIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, gnosisDatabase.Definition)
 	t.Cleanup(dbclose)
@@ -91,6 +100,9 @@ func TestGetTxPointerOutdatedIntegration(t *testing.T) {
 }
 
 func TestGetTxPointerMissingIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, gnosisDatabase.Definition)
 	t.Cleanup(dbclose)
