@@ -62,7 +62,7 @@ func (srv *Server) GetDecryptionKey(w http.ResponseWriter, r *http.Request, eon 
 		return
 	}
 
-	res := "0x" + hex.EncodeToString(decryptionKey.DecryptionKey)
+	res := "0x" + hex.EncodeToString(decryptionKey.DecryptionKey) //nolint:goconst
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(res)
 }

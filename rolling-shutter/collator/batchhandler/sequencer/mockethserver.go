@@ -97,7 +97,7 @@ func (me *MockEthServer) Teardown() {
 	}
 }
 
-func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) {
+func (me *MockEthServer) handle(w http.ResponseWriter, r *http.Request) { //nolint:funlen,gocyclo
 	var (
 		status int
 		mess   jsonrpcMessage

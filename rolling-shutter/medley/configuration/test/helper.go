@@ -61,7 +61,7 @@ func SmokeGenerateConfig[T configuration.Config](
 	afs := afero.NewMemMapFs()
 	v.SetFs(afs)
 
-	configFile := dirPath + config.Name() + ".toml"
+	configFile := dirPath + config.Name()
 	err := afs.MkdirAll(dirPath, os.ModeDir)
 	assert.NilError(t, err)
 

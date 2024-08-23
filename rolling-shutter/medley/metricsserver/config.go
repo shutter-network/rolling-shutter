@@ -43,6 +43,6 @@ func (mc *MetricsConfig) SetExampleValues() error {
 	return nil
 }
 
-func (mc *MetricsConfig) TOMLWriteHeader(w io.Writer) (int, error) {
+func (mc *MetricsConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 	return 0, nil
 }

@@ -139,7 +139,7 @@ func encrypt(msg string) error {
 
 	msgBytes := []byte(msg)
 	encryptedMsg := shcrypto.Encrypt(msgBytes, eonKey, epochIDPoint, sigma)
-	fmt.Println("0x" + hex.EncodeToString(encryptedMsg.Marshal()))
+	fmt.Println("0x" + hex.EncodeToString(encryptedMsg.Marshal())) //nolint:goconst
 	return nil
 }
 

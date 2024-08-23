@@ -21,5 +21,5 @@ func TestRandomisePeers(t *testing.T) {
 	randomisedPeers := randomizePeers(peerAddr)
 
 	equal := reflect.DeepEqual(peerAddr, randomisedPeers)
-	assert.Assert(t, !equal, "randomised unsuccessful")
+	assert.Assert(t, !equal, "randomized unsuccessful")
 }
