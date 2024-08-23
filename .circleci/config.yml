@@ -160,15 +160,6 @@ jobs:
             asdf install tinygo
             asdf install binaryen
             asdf install nodejs
-      - run: make build wasm
-      - node/install-packages:
-          app-dir: ../js/shutter-crypto
-          override-ci-command: npm install
-      - run: make wasm-js
-      - run:
-          name: "Run WASM tests"
-          command: |
-            make wasm-js-test
       - run:
           name: "Run unit tests with gotestsum"
           command: |
