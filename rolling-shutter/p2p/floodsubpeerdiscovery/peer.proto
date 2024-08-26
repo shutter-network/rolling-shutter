@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "./;gossippeerdiscovery";
+option go_package = "./;floodsubpeerdiscovery";
 
 message Peer {
   bytes publicKey = 1;

@@ -4,7 +4,7 @@
 // 	protoc        v3.21.7
 // source: peer.proto
 
-package gossippeerdiscovery
+package floodsubpeerdiscovery
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

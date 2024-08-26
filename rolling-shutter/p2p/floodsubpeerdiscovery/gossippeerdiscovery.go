@@ -1,8 +1,9 @@
-package gossippeerdiscovery
+package floodsubpeerdiscovery
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -13,34 +14,61 @@ import (
 
 const defaultTopic = "_peer-discovery._p2p._pubsub"
 
-type GossipPeerDiscovery struct {
+type FloodsubPeerDiscovery struct {
 	PeerDiscoveryComponents
-	Interval   int
-	Topics     []string
-	ListenOnly bool
+	Interval int
+	Topics   []*pubsub.Topic
 }
 
 type PeerDiscoveryComponents struct {
-	peerId    address.P2PIdentifier
-	pubsub    *pubsub.PubSub
-	peerStore peerstore.Peerstore
+	PeerId    address.P2PIdentifier
+	Pubsub    *pubsub.PubSub
+	PeerStore peerstore.Peerstore
 }
 
-func (pd *GossipPeerDiscovery) init(config PeerDiscoveryComponents, interval int, topics []string, listenOnly bool) {
+func (pd *FloodsubPeerDiscovery) Init(config PeerDiscoveryComponents, interval int, topics []string) error {
 	pd.Interval = interval
+	pd.PeerId = config.PeerId
+	pd.Pubsub = config.Pubsub
+	pd.PeerStore = config.PeerStore
+
 	if len(topics) > 0 {
-		pd.Topics = topics
+		for _, topic := range topics {
+			topic, err := pd.Pubsub.Join(topic)
+			if err != nil {
+				return fmt.Errorf("failed to join topic | err %v", err)
+			}
+			pd.Topics = append(pd.Topics, topic)
+		}
 	} else {
-		pd.Topics = []string{defaultTopic}
+		topic, err := pd.Pubsub.Join(defaultTopic)
+		if err != nil {
+			return fmt.Errorf("failed to join topic | err %v", err)
+		}
+		pd.Topics = append(pd.Topics, topic)
 	}
-	pd.ListenOnly = listenOnly
-	pd.peerId = config.peerId
-	pd.pubsub = config.pubsub
-	pd.peerStore = config.peerStore
+	return nil
 }
 
-func (pd *GossipPeerDiscovery) broadcast() error {
-	pubKey, err := pd.peerId.ExtractPublicKey()
+func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
+	timer := time.NewTicker(time.Duration(pd.Interval) * time.Second)
+
+	for {
+		select {
+		case <-timer.C:
+			err := pd.broadcast()
+			if err != nil {
+				log.Info().Msgf("error in broadcasting floodsub msg | %v", err)
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (pd *FloodsubPeerDiscovery) broadcast() error {
+	pubKey, err := pd.PeerId.ExtractPublicKey()
 	if err != nil {
 		return fmt.Errorf("peerId was missing public key | err %v", err)
 	}
@@ -50,13 +78,13 @@ func (pd *GossipPeerDiscovery) broadcast() error {
 		return fmt.Errorf("peerId was missing public key | err %v", err)
 	}
 
-	if pd.pubsub == nil {
+	if pd.Pubsub == nil {
 		return fmt.Errorf("pubSub not configured | err %v", err)
 	}
 
 	addresses := make([][]byte, 0)
 
-	for _, addr := range pd.peerStore.Addrs(pd.peerId.ID) {
+	for _, addr := range pd.PeerStore.Addrs(pd.PeerId.ID) {
 		addresses = append(addresses, addr.Bytes())
 	}
 
@@ -70,18 +98,16 @@ func (pd *GossipPeerDiscovery) broadcast() error {
 	}
 
 	for _, topic := range pd.Topics {
-		if len(pd.pubsub.ListPeers(topic)) == 0 {
+		if len(pd.Pubsub.ListPeers(topic.String())) == 0 {
 			log.Info().Msgf("skipping broadcasting our peer data on topic %s because there are no peers present", topic)
 			continue
 		}
 		log.Info().Msgf("broadcasting our peer data on topic %s", topic)
-		topic, err := pd.pubsub.Join(topic)
-		if err != nil {
-			return fmt.Errorf("failed to join topic | err %v", err)
-		}
+
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
 			return fmt.Errorf("failed to publish to topic | err %v", err)
 		}
+		defer topic.Close()
 	}
 	return nil
 }
