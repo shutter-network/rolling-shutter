@@ -8,8 +8,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/rs/zerolog/log"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
 )
 
 const defaultTopic = "_peer-discovery._p2p._pubsub"
