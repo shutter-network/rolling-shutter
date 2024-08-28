@@ -36,14 +36,14 @@ func (pd *FloodsubPeerDiscovery) Init(config PeerDiscoveryComponents, interval i
 		for _, topic := range topics {
 			topic, err := pd.Pubsub.Join(topic)
 			if err != nil {
-				return fmt.Errorf("failed to join topic | err %v", err)
+				return fmt.Errorf("failed to join topic | err %w", err)
 			}
 			pd.Topics = append(pd.Topics, topic)
 		}
 	} else {
 		topic, err := pd.Pubsub.Join(defaultTopic)
 		if err != nil {
-			return fmt.Errorf("failed to join topic | err %v", err)
+			return fmt.Errorf("failed to join topic | err %w", err)
 		}
 		pd.Topics = append(pd.Topics, topic)
 	}
@@ -58,7 +58,7 @@ func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
 		case <-timer.C:
 			err := pd.broadcast()
 			if err != nil {
-				log.Info().Msgf("error in broadcasting floodsub msg | %v", err)
+				log.Warn().Msgf("error in broadcasting floodsub msg | %v", err)
 				return err
 			}
 		case <-ctx.Done():
@@ -70,16 +70,16 @@ func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
 func (pd *FloodsubPeerDiscovery) broadcast() error {
 	pubKey, err := pd.PeerId.ExtractPublicKey()
 	if err != nil {
-		return fmt.Errorf("peerId was missing public key | err %v", err)
+		return fmt.Errorf("peerId was missing public key | err %w", err)
 	}
 
 	pubKeyBytes, err := pubKey.Raw()
 	if err != nil || len(pubKeyBytes) == 0 {
-		return fmt.Errorf("peerId was missing public key | err %v", err)
+		return fmt.Errorf("peerId was missing public key | err %w", err)
 	}
 
 	if pd.Pubsub == nil {
-		return fmt.Errorf("pubSub not configured | err %v", err)
+		return fmt.Errorf("pubSub not configured | err %w", err)
 	}
 
 	addresses := make([][]byte, 0)
@@ -94,7 +94,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 	pbPeer, err := proto.Marshal(&peer)
 	if err != nil {
-		return fmt.Errorf("error marshalling message | err %v", err)
+		return fmt.Errorf("error marshalling message | err %w", err)
 	}
 
 	for _, topic := range pd.Topics {
@@ -105,7 +105,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 		log.Info().Msgf("broadcasting our peer data on topic %s", topic)
 
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
-			return fmt.Errorf("failed to publish to topic | err %v", err)
+			return fmt.Errorf("failed to publish to topic | err %w", err)
 		}
 		defer topic.Close()
 	}
