@@ -21,14 +21,14 @@ type FloodsubPeerDiscovery struct {
 }
 
 type PeerDiscoveryComponents struct {
-	PeerId    address.P2PIdentifier
+	PeerID    address.P2PIdentifier
 	Pubsub    *pubsub.PubSub
 	PeerStore peerstore.Peerstore
 }
 
 func (pd *FloodsubPeerDiscovery) Init(config PeerDiscoveryComponents, interval int, topics []string) error {
 	pd.Interval = interval
-	pd.PeerId = config.PeerId
+	pd.PeerID = config.PeerID
 	pd.Pubsub = config.Pubsub
 	pd.PeerStore = config.PeerStore
 
@@ -62,13 +62,18 @@ func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
 				return err
 			}
 		case <-ctx.Done():
+			for _, topic := range pd.Topics {
+				if err := topic.Close(); err != nil {
+					return fmt.Errorf("error in closing topic | %w", err)
+				}
+			}
 			return nil
 		}
 	}
 }
 
 func (pd *FloodsubPeerDiscovery) broadcast() error {
-	pubKey, err := pd.PeerId.ExtractPublicKey()
+	pubKey, err := pd.PeerID.ExtractPublicKey()
 	if err != nil {
 		return fmt.Errorf("peerId was missing public key | err %w", err)
 	}
@@ -84,7 +89,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 
 	addresses := make([][]byte, 0)
 
-	for _, addr := range pd.PeerStore.Addrs(pd.PeerId.ID) {
+	for _, addr := range pd.PeerStore.Addrs(pd.PeerID.ID) {
 		addresses = append(addresses, addr.Bytes())
 	}
 
@@ -94,7 +99,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 	pbPeer, err := proto.Marshal(&peer)
 	if err != nil {
-		return fmt.Errorf("error marshalling message | err %w", err)
+		return fmt.Errorf("error marshaling message | err %w", err)
 	}
 
 	for _, topic := range pd.Topics {
@@ -107,7 +112,6 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
 			return fmt.Errorf("failed to publish to topic | err %w", err)
 		}
-		defer topic.Close()
 	}
 	return nil
 }

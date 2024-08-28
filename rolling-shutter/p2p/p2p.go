@@ -136,11 +136,14 @@ func (p *P2PNode) Run(
 		log.Info().Msg("floodsub peer discovery is enabled")
 		p.FloodSubDiscovery = &floodsubpeerdiscovery.FloodsubPeerDiscovery{}
 		peerDiscoveryComponents := floodsubpeerdiscovery.PeerDiscoveryComponents{
-			PeerId:    address.P2PIdentifier{p.host.ID()},
+			PeerID:    address.P2PIdentifier{ID: p.host.ID()},
 			PeerStore: p.host.Peerstore(),
 			Pubsub:    p.pubSub,
 		}
-		p.FloodSubDiscovery.Init(peerDiscoveryComponents, p.config.FloodsubDiscovery.Interval, p.config.FloodsubDiscovery.Topics)
+		err := p.FloodSubDiscovery.Init(peerDiscoveryComponents, p.config.FloodsubDiscovery.Interval, p.config.FloodsubDiscovery.Topics)
+		if err != nil {
+			return err
+		}
 		runner.Go(func() error {
 			return p.FloodSubDiscovery.Start(ctx)
 		})

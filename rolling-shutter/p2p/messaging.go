@@ -99,7 +99,7 @@ func New(config *Config) (*P2PMessaging, error) {
 		Environment:        config.Environment,
 		DiscoveryNamespace: config.DiscoveryNamespace,
 		IsAccessNode:       config.IsAccessNode,
-		FloodsubDiscovery:  *&config.FloodSubDiscovery,
+		FloodsubDiscovery:  config.FloodSubDiscovery,
 	}
 
 	bootstrapAddresses := config.CustomBootstrapAddresses
