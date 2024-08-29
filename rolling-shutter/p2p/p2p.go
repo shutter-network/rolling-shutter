@@ -23,6 +23,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/env"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p/floodsubpeerdiscovery"
 )
 
 var DefaultBootstrapPeers []*address.P2PAddress
@@ -59,7 +60,8 @@ type P2PNode struct {
 	pubSub      *pubsub.PubSub
 	gossipRooms map[string]*gossipRoom
 
-	GossipMessages chan *pubsub.Message
+	GossipMessages    chan *pubsub.Message
+	FloodSubDiscovery *floodsubpeerdiscovery.FloodsubPeerDiscovery
 }
 
 type p2pNodeConfig struct {
@@ -71,6 +73,13 @@ type p2pNodeConfig struct {
 	IsBootstrapNode    bool
 	IsAccessNode       bool
 	DiscoveryNamespace string
+	FloodsubDiscovery  FloodsubDiscoveryConfig
+}
+
+type FloodsubDiscoveryConfig struct {
+	Enabled  bool
+	Interval int
+	Topics   []string
 }
 
 func NewP2PNode(config p2pNodeConfig) *P2PNode {
@@ -121,6 +130,22 @@ func (p *P2PNode) Run(
 		room := room
 		runner.Go(func() error {
 			return room.readLoop(ctx, p.GossipMessages)
+		})
+	}
+	if p.config.FloodsubDiscovery.Enabled {
+		log.Info().Msg("floodsub peer discovery is enabled")
+		p.FloodSubDiscovery = &floodsubpeerdiscovery.FloodsubPeerDiscovery{}
+		peerDiscoveryComponents := floodsubpeerdiscovery.PeerDiscoveryComponents{
+			PeerID:    address.P2PIdentifier{ID: p.host.ID()},
+			PeerStore: p.host.Peerstore(),
+			Pubsub:    p.pubSub,
+		}
+		err := p.FloodSubDiscovery.Init(peerDiscoveryComponents, p.config.FloodsubDiscovery.Interval, p.config.FloodsubDiscovery.Topics)
+		if err != nil {
+			return err
+		}
+		runner.Go(func() error {
+			return p.FloodSubDiscovery.Start(ctx)
 		})
 	}
 	runner.Go(func() error {

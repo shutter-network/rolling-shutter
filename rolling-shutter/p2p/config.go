@@ -46,8 +46,9 @@ type Config struct {
 	AdvertiseAddresses       []*address.P2PAddress `comment:"Optional, addresses to be advertised to other peers instead of auto-detected ones."`
 	CustomBootstrapAddresses []*address.P2PAddress `comment:"Overwrite p2p boostrap nodes"`
 	Environment              env.Environment
-	DiscoveryNamespace       string `shconfig:",required" comment:"Must be unique for each instance id."`
-	IsAccessNode             bool   `comment:"Optional, to be set to true if running an access node"`
+	DiscoveryNamespace       string                  `shconfig:",required" comment:"Must be unique for each instance id."`
+	IsAccessNode             bool                    `comment:"Optional, to be set to true if running an access node"`
+	FloodSubDiscovery        FloodsubDiscoveryConfig `shconfig:"required"`
 }
 
 func (c *Config) Name() string {
