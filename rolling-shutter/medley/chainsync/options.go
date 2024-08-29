@@ -8,7 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/keybroadcastcontract"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 	"github.com/shutter-network/shop-contracts/predeploy"
 
 	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
@@ -80,7 +81,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		o.syncStart = number.NewBlockNumber(&latestBlock)
 	}
 
-	c.KeyperSetManager, err = bindings.NewKeyperSetManager(*o.keyperSetManagerAddress, client)
+	c.KeyperSetManager, err = keypersetmanager.NewKeypersetmanager(*o.keyperSetManagerAddress, client)
 	if err != nil {
 		return err
 	}
@@ -95,7 +96,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		c.services = append(c.services, c.kssync)
 	}
 
-	c.KeyBroadcast, err = bindings.NewKeyBroadcastContract(*o.keyBroadcastContractAddress, client)
+	c.KeyBroadcast, err = keybroadcastcontract.NewKeybroadcastcontract(*o.keyBroadcastContractAddress, client)
 	if err != nil {
 		return err
 	}
