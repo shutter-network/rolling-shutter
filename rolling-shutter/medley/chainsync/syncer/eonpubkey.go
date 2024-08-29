@@ -7,7 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/keybroadcastcontract"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -18,12 +19,12 @@ import (
 type EonPubKeySyncer struct {
 	Client           client.Client
 	Log              log.Logger
-	KeyBroadcast     *bindings.KeyBroadcastContract
-	KeyperSetManager *bindings.KeyperSetManager
+	KeyBroadcast     *keybroadcastcontract.Keybroadcastcontract
+	KeyperSetManager *keypersetmanager.Keypersetmanager
 	StartBlock       *number.BlockNumber
 	Handler          event.EonPublicKeyHandler
 
-	keyBroadcastCh chan *bindings.KeyBroadcastContractEonKeyBroadcast
+	keyBroadcastCh chan *keybroadcastcontract.KeybroadcastcontractEonKeyBroadcast
 }
 
 func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -55,7 +56,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		Start:   s.StartBlock.ToUInt64Ptr(),
 		Context: ctx,
 	}
-	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, channelSize)
+	s.keyBroadcastCh = make(chan *keybroadcastcontract.KeybroadcastcontractEonKeyBroadcast, channelSize)
 	subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {

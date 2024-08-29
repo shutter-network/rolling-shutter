@@ -9,7 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/keybroadcastcontract"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -31,8 +32,8 @@ type Client struct {
 	chainID *big.Int
 	privKey *ecdsa.PrivateKey
 
-	KeyperSetManager *bindings.KeyperSetManager
-	KeyBroadcast     *bindings.KeyBroadcastContract
+	KeyperSetManager *keypersetmanager.Keypersetmanager
+	KeyBroadcast     *keybroadcastcontract.Keybroadcastcontract
 
 	sssync  *syncer.ShutterStateSyncer
 	kssync  *syncer.KeyperSetSyncer

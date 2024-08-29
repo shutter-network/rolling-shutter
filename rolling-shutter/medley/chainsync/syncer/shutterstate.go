@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -16,13 +16,13 @@ import (
 
 type ShutterStateSyncer struct {
 	Client     client.Client
-	Contract   *bindings.KeyperSetManager
+	Contract   *keypersetmanager.Keypersetmanager
 	StartBlock *number.BlockNumber
 	Log        log.Logger
 	Handler    event.ShutterStateHandler
 
-	pausedCh   chan *bindings.KeyperSetManagerPaused
-	unpausedCh chan *bindings.KeyperSetManagerUnpaused
+	pausedCh   chan *keypersetmanager.KeypersetmanagerPaused
+	unpausedCh chan *keypersetmanager.KeypersetmanagerUnpaused
 }
 
 func (s *ShutterStateSyncer) GetShutterState(ctx context.Context, opts *bind.CallOpts) (*event.ShutterState, error) {
@@ -48,7 +48,7 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 		Start:   s.StartBlock.ToUInt64Ptr(), // nil means latest
 		Context: ctx,
 	}
-	s.pausedCh = make(chan *bindings.KeyperSetManagerPaused)
+	s.pausedCh = make(chan *keypersetmanager.KeypersetmanagerPaused)
 	subs, err := s.Contract.WatchPaused(watchOpts, s.pausedCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
@@ -56,7 +56,7 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	}
 	runner.Defer(subs.Unsubscribe)
 
-	s.unpausedCh = make(chan *bindings.KeyperSetManagerUnpaused)
+	s.unpausedCh = make(chan *keypersetmanager.KeypersetmanagerUnpaused)
 	subs, err = s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
