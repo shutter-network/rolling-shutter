@@ -1,4 +1,4 @@
-package gnosisaccessnode
+package storage
 
 import (
 	"sync"
@@ -8,28 +8,28 @@ import (
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 )
 
-type Storage struct {
+type Memory struct {
 	mu         sync.Mutex
 	eonKeys    map[uint64]*shcrypto.EonPublicKey
 	keyperSets map[uint64]*obskeyperdatabase.KeyperSet
 }
 
-func NewStorage() *Storage {
-	return &Storage{
+func NewMemory() *Memory {
+	return &Memory{
 		mu:         sync.Mutex{},
 		eonKeys:    make(map[uint64]*shcrypto.EonPublicKey),
 		keyperSets: make(map[uint64]*obskeyperdatabase.KeyperSet),
 	}
 }
 
-func (s *Storage) AddEonKey(keyperConfigIndex uint64, key *shcrypto.EonPublicKey) {
+func (s *Memory) AddEonKey(keyperConfigIndex uint64, key *shcrypto.EonPublicKey) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.eonKeys[keyperConfigIndex] = key
 }
 
-func (s *Storage) GetEonKey(keyperConfigIndex uint64) (*shcrypto.EonPublicKey, bool) {
+func (s *Memory) GetEonKey(keyperConfigIndex uint64) (*shcrypto.EonPublicKey, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -37,14 +37,14 @@ func (s *Storage) GetEonKey(keyperConfigIndex uint64) (*shcrypto.EonPublicKey, b
 	return v, ok
 }
 
-func (s *Storage) AddKeyperSet(keyperConfigIndex uint64, keyperSet *obskeyperdatabase.KeyperSet) {
+func (s *Memory) AddKeyperSet(keyperConfigIndex uint64, keyperSet *obskeyperdatabase.KeyperSet) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.keyperSets[keyperConfigIndex] = keyperSet
 }
 
-func (s *Storage) GetKeyperSet(keyperConfigIndex uint64) (*obskeyperdatabase.KeyperSet, bool) {
+func (s *Memory) GetKeyperSet(keyperConfigIndex uint64) (*obskeyperdatabase.KeyperSet, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
