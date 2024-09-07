@@ -11,7 +11,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/gnosiskeyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocknode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/mocksequencer"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/optimism"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/p2pnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/proxy"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/rollupkeyper"
@@ -25,8 +24,6 @@ func Subcommands() []*cobra.Command {
 		bootstrap.Cmd(),
 		chain.Cmd(),
 		collator.Cmd(),
-		optimism.Cmd(),
-		optimism.OPBootstrapCmd(),
 		rollupkeyper.Cmd(),
 		mocknode.Cmd(),
 		snapshot.Cmd(),
