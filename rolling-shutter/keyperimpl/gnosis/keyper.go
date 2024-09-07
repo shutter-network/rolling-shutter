@@ -91,7 +91,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
 	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
-	kpr.core, err = NewKeyperCoreForGnosis(ctx, kpr, messagingMiddleware)
+	kpr.core, err = NewKeyperCore(ctx, kpr, messagingMiddleware)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
@@ -141,7 +141,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(kpr.core, kpr.slotTicker, kpr.eonKeyPublisher)
 }
 
-func NewKeyperCoreForGnosis(ctx context.Context, kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
+func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
 	ethClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to dial ethereum node")
@@ -197,7 +197,7 @@ func NewKeyperCoreForGnosis(ctx context.Context, kpr *Keyper, messagingMiddlewar
 	return core, err
 }
 
-// // FIXME: is the described "once" behavior still the same with the handler implementation?
+// FIXME: is the described "once" behavior still the same with the handler implementation?
 //
 // initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to

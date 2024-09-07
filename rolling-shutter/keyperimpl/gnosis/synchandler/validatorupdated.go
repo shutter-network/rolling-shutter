@@ -4,7 +4,6 @@ import (
 	"context"
 	"math"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -16,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	bindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/validatorregistry"
@@ -56,7 +56,6 @@ func NewValidatorUpdated(
 }
 
 type ValidatorUpdated struct {
-	log     log.Logger
 	evABI   *abi.ABI
 	address common.Address
 
@@ -69,10 +68,6 @@ type ValidatorUpdated struct {
 
 func (kb *ValidatorUpdated) Address() common.Address {
 	return kb.address
-}
-
-func (kb *ValidatorUpdated) Log(msg string, ctx ...any) {
-	kb.log.Info(msg, ctx)
 }
 
 func (_ *ValidatorUpdated) Event() string {
@@ -95,19 +90,19 @@ func (vu *ValidatorUpdated) Handle(
 	events []bindings.ValidatorregistryUpdated,
 ) error {
 	db := database.New(vu.dbPool)
-	filteredEvents, err := vu.filterEvents(ctx, events)
+	events, err := vu.filterEvents(ctx, events)
 	if err != nil {
 		return err
 	}
 	err = vu.dbPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		db := database.New(tx)
+		dtbs := database.New(tx)
 		for _, event := range events {
 			msg := new(validatorregistry.RegistrationMessage)
 			err := msg.Unmarshal(event.Message)
 			if err != nil {
 				return errors.Wrap(err, "failed to unmarshal registration message")
 			}
-			err = db.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
+			err = dtbs.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
 				BlockNumber:    int64(event.Raw.BlockNumber),
 				BlockHash:      event.Raw.BlockHash.Bytes(),
 				TxIndex:        int64(event.Raw.TxIndex),
@@ -137,17 +132,17 @@ func (vu *ValidatorUpdated) Handle(
 	if err != nil {
 		return errors.Wrap(err, "failed to get number of validator registrations")
 	}
-	vu.log.Info(
-		"synced validator registry",
-		"start-block", qCtx.Update.Earliest(),
-		"end-block", qCtx.Update.Latest(),
-		"num-inserted-events", len(filteredEvents),
-		"num-discarded-events", len(events)-len(filteredEvents),
-		"num-registrations", numRegistrations,
-	)
-	//TODO:
-	// metricsNumValidatorRegistrations.Set(float64(numRegistrations))
-	// metricsValidatorRegistrationsSyncedUntil.Set(float64(end))
+	// TODO: use the old zerolog again
+	// vu.log.Info(
+	// 	"synced validator registry",
+	// 	"start-block", qCtx.Update.Earliest(),
+	// 	"end-block", qCtx.Update.Latest(),
+	// 	"num-inserted-events", len(filteredEvents),
+	// 	"num-discarded-events", len(events)-len(filteredEvents),
+	// 	"num-registrations", numRegistrations,
+	// )
+	metrics.NumValidatorRegistrations.Set(float64(numRegistrations))
+	metrics.ValidatorRegistrationsSyncedUntil.Set(float64(qCtx.Update.Latest().Number.Uint64()))
 	return nil
 }
 

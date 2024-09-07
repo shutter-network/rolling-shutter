@@ -2,18 +2,20 @@ package synchandler
 
 import (
 	"context"
+	"fmt"
 	"math"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	bindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -38,7 +40,6 @@ func NewSequencerTransactionSubmitted(dbPool *pgxpool.Pool, address common.Addre
 }
 
 type SequencerTransactionSubmitted struct {
-	log     log.Logger
 	evABI   *abi.ABI
 	address common.Address
 
@@ -47,10 +48,6 @@ type SequencerTransactionSubmitted struct {
 
 func (sts *SequencerTransactionSubmitted) Address() common.Address {
 	return sts.address
-}
-
-func (kb *SequencerTransactionSubmitted) Log(msg string, ctx ...any) {
-	kb.log.Info(msg, ctx)
 }
 
 func (_ *SequencerTransactionSubmitted) Event() string {
@@ -73,6 +70,8 @@ func (sts *SequencerTransactionSubmitted) Handle(
 	qCtx syncer.QueryContext,
 	events []bindings.SequencerTransactionSubmitted,
 ) error {
+	numInsertedEvents := 0
+	numDiscardedEvents := 0
 	err := sts.dbPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := database.New(tx)
 		if qCtx.Remove != nil {
@@ -81,13 +80,15 @@ func (sts *SequencerTransactionSubmitted) Handle(
 					return errors.Wrap(err, "failed to delete transaction submitted events from db")
 				}
 			}
-			// log.Info().
-			// 	Int("depth", numReorgedBlocks).
-			// 	Int64("previous-synced-until", syncStatus.BlockNumber).
-			// 	Int64("new-synced-until", newSyncedUntilBlockNumber).
-			// 	Msg("sync status reset due to reorg")
+			log.Info().
+				Int("depth", qCtx.Remove.Len()).
+				Int64("previous-synced-until", qCtx.Remove.Latest().Number.Int64()).
+				Int64("new-synced-until", qCtx.Update.Latest().Number.Int64()).
+				Msg("sync status reset due to reorg")
 		}
-		for _, event := range sts.filterEvents(events) {
+		filteredEvents := sts.filterEvents(events)
+		numDiscardedEvents = len(events) - len(filteredEvents)
+		for _, event := range filteredEvents {
 			_, err := db.InsertTransactionSubmittedEvent(ctx, database.InsertTransactionSubmittedEventParams{
 				Index:          int64(event.TxIndex),
 				BlockNumber:    int64(event.Raw.BlockNumber),
@@ -102,27 +103,26 @@ func (sts *SequencerTransactionSubmitted) Handle(
 			if err != nil {
 				return errors.Wrap(err, "failed to insert transaction submitted event into db")
 			}
-			// metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
-			// 	log.Debug().
-			// 		Uint64("index", event.TxIndex).
-			// 		Uint64("block", event.Raw.BlockNumber).
-			// 		Uint64("eon", event.Eon).
-			// 		Hex("identityPrefix", event.IdentityPrefix[:]).
-			// 		Hex("sender", event.Sender.Bytes()).
-			// 		Uint64("gasLimit", event.GasLimit.Uint64()).
-			// 		Msg("synced new transaction submitted event")
-			// }
+			numInsertedEvents++
+			metrics.LatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
+			log.Debug().
+				Uint64("index", event.TxIndex).
+				Uint64("block", event.Raw.BlockNumber).
+				Uint64("eon", event.Eon).
+				Hex("identityPrefix", event.IdentityPrefix[:]).
+				Hex("sender", event.Sender.Bytes()).
+				Uint64("gasLimit", event.GasLimit.Uint64()).
+				Msg("synced new transaction submitted event")
 		}
-
 		return nil
 	})
-	// log.Info().
-	// 	Uint64("start-block", start).
-	// 	Uint64("end-block", end).
-	// 	Int("num-inserted-events", len(filteredEvents)).
-	// 	Int("num-discarded-events", len(events)-len(filteredEvents)).
-	// 	Msg("synced sequencer contract")
-	// metricsTxSubmittedEventsSyncedUntil.Set(float64(end))
+	log.Info().
+		Uint64("start-block", qCtx.Update.Earliest().Number.Uint64()).
+		Uint64("end-block", qCtx.Update.Latest().Number.Uint64()).
+		Int("num-inserted-events", numInsertedEvents).
+		Int("num-discarded-events", numDiscardedEvents).
+		Msg("synced sequencer contract")
+	metrics.TxSubmittedEventsSyncedUntil.Set(float64(qCtx.Update.Latest().Number.Uint64()))
 	return err
 }
 
@@ -133,13 +133,13 @@ func (sts *SequencerTransactionSubmitted) filterEvents(
 	for _, event := range events {
 		if event.Eon > math.MaxInt64 ||
 			!event.GasLimit.IsInt64() {
-			// log.Debug().
-			// 	Uint64("eon", event.Eon).
-			// 	Uint64("block-number", event.Raw.BlockNumber).
-			// 	Str("block-hash", event.Raw.BlockHash.Hex()).
-			// 	Uint("tx-index", event.Raw.TxIndex).
-			// 	Uint("log-index", event.Raw.Index).
-			// 	Msg("ignoring transaction submitted event with high eon")
+			log.Debug().
+				Uint64("eon", event.Eon).
+				Uint64("block-number", event.Raw.BlockNumber).
+				Str("block-hash", event.Raw.BlockHash.Hex()).
+				Uint("tx-index", event.Raw.TxIndex).
+				Uint("log-index", event.Raw.Index).
+				Msg("ignoring transaction submitted event with high eon")
 			continue
 		}
 		filteredEvents = append(filteredEvents, event)

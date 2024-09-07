@@ -12,17 +12,10 @@ var _ syncer.ChainUpdateHandler = &ChainUpdate{}
 
 // TODO: implement the call to the operateshuttermint here?
 func NewChainUpdate(log log.Logger) *ChainUpdate {
-	return &ChainUpdate{
-		log: log,
-	}
+	return &ChainUpdate{}
 }
 
 type ChainUpdate struct {
-	log log.Logger
-}
-
-func (kb *ChainUpdate) Log(msg string, ctx ...any) {
-	kb.log.Info(msg, ctx)
 }
 
 func (kb *ChainUpdate) Handle(

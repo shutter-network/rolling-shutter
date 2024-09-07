@@ -16,6 +16,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -338,7 +339,7 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	}
 
 	eonString := fmt.Sprint(keys.Eon)
-	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
-	metricsTxPointerAge.WithLabelValues(eonString).Set(0)
+	metrics.TxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
+	metrics.TxPointerAge.WithLabelValues(eonString).Set(0)
 	return []p2pmsg.Message{}, nil
 }

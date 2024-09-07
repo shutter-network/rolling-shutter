@@ -18,6 +18,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/gnosisssztypes"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -189,7 +190,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 	)
 	slotStartTime := time.Unix(int64(slotStartTimestamp), 0)
 	delta := time.Since(slotStartTime)
-	metricsKeySharesSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
+	metrics.KeySharesSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
 	return msg, nil
 }
 
@@ -279,7 +280,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	)
 	slotStartTime := time.Unix(int64(slotStartTimestamp), 0)
 	delta := time.Since(slotStartTime)
-	metricsKeysSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
+	metrics.KeysSentTimeDelta.WithLabelValues(fmt.Sprint(originalMsg.Eon)).Observe(delta.Seconds())
 	return msg, nil
 }
 
@@ -309,7 +310,7 @@ func (i *MessagingMiddleware) advanceTxPointer(ctx context.Context, msg *p2pmsg.
 		return errors.Wrap(err, "failed to set tx pointer")
 	}
 	eonString := fmt.Sprint(msg.Eon)
-	metricsTxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
-	metricsTxPointerAge.WithLabelValues(eonString).Set(0)
+	metrics.TxPointer.WithLabelValues(eonString).Set(float64(newTxPointer))
+	metrics.TxPointerAge.WithLabelValues(eonString).Set(0)
 	return nil
 }

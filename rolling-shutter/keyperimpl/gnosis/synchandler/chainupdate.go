@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 )
@@ -20,12 +19,7 @@ func NewChainUpdate(fn DecryptionFunction) *ChainUpdate {
 }
 
 type ChainUpdate struct {
-	log     log.Logger
 	decrypt DecryptionFunction
-}
-
-func (cu *ChainUpdate) Log(msg string, ctx ...any) {
-	cu.log.Info(msg, ctx)
 }
 
 func (cu *ChainUpdate) Handle(

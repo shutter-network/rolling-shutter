@@ -2,8 +2,8 @@ package synchandler
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -35,7 +35,7 @@ func makeCallError(attrName string, err error) error {
 
 func init() {
 	var err error
-	KeyperSetManagerContractABI, err = bindings.KeyBroadcastContractMetaData.GetAbi()
+	KeyperSetManagerContractABI, err = bindings.KeyperSetManagerMetaData.GetAbi()
 	if err != nil {
 		panic(err)
 	}
@@ -60,12 +60,12 @@ func NewKeyperSetAdded(
 		keyperSetManagerAddress: contractAddress,
 		ethereumAddress:         ethereumAddress,
 		dbpool:                  db,
+		ethClient:               client,
 		keyperSetManager:        ksm,
 	})
 }
 
 type KeyperSetAdded struct {
-	log                     log.Logger
 	evABI                   *abi.ABI
 	keyperSetManagerAddress common.Address
 	// own address
@@ -80,10 +80,6 @@ type KeyperSetAdded struct {
 
 func (handler *KeyperSetAdded) Address() common.Address {
 	return handler.keyperSetManagerAddress
-}
-
-func (handler *KeyperSetAdded) Log(msg string, ctx ...any) {
-	handler.log.Info(msg, ctx)
 }
 
 func (_ *KeyperSetAdded) Event() string {
@@ -108,79 +104,27 @@ func (handler *KeyperSetAdded) Handle(
 	// TODO: we don't handle reorgs here.
 	// This is because we don't have a good way to deal with
 	// them:
-	// When we originally insert the event, We would have to save
+	// When we originally insert the event, we would have to save
 	// the insert block-hash in the db and upon a reorg delete the keypersets
-	// by insert block-hash.
+	// by insert block-hash. We can't do this in production, since we don't
+	// have a good database migration strategy and framework yet.
 
 	for _, ev := range events {
-		opts := &bind.CallOpts{
-			BlockHash: ev.Raw.BlockHash,
-			Context:   ctx,
-		}
-		ks, err := handler.queryKeyperSetData(opts, ev.KeyperSetContract, ev.ActivationBlock)
+		ks, err := QueryFullKeyperSetFromKeyperSetAddedEvent(ctx, handler.ethClient, ev, handler.keyperSetManager)
 		if err != nil {
-			handler.log.Error("KeyperSetAdded event, error querying keyperset-data", "error", err)
+			// TODO: logging
+			// handler.log.Error("KeyperSetAdded event, error querying keyperset-data", "error", err)
 		}
 		err = handler.processNewKeyperSet(ctx, ks)
 		if err != nil {
-			handler.log.Error("KeyperSetAdded event, error writing to database", "error", err)
+			// TODO: logging
+			// handler.log.Error("KeyperSetAdded event, error writing to database", "error", err)
 		}
 	}
 	return nil
 }
 
-type keyperSet struct {
-	ActivationBlock uint64
-	Members         []common.Address
-	Threshold       uint64
-	Eon             uint64
-
-	AtBlockNumber *number.BlockNumber
-}
-
-func (handler *KeyperSetAdded) queryKeyperSetData(
-	opts *bind.CallOpts,
-	keyperSetContract common.Address,
-	activationBlock uint64,
-) (*keyperSet, error) {
-	// NOTE: unfortunately we have to poll
-	// some data from the blockchain here, because they are not all
-	// available from the event direcly.
-	ks, err := bindings.NewKeyperSet(keyperSetContract, handler.ethClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not bind to KeyperSet contract")
-	}
-	// the manager only accepts final keyper sets,
-	// so we expect this to be final now.
-	final, err := ks.IsFinalized(opts)
-	if err != nil {
-		return nil, makeCallError("IsFinalized", err)
-	}
-	if !final {
-		return nil, errors.New("contract did accept unfinalized keyper-sets")
-	}
-	members, err := ks.GetMembers(opts)
-	if err != nil {
-		return nil, makeCallError("Members", err)
-	}
-	threshold, err := ks.GetThreshold(opts)
-	if err != nil {
-		return nil, makeCallError("Threshold", err)
-	}
-	eon, err := handler.keyperSetManager.GetKeyperSetIndexByBlock(opts, activationBlock)
-	if err != nil {
-		return nil, makeCallError("KeyperSetIndexByBlock", err)
-	}
-	return &keyperSet{
-		ActivationBlock: activationBlock,
-		Members:         members,
-		Threshold:       threshold,
-		Eon:             eon,
-		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
-	}, nil
-}
-
-func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *keyperSet) error {
+func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *KeyperSet) error {
 	isMember := false
 	for _, m := range ev.Members {
 		if m.Cmp(handler.ethereumAddress) == 0 {
@@ -188,14 +132,16 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *keyp
 			break
 		}
 	}
-	handler.log.Info(
-		"new keyper set added",
-		"activation-block", ev.ActivationBlock,
-		"eon", ev.Eon,
-		"num-members", len(ev.Members),
-		"threshold", ev.Threshold,
-		"is-member", isMember,
-	)
+	_ = isMember
+	// FIXME: use the old zerologger again
+	// handler.log.Info(
+	// 	"new keyper set added",
+	// 	"activation-block", ev.ActivationBlock,
+	// 	"eon", ev.Eon,
+	// 	"num-members", len(ev.Members),
+	// 	"threshold", ev.Threshold,
+	// 	"is-member", isMember,
+	// )
 
 	return handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
@@ -220,4 +166,62 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *keyp
 			Threshold:             int32(threshold),
 		})
 	})
+}
+
+type KeyperSet struct {
+	ActivationBlock uint64
+	Members         []common.Address
+	Threshold       uint64
+	Eon             uint64
+
+	AtBlockNumber *number.BlockNumber
+}
+
+// QueryFullKeyperSetFromKeyperSetAddedEvent polls some additional
+// data from the contracts in order to construct the full set of
+// information for a keyper-set.
+// This has to be done because not all information relevant to
+// the keyperset is included in the KeyperSetAdded event.
+func QueryFullKeyperSetFromKeyperSetAddedEvent(
+	ctx context.Context,
+	ethClient client.Client,
+	event bindings.KeyperSetManagerKeyperSetAdded,
+	keyperSetManager *bindings.KeyperSetManager,
+) (*KeyperSet, error) {
+	keyperSet, err := bindings.NewKeyperSet(event.KeyperSetContract, ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("can't bind KeyperSet contract", err)
+	}
+	opts := &bind.CallOpts{
+		BlockHash: event.Raw.BlockHash,
+		Context:   ctx,
+	}
+	// the manager only accepts final keyper sets,
+	// so we expect this to be final now.
+	final, err := keyperSet.IsFinalized(opts)
+	if err != nil {
+		return nil, makeCallError("IsFinalized", err)
+	}
+	if !final {
+		return nil, errors.New("contract did accept unfinalized keyper-sets")
+	}
+	members, err := keyperSet.GetMembers(opts)
+	if err != nil {
+		return nil, makeCallError("Members", err)
+	}
+	threshold, err := keyperSet.GetThreshold(opts)
+	if err != nil {
+		return nil, makeCallError("Threshold", err)
+	}
+	eon, err := keyperSetManager.GetKeyperSetIndexByBlock(opts, event.ActivationBlock)
+	if err != nil {
+		return nil, makeCallError("KeyperSetIndexByBlock", err)
+	}
+	return &KeyperSet{
+		ActivationBlock: event.ActivationBlock,
+		Members:         members,
+		Threshold:       threshold,
+		Eon:             eon,
+		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
+	}, nil
 }
