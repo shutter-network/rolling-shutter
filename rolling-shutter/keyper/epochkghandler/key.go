@@ -35,9 +35,9 @@ func (*DecryptionKeyHandler) MessagePrototypes() []p2pmsg.Message {
 
 func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	decryptionKeys := msg.(*p2pmsg.DecryptionKeys)
-	if decryptionKeys.GetInstanceID() != handler.config.GetInstanceID() {
+	if decryptionKeys.GetInstanceId() != handler.config.GetInstanceID() {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.GetInstanceID(), decryptionKeys.GetInstanceId())
 	}
 
 	eon, err := medley.Uint64ToInt64Safe(decryptionKeys.Eon)
@@ -97,7 +97,7 @@ func checkKeysErrors(
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
-		if i > 0 && bytes.Compare(k.Identity, decryptionKeys.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.IdentityPreimage, decryptionKeys.Keys[i-1].IdentityPreimage) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 
@@ -107,21 +107,21 @@ func checkKeysErrors(
 		}
 		existingDecryptionKey, err := queries.GetDecryptionKey(ctx, database.GetDecryptionKeyParams{
 			Eon:     eon,
-			EpochID: k.GetIdentity(),
+			EpochID: k.GetIdentityPreimage(),
 		})
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.Identity)
+			return pubsub.ValidationReject, errors.Wrapf(err, "failed to get decryption key for identity %x from db", k.IdentityPreimage)
 		}
 		if !errors.Is(err, pgx.ErrNoRows) && bytes.Equal(k.Key, existingDecryptionKey.DecryptionKey) {
 			continue
 		}
 
-		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.Identity)
+		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, pureDKGResult.PublicKey, k.IdentityPreimage)
 		if err != nil {
-			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
+			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.IdentityPreimage)
 		}
 		if !ok {
-			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
+			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.IdentityPreimage)
 		}
 	}
 	return pubsub.ValidationAccept, nil

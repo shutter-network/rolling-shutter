@@ -44,9 +44,9 @@ func (handler *DecryptionKeysHandler) ValidateMessage(_ context.Context, msg p2p
 }
 
 func (handler *DecryptionKeysHandler) validateCommonFields(keys *p2pmsg.DecryptionKeys) (pubsub.ValidationResult, error) {
-	if keys.InstanceID != handler.config.InstanceID {
+	if keys.InstanceId != handler.config.InstanceID {
 		return pubsub.ValidationReject,
-			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceID())
+			errors.Errorf("instance ID mismatch (want=%d, have=%d)", handler.config.InstanceID, keys.GetInstanceId())
 	}
 	if keys.Eon > math.MaxInt64 {
 		return pubsub.ValidationReject, errors.Errorf("eon %d overflows int64", keys.Eon)
@@ -73,15 +73,15 @@ func (handler *DecryptionKeysHandler) validateCommonFields(keys *p2pmsg.Decrypti
 		if err != nil {
 			return pubsub.ValidationReject, err
 		}
-		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, eonKey, k.Identity)
+		ok, err := shcrypto.VerifyEpochSecretKey(epochSecretKey, eonKey, k.IdentityPreimage)
 		if err != nil {
-			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.Identity)
+			return pubsub.ValidationReject, errors.Wrapf(err, "error while checking epoch secret key for identity %x", k.IdentityPreimage)
 		}
 		if !ok {
-			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.Identity)
+			return pubsub.ValidationReject, errors.Errorf("epoch secret key for identity %x is not valid", k.IdentityPreimage)
 		}
 
-		if i > 0 && bytes.Compare(k.Identity, keys.Keys[i-1].Identity) < 0 {
+		if i > 0 && bytes.Compare(k.IdentityPreimage, keys.Keys[i-1].IdentityPreimage) < 0 {
 			return pubsub.ValidationReject, errors.Errorf("keys not ordered")
 		}
 	}

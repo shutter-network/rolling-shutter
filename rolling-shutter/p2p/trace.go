@@ -33,8 +33,8 @@ func InjectTraceContext(ctx context.Context, carrier *p2pmsg.TraceContext) {
 	tid := sc.TraceID()
 	sid := sc.SpanID()
 	flags := sc.TraceFlags()
-	carrier.TraceID = tid[:]
-	carrier.SpanID = sid[:]
+	carrier.TraceId = tid[:]
+	carrier.SpanId = sid[:]
 	carrier.TraceFlags = []byte{byte(flags)}
 	carrier.TraceState = sc.TraceState().String()
 }
@@ -44,8 +44,8 @@ func ExtractTraceContext(ctx context.Context, carrier *p2pmsg.TraceContext) (con
 	if carrier == nil {
 		return ctx, errors.New("carrier is nil")
 	}
-	cTraceID := carrier.GetTraceID()
-	cSpanID := carrier.GetSpanID()
+	cTraceID := carrier.GetTraceId()
+	cSpanID := carrier.GetSpanId()
 	cFlags := carrier.TraceFlags
 	if len(cTraceID) != 16 || len(cSpanID) != 8 || len(cFlags) != 1 {
 		return ctx, errors.New("invalid context")
@@ -116,7 +116,7 @@ func newSpanForReceive(
 		attribute.String("messaging.message.type", msgName),
 		attribute.String("messaging.operation", opName),
 		attribute.String("messaging.producer.id", producer.String()),
-		attribute.Int64("shutter.instance.id", int64(p2pMsg.GetInstanceID())),
+		attribute.Int64("shutter.instance.id", int64(p2pMsg.GetInstanceId())),
 	)
 	log.Debug().Interface("attrs", attrs).Msg("span with attrs")
 	spanName := opName + " " + msg.GetTopic()
@@ -175,7 +175,7 @@ func newSpanForPublish(
 		attribute.String("messaging.system", "libp2p"),
 		attribute.String("messaging.message.type", msgName),
 		attribute.String("messaging.operation", opName),
-		attribute.Int64("shutter.instance.id", int64(p2pMsg.GetInstanceID())),
+		attribute.Int64("shutter.instance.id", int64(p2pMsg.GetInstanceId())),
 	)
 	spanName := opName + " " + p2pMsg.Topic()
 	ctx, span := otel.Tracer(resourceName).

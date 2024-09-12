@@ -20,7 +20,7 @@ const EnvelopeVersion = "0.0.1"
 // Message can be send via the p2p protocol.
 type Message interface {
 	protoreflect.ProtoMessage
-	GetInstanceID() uint64
+	GetInstanceId() uint64
 	Topic() string
 	LogInfo() string
 	Validate() error
@@ -76,7 +76,7 @@ func Unmarshal(data []byte) (Message, *TraceContext, error) {
 }
 
 func (trigger *DecryptionTrigger) LogInfo() string {
-	identityPreimage := identitypreimage.IdentityPreimage(trigger.EpochID)
+	identityPreimage := identitypreimage.IdentityPreimage(trigger.IdentityPreimage)
 	return fmt.Sprintf("DecryptionTrigger{epochid=%x}", identityPreimage.String())
 }
 
@@ -122,7 +122,7 @@ func (keys *DecryptionKeys) LogInfo() string {
 	if len(keys.Keys) == 0 {
 		firstIdentity = "none"
 	} else {
-		id := identitypreimage.IdentityPreimage(keys.Keys[0].Identity)
+		id := identitypreimage.IdentityPreimage(keys.Keys[0].IdentityPreimage)
 		firstIdentity = id.Hex()
 	}
 	return fmt.Sprintf("DecryptionKeys{firstIdentity=%s, numKeys=%d}", firstIdentity, len(keys.Keys))
