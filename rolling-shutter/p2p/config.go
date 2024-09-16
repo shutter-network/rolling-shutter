@@ -62,6 +62,7 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaultValues() error {
 	c.ListenAddresses = defaultListenAddrs
 	c.Environment = env.EnvironmentProduction
+	c.FloodSubDiscovery.Interval = 10
 	return nil
 }
 
