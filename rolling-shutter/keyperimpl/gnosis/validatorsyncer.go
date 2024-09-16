@@ -25,7 +25,7 @@ import (
 
 const (
 	ValidatorRegistrationMessageVersion = 0
-	maxRequestBlockRange                = 100000
+	maxRequestBlockRange                = 10_000
 )
 
 type ValidatorSyncer struct {
