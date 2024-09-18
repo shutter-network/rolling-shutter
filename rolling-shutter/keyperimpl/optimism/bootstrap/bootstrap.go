@@ -34,7 +34,6 @@ func BootstrapValidators(config *Config) error {
 	}
 
 	ms := fx.NewRPCMessageSender(shmcl, config.SigningKey.Key)
-	ms.AllowedToSend.Store(true)
 	batchConfigMsg := shmsg.NewBatchConfig(
 		ks.ActivationBlock,
 		ks.Members,
