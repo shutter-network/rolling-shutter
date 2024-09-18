@@ -78,10 +78,10 @@ func NewRPCMessageSender(cl client.Client, signingKey *ecdsa.PrivateKey) RPCMess
 
 // SendMessage signs the given shmsg.Message and sends the message to shuttermint.
 func (ms *RPCMessageSender) SendMessage(ctx context.Context, msg *shmsg.Message) error {
-	if !ms.AllowedToSend.Load() {
-		log.Info().Str("msg", msg.String()).Msg("not allowed to send")
-		return nil
-	}
+	//if !ms.AllowedToSend.Load() {
+	//	log.Info().Str("msg", msg.String()).Msg("not allowed to send")
+	//	return nil
+	//}
 	if err := ms.maybeFetchChainID(ctx); err != nil {
 		return err
 	}
