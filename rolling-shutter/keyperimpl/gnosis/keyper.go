@@ -91,27 +91,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
 	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
-	kpr.core, err = NewKeyperCore(ctx, kpr, messagingMiddleware)
+	kpr.core, err = InitializeKeyperCore(ctx, kpr, messagingMiddleware)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
-
-	// TODO: parts are now part of the keypercore,
-	// parts are passed in with the event handler
-	// kpr.chainSyncClient, err = chainsync.NewClient(
-	// 	ctx,
-	// 	chainsync.WithClientURL(kpr.config.Gnosis.Node.EthereumURL),
-	// 	chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
-	// 	chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
-
-	// 	chainsync.WithSyncNewBlock(kpr.channelNewBlock),
-	//  chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
-	// 	chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
-	// 	chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
-	// )
-	// if err != nil {
-	// 	return err
-	// }
 
 	eonKeyPublisherClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
 	if err != nil {
@@ -141,7 +124,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(kpr.core, kpr.slotTicker, kpr.eonKeyPublisher)
 }
 
-func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
+func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
 	ethClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to dial ethereum node")
@@ -150,6 +133,7 @@ func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *Messag
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get chain ID")
 	}
+
 	validatorUpdated, err := synchandler.NewValidatorUpdated(
 		kpr.dbpool,
 		ethClient,
@@ -167,7 +151,7 @@ func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *Messag
 	if err != nil {
 		return nil, err
 	}
-	chainUpdate := synchandler.NewChainUpdate(kpr.newBlockHandlerFunc)
+	chainUpdate := synchandler.NewDecryptionChainUpdateHandler(kpr.newBlockHandlerFunc)
 	core, err := keyper.New(
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
@@ -186,8 +170,9 @@ func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *Messag
 				KeyperSetManager: kpr.config.Gnosis.Contracts.KeyperSetManager,
 			}),
 		keyper.WithDBPool(kpr.dbpool),
-		keyper.NoBroadcastEonPublicKey(),
 		keyper.WithMessaging(messagingMiddleware),
+
+		keyper.NoBroadcastEonPublicKey(),
 		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
 
 		keyper.WithChainUpdateHandler(chainUpdate),
@@ -197,12 +182,11 @@ func NewKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware *Messag
 	return core, err
 }
 
-// FIXME: is the described "once" behavior still the same with the handler implementation?
-//
-// initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
+// initSequencerSyncer initializes the sequencer syncer if the keyper is known to be a member of a
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
+	// FIXME: is the described "once" behavior still the same with the handler implementation?
 	return nil
 }
 

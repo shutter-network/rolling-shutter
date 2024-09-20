@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -126,6 +128,12 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 		kpr.blockSyncClient = kpr.opts.blockSyncClient
 	}
 
+	// FIXME: this will only sync the keypersets based
+	// on when the initial event was emitted.
+	// So it could be that there is a keyperset currently
+	// active, but we don't add this since it has been registered
+	// before the sync-start block.
+	//
 	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
 		kpr.dbpool,
 		kpr.blockSyncClient,
@@ -410,6 +418,10 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+func (kpr *KeyperCore) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
+	return kpr.chainsyncer.GetHeaderByHash(ctx, h)
 }
 
 func allowSendIfInKeyperSet(ctx context.Context, queries *database.Queries, syncBlockNumber uint64, kpr *KeyperCore) {

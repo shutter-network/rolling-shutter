@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -38,4 +40,8 @@ func (c *Chainsync) Start(ctx context.Context, runner service.Runner) error {
 		return fmt.Errorf("error initializing Chainsync: %w", err)
 	}
 	return c.fetcher.Start(ctx, runner)
+}
+
+func (c *Chainsync) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
+	return c.fetcher.GetHeaderByHash(ctx, h)
 }

@@ -60,6 +60,20 @@ func NewFetcher(c ChainClient, chainCache ChainCache, log log.Logger) *Fetcher {
 		processingTrig:        make(chan struct{}, 1),
 	}
 }
+func (f *Fetcher) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
+	header, err := f.chainCache.GetHeaderByHash(ctx, h)
+	if err != nil {
+		log.Error("failed to query header from chain-cache", "error", err)
+		err = nil
+	}
+	if header == nil {
+		header, err = f.client.HeaderByHash(ctx, h)
+		if err != nil {
+			err = fmt.Errorf("failed to query header from RPC client: %w", err)
+		}
+	}
+	return header, err
+}
 
 func (f *Fetcher) Start(ctx context.Context, runner service.Runner) error {
 	var err error
@@ -100,19 +114,25 @@ func (f *Fetcher) Start(ctx context.Context, runner service.Runner) error {
 
 // This method has to be called before starting the Fetcher.
 func (f *Fetcher) RegisterContractEventHandler(h ContractEventHandler) {
+	f.syncMux.Lock()
+	defer f.syncMux.Unlock()
+
 	f.contractEventHandlers = append(f.contractEventHandlers, h)
 }
 
 // This method has to be called before starting the Fetcher.
 func (f *Fetcher) RegisterChainUpdateHandler(h ChainUpdateHandler) {
+	f.syncMux.Lock()
+	defer f.syncMux.Unlock()
+
 	f.chainUpdateHandlers = append(f.chainUpdateHandlers, h)
 }
 
-func (f *Fetcher) processChainUpdateHandler(ctx context.Context, qCtx QueryContext, h ChainUpdateHandler) error {
+func (f *Fetcher) processChainUpdateHandler(ctx context.Context, qCtx ChainUpdateContext, h ChainUpdateHandler) error {
 	return h.Handle(ctx, qCtx)
 }
 
-func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx QueryContext, h ContractEventHandler, logs []types.Log) error {
+func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx ChainUpdateContext, h ContractEventHandler, logs []types.Log) error {
 	var result error
 	events := []any{}
 	for _, l := range logs {
@@ -160,7 +180,7 @@ func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx QueryCon
 	return h.Handle(ctx, qCtx, events)
 }
 
-func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx QueryContext) error {
+func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx ChainUpdateContext) error {
 	query := ethereum.FilterQuery{
 		Addresses: f.addresses,
 		Topics:    f.topics,
@@ -186,6 +206,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx QueryContext) error {
 
 	wg := sync.WaitGroup{}
 	var result error
+	f.syncMux.RLock()
 	for _, h := range f.contractEventHandlers {
 		// TODO: copy all the logs?
 		handler := h
@@ -201,13 +222,14 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx QueryContext) error {
 			}
 		}()
 	}
-	//XXX: this runs the chain update handler in parallel
-	// with the event handlers. Is this good or would it
-	// be better to e.g. run them AFTER the contract
-	// event handlers did run?
+	f.syncMux.RUnlock()
+	// run the chain-update handlers after the contract event handlers did run.
+	// This allows processing of the fully newly updated program-state.
+	wg.Wait()
+	f.syncMux.RLock()
 	for i, h := range f.chainUpdateHandlers {
 		handler := h
-		f.log.Info("spawing chain update handler", "num", i)
+		f.log.Info("spawning chain update handler", "num", i)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -220,6 +242,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx QueryContext) error {
 			}
 		}()
 	}
+	f.syncMux.RUnlock()
 	wg.Wait()
 	return result
 }

@@ -67,7 +67,7 @@ func (handler *EonKeyBroadcast) Accept(
 
 func (handler *EonKeyBroadcast) Handle(
 	ctx context.Context,
-	query syncer.QueryContext,
+	query syncer.ChainUpdateContext,
 	events []bindings.KeyBroadcastContractEonKeyBroadcast,
 ) error {
 	for _, ev := range events {

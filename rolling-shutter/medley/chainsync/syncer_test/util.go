@@ -45,8 +45,8 @@ func MakeChain(start int64, startParent common.Hash, numHeader uint, seed int64)
 	return h
 }
 
-func NewTestKeyBroadcastHandler(log log.Logger) (*TestKeyBroadcastHandler, chan syncer.QueryContext, error) {
-	querySyncChan := make(chan syncer.QueryContext)
+func NewTestKeyBroadcastHandler(log log.Logger) (*TestKeyBroadcastHandler, chan syncer.ChainUpdateContext, error) {
+	querySyncChan := make(chan syncer.ChainUpdateContext)
 	return &TestKeyBroadcastHandler{
 		log:           log,
 		evABI:         KeyBroadcastContractABI,
@@ -61,7 +61,7 @@ type TestKeyBroadcastHandler struct {
 	evABI         *abi.ABI
 	address       common.Address
 	eons          map[common.Hash]uint64
-	querySyncChan chan syncer.QueryContext
+	querySyncChan chan syncer.ChainUpdateContext
 }
 
 func (teh *TestKeyBroadcastHandler) Address() common.Address {
@@ -88,7 +88,7 @@ func (teh *TestKeyBroadcastHandler) Accept(
 }
 func (teh *TestKeyBroadcastHandler) Handle(
 	ctx context.Context,
-	qCtx syncer.QueryContext,
+	qCtx syncer.ChainUpdateContext,
 	evs []bindings.KeyBroadcastContractEonKeyBroadcast,
 ) error {
 	if qCtx.Remove != nil {
@@ -123,8 +123,8 @@ func (teh *TestKeyBroadcastHandler) GetBlockHashes() map[common.Hash]struct{} {
 	return m
 }
 
-func NewTestChainUpdateHandler(log log.Logger) (*TestChainUpdateHandler, chan syncer.QueryContext, error) {
-	querySyncChan := make(chan syncer.QueryContext)
+func NewTestChainUpdateHandler(log log.Logger) (*TestChainUpdateHandler, chan syncer.ChainUpdateContext, error) {
+	querySyncChan := make(chan syncer.ChainUpdateContext)
 	return &TestChainUpdateHandler{
 		log:           log,
 		querySyncChan: querySyncChan,
@@ -134,13 +134,13 @@ func NewTestChainUpdateHandler(log log.Logger) (*TestChainUpdateHandler, chan sy
 
 type TestChainUpdateHandler struct {
 	log           log.Logger
-	querySyncChan chan syncer.QueryContext
+	querySyncChan chan syncer.ChainUpdateContext
 	chainCache    syncer.ChainCache
 }
 
 func (teh *TestChainUpdateHandler) Handle(
 	ctx context.Context,
-	qCtx syncer.QueryContext,
+	qCtx syncer.ChainUpdateContext,
 ) error {
 	err := teh.chainCache.Update(ctx, qCtx)
 	teh.querySyncChan <- qCtx

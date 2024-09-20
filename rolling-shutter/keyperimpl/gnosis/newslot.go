@@ -43,22 +43,30 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	fmt.Printf("\n\n%d\n\n\n", slot)
 
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
-	// FIXME: retrieve that from the actual SubmittedEvents highest blocknum and THEN calculate it
-	// slot := medley.BlockTimestampToSlot(qCtx.Update.Latest().Time, sts.GenesisSlotTimestamp, sts.SecondsPerSlot)
-	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)
+	latestTxSubmitted, err := gnosisKeyperDB.GetLatestTransactionSubmittedEvent(ctx)
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
 		// That's because non-keypers don't sync transaction submitted events.
-		return errors.Wrap(err, "failed to query transaction submitted sync status from db")
+		return errors.Wrap(err, "failed to query latest transaction submitted from db")
 	}
-	if syncedUntil.Slot >= int64(slot) {
+	latestTxSubmittedHeader, err := kpr.core.GetHeaderByHash(ctx, common.BytesToHash(latestTxSubmitted.BlockHash))
+	if err != nil {
+		return errors.Wrap(err, "failed to query header by hash")
+	}
+	syncedUntilSlot := medley.BlockTimestampToSlot(
+		latestTxSubmittedHeader.Time,
+		kpr.config.Gnosis.GenesisSlotTimestamp,
+		kpr.config.Gnosis.SecondsPerSlot,
+	)
+	if syncedUntilSlot >= slot {
 		// If we already synced the block for slot n before this slot has started on our clock,
 		// either the previous block proposer proposed early (ie is malicious) or our clocks are
 		// out of sync. In any case, it does not make sense to produce keys as the block has
 		// already been built, so we return an error.
 		return errors.Errorf("processing slot %d for which a block has already been processed", slot)
 	}
-	nextBlock := syncedUntil.BlockNumber + 1
+	// TODO: overflow protection
+	nextBlock := latestTxSubmittedHeader.Number.Int64() + 1
 
 	queries := obskeyper.New(kpr.dbpool)
 	keyperSet, err := queries.GetKeyperSet(ctx, nextBlock)

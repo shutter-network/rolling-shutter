@@ -86,7 +86,7 @@ func (kb *ValidatorUpdated) Accept(
 }
 func (vu *ValidatorUpdated) Handle(
 	ctx context.Context,
-	qCtx syncer.QueryContext,
+	qCtx syncer.ChainUpdateContext,
 	events []bindings.ValidatorregistryUpdated,
 ) error {
 	db := database.New(vu.dbPool)

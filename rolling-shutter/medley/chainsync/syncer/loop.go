@@ -32,6 +32,9 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 		// no chain-cache present yet,
 		// just set the chain-update without
 		// checking for reorgs
+		// FIXME: here we could incorporate a starting block
+		// option, fetch the starting block, and set this in
+		// the cache and sync from there.
 		remove = nil
 		update = f.chainUpdate
 		f.log.Trace("internal chain cache empty, setting updated chain segment")
@@ -40,7 +43,8 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 		success = false
 		return success, err
 	} else {
-		if new(big.Int).Add(syncedChain.Latest().Number, big.NewInt(1)).Cmp(f.chainUpdate.Earliest().Number) == -1 {
+		if new(big.Int).Add(syncedChain.Latest().Number, big.NewInt(1)).
+			Cmp(f.chainUpdate.Earliest().Number) == -1 {
 			//FIXME: overflow
 			diff := new(big.Int).Sub(f.chainUpdate.Earliest().Number, syncedChain.Latest().Number).Uint64()
 			queryBlocks := MaxRequestBlockRange
@@ -86,7 +90,7 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 		}
 	}
 
-	qCtx := QueryContext{
+	qCtx := ChainUpdateContext{
 		Remove: remove,
 		Update: update,
 	}

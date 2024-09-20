@@ -13,9 +13,9 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
 )
 
-var ErrCritical = errors.New("critical error, signalling shutdown")
+var ErrCritical = errors.New("critical error, signaling shutdown")
 
-type QueryContext struct {
+type ChainUpdateContext struct {
 	// a previously applied chainsegment that has to be
 	// removed from the state first
 	Remove *chainsegment.ChainSegment
@@ -24,27 +24,23 @@ type QueryContext struct {
 }
 
 type ChainUpdateHandler interface {
-	Handle(ctx context.Context, qCtx QueryContext) error
-}
-
-type ContractEventHandler interface {
-	Topic() common.Hash
-	Address() common.Address
-
-	Parse(log types.Log) (any, bool, error)
-	Accept(ctx context.Context, h types.Header, ev any) (bool, error)
-	Handle(ctx context.Context, qCtx QueryContext, events []any) error
+	Handle(ctx context.Context, qCtx ChainUpdateContext) error
 }
 
 // IContractEventHandler is the generic interface
 // that should be implemented.
+// This allows more narrowly typed implementations
+// on a per-contracts-event basis, while offloading
+// the dynamic typing to a single implementation
+// (`contractEventHandler[T]`, complying to the
+// ContractEventHandler interface).
 type IContractEventHandler[T any] interface {
 	Address() common.Address
 	Event() string
 	ABI() abi.ABI
 
 	Accept(context.Context, types.Header, T) (bool, error)
-	Handle(context.Context, QueryContext, []T) error
+	Handle(context.Context, ChainUpdateContext, []T) error
 }
 
 // WrapHandler wraps the generic implementation into
@@ -58,4 +54,18 @@ func WrapHandler[T any](h IContractEventHandler[T]) (ContractEventHandler, error
 	return contractEventHandler[T]{
 		h: h,
 	}, nil
+}
+
+// ContractEventHandler is the dynamically typed
+// interface that is accepted by the chainsync.
+// Ideally this doesn't have to be implemented,
+// but should be result of wrapping the more
+// narrowly typed IContractEventHandler implementations.
+type ContractEventHandler interface {
+	Topic() common.Hash
+	Address() common.Address
+
+	Parse(log types.Log) (any, bool, error)
+	Accept(ctx context.Context, h types.Header, ev any) (bool, error)
+	Handle(ctx context.Context, qCtx ChainUpdateContext, events []any) error
 }

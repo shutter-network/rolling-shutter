@@ -23,6 +23,7 @@ type options struct {
 	logger         log.Logger
 	syncStart      *number.BlockNumber
 	blockCacheSize uint64
+	chainCache     syncer.ChainCache
 	eventHandler   []syncer.ContractEventHandler
 	chainHandler   []syncer.ChainUpdateHandler
 }
@@ -50,10 +51,24 @@ func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
 		}
 	}
 
+	// FIXME: what to do when the chaincache is empty or too old
+	// and we don't want to sync ALL blocks?
+	// The Latest() of the chaincache determines what is the starting
+	// point of the chainsync.
 	//TODO: db chaincache when option supplied
-	cache := syncer.NewMemoryChainCache(int(o.blockCacheSize), nil)
+
+	if o.chainCache == nil {
+		cache := syncer.NewMemoryChainCache(int(o.blockCacheSize), nil)
+
+	}
 	f := syncer.NewFetcher(o.ethClient, cache, o.logger)
 
+	for _, h := range o.chainHandler {
+		f.RegisterChainUpdateHandler(h)
+	}
+	for _, h := range o.eventHandler {
+		f.RegisterContractEventHandler(h)
+	}
 	return f, nil
 }
 
@@ -82,6 +97,13 @@ func WithSyncStartBlock(
 func WithClientURL(url string) Option {
 	return func(o *options) error {
 		o.clientURL = url
+		return nil
+	}
+}
+
+func WithChainCache(c syncer.ChainCache) Option {
+	return func(o *options) error {
+		o.blockCacheSize = c
 		return nil
 	}
 }

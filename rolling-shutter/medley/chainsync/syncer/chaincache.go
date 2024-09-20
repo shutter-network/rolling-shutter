@@ -11,10 +11,13 @@ import (
 
 type ChainCache interface {
 	Get(context.Context) (*chainsegment.ChainSegment, error)
-	Update(context.Context, QueryContext) error
+	Update(context.Context, ChainUpdateContext) error
+	GetHeaderByHash(context.Context, common.Hash) (*types.Header, error)
 }
 
 var ErrEmpy = errors.New("chain-cache empty")
+
+var _ ChainCache = &MemoryChainCache{}
 
 func NewMemoryChainCache(maxSize int, chain *chainsegment.ChainSegment) *MemoryChainCache {
 	// chain can be nil
@@ -36,7 +39,12 @@ func (mcc *MemoryChainCache) Get(ctx context.Context) (*chainsegment.ChainSegmen
 	return mcc.chain, nil
 
 }
-func (mcc *MemoryChainCache) Update(ctx context.Context, qCtx QueryContext) error {
+
+func (mcc *MemoryChainCache) GetHeaderByHash(_ context.Context, h common.Hash) (*types.Header, error) {
+	return mcc.chain.GetHeaderByHash(h), nil
+}
+
+func (mcc *MemoryChainCache) Update(ctx context.Context, qCtx ChainUpdateContext) error {
 	newSegment := []*types.Header{}
 	if mcc.chain != nil {
 		// OPTIM: can be implemented more efficient, but mainly used for testing

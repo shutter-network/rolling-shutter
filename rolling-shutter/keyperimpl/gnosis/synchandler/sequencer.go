@@ -67,7 +67,7 @@ func (sts *SequencerTransactionSubmitted) Accept(
 }
 func (sts *SequencerTransactionSubmitted) Handle(
 	ctx context.Context,
-	qCtx syncer.QueryContext,
+	qCtx syncer.ChainUpdateContext,
 	events []bindings.SequencerTransactionSubmitted,
 ) error {
 	numInsertedEvents := 0

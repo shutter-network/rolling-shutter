@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/jackc/pgx/v4"
@@ -15,6 +16,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 )
 
+// TODO: make configurable
 const MaxSyncedBlockCacheSize = 100
 
 var _ syncer.ChainCache = &DatabaseChainCache{}
@@ -68,7 +70,28 @@ func (f *DatabaseChainCache) Get(ctx context.Context) (*chainsegment.ChainSegmen
 	return chainsegment.NewChainSegment(headers...), nil
 }
 
-func (f *DatabaseChainCache) Update(ctx context.Context, qCtx syncer.QueryContext) error {
+func (f *DatabaseChainCache) GetHeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
+	var header *types.Header
+	err := f.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		q := database.New(tx)
+		block, err := q.GetSyncedBlockByHash(ctx, blockHash.Bytes())
+		if err != nil {
+			return err
+		}
+		header, err = DecodeHeader(block.Header)
+		return err
+	})
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed to query block header from database cache: %w", err)
+	}
+	if err == pgx.ErrNoRows {
+		// we don't have the header cached
+		err = nil
+	}
+	return header, err
+}
+
+func (f *DatabaseChainCache) Update(ctx context.Context, qCtx syncer.ChainUpdateContext) error {
 	return f.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		q := database.New(tx)
 		for _, header := range qCtx.Remove.Get() {
