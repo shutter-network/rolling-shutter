@@ -20,7 +20,7 @@ type ChainUpdate struct {
 
 func (kb *ChainUpdate) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 ) error {
 	return nil
 }

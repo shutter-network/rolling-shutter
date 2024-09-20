@@ -20,11 +20,11 @@ type ChainUpdateContext struct {
 	// removed from the state first
 	Remove *chainsegment.ChainSegment
 	// the chainsegment the passed in events are part of
-	Update *chainsegment.ChainSegment
+	Append *chainsegment.ChainSegment
 }
 
 type ChainUpdateHandler interface {
-	Handle(ctx context.Context, qCtx ChainUpdateContext) error
+	Handle(ctx context.Context, update ChainUpdateContext) error
 }
 
 // IContractEventHandler is the generic interface
@@ -67,5 +67,5 @@ type ContractEventHandler interface {
 
 	Parse(log types.Log) (any, bool, error)
 	Accept(ctx context.Context, h types.Header, ev any) (bool, error)
-	Handle(ctx context.Context, qCtx ChainUpdateContext, events []any) error
+	Handle(ctx context.Context, update ChainUpdateContext, events []any) error
 }

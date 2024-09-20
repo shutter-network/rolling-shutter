@@ -86,7 +86,7 @@ func (kb *ValidatorUpdated) Accept(
 }
 func (vu *ValidatorUpdated) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 	events []bindings.ValidatorregistryUpdated,
 ) error {
 	db := database.New(vu.dbPool)
@@ -117,8 +117,8 @@ func (vu *ValidatorUpdated) Handle(
 		}
 		err = db.SetValidatorRegistrationsSyncedUntil(ctx, database.SetValidatorRegistrationsSyncedUntilParams{
 			//TODO: check int64 overflow
-			BlockNumber: int64(qCtx.Update.Latest().Number.Int64()),
-			BlockHash:   qCtx.Update.Latest().Hash().Bytes(),
+			BlockNumber: int64(update.Append.Latest().Number.Int64()),
+			BlockHash:   update.Append.Latest().Hash().Bytes(),
 		})
 		if err != nil {
 			return err
@@ -142,7 +142,7 @@ func (vu *ValidatorUpdated) Handle(
 	// 	"num-registrations", numRegistrations,
 	// )
 	metrics.NumValidatorRegistrations.Set(float64(numRegistrations))
-	metrics.ValidatorRegistrationsSyncedUntil.Set(float64(qCtx.Update.Latest().Number.Uint64()))
+	metrics.ValidatorRegistrationsSyncedUntil.Set(float64(update.Append.Latest().Number.Uint64()))
 	return nil
 }
 

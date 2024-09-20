@@ -24,10 +24,10 @@ type DecryptionChainUpdateHandler struct {
 
 func (cu *DecryptionChainUpdateHandler) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 ) error {
-	if qCtx.Update != nil {
-		for _, header := range qCtx.Update.Get() {
+	if update.Append != nil {
+		for _, header := range update.Append.Get() {
 			// Call the decrypt function with all updated headers.
 			// The downstream function is expected to keep track of
 			// what slots have already been sent out.

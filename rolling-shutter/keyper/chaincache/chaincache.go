@@ -91,10 +91,10 @@ func (f *DatabaseChainCache) GetHeaderByHash(ctx context.Context, blockHash comm
 	return header, err
 }
 
-func (f *DatabaseChainCache) Update(ctx context.Context, qCtx syncer.ChainUpdateContext) error {
+func (f *DatabaseChainCache) Update(ctx context.Context, update syncer.ChainUpdateContext) error {
 	return f.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		q := database.New(tx)
-		for _, header := range qCtx.Remove.Get() {
+		for _, header := range update.Remove.Get() {
 			// Not strictly necessary if the QueryContext.Delete
 			// have the corresponding reorged blocks in QueryContext.Update
 			err := q.DeleteSyncedBlockByHash(ctx, header.Hash().Bytes())
@@ -102,7 +102,7 @@ func (f *DatabaseChainCache) Update(ctx context.Context, qCtx syncer.ChainUpdate
 				return err
 			}
 		}
-		updateHeader := qCtx.Update.Get()
+		updateHeader := update.Append.Get()
 		for _, header := range updateHeader {
 			h, err := EncodeHeader(header)
 			if err != nil {

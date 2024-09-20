@@ -43,7 +43,7 @@ func (gh contractEventHandler[T]) Accept(ctx context.Context, h types.Header, ev
 	}
 }
 
-func (gh contractEventHandler[T]) Handle(ctx context.Context, qCtx ChainUpdateContext, events []any) error {
+func (gh contractEventHandler[T]) Handle(ctx context.Context, update ChainUpdateContext, events []any) error {
 	tList := []T{}
 	for _, ev := range events {
 		switch t := ev.(type) {
@@ -55,5 +55,5 @@ func (gh contractEventHandler[T]) Handle(ctx context.Context, qCtx ChainUpdateCo
 	if len(tList) == 0 {
 		return nil
 	}
-	return gh.h.Handle(ctx, qCtx, tList)
+	return gh.h.Handle(ctx, update, tList)
 }

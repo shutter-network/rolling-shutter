@@ -128,11 +128,11 @@ func (f *Fetcher) RegisterChainUpdateHandler(h ChainUpdateHandler) {
 	f.chainUpdateHandlers = append(f.chainUpdateHandlers, h)
 }
 
-func (f *Fetcher) processChainUpdateHandler(ctx context.Context, qCtx ChainUpdateContext, h ChainUpdateHandler) error {
-	return h.Handle(ctx, qCtx)
+func (f *Fetcher) processChainUpdateHandler(ctx context.Context, update ChainUpdateContext, h ChainUpdateHandler) error {
+	return h.Handle(ctx, update)
 }
 
-func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx ChainUpdateContext, h ContractEventHandler, logs []types.Log) error {
+func (f *Fetcher) processContractEventHandler(ctx context.Context, update ChainUpdateContext, h ContractEventHandler, logs []types.Log) error {
 	var result error
 	events := []any{}
 	for _, l := range logs {
@@ -158,7 +158,7 @@ func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx ChainUpd
 		if !ok {
 			continue
 		}
-		header := qCtx.Update.GetHeaderByHash(l.BlockHash)
+		header := update.Append.GetHeaderByHash(l.BlockHash)
 		if header == nil {
 			f.log.Error(ErrServerStateInconsistent.Error(), "log-block-hash", l.BlockHash)
 			result = multierror.Append(result, err)
@@ -177,16 +177,16 @@ func (f *Fetcher) processContractEventHandler(ctx context.Context, qCtx ChainUpd
 	if errors.Is(result, ErrCritical) {
 		return result
 	}
-	return h.Handle(ctx, qCtx, events)
+	return h.Handle(ctx, update, events)
 }
 
-func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx ChainUpdateContext) error {
+func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext) error {
 	query := ethereum.FilterQuery{
 		Addresses: f.addresses,
 		Topics:    f.topics,
 		//FIXME: does this work when from and to are the same?
-		FromBlock: qCtx.Update.Earliest().Number,
-		ToBlock:   qCtx.Update.Latest().Number,
+		FromBlock: update.Append.Earliest().Number,
+		ToBlock:   update.Append.Latest().Number,
 	}
 
 	logs, err := f.client.FilterLogs(ctx, query)
@@ -194,7 +194,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx ChainUpdateContext) e
 		return err
 	}
 	for _, l := range logs {
-		if qCtx.Update.GetHeaderByHash(l.BlockHash) == nil {
+		if update.Append.GetHeaderByHash(l.BlockHash) == nil {
 			// The API only allows filtering by blocknumber.
 			// If the retrieved log's block-hash is not present in the
 			// update query-context,
@@ -214,7 +214,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx ChainUpdateContext) e
 		go func() {
 			defer wg.Done()
 
-			err := f.processContractEventHandler(ctx, qCtx, handler, logs)
+			err := f.processContractEventHandler(ctx, update, handler, logs)
 			if err != nil {
 				err = fmt.Errorf("contract-event-handler error: %w", err)
 				f.log.Error("handler processing errored", "error", err)
@@ -234,7 +234,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, qCtx ChainUpdateContext) e
 		go func() {
 			defer wg.Done()
 
-			err := f.processChainUpdateHandler(ctx, qCtx, handler)
+			err := f.processChainUpdateHandler(ctx, update, handler)
 			if err != nil {
 				err = fmt.Errorf("chain-update-handler error: %w", err)
 				f.log.Error("handler processing errored", "error", err)

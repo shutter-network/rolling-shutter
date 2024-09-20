@@ -88,18 +88,18 @@ func (teh *TestKeyBroadcastHandler) Accept(
 }
 func (teh *TestKeyBroadcastHandler) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 	evs []bindings.KeyBroadcastContractEonKeyBroadcast,
 ) error {
-	if qCtx.Remove != nil {
-		for _, h := range qCtx.Remove.Get() {
+	if update.Remove != nil {
+		for _, h := range update.Remove.Get() {
 			_, ok := teh.eons[h.Hash()]
 			if ok {
 				delete(teh.eons, h.Hash())
 			}
 		}
 	}
-	if qCtx.Update != nil {
+	if update.Append != nil {
 		for _, ev := range evs {
 			teh.eons[ev.Raw.BlockHash] = ev.Eon
 		}
@@ -140,10 +140,10 @@ type TestChainUpdateHandler struct {
 
 func (teh *TestChainUpdateHandler) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 ) error {
-	err := teh.chainCache.Update(ctx, qCtx)
-	teh.querySyncChan <- qCtx
+	err := teh.chainCache.Update(ctx, update)
+	teh.querySyncChan <- update
 	return err
 }
 

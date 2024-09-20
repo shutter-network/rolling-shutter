@@ -67,23 +67,23 @@ func (sts *SequencerTransactionSubmitted) Accept(
 }
 func (sts *SequencerTransactionSubmitted) Handle(
 	ctx context.Context,
-	qCtx syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 	events []bindings.SequencerTransactionSubmitted,
 ) error {
 	numInsertedEvents := 0
 	numDiscardedEvents := 0
 	err := sts.dbPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		db := database.New(tx)
-		if qCtx.Remove != nil {
-			for _, header := range qCtx.Remove.Get() {
+		if update.Remove != nil {
+			for _, header := range update.Remove.Get() {
 				if err := db.DeleteTransactionSubmittedEventsFromBlockHash(ctx, header.Hash().Bytes()); err != nil {
 					return errors.Wrap(err, "failed to delete transaction submitted events from db")
 				}
 			}
 			log.Info().
-				Int("depth", qCtx.Remove.Len()).
-				Int64("previous-synced-until", qCtx.Remove.Latest().Number.Int64()).
-				Int64("new-synced-until", qCtx.Update.Latest().Number.Int64()).
+				Int("depth", update.Remove.Len()).
+				Int64("previous-synced-until", update.Remove.Latest().Number.Int64()).
+				Int64("new-synced-until", update.Append.Latest().Number.Int64()).
 				Msg("sync status reset due to reorg")
 		}
 		filteredEvents := sts.filterEvents(events)
@@ -117,12 +117,12 @@ func (sts *SequencerTransactionSubmitted) Handle(
 		return nil
 	})
 	log.Info().
-		Uint64("start-block", qCtx.Update.Earliest().Number.Uint64()).
-		Uint64("end-block", qCtx.Update.Latest().Number.Uint64()).
+		Uint64("start-block", update.Append.Earliest().Number.Uint64()).
+		Uint64("end-block", update.Append.Latest().Number.Uint64()).
 		Int("num-inserted-events", numInsertedEvents).
 		Int("num-discarded-events", numDiscardedEvents).
 		Msg("synced sequencer contract")
-	metrics.TxSubmittedEventsSyncedUntil.Set(float64(qCtx.Update.Latest().Number.Uint64()))
+	metrics.TxSubmittedEventsSyncedUntil.Set(float64(update.Append.Latest().Number.Uint64()))
 	return err
 }
 

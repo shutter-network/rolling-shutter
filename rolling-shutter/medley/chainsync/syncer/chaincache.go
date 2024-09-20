@@ -44,13 +44,13 @@ func (mcc *MemoryChainCache) GetHeaderByHash(_ context.Context, h common.Hash) (
 	return mcc.chain.GetHeaderByHash(h), nil
 }
 
-func (mcc *MemoryChainCache) Update(ctx context.Context, qCtx ChainUpdateContext) error {
+func (mcc *MemoryChainCache) Update(ctx context.Context, update ChainUpdateContext) error {
 	newSegment := []*types.Header{}
 	if mcc.chain != nil {
 		// OPTIM: can be implemented more efficient, but mainly used for testing
 		removeHashes := map[common.Hash]struct{}{}
-		if qCtx.Remove != nil {
-			for _, header := range qCtx.Remove.Get() {
+		if update.Remove != nil {
+			for _, header := range update.Remove.Get() {
 				removeHashes[header.Hash()] = struct{}{}
 			}
 		}
@@ -60,8 +60,8 @@ func (mcc *MemoryChainCache) Update(ctx context.Context, qCtx ChainUpdateContext
 				newSegment = append(newSegment, header)
 			}
 		}
-		if qCtx.Update != nil {
-			for _, header := range qCtx.Update.Get() {
+		if update.Append != nil {
+			for _, header := range update.Append.Get() {
 				newSegment = append(newSegment, header)
 			}
 		}
@@ -70,10 +70,10 @@ func (mcc *MemoryChainCache) Update(ctx context.Context, qCtx ChainUpdateContext
 			newSegment = newSegment[len(newSegment)-mcc.maxSize:]
 		}
 	} else {
-		if qCtx.Update == nil {
+		if update.Append == nil {
 			return nil
 		}
-		newSegment = qCtx.Update.Get()
+		newSegment = update.Append.Get()
 	}
 	mcc.chain = chainsegment.NewChainSegment(newSegment...)
 	return nil

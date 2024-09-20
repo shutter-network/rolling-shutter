@@ -15,17 +15,18 @@ import (
 
 var noopLogger = &logger.NoopLogger{}
 
+const defaultMemoryBlockCacheSize = 50
+
 type Option func(*options) error
 
 type options struct {
-	clientURL      string
-	ethClient      client.Sync
-	logger         log.Logger
-	syncStart      *number.BlockNumber
-	blockCacheSize uint64
-	chainCache     syncer.ChainCache
-	eventHandler   []syncer.ContractEventHandler
-	chainHandler   []syncer.ChainUpdateHandler
+	clientURL    string
+	ethClient    client.Sync
+	logger       log.Logger
+	syncStart    *number.BlockNumber
+	chainCache   syncer.ChainCache
+	eventHandler []syncer.ContractEventHandler
+	chainHandler []syncer.ChainUpdateHandler
 }
 
 func (o *options) verify() error {
@@ -51,17 +52,10 @@ func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
 		}
 	}
 
-	// FIXME: what to do when the chaincache is empty or too old
-	// and we don't want to sync ALL blocks?
-	// The Latest() of the chaincache determines what is the starting
-	// point of the chainsync.
-	//TODO: db chaincache when option supplied
-
 	if o.chainCache == nil {
-		cache := syncer.NewMemoryChainCache(int(o.blockCacheSize), nil)
-
+		o.chainCache = syncer.NewMemoryChainCache(int(defaultMemoryBlockCacheSize), nil)
 	}
-	f := syncer.NewFetcher(o.ethClient, cache, o.logger)
+	f := syncer.NewFetcher(o.ethClient, o.chainCache, o.logger)
 
 	for _, h := range o.chainHandler {
 		f.RegisterChainUpdateHandler(h)
@@ -74,11 +68,10 @@ func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
 
 func defaultOptions() *options {
 	return &options{
-		logger:         noopLogger,
-		syncStart:      number.NewBlockNumber(nil),
-		blockCacheSize: 50,
-		eventHandler:   []syncer.ContractEventHandler{},
-		chainHandler:   []syncer.ChainUpdateHandler{},
+		logger:       noopLogger,
+		syncStart:    number.NewBlockNumber(nil),
+		eventHandler: []syncer.ContractEventHandler{},
+		chainHandler: []syncer.ChainUpdateHandler{},
 	}
 }
 
@@ -101,16 +94,19 @@ func WithClientURL(url string) Option {
 	}
 }
 
+// NOTE: The Latest() of the chaincache determines what is the starting
+// point of the chainsync.
+// In case of an empty chaincache, we will initialize the cache
+// with the current latest block.
+// If we have a very old (persistent) chaincache, we will sync EVERY block
+// since the latest known block of the cache due to consistency considerations.
+// If that is unfeasible, the cache has to be emptied beforehand and the
+// gap in state-updates has to be dealt with or accepted.
+// If NO chaincache is passed with this option, an empty in-memory
+// chain-cache with a capped cachesize will be used.
 func WithChainCache(c syncer.ChainCache) Option {
 	return func(o *options) error {
-		o.blockCacheSize = c
-		return nil
-	}
-}
-
-func WithBlockCacheSize(s uint64) Option {
-	return func(o *options) error {
-		o.blockCacheSize = s
+		o.chainCache = c
 		return nil
 	}
 }

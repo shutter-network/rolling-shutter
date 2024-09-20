@@ -98,7 +98,7 @@ func (handler *KeyperSetAdded) Accept(
 }
 func (handler *KeyperSetAdded) Handle(
 	ctx context.Context,
-	query syncer.ChainUpdateContext,
+	update syncer.ChainUpdateContext,
 	events []bindings.KeyperSetManagerKeyperSetAdded,
 ) error {
 	// TODO: we don't handle reorgs here.

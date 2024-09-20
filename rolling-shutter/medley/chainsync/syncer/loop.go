@@ -20,7 +20,7 @@ func (f *Fetcher) triggerHandlerProcessing() {
 // success will be True, when we successfully applied the updated chain segment
 // to the old chain. If there remains a gap, this has to return false.
 func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
-	var syncedChain, remove, update *chainsegment.ChainSegment
+	var syncedChain, removedSegment, updatedSegment *chainsegment.ChainSegment
 
 	syncedChain, err = f.chainCache.Get(ctx)
 	if f.chainUpdate == nil {
@@ -35,8 +35,8 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 		// FIXME: here we could incorporate a starting block
 		// option, fetch the starting block, and set this in
 		// the cache and sync from there.
-		remove = nil
-		update = f.chainUpdate
+		removedSegment = nil
+		updatedSegment = f.chainUpdate
 		f.log.Trace("internal chain cache empty, setting updated chain segment")
 	} else if err != nil {
 		//TODO: what to do on db error?
@@ -61,7 +61,7 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 				"update-earliest-blocknum", f.chainUpdate.Earliest().Number,
 				"num-query-blocks", queryBlocks,
 			)
-			update, err = syncedChain.NewSegmentRight(ctx, f.client, queryBlocks)
+			updatedSegment, err = syncedChain.NewSegmentRight(ctx, f.client, queryBlocks)
 			if errors.Is(err, chainsegment.ErrReorg) {
 				// this means we reorged the old chain segment.
 				// extend the chain update to the left in chunks and try again
@@ -70,7 +70,7 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 				success = false
 				return success, err
 			}
-			remove = nil
+			removedSegment = nil
 			success = false
 		} else {
 			result, errr := syncedChain.UpdateLatest(ctx, f.client, f.chainUpdate)
@@ -82,30 +82,30 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 				f.log.Error("error updating chain", "error", err)
 				err = errr
 			}
-			remove = result.RemovedSegment
-			update = result.UpdatedSegment
+			removedSegment = result.RemovedSegment
+			updatedSegment = result.UpdatedSegment
 			// we will process the whole segment of the chain update
 			f.chainUpdate = nil
 			success = true
 		}
 	}
 
-	qCtx := ChainUpdateContext{
-		Remove: remove,
-		Update: update,
+	update := ChainUpdateContext{
+		Remove: removedSegment,
+		Append: updatedSegment,
 	}
 	//FIXME: both can be nil, is this expected?
-	if qCtx.Update == nil {
+	if update.Append == nil {
 		return success, err
 	}
 
 	// blocking call, until all handlers are done processing the
 	// new chain segment
-	err = f.FetchAndHandle(ctx, qCtx)
+	err = f.FetchAndHandle(ctx, update)
 	if err != nil {
 		return false, err
 	}
-	err = f.chainCache.Update(ctx, qCtx)
+	err = f.chainCache.Update(ctx, update)
 	if err != nil {
 		return false, err
 	}
