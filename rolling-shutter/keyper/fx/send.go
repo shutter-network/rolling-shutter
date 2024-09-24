@@ -35,7 +35,7 @@ func SendShutterMessages(
 				log.Err(err).Str("msg", msg.String()).Msg("sending non-retrieable msg failed")
 				return err
 			}
-			log.Info().Str("msg", msg.String()).Msg("msg not accepted, will be retried")
+			log.Warn().Err(err).Str("msg", msg.String()).Msg("msg not accepted, will be retried")
 			return nil
 		}
 		log.Info().Int32("id", outgoing.ID).
