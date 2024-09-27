@@ -28,13 +28,13 @@ import (
 )
 
 func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) error {
-	return kpr.maybeTriggerDecryption(ctx, slot.Number)
+	return kpr.maybeDecryptOnNewSlot(ctx, slot.Number)
 }
 
-// maybeTriggerDecryption triggers decryption for the given slot if
+// maybeDecryptOnNewSlot triggers decryption for the given slot if
 // - it hasn't been triggered for this slot before and
 // - the keyper is part of the corresponding keyper set.
-func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) error {
+func (kpr *Keyper) maybeDecryptOnNewSlot(ctx context.Context, slot uint64) error {
 	if kpr.latestTriggeredSlot != nil && slot <= *kpr.latestTriggeredSlot {
 		return nil
 	}

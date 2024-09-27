@@ -151,7 +151,7 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 	if err != nil {
 		return nil, err
 	}
-	decryptOnChainUpdate := synchandler.NewDecryptOnChainUpdateHandler(kpr.newBlockHandlerFunc)
+	decryptOnChainUpdate := synchandler.NewDecryptOnChainUpdate(kpr.maybeDecryptOnNewHeader)
 	core, err := keyper.New(
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
@@ -190,13 +190,13 @@ func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
 	return nil
 }
 
-func (kpr *Keyper) newBlockHandlerFunc(ctx context.Context, header *types.Header) error {
+func (kpr *Keyper) maybeDecryptOnNewHeader(ctx context.Context, header *types.Header) error {
 	slot := medley.BlockTimestampToSlot(
 		header.Time,
 		kpr.config.Gnosis.GenesisSlotTimestamp,
 		kpr.config.Gnosis.SecondsPerSlot,
 	)
-	return kpr.maybeTriggerDecryption(ctx, slot+1)
+	return kpr.maybeDecryptOnNewSlot(ctx, slot+1)
 }
 
 func (kpr *Keyper) processInputs(ctx context.Context) error {
