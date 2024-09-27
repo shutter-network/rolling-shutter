@@ -75,18 +75,6 @@ func defaultOptions() *options {
 	}
 }
 
-func WithSyncStartBlock(
-	blockNumber *number.BlockNumber,
-) Option {
-	if blockNumber == nil {
-		blockNumber = number.NewBlockNumber(nil)
-	}
-	return func(o *options) error {
-		o.syncStart = blockNumber
-		return nil
-	}
-}
-
 func WithClientURL(url string) Option {
 	return func(o *options) error {
 		o.clientURL = url

@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -183,6 +184,11 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 		// but instead push them on the internal channel,
 		// where it gets written to a contract onchain
 		keyper.WithEonPublicKeyHandler(kpr.sendNewEonPubkeyToChannel),
+
+		// This will only start syncing blockchain events
+		// from a specific block on, and only when we never synced before.
+		// Otherwise, it will pick up syncing where we last stopped.
+		keyper.WithSyncStartBlockNumber(*new(big.Int).SetUint64(kpr.config.Gnosis.SyncStartBlockNumber)),
 
 		// trigger possible decryption on every new block header from Gnosis chain
 		keyper.WithChainUpdateHandler(decryptOnChainUpdate),

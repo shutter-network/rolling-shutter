@@ -3,6 +3,7 @@ package keyper
 import (
 	"context"
 	"errors"
+	"math/big"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,6 +21,7 @@ type options struct {
 	dbpool               *pgxpool.Pool
 	broadcastEonPubKey   bool
 	messaging            p2p.Messaging
+	syncStartBlockNumber *big.Int
 	blockSyncClient      *ethclient.Client
 	messageHandler       []p2p.MessageHandler
 	eonPubkeyHandler     EonPublicKeyHandlerFunc
@@ -133,6 +135,14 @@ func WithChainUpdateHandler(h syncer.ChainUpdateHandler) Option {
 func WithEthereumAddress(address common.Address) Option {
 	return func(o *options) error {
 		o.ethereumAddress = address
+		return nil
+	}
+}
+
+// TODO: use this e.g. with e.g. the Gnosis keyper and the gnosis config value "SyncStartBlockNumber"
+func WithSyncStartBlockNumber(num big.Int) Option {
+	return func(o *options) error {
+		o.syncStartBlockNumber = &num
 		return nil
 	}
 }

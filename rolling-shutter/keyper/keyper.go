@@ -3,6 +3,7 @@ package keyper
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +18,7 @@ import (
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/chaincache"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
@@ -28,6 +30,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/channel"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -142,6 +146,36 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 	)
 	if err != nil {
 		return err
+	}
+
+	dbChainCache := chaincache.NewDatabaseChainCache(kpr.dbpool)
+	cachedChain, err := dbChainCache.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	// The keyper hasn't been synced before.
+	// use the provided option to start syncing only from a specific block
+	if cachedChain == nil {
+		syncBlockNumber := kpr.opts.syncStartBlockNumber
+		if syncBlockNumber == nil {
+			syncBlockHeader, err := kpr.blockSyncClient.HeaderByNumber(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("can't fetch latest head: %w", err)
+			}
+			syncBlockNumber = syncBlockHeader.Number
+		}
+		cachedBeforeSyncStart, err := kpr.blockSyncClient.HeaderByNumber(ctx, new(big.Int).Sub(syncBlockNumber, big.NewInt(1)))
+		if err != nil {
+			return fmt.Errorf("can't fetch header before the sync start: %w", err)
+		}
+		// pretend that we synced until one block before the sync start
+		err = dbChainCache.Update(ctx, syncer.ChainUpdateContext{
+			Append: chainsegment.NewChainSegment(cachedBeforeSyncStart),
+		})
+		if err != nil {
+			return fmt.Errorf("can't update database chain-cache with initial header: %w", err)
+		}
 	}
 
 	chainsyncOpts := []chainsync.Option{
