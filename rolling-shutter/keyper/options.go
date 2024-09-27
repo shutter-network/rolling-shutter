@@ -14,30 +14,24 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
-type ContractAddresses struct {
-	KeyperSetManager common.Address
-}
-
 type Option func(*options) error
 
 type options struct {
-	dbpool             *pgxpool.Pool
-	broadcastEonPubKey bool
-	messaging          p2p.Messaging
-	blockSyncClient    *ethclient.Client
-	messageHandler     []p2p.MessageHandler
-	eonPubkeyHandler   EonPublicKeyHandlerFunc
-	contractAddressses ContractAddresses
-	ethereumAddress    common.Address
-	chainHandler       []syncer.ChainUpdateHandler
-	eventHandler       []syncer.ContractEventHandler
+	dbpool               *pgxpool.Pool
+	broadcastEonPubKey   bool
+	messaging            p2p.Messaging
+	blockSyncClient      *ethclient.Client
+	messageHandler       []p2p.MessageHandler
+	eonPubkeyHandler     EonPublicKeyHandlerFunc
+	ethereumAddress      common.Address
+	chainHandler         []syncer.ChainUpdateHandler
+	eventHandler         []syncer.ContractEventHandler
 }
 
 func newDefaultOptions() *options {
 	return &options{
 		broadcastEonPubKey: true,
 		messageHandler:     []p2p.MessageHandler{},
-		contractAddressses: ContractAddresses{},
 		chainHandler:       []syncer.ChainUpdateHandler{},
 		eventHandler:       []syncer.ContractEventHandler{},
 	}
@@ -115,14 +109,6 @@ func WithBlockSyncClient(client *ethclient.Client) Option {
 func WithMessaging(sender p2p.Messaging) Option {
 	return func(o *options) error {
 		o.messaging = sender
-		return nil
-	}
-}
-
-// TODO: docs
-func WithContractAddresses(addresses ContractAddresses) Option {
-	return func(o *options) error {
-		o.contractAddressses = addresses
 		return nil
 	}
 }

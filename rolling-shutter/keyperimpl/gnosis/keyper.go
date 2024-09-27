@@ -163,12 +163,11 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 			Shuttermint:          kpr.config.Shuttermint,
 			Metrics:              kpr.config.Metrics,
 			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
+			ContractAddresses: kprconfig.ContractAddresses{
+				KeyperSetManager: kpr.config.Gnosis.Contracts.KeyperSetManager,
+			},
 		},
 		kpr.decryptionTriggerChannel,
-		keyper.WithContractAddresses(
-			keyper.ContractAddresses{
-				KeyperSetManager: kpr.config.Gnosis.Contracts.KeyperSetManager,
-			}),
 		keyper.WithDBPool(kpr.dbpool),
 		keyper.WithMessaging(messagingMiddleware),
 
