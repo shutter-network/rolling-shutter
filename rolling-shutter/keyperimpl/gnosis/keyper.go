@@ -152,7 +152,9 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 		return nil, err
 	}
 	decryptOnChainUpdate := synchandler.NewDecryptOnChainUpdate(kpr.maybeDecryptOnNewHeader)
+
 	core, err := keyper.New(
+		// keyper core config
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
@@ -167,15 +169,26 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 				KeyperSetManager: kpr.config.Gnosis.Contracts.KeyperSetManager,
 			},
 		},
+		// send messages here to trigger decryption in the keyper core
 		kpr.decryptionTriggerChannel,
+		// The keyper core needs the implementation addresses of the core
+		// contracts
 		keyper.WithDBPool(kpr.dbpool),
+		// P2P messaging - we use a middleware to inject some special
+		// functionality
 		keyper.WithMessaging(messagingMiddleware),
 
+		// don't broadcast generated eon public keys to the P2P network,
 		keyper.NoBroadcastEonPublicKey(),
+		// but instead push them on the internal channel,
+		// where it gets written to a contract onchain
 		keyper.WithEonPublicKeyHandler(kpr.sendNewEonPubkeyToChannel),
 
+		// trigger possible decryption on every new block header from Gnosis chain
 		keyper.WithChainUpdateHandler(decryptOnChainUpdate),
+		// process the SequencerTransactionSubmitted events from Gnosis chain
 		keyper.WithContractEventHandler(sequencerTxSubmitted),
+		// process the ValidatorUpdated events from Gnosis chain
 		keyper.WithContractEventHandler(validatorUpdated),
 	)
 	return core, err
