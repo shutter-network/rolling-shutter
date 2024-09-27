@@ -8,21 +8,21 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 )
 
-var _ syncer.ChainUpdateHandler = &DecryptionChainUpdateHandler{}
+var _ syncer.ChainUpdateHandler = &DecryptOnhChainUpdateHandler{}
 
 type DecryptionFunction = func(context.Context, *types.Header) error
 
-func NewDecryptionChainUpdateHandler(fn DecryptionFunction) *DecryptionChainUpdateHandler {
-	return &DecryptionChainUpdateHandler{
+func NewDecryptOnChainUpdateHandler(fn DecryptionFunction) *DecryptOnhChainUpdateHandler {
+	return &DecryptOnhChainUpdateHandler{
 		decrypt: fn,
 	}
 }
 
-type DecryptionChainUpdateHandler struct {
+type DecryptOnhChainUpdateHandler struct {
 	decrypt DecryptionFunction
 }
 
-func (cu *DecryptionChainUpdateHandler) Handle(
+func (cu *DecryptOnhChainUpdateHandler) Handle(
 	ctx context.Context,
 	update syncer.ChainUpdateContext,
 ) error {

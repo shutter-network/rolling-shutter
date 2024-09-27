@@ -151,7 +151,7 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 	if err != nil {
 		return nil, err
 	}
-	chainUpdate := synchandler.NewDecryptionChainUpdateHandler(kpr.newBlockHandlerFunc)
+	decryptOnChainUpdate := synchandler.NewDecryptOnChainUpdateHandler(kpr.newBlockHandlerFunc)
 	core, err := keyper.New(
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
@@ -173,9 +173,9 @@ func InitializeKeyperCore(ctx context.Context, kpr *Keyper, messagingMiddleware 
 		keyper.WithMessaging(messagingMiddleware),
 
 		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
+		keyper.WithEonPublicKeyHandler(kpr.sendNewEonPubkeyToChannel),
 
-		keyper.WithChainUpdateHandler(chainUpdate),
+		keyper.WithChainUpdateHandler(decryptOnChainUpdate),
 		keyper.WithContractEventHandler(sequencerTxSubmitted),
 		keyper.WithContractEventHandler(validatorUpdated),
 	)
@@ -220,7 +220,7 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 	}
 }
 
-func (kpr *Keyper) channelNewEonPublicKey(_ context.Context, key keyper.EonPublicKey) error {
+func (kpr *Keyper) sendNewEonPubkeyToChannel(_ context.Context, key keyper.EonPublicKey) error {
 	kpr.newEonPublicKeys <- key
 	return nil
 }
