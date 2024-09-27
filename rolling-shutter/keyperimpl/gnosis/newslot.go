@@ -65,8 +65,14 @@ func (kpr *Keyper) maybeDecryptOnNewSlot(ctx context.Context, slot uint64) error
 		// already been built, so we return an error.
 		return errors.Errorf("processing slot %d for which a block has already been processed", slot)
 	}
-	// TODO: overflow protection
-	nextBlock := latestTxSubmittedHeader.Number.Int64() + 1
+	if !latestTxSubmittedHeader.Number.IsInt64() {
+		return errors.New("block number int64 overflow, can't process")
+	}
+	latestTxSubmittedBlockNumber := latestTxSubmittedHeader.Number.Int64()
+	if latestTxSubmittedBlockNumber == math.MaxInt64 {
+		return errors.New("next block number int64 overflow, can't process")
+	}
+	nextBlock := latestTxSubmittedBlockNumber + 1
 
 	queries := obskeyper.New(kpr.dbpool)
 	keyperSet, err := queries.GetKeyperSet(ctx, nextBlock)
