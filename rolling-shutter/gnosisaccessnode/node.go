@@ -53,7 +53,6 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 	)
 	chainsyncOpts := []chainsync.Option{
 		chainsync.WithClient(ethClient),
-		chainsync.WithBlockCacheSize(200),
 		chainsync.WithContractEventHandler(keyperSetAdded),
 		chainsync.WithContractEventHandler(eonKeyBroadcast),
 	}
