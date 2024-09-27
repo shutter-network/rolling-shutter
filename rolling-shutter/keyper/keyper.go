@@ -146,9 +146,6 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 
 	chainsyncOpts := []chainsync.Option{
 		chainsync.WithClient(kpr.blockSyncClient),
-		// TODO: do the stuff from kpr.operateShuttermint in a chainupdate-handler instead
-		// of polling in a separate goroutine
-		// chainsync.WithChainUpdateHandler(),
 		chainsync.WithContractEventHandler(keyperSetAdded),
 	}
 	for _, eh := range kpr.opts.eventHandler {
@@ -207,7 +204,8 @@ func (kpr *KeyperCore) getServices() []service.Service {
 	services := []service.Service{
 		kpr.chainsyncer,
 		kpr.messaging,
-		// TODO: put this in a chainHandler in the chainsyncer
+		// TODO: put this in a chainHandler in the chainsyncer,
+		// but beware of historic chain updates
 		service.Function{Func: kpr.operateShuttermint},
 		newEonPubKeyHandler(kpr),
 	}
