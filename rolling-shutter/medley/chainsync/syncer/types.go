@@ -2,7 +2,6 @@ package syncer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -13,8 +12,6 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
 )
-
-var ErrCritical = errors.New("critical error, signaling shutdown")
 
 type ChainUpdateContext struct {
 	// a previously applied chainsegment that has to be

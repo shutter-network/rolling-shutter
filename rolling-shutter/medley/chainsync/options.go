@@ -9,10 +9,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/logger"
 )
-
-var noopLogger = &logger.NoopLogger{}
 
 const defaultMemoryBlockCacheSize = 50
 

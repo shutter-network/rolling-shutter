@@ -245,6 +245,8 @@ func (kpr *KeyperCore) getServices() []service.Service {
 	}
 	keyTrigger := kpr.trigger
 	if kpr.config.HTTPEnabled {
+		// allow manually triggering the decryption via the
+		// admin HTTP endpoint:
 		httpServer := kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.messaging)
 		services = append(services, httpServer)
 		// combine two sources of decryption triggers

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/hashicorp/go-multierror"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/errs"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -177,7 +178,7 @@ func (f *Fetcher) processContractEventHandler(ctx context.Context, update ChainU
 			events = append(events, a)
 		}
 	}
-	if errors.Is(result, ErrCritical) {
+	if errors.Is(result, errs.ErrCritical) {
 		return result
 	}
 	return h.Handle(ctx, update, events)

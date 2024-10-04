@@ -288,7 +288,7 @@ func (t *TestClient) FilterLogs(ctx context.Context, query ethereum.FilterQuery)
 		}
 		filtered = append(filtered, log)
 	}
-	// TODO: filter by the topics, but this gets complex
+	// OPTIM: filter by the topics, but this gets complex
 	// since it's position based as well.
 	// It's not strictly needed for the tests, since the downstream
 	// caller should also ignore wrong log types upon parsing.

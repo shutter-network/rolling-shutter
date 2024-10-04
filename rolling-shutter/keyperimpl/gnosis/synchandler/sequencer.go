@@ -50,7 +50,7 @@ func (sts *SequencerTransactionSubmitted) Address() common.Address {
 	return sts.address
 }
 
-func (_ *SequencerTransactionSubmitted) Event() string {
+func (*SequencerTransactionSubmitted) Event() string {
 	return "TransactionSubmitted"
 }
 

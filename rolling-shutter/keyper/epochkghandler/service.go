@@ -27,7 +27,7 @@ type KeyShareHandler struct {
 	Trigger   <-chan *broker.Event[*DecryptionTrigger]
 }
 
-func (ksh *KeyShareHandler) handleEvent(ctx context.Context, ev *broker.Event[*DecryptionTrigger]) {
+func (ksh *KeyShareHandler) handleDecryptionTrigger(ctx context.Context, ev *broker.Event[*DecryptionTrigger]) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -85,7 +85,7 @@ func (ksh *KeyShareHandler) Start(ctx context.Context, group service.Runner) err
 					log.Debug().Msg("decryption trigger channel closed, stopping loop")
 					return nil
 				}
-				ksh.handleEvent(ctx, triggerEvent)
+				ksh.handleDecryptionTrigger(ctx, triggerEvent)
 			case <-ctx.Done():
 				return ctx.Err()
 			}

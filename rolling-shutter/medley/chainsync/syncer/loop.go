@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/errs"
 )
 
 var errUint64Overflow = errors.New("uint64 overflow in conversion from math.Big")
@@ -146,7 +147,7 @@ func (f *Fetcher) loop(ctx context.Context) error {
 						removed = f.chainUpdate
 						fullUpdated = newSegment
 					}
-					if errors.Is(err, ErrCritical) {
+					if errors.Is(err, errs.ErrCritical) {
 						// TODO: unwrap the specific critical error
 						return err
 					}
@@ -164,7 +165,7 @@ func (f *Fetcher) loop(ctx context.Context) error {
 		case <-f.processingTrig:
 			success, err := f.handlerSync(ctx)
 			if err != nil {
-				if errors.Is(err, ErrCritical) {
+				if errors.Is(err, errs.ErrCritical) {
 					// TODO: unwrap the specific critical error
 					return err
 				}

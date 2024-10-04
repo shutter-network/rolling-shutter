@@ -31,9 +31,17 @@ func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) err
 	return kpr.maybeDecryptOnNewSlot(ctx, slot.Number)
 }
 
-// maybeDecryptOnNewSlot triggers decryption for the given slot if
-// - it hasn't been triggered for this slot before and
-// - the keyper is part of the corresponding keyper set.
+// maybeDecryptOnNewSlot tries to trigger decryption for the given slot.
+// This will only be conducted when:
+//   - it hasn't been triggered for this slot before and
+//   - the keyper is part of the corresponding keyper set.
+//
+// The function is called from 2 locations:
+//   - on a local timer event that tries to preempt slots
+//   - on receival of a new block from the chain-client.
+//
+// Therefore it is important that it is idempotent when called with the
+// same slot (see above).
 func (kpr *Keyper) maybeDecryptOnNewSlot(ctx context.Context, slot uint64) error {
 	if kpr.latestTriggeredSlot != nil && slot <= *kpr.latestTriggeredSlot {
 		return nil
@@ -279,8 +287,11 @@ func (kpr *Keyper) triggerDecryption(
 		Int("num-identities", len(trigger.IdentityPreimages)).
 		Int64("tx-pointer", txPointer).
 		Msg("sending decryption trigger")
-	kpr.decryptionTriggerChannel <- event
 
+	// let the keyper core handle the decryption - this channel
+	// receives on the keyper-core. If a result notification is required,
+	// we could wait for <-event.Result() somewhere:
+	kpr.decryptionTriggerChannel <- event
 	return nil
 }
 
