@@ -23,13 +23,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/slotticker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
-
-func (kpr *Keyper) processNewSlot(ctx context.Context, slot slotticker.Slot) error {
-	return kpr.maybeDecryptOnNewSlot(ctx, slot.Number)
-}
 
 // maybeDecryptOnNewSlot tries to trigger decryption for the given slot.
 // This will only be conducted when:
