@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/hashicorp/go-multierror"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -83,8 +85,12 @@ func (f *Fetcher) Start(ctx context.Context, runner service.Runner) error {
 		return fmt.Errorf("can't construct topics for handler: %w", err)
 	}
 
-	// TODO: retry
-	latest, err := f.client.HeaderByNumber(ctx, big.NewInt(-2))
+	latest, err := retry.FunctionCall(ctx, func(ctx context.Context) (*types.Header, error) {
+		return f.ethClient.HeaderByNumber(ctx, big.NewInt(-2))
+	},
+		retry.Interval(500*time.Millisecond),
+		retry.MaxInterval(30*time.Second),
+	)
 	if err != nil {
 		return fmt.Errorf("can't get header by number: %w", err)
 	}
