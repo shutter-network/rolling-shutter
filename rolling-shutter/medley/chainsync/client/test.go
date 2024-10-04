@@ -55,9 +55,9 @@ type TestClientController struct {
 	c *TestClient
 }
 
-func NewTestClient(log log.Logger) (*TestClient, *TestClientController) {
+func NewTestClient(logger log.Logger) (*TestClient, *TestClientController) {
 	c := &TestClient{
-		log:                    log,
+		log:                    logger,
 		mux:                    &sync.RWMutex{},
 		subsMux:                &sync.RWMutex{},
 		headerChain:            []*types.Header{},
@@ -108,6 +108,7 @@ func (c *TestClientController) WaitSubscribed(ctx context.Context) {
 		time.After(50 * time.Millisecond)
 	}
 }
+
 func (c *TestClientController) EmitLatestHead(ctx context.Context) error {
 	c.c.subsMux.RLock()
 	defer c.c.subsMux.RUnlock()
@@ -230,7 +231,7 @@ func (t *TestClient) SubscribeNewHead(_ context.Context, ch chan<- *types.Header
 	return su, nil
 }
 
-func (t *TestClient) getLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
+func (t *TestClient) getLogs(_ context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
 	logs := []types.Log{}
 	if query.BlockHash != nil {
 		log, ok := t.logs[*query.BlockHash]
@@ -287,10 +288,6 @@ func (t *TestClient) FilterLogs(ctx context.Context, query ethereum.FilterQuery)
 		}
 		filtered = append(filtered, log)
 	}
-	//FIXME: this never gets called
-	if len(filtered) > 0 {
-		t.log.Info("logs survived filter in FilterLogs", "logs", filtered)
-	}
 	// TODO: filter by the topics, but this gets complex
 	// since it's position based as well.
 	// It's not strictly needed for the tests, since the downstream
@@ -312,17 +309,16 @@ func (t *TestClient) TransactionReceipt(_ context.Context, _ common.Hash) (*type
 
 func (t *TestClient) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	panic(ErrNotImplemented)
-
 }
+
 func (t *TestClient) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	panic(ErrNotImplemented)
-
 }
+
 func (t *TestClient) TransactionCount(ctx context.Context, blockHash common.Hash) (uint, error) {
 	panic(ErrNotImplemented)
-
 }
+
 func (t *TestClient) TransactionInBlock(ctx context.Context, blockHash common.Hash, index uint) (*types.Transaction, error) {
 	panic(ErrNotImplemented)
-
 }
