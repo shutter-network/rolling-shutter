@@ -2,8 +2,10 @@ package synchandler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 )
@@ -25,19 +27,23 @@ type DecryptOnChainUpdate struct {
 func (cu *DecryptOnChainUpdate) Handle(
 	ctx context.Context,
 	update syncer.ChainUpdateContext,
-) error {
+) (result error) {
+	// in case of a reorg (non-nil update.Remove segment) we can't roll back any
+	// changes, since the keys have been release already publicly.
 	if update.Append != nil {
 		for _, header := range update.Append.Get() {
-			// Call the decrypt function with all updated headers.
-			// The downstream function is expected to keep track of
-			// what slots have already been sent out.
-			// We could also calculate that by comparing the QueryContext.Update
-			// with the QueryContext.Remove by blocknumber and only passing
-			// in the non-reorged blocks.
-			// TODO: do that instead --^
+			// We can call the decrypt function with all updated headers,
+			// even if this was a reorg.
+			// This is because the downstream function is expected to keep track of
+			// what slots have already been sent out and decide on itself wether
+			// to re-release keys.
 			err := cu.decrypt(ctx, header)
 			if err != nil {
-				// TODO: log, or return with a multierr?
+				result = multierror.Append(result,
+					fmt.Errorf("failed to decrypt for block %s (num=%d): %w",
+						header.Hash().String(),
+						header.Number.Uint64(),
+						err))
 			}
 		}
 	}
