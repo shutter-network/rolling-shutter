@@ -141,7 +141,7 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
 		kpr.dbpool,
 		kpr.blockSyncClient,
-		kpr.opts.contractAddressses.KeyperSetManager,
+		kpr.config.ContractAddresses.KeyperSetManager,
 		kpr.opts.ethereumAddress,
 	)
 	if err != nil {

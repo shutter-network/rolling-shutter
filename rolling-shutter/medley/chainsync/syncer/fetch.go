@@ -7,10 +7,11 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/hashicorp/go-multierror"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -21,16 +22,14 @@ const MaxSyncedBlockCacheSize = 1000
 
 var ErrServerStateInconsistent = errors.New("server's chain-state differs from assumed local state")
 
-// TODO: naming
-type ChainClient interface {
+type ChainSyncEthClient interface {
 	ethereum.LogFilterer
 	ethereum.ChainReader
 }
 
 type Fetcher struct {
-	client     ChainClient
+	ethClient  ChainSyncEthClient
 	chainCache ChainCache
-	log        log.Logger
 	syncMux    sync.RWMutex
 
 	chainUpdate *chainsegment.ChainSegment
@@ -45,11 +44,10 @@ type Fetcher struct {
 	processingTrig chan struct{}
 }
 
-func NewFetcher(c ChainClient, chainCache ChainCache, log log.Logger) *Fetcher {
+func NewFetcher(c ChainSyncEthClient, chainCache ChainCache) *Fetcher {
 	return &Fetcher{
 		chainCache:            chainCache,
-		client:                c,
-		log:                   log,
+		ethClient:             c,
 		syncMux:               sync.RWMutex{},
 		chainUpdate:           &chainsegment.ChainSegment{},
 		contractEventHandlers: []ContractEventHandler{},
@@ -63,11 +61,11 @@ func NewFetcher(c ChainClient, chainCache ChainCache, log log.Logger) *Fetcher {
 func (f *Fetcher) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
 	header, err := f.chainCache.GetHeaderByHash(ctx, h)
 	if err != nil {
-		log.Error("failed to query header from chain-cache", "error", err)
+		log.Error().Err(err).Msg("failed to query header from chain-cache")
 		err = nil
 	}
 	if header == nil {
-		header, err = f.client.HeaderByHash(ctx, h)
+		header, err = f.ethClient.HeaderByHash(ctx, h)
 		if err != nil {
 			err = fmt.Errorf("failed to query header from RPC client: %w", err)
 		}
@@ -90,10 +88,10 @@ func (f *Fetcher) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return fmt.Errorf("can't get header by number: %w", err)
 	}
-	f.log.Info("current latest head", "latest", latest)
+
 	f.chainUpdate = chainsegment.NewChainSegment(latest)
 
-	subs, err := f.client.SubscribeNewHead(ctx, f.inChan)
+	subs, err := f.ethClient.SubscribeNewHead(ctx, f.inChan)
 	if err != nil {
 		return fmt.Errorf("can't subscribe to new head: %w", err)
 	}
@@ -152,21 +150,20 @@ func (f *Fetcher) processContractEventHandler(ctx context.Context, update ChainU
 			continue
 		}
 
-		// XXX: err ineffassign
-		// TODO: maybe remove the bool ok?
-		a, ok, err := h.Parse(l)
-		if !ok {
+		a, err := h.Parse(l)
+		// error here means we skip processing for this handler
+		if err != nil {
+			// TODO: we could log some errors here if they are not "wrong topic"
 			continue
 		}
 		header := update.Append.GetHeaderByHash(l.BlockHash)
 		if header == nil {
-			f.log.Error(ErrServerStateInconsistent.Error(), "log-block-hash", l.BlockHash)
+			log.Error().Err(ErrServerStateInconsistent).Str("log-block-hash", l.BlockHash.String())
 			result = multierror.Append(result, err)
 			continue
 		}
 		accept, err := h.Accept(ctx, *header, a)
 		if err != nil {
-			f.log.Error("accept handler errored", "error", err)
 			result = multierror.Append(result, err)
 			continue
 		}
@@ -184,12 +181,12 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 	query := ethereum.FilterQuery{
 		Addresses: f.addresses,
 		Topics:    f.topics,
-		//FIXME: does this work when from and to are the same?
+		//FIXME: oes this work when from and to are the same?
 		FromBlock: update.Append.Earliest().Number,
 		ToBlock:   update.Append.Latest().Number,
 	}
 
-	logs, err := f.client.FilterLogs(ctx, query)
+	logs, err := f.ethClient.FilterLogs(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -217,7 +214,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 			err := f.processContractEventHandler(ctx, update, handler, logs)
 			if err != nil {
 				err = fmt.Errorf("contract-event-handler error: %w", err)
-				f.log.Error("handler processing errored", "error", err)
+				log.Error().Err(err).Msg("handler processing errored")
 				result = multierror.Append(result, err)
 			}
 		}()
@@ -227,9 +224,8 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 	// This allows processing of the fully newly updated program-state.
 	wg.Wait()
 	f.syncMux.RLock()
-	for i, h := range f.chainUpdateHandlers {
+	for _, h := range f.chainUpdateHandlers {
 		handler := h
-		f.log.Info("spawning chain update handler", "num", i)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -237,7 +233,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 			err := f.processChainUpdateHandler(ctx, update, handler)
 			if err != nil {
 				err = fmt.Errorf("chain-update-handler error: %w", err)
-				f.log.Error("handler processing errored", "error", err)
+				log.Error().Err(err).Msg("handler processing errored")
 				result = multierror.Append(result, err)
 			}
 		}()

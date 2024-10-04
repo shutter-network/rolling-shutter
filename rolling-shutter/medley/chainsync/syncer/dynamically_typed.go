@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type contractEventHandler[T any] struct {
@@ -20,18 +22,18 @@ func (gh contractEventHandler[T]) Topic() common.Hash {
 	return gh.h.ABI().Events[gh.h.Event()].ID
 }
 
-func (gh contractEventHandler[T]) Parse(log types.Log) (any, bool, error) {
+func (gh contractEventHandler[T]) Parse(log types.Log) (any, error) {
 	var event T
 
 	if err := UnpackLog(gh.h.ABI(), &event, gh.h.Event(), log); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	// Set the log to the Raw field
 	f := reflect.ValueOf(&event).Elem().FieldByName("Raw")
 	if f.CanSet() {
 		f.Set(reflect.ValueOf(log))
 	}
-	return event, true, nil
+	return event, nil
 
 }
 func (gh contractEventHandler[T]) Accept(ctx context.Context, h types.Header, ev any) (bool, error) {
@@ -56,4 +58,11 @@ func (gh contractEventHandler[T]) Handle(ctx context.Context, update ChainUpdate
 		return nil
 	}
 	return gh.h.Handle(ctx, update, tList)
+}
+
+func (gh contractEventHandler[T]) Logger() zerolog.Logger {
+	return log.With().
+		Str("contract-event-handler", gh.h.Event()).
+		Str("contract-address", gh.Address().String()).
+		Logger()
 }

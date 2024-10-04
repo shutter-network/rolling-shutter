@@ -32,12 +32,11 @@ type MemoryChainCache struct {
 	maxSize int
 }
 
-func (mcc *MemoryChainCache) Get(ctx context.Context) (*chainsegment.ChainSegment, error) {
+func (mcc *MemoryChainCache) Get(_ context.Context) (*chainsegment.ChainSegment, error) {
 	if mcc.chain == nil {
 		return nil, ErrEmpy
 	}
 	return mcc.chain, nil
-
 }
 
 func (mcc *MemoryChainCache) GetHeaderByHash(_ context.Context, h common.Hash) (*types.Header, error) {
@@ -61,9 +60,7 @@ func (mcc *MemoryChainCache) Update(ctx context.Context, update ChainUpdateConte
 			}
 		}
 		if update.Append != nil {
-			for _, header := range update.Append.Get() {
-				newSegment = append(newSegment, header)
-			}
+			newSegment = append(newSegment, update.Append.Get()...)
 		}
 		if len(newSegment) > mcc.maxSize {
 			//TODO: check for oneoff

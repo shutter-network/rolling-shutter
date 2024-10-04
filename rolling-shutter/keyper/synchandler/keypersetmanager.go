@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -24,13 +25,13 @@ import (
 var (
 	ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
-	errNilCallOpts        = errors.New("nil call-opts")
-	errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
-	errLatestBlock        = errors.New("'nil' latest block")
+	// errNilCallOpts        = errors.New("nil call-opts")
+	// errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
+	// errLatestBlock        = errors.New("'nil' latest block")
 )
 
 func makeCallError(attrName string, err error) error {
-	return errors.Wrapf(err, "could not retrieve `%s` from contract", attrName)
+	return fmt.Errorf("could not retrieve `%s` from contract: %w", attrName, err)
 }
 
 func init() {
@@ -45,22 +46,21 @@ var KeyperSetManagerContractABI *abi.ABI
 
 func NewKeyperSetAdded(
 	db *pgxpool.Pool,
-	client client.Client,
+	ethClient client.Client,
 	contractAddress,
 	ethereumAddress common.Address,
 ) (syncer.ContractEventHandler, error) {
-	ksm, err := bindings.NewKeyperSetManager(contractAddress, client)
+	ksm, err := bindings.NewKeyperSetManager(contractAddress, ethClient)
 	if err != nil {
 		return nil, err
 	}
 	return syncer.WrapHandler(&KeyperSetAdded{
-		// TODO: log
 		// log:                     log,
 		evABI:                   KeyperSetManagerContractABI,
 		keyperSetManagerAddress: contractAddress,
 		ethereumAddress:         ethereumAddress,
 		dbpool:                  db,
-		ethClient:               client,
+		ethClient:               ethClient,
 		keyperSetManager:        ksm,
 	})
 }
@@ -82,7 +82,7 @@ func (handler *KeyperSetAdded) Address() common.Address {
 	return handler.keyperSetManagerAddress
 }
 
-func (_ *KeyperSetAdded) Event() string {
+func (*KeyperSetAdded) Event() string {
 	return "KeyperSetAdded"
 }
 
@@ -112,13 +112,13 @@ func (handler *KeyperSetAdded) Handle(
 	for _, ev := range events {
 		ks, err := QueryFullKeyperSetFromKeyperSetAddedEvent(ctx, handler.ethClient, ev, handler.keyperSetManager)
 		if err != nil {
-			// TODO: logging
-			// handler.log.Error("KeyperSetAdded event, error querying keyperset-data", "error", err)
+			log.Error().
+				Err(err).
+				Msg("KeyperSetAdded event, error querying keyperset-data")
 		}
 		err = handler.processNewKeyperSet(ctx, ks)
 		if err != nil {
-			// TODO: logging
-			// handler.log.Error("KeyperSetAdded event, error writing to database", "error", err)
+			log.Error().Err(err).Msg("KeyperSetAdded event, error writing to database")
 		}
 	}
 	return nil
@@ -132,16 +132,15 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *Keyp
 			break
 		}
 	}
-	_ = isMember
-	// FIXME: use the old zerologger again
-	// handler.log.Info(
-	// 	"new keyper set added",
-	// 	"activation-block", ev.ActivationBlock,
-	// 	"eon", ev.Eon,
-	// 	"num-members", len(ev.Members),
-	// 	"threshold", ev.Threshold,
-	// 	"is-member", isMember,
-	// )
+	// FIXME: why is the isMember never used for anything other than logging?
+	// check the adapted code what was happening there
+	log.Info().
+		Uint64("activation-block", ev.ActivationBlock).
+		Uint64("eon", ev.Eon).
+		Int("num-members", len(ev.Members)).
+		Uint64("threshold", ev.Threshold).
+		Bool("is-member", isMember).
+		Msg("new keyper set added")
 
 	return handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
@@ -190,7 +189,7 @@ func QueryFullKeyperSetFromKeyperSetAddedEvent(
 ) (*KeyperSet, error) {
 	keyperSet, err := bindings.NewKeyperSet(event.KeyperSetContract, ethClient)
 	if err != nil {
-		return nil, fmt.Errorf("can't bind KeyperSet contract", err)
+		return nil, fmt.Errorf("can't bind KeyperSet contract: %w", err)
 	}
 	opts := &bind.CallOpts{
 		BlockHash: event.Raw.BlockHash,

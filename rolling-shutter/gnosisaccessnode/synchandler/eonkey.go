@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosisaccessnode/storage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/shop-contracts/bindings"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
@@ -26,13 +25,10 @@ func init() {
 var KeyBroadcastContractContractABI *abi.ABI
 
 func NewEonKeyBroadcast(
-	client client.Client,
 	store *storage.Memory,
 	contractAddress common.Address,
 ) (syncer.ContractEventHandler, error) {
 	return syncer.WrapHandler(&EonKeyBroadcast{
-		// TODO: log
-		// log:                     log,
 		evABI:               KeyBroadcastContractContractABI,
 		keyBroadcastAddress: contractAddress,
 		storage:             store,
@@ -49,7 +45,7 @@ func (handler *EonKeyBroadcast) Address() common.Address {
 	return handler.keyBroadcastAddress
 }
 
-func (_ *EonKeyBroadcast) Event() string {
+func (*EonKeyBroadcast) Event() string {
 	// TODO: look this up that his is correct
 	return "EonKeyBroadcast"
 }
@@ -57,6 +53,7 @@ func (_ *EonKeyBroadcast) Event() string {
 func (handler *EonKeyBroadcast) ABI() abi.ABI {
 	return *handler.evABI
 }
+
 func (handler *EonKeyBroadcast) Accept(
 	_ context.Context,
 	_ types.Header,

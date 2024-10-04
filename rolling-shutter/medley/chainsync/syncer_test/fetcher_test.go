@@ -36,9 +36,8 @@ func TestPackAndParseEvent(t *testing.T) {
 	h, err := syncer.WrapHandler(testHandler)
 	assert.NilError(t, err)
 
-	evAny, ok, err := h.Parse(*eventLog)
+	evAny, err := h.Parse(*eventLog)
 	assert.NilError(t, err)
-	assert.Assert(t, ok)
 
 	ev, ok := evAny.(bindings.KeyBroadcastContractEonKeyBroadcast)
 	assert.Assert(t, ok)
@@ -108,7 +107,7 @@ func TestReorgOld(t *testing.T) {
 		},
 	)
 
-	f := syncer.NewFetcher(chain.Client, syncer.NewMemoryChainCache(50, nil), log)
+	f := syncer.NewFetcher(chain.Client, syncer.NewMemoryChainCache(50, nil))
 
 	keyBroadcastHandler, keyBroadcastHandlerCh, err := NewTestKeyBroadcastHandler(log)
 	//TODO: use this?

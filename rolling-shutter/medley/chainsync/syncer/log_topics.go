@@ -2,14 +2,14 @@ package syncer
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-// TODO: errors for unpacklog
-var todoError = errors.New("todo")
+var errTopicMismatch = errors.New("passed in topic does not match handler")
 
 func topics(handler []ContractEventHandler) ([][]common.Hash, error) {
 	var query [][]any
@@ -30,16 +30,14 @@ func UnpackLog(a abi.ABI, out interface{}, event string, log types.Log) error {
 
 	// Anonymous events are not supported.
 	if len(log.Topics) == 0 {
-		//TODO:
-		return todoError
+		return errTopicMismatch
 	}
 	if log.Topics[0] != a.Events[event].ID {
-		//TODO:
-		return todoError
+		return errTopicMismatch
 	}
 	if len(log.Data) > 0 {
 		if err := a.UnpackIntoInterface(out, event, log.Data); err != nil {
-			return err
+			return fmt.Errorf("error marshaling into `out` value: %w", err)
 		}
 	}
 	var indexed abi.Arguments

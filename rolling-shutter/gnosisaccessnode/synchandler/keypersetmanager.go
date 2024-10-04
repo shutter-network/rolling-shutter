@@ -3,8 +3,6 @@ package synchandler
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -20,11 +18,11 @@ import (
 )
 
 var (
-	ErrParseKeyperSet = errors.New("can't parse KeyperSet")
-
-	errNilCallOpts        = errors.New("nil call-opts")
-	errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
-	errLatestBlock        = errors.New("'nil' latest block")
+// ErrParseKeyperSet = errors.New("can't parse KeyperSet")
+//
+// errNilCallOpts        = errors.New("nil call-opts")
+// errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
+// errLatestBlock        = errors.New("'nil' latest block")
 )
 
 func init() {
@@ -38,21 +36,22 @@ func init() {
 var KeyperSetManagerContractABI *abi.ABI
 
 func NewKeyperSetAdded(
-	client client.Client,
-	storage *storage.Memory,
+	ethClient client.Client,
+	store *storage.Memory,
 	contractAddress common.Address,
 ) (syncer.ContractEventHandler, error) {
-	ksm, err := bindings.NewKeyperSetManager(contractAddress, client)
+	// we need access to an additional contract here in oder to pull in some more
+	// required information about the keyper sets:
+	ksm, err := bindings.NewKeyperSetManager(contractAddress, ethClient)
 	if err != nil {
 		return nil, err
 	}
 	return syncer.WrapHandler(&KeyperSetAdded{
-		// TODO: log
-		// log:                     log,
+		storage:                 store,
 		evABI:                   KeyperSetManagerContractABI,
 		keyperSetManagerAddress: contractAddress,
 		keyperSetManager:        ksm,
-		ethClient:               client,
+		ethClient:               ethClient,
 	})
 }
 
@@ -60,38 +59,37 @@ type KeyperSetAdded struct {
 	storage                 *storage.Memory
 	evABI                   *abi.ABI
 	keyperSetManagerAddress common.Address
-	dbpool                  *pgxpool.Pool
-
-	// we only need this because we have to poll
-	// additional data from the contract
-	ethClient        client.Client
-	keyperSetManager *bindings.KeyperSetManager
+	ethClient               client.Client
+	keyperSetManager        *bindings.KeyperSetManager
 }
 
 func (handler *KeyperSetAdded) Address() common.Address {
 	return handler.keyperSetManagerAddress
 }
 
-func (_ *KeyperSetAdded) Event() string {
+func (*KeyperSetAdded) Event() string {
 	return "KeyperSetAdded"
 }
 
 func (handler *KeyperSetAdded) ABI() abi.ABI {
 	return *handler.evABI
 }
+
 func (handler *KeyperSetAdded) Accept(
-	ctx context.Context,
-	header types.Header,
-	ev bindings.KeyperSetManagerKeyperSetAdded,
+	_ context.Context,
+	_ types.Header,
+	_ bindings.KeyperSetManagerKeyperSetAdded,
 ) (bool, error) {
 	return true, nil
 }
+
 func (handler *KeyperSetAdded) Handle(
 	ctx context.Context,
 	update syncer.ChainUpdateContext,
 	events []bindings.KeyperSetManagerKeyperSetAdded,
 ) error {
 	// TODO: handle reorgs here
+	_ = update
 
 	for _, ev := range events {
 		keyperSet, err := keypersetsync.QueryFullKeyperSetFromKeyperSetAddedEvent(
@@ -103,6 +101,7 @@ func (handler *KeyperSetAdded) Handle(
 		if err != nil {
 			log.Error().Err(err).Msg("KeyperSetAdded event, error querying keyperset-data")
 		}
+		// FIXME: integer overflow protection
 		obsKeyperSet := obskeyperdatabase.KeyperSet{
 			KeyperConfigIndex:     int64(keyperSet.Eon),
 			ActivationBlockNumber: int64(keyperSet.ActivationBlock),
@@ -116,7 +115,6 @@ func (handler *KeyperSetAdded) Handle(
 			Uint64("threshold", keyperSet.Threshold).
 			Msg("adding keyper set")
 		handler.storage.AddKeyperSet(keyperSet.Eon, &obsKeyperSet)
-		return nil
 	}
 	return nil
 }

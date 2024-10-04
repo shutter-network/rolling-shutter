@@ -46,11 +46,16 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 		node.storage,
 		node.config.Contracts.KeyperSetManager,
 	)
+	if err != nil {
+		return err
+	}
 	eonKeyBroadcast, err := synchandler.NewEonKeyBroadcast(
-		ethClient,
 		node.storage,
 		node.config.Contracts.KeyBroadcastContract,
 	)
+	if err != nil {
+		return err
+	}
 	chainsyncOpts := []chainsync.Option{
 		chainsync.WithClient(ethClient),
 		chainsync.WithContractEventHandler(keyperSetAdded),
@@ -58,7 +63,7 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 	}
 	chainsyncer, err := chainsync.New(chainsyncOpts...)
 	if err != nil {
-		return fmt.Errorf("can't instantiate chainsync", err)
+		return fmt.Errorf("can't instantiate chainsync: %w", err)
 	}
 	services = append(services, chainsyncer)
 	if node.config.Metrics.Enabled {

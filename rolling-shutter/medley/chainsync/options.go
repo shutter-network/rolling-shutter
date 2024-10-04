@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
@@ -22,7 +21,6 @@ type Option func(*options) error
 type options struct {
 	clientURL    string
 	ethClient    client.Sync
-	logger       log.Logger
 	syncStart    *number.BlockNumber
 	chainCache   syncer.ChainCache
 	eventHandler []syncer.ContractEventHandler
@@ -55,7 +53,7 @@ func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
 	if o.chainCache == nil {
 		o.chainCache = syncer.NewMemoryChainCache(int(defaultMemoryBlockCacheSize), nil)
 	}
-	f := syncer.NewFetcher(o.ethClient, o.chainCache, o.logger)
+	f := syncer.NewFetcher(o.ethClient, o.chainCache)
 
 	for _, h := range o.chainHandler {
 		f.RegisterChainUpdateHandler(h)
@@ -68,7 +66,6 @@ func (o *options) initFetcher(ctx context.Context) (*syncer.Fetcher, error) {
 
 func defaultOptions() *options {
 	return &options{
-		logger:       noopLogger,
 		syncStart:    number.NewBlockNumber(nil),
 		eventHandler: []syncer.ContractEventHandler{},
 		chainHandler: []syncer.ChainUpdateHandler{},
@@ -95,13 +92,6 @@ func WithClientURL(url string) Option {
 func WithChainCache(c syncer.ChainCache) Option {
 	return func(o *options) error {
 		o.chainCache = c
-		return nil
-	}
-}
-
-func WithLogger(l log.Logger) Option {
-	return func(o *options) error {
-		o.logger = l
 		return nil
 	}
 }
