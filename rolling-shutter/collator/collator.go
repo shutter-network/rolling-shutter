@@ -61,7 +61,7 @@ func New(cfg *config.Config) service.Service {
 	return &collator{Config: cfg}
 }
 
-func (c *collator) Start(ctx context.Context, runner service.Runner) error {
+func (c *collator) Start(ctx context.Context, runner service.Runner) error { //nolint:funlen
 	var err error
 	cfg := c.Config
 	log.Info().Str("ethereum-address", cfg.Ethereum.PrivateKey.EthereumAddress().Hex()).Msg(

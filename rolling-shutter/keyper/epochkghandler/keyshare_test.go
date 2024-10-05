@@ -87,7 +87,7 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	}
 }
 
-func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
+func TestDecryptionKeyshareValidatorIntegration(t *testing.T) { //nolint:funlen
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

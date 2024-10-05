@@ -30,6 +30,10 @@ var (
 	errFailedMarshalLibp2pPublic    error = errors.New("failed to marshal Libp2pPublic key")
 )
 
+func makeUpstreamAPIChangeMessage(name string) string {
+	return name + " did return unexpected type, indicating an upstream API change"
+}
+
 func NewLibp2pPrivate(b []byte) (*Libp2pPrivate, error) {
 	// We have to do all of this only because libp2p did decide to make the
 	// underlying key member private, not provide a simple constructor and
@@ -49,8 +53,7 @@ func NewLibp2pPrivate(b []byte) (*Libp2pPrivate, error) {
 	if !ok {
 		panic(errors.Wrap(
 			errFailedUnmarshalLibp2pPrivate,
-			"libp2p's UnmarshalEd25519PrivateKey() did return unexpected type, "+
-				"indicating an upstream API change",
+			makeUpstreamAPIChangeMessage("libp2p's UnmarshalEd25519PrivateKey()"),
 		))
 	}
 	return &Libp2pPrivate{
@@ -66,10 +69,7 @@ func (k *Libp2pPrivate) Public() Public {
 	pub := k.Key.GetPublic()
 	edPubK, ok := pub.(*crypto.Ed25519PublicKey)
 	if !ok {
-		panic(errors.New(
-			"libp2p's GetPublic() did return unexpected type, " +
-				"indicating an upstream API change",
-		))
+		panic(errors.New(makeUpstreamAPIChangeMessage("libp2p's GetPublic()")))
 	}
 	return &Libp2pPublic{Key: *edPubK}
 }
@@ -115,9 +115,8 @@ func (k *Libp2pPrivate) UnmarshalText(b []byte) error {
 	if !ok {
 		panic(errors.Wrap(
 			errFailedUnmarshalLibp2pPrivate,
-			"libp2p's UnmarshalPrivateKey() did return unexpected type, "+
-				"indicating an upstream API change",
-		))
+			makeUpstreamAPIChangeMessage("libp2p's UnmarshalPrivateKey()")),
+		)
 	}
 	k.Key = *edPk
 	return nil
@@ -159,8 +158,7 @@ func NewLibp2pPublic(b []byte) (*Libp2pPublic, error) {
 	if !ok {
 		panic(errors.Wrap(
 			errFailedUnmarshalLibp2pPrivate,
-			"libp2p's UnmarshalEd25519PublicKey() did return unexpected type, "+
-				"indicating an upstream API change",
+			makeUpstreamAPIChangeMessage("libp2p's UnmarshalEd25519PublicKey()"),
 		))
 	}
 	return &Libp2pPublic{
@@ -210,9 +208,7 @@ func (k *Libp2pPublic) UnmarshalText(b []byte) error {
 	if !ok {
 		panic(errors.Wrap(
 			errFailedUnmarshalLibp2pPublic,
-			"libp2p's UnmarshalPublicKey() did return unexpected type, "+
-				"indicating an upstream API change",
-		))
+			makeUpstreamAPIChangeMessage("libp2p's UnmarshalPublicKey()")))
 	}
 	k.Key = *edPubK
 	return nil
