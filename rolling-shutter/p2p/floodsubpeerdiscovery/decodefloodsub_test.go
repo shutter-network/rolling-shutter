@@ -1,6 +1,7 @@
 package floodsubpeerdiscovery
 
 import (
+	"encoding/base64"
 	"fmt"
 	"testing"
 
@@ -9,7 +10,9 @@ import (
 )
 
 func TestDecodeConst(t *testing.T) {
-	msg := []byte("CiD53zJL+X7bj6vatGWpsYWmCBSsCTBi0jqBsHyc9yeM3xIIBKdjseMGWd0SCwSnY7HjkQJZ3c0D")
+	raw := "CiD53zJL+X7bj6vatGWpsYWmCBSsCTBi0jqBsHyc9yeM3xIIBKdjseMGWd0SCwSnY7HjkQJZ3c0D"
+	msg, err := base64.StdEncoding.DecodeString(raw)
+	assert.NilError(t, err, "could not b64 decode")
 	p := Peer{}
 	proto.Unmarshal(msg, &p)
 	fmt.Println(p.Addrs, p.PublicKey)
