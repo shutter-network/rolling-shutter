@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 	"gotest.tools/v3/assert"
 )
@@ -15,7 +16,11 @@ func TestDecodeConst(t *testing.T) {
 	assert.NilError(t, err, "could not b64 decode")
 	p := Peer{}
 	proto.Unmarshal(msg, &p)
-	fmt.Println(p.Addrs, p.PublicKey)
+	for _, addr := range p.Addrs {
+		ma, err := multiaddr.NewMultiaddrBytes(addr)
+		assert.NilError(t, err, "could not decode multiaddr")
+		fmt.Println(ma.String())
+	}
 	assert.Check(t, len(p.PublicKey) > 0, "no pubkey decoded")
 	assert.Check(t, len(p.Addrs) > 0, "no addresses decoded")
 }
