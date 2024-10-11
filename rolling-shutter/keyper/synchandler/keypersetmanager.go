@@ -22,13 +22,7 @@ import (
 	"github.com/shutter-network/shop-contracts/bindings"
 )
 
-var (
-	ErrParseKeyperSet = errors.New("can't parse KeyperSet")
-
-	// errNilCallOpts        = errors.New("nil call-opts")
-	// errNilOptsBlockNumber = errors.New("opts block-number is nil, but 'latest' not allowed")
-	// errLatestBlock        = errors.New("'nil' latest block")
-)
+var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
 func makeCallError(attrName string, err error) error {
 	return fmt.Errorf("could not retrieve `%s` from contract: %w", attrName, err)
@@ -55,7 +49,6 @@ func NewKeyperSetAdded(
 		return nil, err
 	}
 	return syncer.WrapHandler(&KeyperSetAdded{
-		// log:                     log,
 		evABI:                   KeyperSetManagerContractABI,
 		keyperSetManagerAddress: contractAddress,
 		ethereumAddress:         ethereumAddress,
@@ -68,7 +61,7 @@ func NewKeyperSetAdded(
 type KeyperSetAdded struct {
 	evABI                   *abi.ABI
 	keyperSetManagerAddress common.Address
-	// own address
+	// our address to check wether we are part of the keyper-set
 	ethereumAddress common.Address
 	dbpool          *pgxpool.Pool
 
@@ -89,13 +82,15 @@ func (*KeyperSetAdded) Event() string {
 func (handler *KeyperSetAdded) ABI() abi.ABI {
 	return *handler.evABI
 }
+
 func (handler *KeyperSetAdded) Accept(
-	ctx context.Context,
-	header types.Header,
-	ev bindings.KeyperSetManagerKeyperSetAdded,
+	_ context.Context,
+	_ types.Header,
+	_ bindings.KeyperSetManagerKeyperSetAdded,
 ) (bool, error) {
 	return true, nil
 }
+
 func (handler *KeyperSetAdded) Handle(
 	ctx context.Context,
 	update syncer.ChainUpdateContext,
@@ -132,8 +127,6 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *Keyp
 			break
 		}
 	}
-	// FIXME: why is the isMember never used for anything other than logging?
-	// check the adapted code what was happening there
 	log.Info().
 		Uint64("activation-block", ev.ActivationBlock).
 		Uint64("eon", ev.Eon).
@@ -141,6 +134,17 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *Keyp
 		Uint64("threshold", ev.Threshold).
 		Bool("is-member", isMember).
 		Msg("new keyper set added")
+
+	// TODO: before, we were notifying the SequencerTransactionSubmitted
+	// handler when we were part of the newly inserted KeyperSet.
+	// This was an optimisation measure to not let the node
+	// insert SequencerTransactionSubmitted events into it's DB for
+	// Eons that are before the point where it is part of the KeyperSet.
+	// This optimisation is for now omitted, since it unnecessarily coupled
+	// both handler. It was mainly done like this to avoid adding an
+	// additional field 'weAreMember' to the KeyperSet in the db.
+	// XXX: do we have to insert keypersets we are not part of?
+	// Maybe it would be easiest to just ignore those keypersets?
 
 	return handler.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
@@ -158,6 +162,9 @@ func (handler *KeyperSetAdded) processNewKeyperSet(ctx context.Context, ev *Keyp
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
 		}
 
+		// we insert the keyperset into the db, even though we are not member of it.
+		// Since there is no field to mark our keypersets, we would always
+		// have to iterate over all keypersets...
 		return obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 			KeyperConfigIndex:     keyperConfigIndex,
 			ActivationBlockNumber: activationBlockNumber,
