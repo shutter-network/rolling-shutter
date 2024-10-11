@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
@@ -40,7 +41,7 @@ const (
 
 type Keyper struct {
 	core            *keyper.KeyperCore
-	config          *Config
+	config          *config.Config
 	dbpool          *pgxpool.Pool
 	beaconAPIClient *beaconapiclient.Client
 
@@ -60,7 +61,7 @@ type Keyper struct {
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
 }
 
-func New(c *Config) *Keyper {
+func New(c *config.Config) *Keyper {
 	return &Keyper{
 		config: c,
 	}
