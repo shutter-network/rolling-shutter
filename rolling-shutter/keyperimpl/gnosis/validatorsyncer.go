@@ -18,6 +18,7 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/validatorregistry"
@@ -107,8 +108,8 @@ func (v *ValidatorSyncer) syncRange(ctx context.Context, start, end uint64) erro
 		Int("num-discarded-events", len(events)-len(filteredEvents)).
 		Int64("num-registrations", numRegistrations).
 		Msg("synced validator registry")
-	metricsNumValidatorRegistrations.Set(float64(numRegistrations))
-	metricsValidatorRegistrationsSyncedUntil.Set(float64(end))
+	metrics.NumValidatorRegistrations.Set(float64(numRegistrations))
+	metrics.ValidatorRegistrationsSyncedUntil.Set(float64(end))
 	return nil
 }
 
