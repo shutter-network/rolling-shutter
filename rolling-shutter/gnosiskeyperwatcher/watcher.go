@@ -3,15 +3,15 @@ package gnosiskeyperwatcher
 import (
 	"context"
 
-	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
+	gnosisconfig "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 type Watcher struct {
-	config *keyper.Config
+	config *gnosisconfig.Config
 }
 
-func New(config *keyper.Config) *Watcher {
+func New(config *gnosisconfig.Config) *Watcher {
 	return &Watcher{
 		config: config,
 	}
