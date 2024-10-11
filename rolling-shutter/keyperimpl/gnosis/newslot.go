@@ -19,6 +19,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	gnosisdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
@@ -217,8 +218,8 @@ func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointer
 			return 0, errors.Wrap(err, "failed to query transaction submitted event count from db")
 		}
 	}
-	metricsTxPointer.WithLabelValues(eonString).Set(float64(txPointer))
-	metricsTxPointerAge.WithLabelValues(eonString).Set(float64(txPointerAge))
+	metrics.TxPointer.WithLabelValues(eonString).Set(float64(txPointer))
+	metrics.TxPointerAge.WithLabelValues(eonString).Set(float64(txPointerAge))
 	return txPointer, nil
 }
 
