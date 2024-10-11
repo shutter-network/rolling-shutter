@@ -3,8 +3,11 @@ package keyper
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -15,6 +18,7 @@ import (
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract/deployment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/chaincache"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/fx"
@@ -22,8 +26,12 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprapi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/smobserver"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/synchandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/channel"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -44,6 +52,7 @@ type KeyperCore struct {
 	messaging         p2p.Messaging
 	messageSender     fx.RPCMessageSender
 	blockSyncClient   *ethclient.Client
+	chainsyncer       *chainsync.Chainsync
 
 	shuttermintState *smobserver.ShuttermintState
 	metricsServer    *metricsserver.MetricsServer
@@ -122,7 +131,59 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 	} else {
 		kpr.blockSyncClient = kpr.opts.blockSyncClient
 	}
-	return nil
+
+	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
+		kpr.dbpool,
+		kpr.blockSyncClient,
+		kpr.config.ContractAddresses.KeyperSetManager,
+		kpr.opts.ethereumAddress,
+	)
+	if err != nil {
+		return err
+	}
+
+	dbChainCache := chaincache.NewDatabaseChainCache(kpr.dbpool)
+	cachedChain, err := dbChainCache.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	// The keyper hasn't been synced before.
+	// use the provided option to start syncing only from a specific block
+	if cachedChain == nil {
+		syncBlockNumber := kpr.opts.syncStartBlockNumber
+		if syncBlockNumber == nil {
+			syncBlockHeader, err := kpr.blockSyncClient.HeaderByNumber(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("can't fetch latest head: %w", err)
+			}
+			syncBlockNumber = syncBlockHeader.Number
+		}
+		cachedBeforeSyncStart, err := kpr.blockSyncClient.HeaderByNumber(ctx, new(big.Int).Sub(syncBlockNumber, big.NewInt(1)))
+		if err != nil {
+			return fmt.Errorf("can't fetch header before the sync start: %w", err)
+		}
+		// pretend that we synced until one block before the sync start
+		err = dbChainCache.Update(ctx, syncer.ChainUpdateContext{
+			Append: chainsegment.NewChainSegment(cachedBeforeSyncStart),
+		})
+		if err != nil {
+			return fmt.Errorf("can't update database chain-cache with initial header: %w", err)
+		}
+	}
+
+	chainsyncOpts := []chainsync.Option{
+		chainsync.WithClient(kpr.blockSyncClient),
+		chainsync.WithContractEventHandler(keyperSetAdded),
+	}
+	for _, eh := range kpr.opts.eventHandler {
+		chainsyncOpts = append(chainsyncOpts, chainsync.WithContractEventHandler(eh))
+	}
+	for _, ch := range kpr.opts.chainHandler {
+		chainsyncOpts = append(chainsyncOpts, chainsync.WithChainUpdateHandler(ch))
+	}
+	kpr.chainsyncer, err = chainsync.New(chainsyncOpts...)
+	return err
 }
 
 func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
@@ -169,12 +230,17 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 
 func (kpr *KeyperCore) getServices() []service.Service {
 	services := []service.Service{
+		kpr.chainsyncer,
 		kpr.messaging,
+		// TODO: put this in a chainHandler in the chainsyncer,
+		// but beware of historic chain updates
 		service.Function{Func: kpr.operateShuttermint},
 		newEonPubKeyHandler(kpr),
 	}
 	keyTrigger := kpr.trigger
 	if kpr.config.HTTPEnabled {
+		// allow manually triggering the decryption via the
+		// admin HTTP endpoint:
 		httpServer := kprapi.NewHTTPService(kpr.dbpool, kpr.config, kpr.messaging)
 		services = append(services, httpServer)
 		// combine two sources of decryption triggers
@@ -346,7 +412,9 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 }
 
 // TODO: we need a better block syncing mechanism!
-// Also this is doing too much work sequentially in one routine.
+// Now that we have the chainsync, we could put this in a ChainUpdateHandler.
+// However we have to take care of what happens when the node restarts
+// and is quickly syncing non-latest historic, but unknown blocks.
 func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner) error {
 	for {
 		syncBlockNumber, err := retry.FunctionCall(ctx, kpr.blockSyncClient.BlockNumber)
@@ -375,4 +443,8 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+func (kpr *KeyperCore) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
+	return kpr.chainsyncer.GetHeaderByHash(ctx, h)
 }

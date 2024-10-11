@@ -59,12 +59,13 @@ func (sts *SequencerTransactionSubmitted) ABI() abi.ABI {
 }
 
 func (sts *SequencerTransactionSubmitted) Accept(
-	ctx context.Context,
-	header types.Header,
-	ev bindings.SequencerTransactionSubmitted,
+	_ context.Context,
+	_ types.Header,
+	_ bindings.SequencerTransactionSubmitted,
 ) (bool, error) {
 	return true, nil
 }
+
 func (sts *SequencerTransactionSubmitted) Handle(
 	ctx context.Context,
 	update syncer.ChainUpdateContext,
@@ -130,6 +131,17 @@ func (sts *SequencerTransactionSubmitted) filterEvents(
 	events []bindings.SequencerTransactionSubmitted,
 ) []bindings.SequencerTransactionSubmitted {
 	filteredEvents := []bindings.SequencerTransactionSubmitted{}
+	// TODO: before the refactoring, a mux'ed field was read here
+	// in order to filter out Eons that are before "our" first
+	// keyper-sets eon.
+	// Do this by direcly reading "our" keyper-sets from the DB
+	// without manually iterating over all keyper-sets / addresses.
+	// This requires persisting this information upon insertion
+	// in the KeyperSetAdded event handler and thus a database migration.
+	//
+	// For now, insert all events into the DB.
+	// We could clean up this from time to time as a temporary measure
+	// to not make the DB grow unnecessarily.
 	for _, event := range events {
 		if event.Eon > math.MaxInt64 ||
 			!event.GasLimit.IsInt64() {
@@ -139,7 +151,7 @@ func (sts *SequencerTransactionSubmitted) filterEvents(
 				Str("block-hash", event.Raw.BlockHash.Hex()).
 				Uint("tx-index", event.Raw.TxIndex).
 				Uint("log-index", event.Raw.Index).
-				Msg("ignoring transaction submitted event with high eon")
+				Msg("ignoring transaction submitted event")
 			continue
 		}
 		filteredEvents = append(filteredEvents, event)

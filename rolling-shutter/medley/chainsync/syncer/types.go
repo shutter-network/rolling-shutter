@@ -47,8 +47,8 @@ type IContractEventHandler[T any] interface {
 func WrapHandler[T any](h IContractEventHandler[T]) (ContractEventHandler, error) {
 	var t T
 	if reflect.TypeOf(t).Kind() == reflect.Pointer {
-		return nil, fmt.Errorf("Handler must not receive pointer values for the event types.")
 		return nil, fmt.Errorf("handler must not receive pointer values for the event types")
+	}
 	return contractEventHandler[T]{
 		h: h,
 	}, nil
@@ -63,7 +63,7 @@ type ContractEventHandler interface {
 	Topic() common.Hash
 	Address() common.Address
 
-	Parse(log types.Log) (any, bool, error)
+	Parse(log types.Log) (any, error)
 	Accept(ctx context.Context, h types.Header, ev any) (bool, error)
 	Handle(ctx context.Context, update ChainUpdateContext, events []any) error
 	Logger() zerolog.Logger

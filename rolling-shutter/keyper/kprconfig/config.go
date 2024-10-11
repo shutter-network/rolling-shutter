@@ -18,6 +18,10 @@ import (
 
 var _ configuration.Config = &ShuttermintConfig{}
 
+type ContractAddresses struct {
+	KeyperSetManager common.Address
+}
+
 type Config struct {
 	InstanceID  uint64
 	DatabaseURL string
@@ -31,6 +35,7 @@ type Config struct {
 	Metrics     *metricsserver.MetricsConfig
 
 	MaxNumKeysPerMessage uint64
+	ContractAddresses    ContractAddresses
 }
 
 func (c *Config) GetAddress() common.Address {

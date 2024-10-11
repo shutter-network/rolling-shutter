@@ -29,6 +29,8 @@ const (
 )
 
 // EonKeyPublisher is a service that publishes eon keys via a eon key publisher contract.
+// E.g. in the Gnosis keyper implementation this is used to publish keys onchain
+// instead of broadcasting it on the p2p-network.
 type EonKeyPublisher struct {
 	dbpool           *pgxpool.Pool
 	client           *ethclient.Client

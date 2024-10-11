@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -14,11 +15,15 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/chainsegment"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/errs"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
-const MaxRequestBlockRange = 1000
-const MaxSyncedBlockCacheSize = 1000
+const (
+	MaxRequestBlockRange    = 1000
+	MaxSyncedBlockCacheSize = 1000
+)
 
 var ErrServerStateInconsistent = errors.New("server's chain-state differs from assumed local state")
 
@@ -58,14 +63,15 @@ func NewFetcher(c ChainSyncEthClient, chainCache ChainCache) *Fetcher {
 		processingTrig:        make(chan struct{}, 1),
 	}
 }
+
 func (f *Fetcher) GetHeaderByHash(ctx context.Context, h common.Hash) (*types.Header, error) {
-		log.Error().Err(err).Msg("failed to query header from chain-cache")
+	header, err := f.chainCache.GetHeaderByHash(ctx, h)
 	if err != nil {
-		log.Error("failed to query header from chain-cache", "error", err)
+		log.Error().Err(err).Msg("failed to query header from chain-cache")
 		err = nil
-		header, err = f.ethClient.HeaderByHash(ctx, h)
+	}
 	if header == nil {
-		header, err = f.client.HeaderByHash(ctx, h)
+		header, err = f.ethClient.HeaderByHash(ctx, h)
 		if err != nil {
 			err = fmt.Errorf("failed to query header from RPC client: %w", err)
 		}
@@ -83,8 +89,12 @@ func (f *Fetcher) Start(ctx context.Context, runner service.Runner) error {
 		return fmt.Errorf("can't construct topics for handler: %w", err)
 	}
 
-	// TODO: retry
-	latest, err := f.client.HeaderByNumber(ctx, big.NewInt(-2))
+	latest, err := retry.FunctionCall(ctx, func(ctx context.Context) (*types.Header, error) {
+		return f.ethClient.HeaderByNumber(ctx, big.NewInt(-2))
+	},
+		retry.Interval(500*time.Millisecond),
+		retry.MaxInterval(30*time.Second),
+	)
 	if err != nil {
 		return fmt.Errorf("can't get header by number: %w", err)
 	}
@@ -176,8 +186,8 @@ func (f *Fetcher) processContractEventHandler(
 			events = append(events, a)
 		}
 	}
-	if errors.Is(result, ErrCritical) {
 	if errors.Is(result, errs.ErrCritical) {
+		return result
 	}
 	return h.Handle(ctx, update, events)
 }
@@ -186,7 +196,7 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 	query := ethereum.FilterQuery{
 		Addresses: f.addresses,
 		Topics:    f.topics,
-		//FIXME: oes this work when from and to are the same?
+		// FIXME: oes this work when from and to are the same?
 		FromBlock: update.Append.Earliest().Number,
 		ToBlock:   update.Append.Latest().Number,
 	}
@@ -226,11 +236,11 @@ func (f *Fetcher) FetchAndHandle(ctx context.Context, update ChainUpdateContext)
 	}
 	f.syncMux.RUnlock()
 	// run the chain-update handlers after the contract event handlers did run.
-	for _, h := range f.chainUpdateHandlers {
+	// This allows processing of the fully newly updated program-state.
 	wg.Wait()
-	for i, h := range f.chainUpdateHandlers {
+	f.syncMux.RLock()
+	for _, h := range f.chainUpdateHandlers {
 		handler := h
-		f.log.Info("spawning chain update handler", "num", i)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
