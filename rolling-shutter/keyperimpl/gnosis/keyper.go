@@ -169,6 +169,8 @@ func (kpr *Keyper) initKeyperCore(
 	opts := []keyper.Option{
 		// The keyper core needs the implementation addresses of the core
 		// contracts
+		// re-use the gnosis client to receive chain updates
+		keyper.WithBlockSyncClient(kpr.gnosisEthClient),
 		keyper.WithDBPool(kpr.dbpool),
 		// P2P messaging - we use a middleware to inject some special
 		// functionality
