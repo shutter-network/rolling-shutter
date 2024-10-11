@@ -107,8 +107,9 @@ func (vu *ValidatorUpdated) Handle(
 				return errors.Wrap(err, "failed to unmarshal registration message")
 			}
 			err = dtbs.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
-				BlockNumber:    int64(event.Raw.BlockNumber),
-				BlockHash:      event.Raw.BlockHash.Bytes(),
+				BlockNumber: int64(event.Raw.BlockNumber),
+				BlockHash:   event.Raw.BlockHash.Bytes(),
+				//TODO: check int64 overflow
 				TxIndex:        int64(event.Raw.TxIndex),
 				LogIndex:       int64(event.Raw.Index),
 				ValidatorIndex: int64(msg.ValidatorIndex),

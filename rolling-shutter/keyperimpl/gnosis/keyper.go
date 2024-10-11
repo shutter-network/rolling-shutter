@@ -165,16 +165,15 @@ func (kpr *Keyper) initKeyperCore(
 	chainUpdateHandler []syncer.ChainUpdateHandler,
 	eventHandler []syncer.ContractEventHandler,
 ) error {
-	messagingMiddleware := NewMessagingMiddleware(messaging, kpr.dbpool, kpr.config)
 	opts := []keyper.Option{
-		// The keyper core needs the implementation addresses of the core
-		// contracts
 		// re-use the gnosis client to receive chain updates
 		keyper.WithBlockSyncClient(kpr.gnosisEthClient),
 		keyper.WithDBPool(kpr.dbpool),
 		// P2P messaging - we use a middleware to inject some special
 		// functionality
-		keyper.WithMessaging(messagingMiddleware),
+		keyper.WithMessaging(
+			NewMessagingMiddleware(messaging, kpr.dbpool, kpr.config),
+		),
 
 		// don't broadcast generated eon public keys to the P2P network,
 		keyper.NoBroadcastEonPublicKey(),
@@ -185,6 +184,10 @@ func (kpr *Keyper) initKeyperCore(
 		// This will only start syncing blockchain events
 		// from a specific block on, and only when we never synced before.
 		// Otherwise, it will pick up syncing where we last stopped.
+		// Beware that this has to be a block at or before where the keyper-set was
+		// added (not started) onchain.
+		// Otherwise the node will miss the event and never know it is
+		// part of the keyper-set.
 		keyper.WithSyncStartBlockNumber(*new(big.Int).SetUint64(kpr.config.Gnosis.SyncStartBlockNumber)),
 	}
 	for _, h := range chainUpdateHandler {
@@ -195,7 +198,6 @@ func (kpr *Keyper) initKeyperCore(
 	}
 	var err error
 	kpr.core, err = keyper.New(
-		// keyper core config
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
@@ -206,23 +208,17 @@ func (kpr *Keyper) initKeyperCore(
 			Shuttermint:          kpr.config.Shuttermint,
 			Metrics:              kpr.config.Metrics,
 			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
+			// The keyper core needs the implementation addresses of the core
+			// contracts on the specific chain.
 			ContractAddresses: kprconfig.ContractAddresses{
 				KeyperSetManager: kpr.config.Gnosis.Contracts.KeyperSetManager,
 			},
 		},
-		// send messages here to trigger decryption in the keyper core
+		// send events to this channel to trigger decryption in the keyper core
 		kpr.decryptionTriggerChannel,
 		opts...,
 	)
 	return err
-}
-
-// initSequencerSyncer initializes the sequencer syncer if the keyper is known to be a member of a
-// keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
-// be added, as only then we will know which eon(s) we are responsible for.
-func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
-	// FIXME: is the described "once" behavior still the same with the handler implementation?
-	return nil
 }
 
 func (kpr *Keyper) maybeDecryptOnNewHeader(ctx context.Context, header *types.Header) error {

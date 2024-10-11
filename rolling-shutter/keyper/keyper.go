@@ -132,12 +132,6 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 		kpr.blockSyncClient = kpr.opts.blockSyncClient
 	}
 
-	// FIXME: this will only sync the keypersets based
-	// on when the initial event was emitted.
-	// So it could be that there is a keyperset currently
-	// active, but we don't add this since it has been registered
-	// before the sync-start block.
-	//
 	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
 		kpr.dbpool,
 		kpr.blockSyncClient,
