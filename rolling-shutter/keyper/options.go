@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
@@ -38,8 +36,6 @@ func newDefaultOptions() *options {
 		eventHandler:       []syncer.ContractEventHandler{},
 	}
 }
-
-var keyperNewConfigType = reflect.TypeOf(contract.KeypersConfigsListNewConfig{})
 
 func validateOptions(o *options) error {
 	if !o.broadcastEonPubKey && o.eonPubkeyHandler == nil {
