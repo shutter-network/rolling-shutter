@@ -3,7 +3,6 @@ package floodsubpeerdiscovery
 import (
 	"bufio"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"testing"
@@ -19,10 +18,8 @@ func (p *Peer) Print() error {
 		if err != nil {
 			return fmt.Errorf("could not parse multiaddr %v: %e", string(addr), err)
 		}
-		fmt.Println(ma.String())
+		fmt.Printf("%v: %v\n", base64.RawStdEncoding.EncodeToString(p.PublicKey), ma.String())
 	}
-	fmt.Println(base64.RawStdEncoding.EncodeToString(p.PublicKey))
-	fmt.Println(hex.EncodeToString(p.PublicKey))
 	return nil
 }
 
