@@ -147,6 +147,12 @@ func (p *P2PNode) Run(
 		runner.Go(func() error {
 			return p.FloodSubDiscovery.Start(ctx)
 		})
+
+		for _, subs := range p.FloodSubDiscovery.Subscription {
+			runner.Go(func() error {
+				return p.FloodSubDiscovery.ReadLoop(ctx, subs)
+			})
+		}
 	}
 	runner.Go(func() error {
 		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")

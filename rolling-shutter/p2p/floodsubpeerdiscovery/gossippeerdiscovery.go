@@ -129,3 +129,18 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 	return nil
 }
+
+func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subscription) error {
+	for {
+		msg, err := subs.Next(ctx)
+		if err != nil {
+			return err
+		}
+
+		if msg.ReceivedFrom == pd.PeerID.ID {
+			continue
+		}
+
+		log.Info().Msgf("found a floodsub discovery message | %v", err)
+	}
+}
