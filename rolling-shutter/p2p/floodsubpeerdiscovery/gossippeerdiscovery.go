@@ -104,10 +104,6 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 
 	for _, topic := range pd.Topics {
-		if len(pd.Pubsub.ListPeers(topic.String())) == 0 {
-			log.Info().Msgf("skipping broadcasting our peer data on topic %s because there are no peers present", topic)
-			continue
-		}
 		log.Info().Msgf("broadcasting our peer data on topic %s", topic)
 
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
