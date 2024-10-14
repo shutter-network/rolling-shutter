@@ -17,8 +17,9 @@ const defaultTopic = "_peer-discovery._p2p._pubsub"
 
 type FloodsubPeerDiscovery struct {
 	PeerDiscoveryComponents
-	Interval int
-	Topics   []*pubsub.Topic
+	Interval     int
+	Topics       []*pubsub.Topic
+	Subscription []*pubsub.Subscription
 }
 
 type PeerDiscoveryComponents struct {
@@ -40,6 +41,12 @@ func (pd *FloodsubPeerDiscovery) Init(config PeerDiscoveryComponents, interval i
 				return fmt.Errorf("failed to join topic | err %w", err)
 			}
 			pd.Topics = append(pd.Topics, topic)
+
+			subs, err := topic.Subscribe()
+			if err != nil {
+				return fmt.Errorf("failed to subscribe topic | err %w", err)
+			}
+			pd.Subscription = append(pd.Subscription, subs)
 		}
 	} else {
 		topic, err := pd.Pubsub.Join(defaultTopic)
@@ -47,6 +54,12 @@ func (pd *FloodsubPeerDiscovery) Init(config PeerDiscoveryComponents, interval i
 			return fmt.Errorf("failed to join topic | err %w", err)
 		}
 		pd.Topics = append(pd.Topics, topic)
+
+		subs, err := topic.Subscribe()
+		if err != nil {
+			return fmt.Errorf("failed to subscribe topic | err %w", err)
+		}
+		pd.Subscription = append(pd.Subscription, subs)
 	}
 	return nil
 }
@@ -63,6 +76,10 @@ func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
 				return err
 			}
 		case <-ctx.Done():
+			for _, subs := range pd.Subscription {
+				subs.Cancel()
+			}
+
 			for _, topic := range pd.Topics {
 				if err := topic.Close(); err != nil {
 					return fmt.Errorf("error in closing topic | %w", err)
