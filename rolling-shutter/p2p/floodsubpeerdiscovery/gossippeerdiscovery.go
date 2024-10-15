@@ -3,10 +3,15 @@ package floodsubpeerdiscovery
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 
@@ -141,6 +146,35 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 			continue
 		}
 
-		log.Info().Msgf("found a floodsub discovery message | %v", err)
+		var peerMsg Peer
+		if err := proto.Unmarshal(msg.GetData(), &peerMsg); err != nil {
+			log.Warn().Msgf("failed to unmarshal the floodsub peer message | %v", err)
+			continue
+		}
+
+		pubKey, err := crypto.PubKeyUnmarshallers[pb.KeyType_Ed25519](peerMsg.PublicKey)
+		if err != nil {
+			log.Warn().Msgf("failed to get pub key from floodsub message | %v", err)
+			continue
+		}
+
+		pID, err := peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			log.Warn().Msgf("failed to get peer id from floodsub message | %v", err)
+			continue
+		}
+
+		multiAddresses := make([]string, 0)
+		for _, addr := range peerMsg.Addrs {
+			mulAddr, err := multiaddr.NewMultiaddrBytes(addr)
+			if err != nil {
+				log.Warn().Msgf("failed to get multi address from floodsub message | %v", err)
+				continue
+			}
+			multiAddresses = append(multiAddresses, mulAddr.String())
+		}
+
+		log.Info().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]",
+			pID.String(), strings.Join(multiAddresses, ", "))
 	}
 }
