@@ -174,6 +174,7 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 			multiAddresses = append(multiAddresses, mulAddr.String())
 		}
 
-		log.Info().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]", pID.String(), strings.Join(multiAddresses, ", "))
+		log.Info().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]",
+			pID.String(), strings.Join(multiAddresses, ", "))
 	}
 }
