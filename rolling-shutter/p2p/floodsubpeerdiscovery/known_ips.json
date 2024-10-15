@@ -1,0 +1,27 @@
+{
+  "ip-to-name": {
+    "157.230.104.246": "chiado-k01",
+    "134.209.225.234": "chiado-k02",
+    "157.230.114.117": "chiado-k03",
+    "64.225.104.2": "chiado-k04",
+    "157.230.111.142": "chiado-k05",
+    "139.59.213.96": "bootstrap-chiado",
+    "167.99.177.227": "chiado-boot1",
+    "159.89.15.119": "chiado-boot2",
+    "139.144.26.89": "lighthouse-0",
+    "170.187.154.239": "teku-0",
+    "139.144.26.115": "lodestar-0"
+  },
+  "name-to-id": {
+    "lighthouse-0": "12D3KooWPfF7vMNxns3NarnfkEgfwTR9xx25Nt6o8Rw6LEE911so",
+    "teku-0": "12D3KooWMYD2gqaqW2MrTcASWkaTBtpsvyciYpHnoDLyLJgAQn58",
+    "lodestar-0": "12D3KooWCTov5qka1a6FYvrz3fQXpZtpWugmKEoyybSDHp5Uw6DR",
+    "chiado-k01": "12D3KooWFUYoPd3bdPuRi6FXkEQRSw7FRf2e23NAypjfDVYuvBAV",
+    "chiado-k02": "12D3KooWAsBKAj1NEtvu7wcLiEVU49N6Z9GPK3tZ87m17tFdWdNE",
+    "chiado-k03": "12D3KooWEDk8XJdxHjCHh9wTGVRXtpyCvCP4N4Jztr8zTJd4rMVX",
+    "chiado-k04": "12D3KooWMXTYrwEz4v5aGa7chYHjVVpjzzkq9JSjZzxbdh9YgAQS",
+    "chiado-k05": "12D3KooWA3FPqxV8whaFPbLzwbyDEWML4y73D6RJqb2mn7SHz6fg",
+    "chiado-boot1": "12D3KooWSdm5guPBdn8DSaBphVBzUUgPLg9sZLnazEUrcbtLy254",
+    "chiado-boot2": "12D3KooWPP6bp2PJQR8rUvG1SD4qNH4WFrKve6DMgWThyKxwNbbH"
+  }
+}
