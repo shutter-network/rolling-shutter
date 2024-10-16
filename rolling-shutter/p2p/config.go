@@ -64,6 +64,7 @@ func (c *Config) SetDefaultValues() error {
 	c.ListenAddresses = defaultListenAddrs
 	c.Environment = env.EnvironmentProduction
 	c.FloodSubDiscovery.Interval = 10
+	c.FloodSubDiscovery.Topics = []string{}
 	return nil
 }
 
