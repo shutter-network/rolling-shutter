@@ -43,7 +43,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to connect to database")
 	}
 
-	contractsClient, err := ethclient.Dial(kpr.config.Ethereum.ContractsURL)
+	contractsClient, err := ethclient.Dial(kpr.config.Ethereum.EthereumURL)
 	if err != nil {
 		return err
 	}

@@ -63,11 +63,11 @@ func TestDecryptionKeys(t *testing.T) {
 	assert.NilError(t, err)
 
 	orig := &DecryptionKeys{
-		InstanceID: cfg.instanceID,
+		InstanceId: cfg.instanceID,
 		Keys: []*Key{
 			{
-				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey.Marshal(),
+				IdentityPreimage: cfg.identityPreimage.Bytes(),
+				Key:              validSecretKey.Marshal(),
 			},
 		},
 	}
@@ -100,11 +100,11 @@ func TestDecryptionKeyShare(t *testing.T) {
 	keyshare := cfg.keys.EpochSecretKeyShare(cfg.identityPreimage, int(keyperIndex)).Marshal()
 
 	orig := &DecryptionKeyShares{
-		InstanceID:  cfg.instanceID,
+		InstanceId:  cfg.instanceID,
 		KeyperIndex: keyperIndex,
 		Shares: []*KeyShare{{
-			EpochID: cfg.identityPreimage.Bytes(),
-			Share:   keyshare,
+			IdentityPreimage: cfg.identityPreimage.Bytes(),
+			Share:            keyshare,
 		}},
 	}
 	m, tc := marshalUnmarshalMessage(t, orig, nil)
@@ -136,8 +136,8 @@ func TestTraceContext(t *testing.T) {
 	defer trace.SetDisabled()
 
 	tc := &TraceContext{
-		TraceID:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		SpanID:     []byte{1, 1, 1, 1, 1, 1, 1, 1},
+		TraceId:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		SpanId:     []byte{1, 1, 1, 1, 1, 1, 1, 1},
 		TraceFlags: []byte{1},
 		TraceState: "tracestate",
 	}
@@ -145,11 +145,11 @@ func TestTraceContext(t *testing.T) {
 	validSecretKey, err := cfg.keys.EpochSecretKey(cfg.identityPreimage)
 	assert.NilError(t, err)
 	msg := &DecryptionKeys{
-		InstanceID: cfg.instanceID,
+		InstanceId: cfg.instanceID,
 		Keys: []*Key{
 			{
-				Identity: cfg.identityPreimage.Bytes(),
-				Key:      validSecretKey.Marshal(),
+				IdentityPreimage: cfg.identityPreimage.Bytes(),
+				Key:              validSecretKey.Marshal(),
 			},
 		},
 	}

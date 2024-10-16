@@ -47,13 +47,13 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	shares := []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochID: identityPreimage.Bytes(),
-			Share:   keys.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            keys.EpochSecretKeyShare(identityPreimage, 0).Marshal(),
 		}
 		shares = append(shares, share)
 	}
 	msgs := p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeyShares{
-		InstanceID:  config.GetInstanceID(),
+		InstanceId:  config.GetInstanceID(),
 		Eon:         keyperConfigIndex,
 		KeyperIndex: 0,
 		Shares:      shares,
@@ -65,13 +65,13 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	shares = []*p2pmsg.KeyShare{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
-			EpochID: identityPreimage.Bytes(),
-			Share:   keys.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
+			IdentityPreimage: identityPreimage.Bytes(),
+			Share:            keys.EpochSecretKeyShare(identityPreimage, 2).Marshal(),
 		}
 		shares = append(shares, share)
 	}
 	msgs = p2ptest.MustHandleMessage(t, handler, ctx, &p2pmsg.DecryptionKeyShares{
-		InstanceID:  config.GetInstanceID(),
+		InstanceId:  config.GetInstanceID(),
 		Eon:         keyperConfigIndex,
 		KeyperIndex: 2,
 		Shares:      shares,
@@ -79,10 +79,10 @@ func TestHandleDecryptionKeyShareIntegration(t *testing.T) {
 	assert.Assert(t, len(msgs) == 1)
 	msg, ok := msgs[0].(*p2pmsg.DecryptionKeys)
 	assert.Check(t, ok)
-	assert.Check(t, msg.InstanceID == config.GetInstanceID())
+	assert.Check(t, msg.InstanceId == config.GetInstanceID())
 	assert.Check(t, len(msg.Keys) == len(identityPreimages))
 	for i, key := range msg.Keys {
-		assert.Check(t, bytes.Equal(key.Identity, identityPreimages[i].Bytes()))
+		assert.Check(t, bytes.Equal(key.IdentityPreimage, identityPreimages[i].Bytes()))
 		assert.Check(t, bytes.Equal(key.Key, encodedDecryptionKeys[i]))
 	}
 }
@@ -116,17 +116,17 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "valid decryption key share",
 			validationResult: pubsub.ValidationAccept,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID(),
+				InstanceId:  config.GetInstanceID(),
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 					{
-						EpochID: secondIdentityPreimage.Bytes(),
-						Share:   secondKeyshare,
+						IdentityPreimage: secondIdentityPreimage.Bytes(),
+						Share:            secondKeyshare,
 					},
 				},
 			},
@@ -135,13 +135,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key share wrong epoch",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID(),
+				InstanceId:  config.GetInstanceID(),
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: wrongIdentityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: wrongIdentityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -150,13 +150,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key share wrong instance ID",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID() + 1,
+				InstanceId:  config.GetInstanceID() + 1,
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -165,13 +165,13 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key share wrong keyper index",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID(),
+				InstanceId:  config.GetInstanceID(),
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex + 1,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},
@@ -180,7 +180,7 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key share empty",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID(),
+				InstanceId:  config.GetInstanceID(),
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex,
 				Shares:      []*p2pmsg.KeyShare{},
@@ -190,17 +190,17 @@ func TestDecryptionKeyshareValidatorIntegration(t *testing.T) {
 			name:             "invalid decryption key share unordered",
 			validationResult: pubsub.ValidationReject,
 			msg: &p2pmsg.DecryptionKeyShares{
-				InstanceID:  config.GetInstanceID(),
+				InstanceId:  config.GetInstanceID(),
 				Eon:         keyperConfigIndex,
 				KeyperIndex: keyperIndex,
 				Shares: []*p2pmsg.KeyShare{
 					{
-						EpochID: secondIdentityPreimage.Bytes(),
-						Share:   secondKeyshare,
+						IdentityPreimage: secondIdentityPreimage.Bytes(),
+						Share:            secondKeyshare,
 					},
 					{
-						EpochID: identityPreimage.Bytes(),
-						Share:   keyshare,
+						IdentityPreimage: identityPreimage.Bytes(),
+						Share:            keyshare,
 					},
 				},
 			},

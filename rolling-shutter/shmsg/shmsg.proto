@@ -4,46 +4,42 @@ package shmsg;
 option go_package = "./;shmsg";
 
 message BatchConfig {
-        uint64 activation_block_number = 1;
-        repeated bytes keypers = 2;
-        uint64 threshold = 3 ;
-        uint64 keyper_config_index = 5;
+  uint64 activation_block_number = 1;
+  repeated bytes keypers = 2;
+  uint64 threshold = 3;
+  uint64 keyper_config_index = 5;
 }
 
-// message BatchConfigStarted {
-//         uint64 batch_config_index = 1;
-// }
-
 message BlockSeen {
-        uint64 block_number = 1;
+  uint64 block_number = 1;
 }
 
 message CheckIn {
-        bytes validator_public_key = 1;  // 32 byte ed25519 public key
-        bytes encryption_public_key = 2;  // compressed ecies public key
+  bytes validator_public_key = 1;// 32 byte ed25519 public key
+  bytes encryption_public_key = 2;// compressed ecies public key
 }
 
 
 message PolyEval {
-        uint64 eon = 1;
-        repeated bytes receivers = 2;
-        repeated bytes encrypted_evals = 3;
+  uint64 eon = 1;
+  repeated bytes receivers = 2;
+  repeated bytes encrypted_evals = 3;
 }
 
 message PolyCommitment {
-        uint64 eon = 1;
-        repeated bytes gammas = 2;
+  uint64 eon = 1;
+  repeated bytes gammas = 2;
 }
 
 message Accusation {
-        uint64 eon = 1;
-        repeated bytes accused = 2;
+  uint64 eon = 1;
+  repeated bytes accused = 2;
 }
 
 message Apology {
-        uint64 eon = 1;
-        repeated bytes accusers = 2;
-        repeated bytes poly_evals = 3;
+  uint64 eon = 1;
+  repeated bytes accusers = 2;
+  repeated bytes poly_evals = 3;
 }
 
 // DKGResult is sent by the keyper if the DKG process for an eon has
@@ -52,30 +48,30 @@ message Apology {
 // shuttermint app will restart the DKG process. This replaces the EonStartVote
 // the keypers sent previously when the DKG process failed.
 message DKGResult {
-        bool success = 1;
-        uint64 eon=2;
+  bool success = 1;
+  uint64 eon = 2;
 }
 
 message Message {
-        oneof payload {
-                BatchConfig batch_config = 4;
-                // BatchConfigStarted batch_config_started = 6;
-                BlockSeen block_seen = 14;
-                CheckIn check_in = 7;
+  oneof payload {
+    BatchConfig batch_config = 4;
+    // BatchConfigStarted batch_config_started = 6;
+    BlockSeen block_seen = 14;
+    CheckIn check_in = 7;
 
-                // DKG messages
-                PolyEval poly_eval = 9;
-                PolyCommitment poly_commitment = 10;
-                Accusation accusation = 11;
-                Apology apology = 12;
+    // DKG messages
+    PolyEval poly_eval = 9;
+    PolyCommitment poly_commitment = 10;
+    Accusation accusation = 11;
+    Apology apology = 12;
 
-                DKGResult dkg_result = 15;
-                // EonStartVote eon_start_vote = 13;
-        }
+    DKGResult dkg_result = 15;
+    // EonStartVote eon_start_vote = 13;
+  }
 }
 
 message MessageWithNonce {
-        Message msg = 1;
-        bytes chain_id = 2;
-        uint64 random_nonce = 3;
+  Message msg = 1;
+  bytes chain_id = 2;
+  uint64 random_nonce = 3;
 }

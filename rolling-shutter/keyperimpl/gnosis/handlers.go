@@ -69,11 +69,11 @@ func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, share := range keyShares.Shares {
-		identityPreimage := identitypreimage.IdentityPreimage(share.EpochID)
+		identityPreimage := identitypreimage.IdentityPreimage(share.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
-		keyShares.InstanceID,
+		keyShares.InstanceId,
 		keyShares.Eon,
 		extra.Gnosis.Slot,
 		extra.Gnosis.TxPointer,
@@ -136,14 +136,14 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 		for _, share := range keyShares.GetShares() {
 			decryptionKeyDB, err := keyperCoreDB.GetDecryptionKey(ctx, corekeyperdatabase.GetDecryptionKeyParams{
 				Eon:     int64(keyShares.Eon),
-				EpochID: share.EpochID,
+				EpochID: share.IdentityPreimage,
 			})
 			if err == pgx.ErrNoRows {
 				return []p2pmsg.Message{}, nil
 			}
 			key := &p2pmsg.Key{
-				Identity: share.EpochID,
-				Key:      decryptionKeyDB.DecryptionKey,
+				IdentityPreimage: share.IdentityPreimage,
+				Key:              decryptionKeyDB.DecryptionKey,
 			}
 			keys = append(keys, key)
 		}
@@ -154,7 +154,7 @@ func (h *DecryptionKeySharesHandler) HandleMessage(ctx context.Context, msg p2pm
 			signatures = append(signatures, signature.Signature)
 		}
 		decryptionKeysMsg := &p2pmsg.DecryptionKeys{
-			InstanceID: keyShares.InstanceID,
+			InstanceId: keyShares.InstanceId,
 			Eon:        keyShares.Eon,
 			Keys:       keys,
 			Extra: &p2pmsg.DecryptionKeys_Gnosis{
@@ -240,11 +240,11 @@ func ValidateDecryptionKeysSignatures(
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, key := range keys.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	slotDecryptionSignatureData, err := gnosisssztypes.NewSlotDecryptionSignatureData(
-		keys.InstanceID,
+		keys.InstanceId,
 		keys.Eon,
 		extra.Slot,
 		extra.TxPointer,
@@ -319,7 +319,7 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, key := range keys.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 	identitiesHash := computeIdentitiesHash(identityPreimages)

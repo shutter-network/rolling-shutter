@@ -30,7 +30,7 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 
 func (q *Queries) InsertDecryptionKeysMsg(ctx context.Context, msg *p2pmsg.DecryptionKeys) error {
 	for _, key := range msg.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.Identity)
+		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
 		tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
 			Eon:           int64(msg.Eon),
 			EpochID:       identityPreimage.Bytes(),
@@ -51,7 +51,7 @@ func (q *Queries) InsertDecryptionKeySharesMsg(ctx context.Context, msg *p2pmsg.
 	for _, share := range msg.GetShares() {
 		err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
 			Eon:                int64(msg.Eon),
-			EpochID:            share.EpochID,
+			EpochID:            share.IdentityPreimage,
 			KeyperIndex:        int64(msg.KeyperIndex),
 			DecryptionKeyShare: share.Share,
 		})

@@ -15,8 +15,8 @@ func NewSignedDecryptionTrigger(
 	instanceID uint64, identityPreimage identitypreimage.IdentityPreimage, blockNumber uint64, txHash []byte, privKey *ecdsa.PrivateKey,
 ) (*DecryptionTrigger, error) {
 	trigger := &DecryptionTrigger{
-		InstanceID:       instanceID,
-		EpochID:          identityPreimage.Bytes(),
+		InstanceId:       instanceID,
+		IdentityPreimage: identityPreimage.Bytes(),
 		BlockNumber:      blockNumber,
 		TransactionsHash: txHash,
 	}
@@ -34,8 +34,8 @@ func (trigger *DecryptionTrigger) SetSignature(s []byte) {
 func (trigger *DecryptionTrigger) Hash() []byte {
 	hash := sha3.New256()
 	hash.Write(triggerHashPrefix)
-	_ = binary.Write(hash, binary.BigEndian, trigger.InstanceID)
-	_ = binary.Write(hash, binary.BigEndian, trigger.EpochID)
+	_ = binary.Write(hash, binary.BigEndian, trigger.InstanceId)
+	_ = binary.Write(hash, binary.BigEndian, trigger.IdentityPreimage)
 	hash.Write(trigger.TransactionsHash)
 	return hash.Sum(nil)
 }
