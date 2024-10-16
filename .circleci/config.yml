@@ -1,12 +1,6 @@
 version: 2.1
 
 commands:
-  install-rsync:
-    steps:
-      - run:
-          name: Install rsync
-          command: |
-            sudo apt update && sudo apt install rsync
   install-asdf:
     steps:
       - run:
@@ -146,7 +140,6 @@ jobs:
       - restore_cache:
           keys:
             - rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
-      - install-rsync
       - install-asdf
       - run:
           name: "Install asdf plugins"
