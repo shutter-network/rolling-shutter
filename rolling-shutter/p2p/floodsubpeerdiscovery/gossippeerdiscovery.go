@@ -8,7 +8,6 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
@@ -101,7 +100,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 		return fmt.Errorf("peerId was missing public key | err %w", err)
 	}
 
-	pubKeyBytes, err := pubKey.Raw()
+	pubKeyBytes, err := crypto.MarshalPublicKey(pubKey)
 	if err != nil || len(pubKeyBytes) == 0 {
 		return fmt.Errorf("peerId was missing public key | err %w", err)
 	}
@@ -152,7 +151,7 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 			continue
 		}
 
-		pubKey, err := crypto.PubKeyUnmarshallers[pb.KeyType_Ed25519](peerMsg.PublicKey)
+		pubKey, err := crypto.UnmarshalPublicKey(peerMsg.PublicKey)
 		if err != nil {
 			log.Warn().Msgf("failed to get pub key from floodsub message | %v", err)
 			continue
