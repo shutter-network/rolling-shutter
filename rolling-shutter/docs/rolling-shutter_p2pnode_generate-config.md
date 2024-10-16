@@ -9,6 +9,7 @@ rolling-shutter p2pnode generate-config [flags]
 ### Options
 
 ```
+  -f, --force           overwrite existing file
   -h, --help            help for generate-config
       --output string   output file
 ```

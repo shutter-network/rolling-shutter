@@ -38,6 +38,7 @@ func NewConfig() *Config {
 
 func (c *Config) Init() {
 	c.P2PKey = &keys.Libp2pPrivate{}
+	c.AdvertiseAddresses = []*address.P2PAddress{}
 }
 
 type Config struct {
@@ -63,6 +64,7 @@ func (c *Config) SetDefaultValues() error {
 	c.ListenAddresses = defaultListenAddrs
 	c.Environment = env.EnvironmentProduction
 	c.FloodSubDiscovery.Interval = 10
+	c.FloodSubDiscovery.Topics = []string{}
 	return nil
 }
 

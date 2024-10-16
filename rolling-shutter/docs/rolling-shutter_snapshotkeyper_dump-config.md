@@ -10,6 +10,7 @@ rolling-shutter snapshotkeyper dump-config [flags]
 
 ```
       --config string   config file
+  -f, --force           overwrite existing file
   -h, --help            help for dump-config
       --output string   output file
 ```

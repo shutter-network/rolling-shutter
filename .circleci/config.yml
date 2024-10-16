@@ -1,52 +1,341 @@
 version: 2.1
 
-# CircleCI dynamic configuration file, see
-# https://circleci.com/docs/2.0/dynamic-config/
-
-setup: true
+commands:
+  install-asdf:
+    steps:
+      - run:
+          name: Install asdf
+          command: |
+            if [[ -e ~/.asdf ]]; then
+              echo "asdf already installed"
+            else
+              git clone --depth 1 https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
+            fi
+            echo >${BASH_ENV} 'source ~/.asdf/asdf.sh'
 
 orbs:
-  continuation: circleci/continuation@0.3.1
+  node: circleci/node@4.7
 
 executors:
-  cimg-base:
+  py:
     docker:
-      - image: cimg/base:2022.12
+      - image: cimg/python:3.11.1-node@sha256:fac71c651914675c788807a3024d3730d897d3c898c47fa207268082fcba41c8
+        environment:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+  node18:
+    docker:
+      - image: cimg/node:18.17.0
+
+  go:
+    docker:
+      - image: cimg/go:1.21.1
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+  go-integration:
+    docker:
+      - image: cimg/go:1.21.1
+        environment:
+          GO111MODULE: "on"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          ROLLING_SHUTTER_TESTDB_URL: postgres://pguser:password@localhost:5432/testdb
+      - image: cimg/postgres:13.9
+        environment:
+          POSTGRES_USER: pguser
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
 
 jobs:
-  gen:
-    executor: cimg-base
-    working_directory: ~/src/.circleci
+  pre-commit:
+    executor: py
+    working_directory: ~/src
+    steps:
+      - checkout
+      - run:
+          name: Prepare system
+          command: |
+            cp .circleci/.nodeenvrc ~
+            cp .tool-versions ~
+      - install-asdf
+      - run:
+          name: Install pre-commit with asdf
+          command: |
+            asdf plugin add golang
+            asdf install golang
+            asdf plugin add pre-commit
+            asdf install pre-commit
+      - restore_cache:
+          keys:
+            - go-mod-v7-{{ checksum "rolling-shutter/go.sum" }}-{{ checksum "rolling-shutter/go.mod" }}
+      - restore_cache:
+          key: pre-commit-cache-v11-{{ checksum ".pre-commit-config.yaml" }}
+      - run: pre-commit install-hooks
+      - save_cache:
+          key: pre-commit-cache-v11-{{ checksum ".pre-commit-config.yaml" }}
+          paths:
+            - ~/.cache/pre-commit
+            - ~/.local
+      - run: SKIP=generate pre-commit run --show-diff-on-failure -a
+
+  rs-generate:
+    executor: go
+    working_directory: ~/src/rolling-shutter
     steps:
       - checkout:
           path: ~/src
       - restore_cache:
-          key: gen-clj-v16
+          keys:
+            - rs-generate-v19-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+      - install-asdf
       - run:
-          name: Install babashka
+          name: "Install asdf plugins"
           command: |
-            if [[ -e ~/bin/bb ]]; then
-              echo "babashka already installed"
-            else
-              curl -sL https://raw.githubusercontent.com/babashka/babashka/master/install -o ~/install-bb
-              mkdir -p ~/bin
-              bash ~/install-bb --version 1.3.176 --dir ~/bin
+            asdf plugin add protoc || true
+            asdf plugin add nodejs || true
+      - run:
+          name: "Install asdf managed executables"
+          command: |
+            asdf install protoc
+            asdf install nodejs
+      - node/install-packages:
+          app-dir: ~/src/contracts
+          override-ci-command: npm install
+      - run: make install-codegen-tools
+      - run:
+          name: Remove generated files
+          command: |
+            find . -name '*.gen.go' |xargs rm
+      - run:
+          name: Remove generated doc files
+          command: |
+            find ./docs -name '*.md' -delete
+      - run: make generate
+      - save_cache:
+          key: rs-generate-v19-{{ checksum "go.sum" }}-{{checksum "go.mod"}}
+          paths:
+            - "~/go/pkg/mod"
+            - "~/.cache/go-build"
+            - ~/.asdf
+      - run: git diff --exit-code
+
+  rs-build:
+    parameters:
+      go-version:
+        type: string
+    executor: << parameters.go-version >>
+    working_directory: ~/src/rolling-shutter
+    steps:
+      - checkout:
+          path: ~/src
+      - restore_cache:
+          keys:
+            - go-mod-v8-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - run: go get -d ./...
+      - save_cache:
+          key: go-mod-v8-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          paths:
+            - ~/go/pkg/
+      - restore_cache:
+          keys:
+            - rs-build-<< parameters.go-version >>-v4-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - install-asdf
+      - run:
+          name: "Install asdf plugins"
+          command: |
+            asdf plugin add tinygo https://github.com/schmir/asdf-tinygo.git || true
+            asdf plugin add binaryen https://github.com/birros/asdf-binaryen.git || true
+            asdf plugin add nodejs || true
+      - run:
+          name: "Install asdf managed executables"
+          command: |
+            asdf install tinygo
+            asdf install binaryen
+            asdf install nodejs
+      - run:
+          name: "Run unit tests with gotestsum"
+          command: |
+            mkdir -p report/unit report/integration
+            gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short -race ./...
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            if [[ -v ROLLING_SHUTTER_TESTDB_URL ]]; then
+              dockerize -wait tcp://localhost:5432 -timeout 1m
             fi
       - run:
-          name: Generate continuation config
+          name: "Run integration tests with gotestsum"
           command: |
-            ~/bin/bb -gen-ci
+            gotestsum -f standard-verbose --junitfile report/integration/tests.xml -- -race -p 1 -run Integration -count=1 ./...
+      - store_test_results:
+          path: report
       - save_cache:
-          key: gen-clj-v16
+          key: rs-build-<< parameters.go-version >>-v5-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
-            - ~/bin/
-      - continuation/continue:
-          configuration_path: continue-generated.yml
+            - "~/.cache/go-build"
+
+  build-docker-image:
+    docker:
+      - image: cimg/base:2023.08
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: "Build docker image"
+          command: |
+            export DOCKER_BUILDKIT=1
+            docker build -f docker/build-src/snapshot/Dockerfile -t snapshot:latest .
+      - run:
+          name: "Upload docker image"
+          command: |
+            TAG=ghcr.io/shutter-network/snapshot-$CIRCLE_BRANCH:$(git rev-list --count HEAD)
+            echo "Uploading $TAG"
+            echo $UPLOAD_GHCR_IO | docker login ghcr.io -u rolling-shutter-deployment --password-stdin
+            docker tag snapshot:latest $TAG
+            docker push $TAG
+
+  build-release:
+    parameters:
+      go-os-arch:
+        type: string
+    executor: go
+    working_directory: ~/
+    steps:
+      - run:
+          name: Configure environment for private repository
+          command: |
+            mkdir ~/.ssh; chmod 700 ~/.ssh
+            echo >>~/.ssh/known_hosts github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+            git config --global url."git@github.com:shutter-network/rolling-shutter".insteadOf https://github.com/shutter-network/rolling-shutter
+            echo >>${BASH_ENV} export GOPRIVATE=github.com/shutter-network/rolling-shutter/rolling-shutter
+      - run:
+          name: Configure environment
+          command: |
+            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
+            test -z ${version} && version=${CIRCLE_SHA1}
+            echo >>${BASH_ENV} export VERSION="${version}"
+
+            echo >>${BASH_ENV} osarch=<< parameters.go-os-arch >>
+            # set GOOS, GOARCH from osarch:
+            echo SUZTPSctJyByZWFkIC1yIEdPT1MgR09BUkNIIDw8PCAke29zYXJjaH0K |base64 --decode >>${BASH_ENV}
+            echo >>${BASH_ENV} export GOOS GOARCH
+      - run:
+          name: Go install
+          command: |
+            env CGO_ENABLED=0 go install github.com/shutter-network/rolling-shutter/rolling-shutter@${CIRCLE_SHA1}
+      - run:
+          name: Copy binary
+          command: |
+            dst=${HOME}/release-bin/rolling-shutter-$GOOS-$GOARCH-$VERSION
+            mkdir ${HOME}/release-bin
+            if test -e ${HOME}/go/bin/rolling-shutter; then
+              mv ${HOME}/go/bin/rolling-shutter ${dst}
+            else
+              mv ${HOME}/go/bin/${GOOS}_${GOARCH}/rolling-shutter ${dst}
+            fi
+            du -h ${dst}
+      - persist_to_workspace:
+          root: "~"
+          paths:
+            - "release-bin/"
+
+  publish-release:
+    executor: go
+    working_directory: ~/
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Configure environment
+          command: |
+            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
+            echo >>${BASH_ENV} export VERSION="${version}"
+      - run: go install github.com/tcnksm/ghr@v0.14.0
+      - run:
+          name: Upload binaries
+          command: |
+            du -hc release-bin/*
+            ghr -u shutter-network -r rolling-shutter ${CIRCLE_TAG} release-bin
+
+  rs-lint:
+    executor: go
+    resource_class: medium+
+    working_directory: ~/src/rolling-shutter
+    steps:
+      - checkout:
+          path: ~/src
+      - restore_cache:
+          keys:
+            - go-mod-v7-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - restore_cache:
+          keys:
+            - rs-lint-v13-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+      - install-asdf
+      - run:
+          name: "Install golangci-lint"
+          command: |
+            asdf plugin add golangci-lint || true
+            asdf install golangci-lint
+      - run: |
+          make lint-changes
+      - save_cache:
+          key: rs-lint-v14-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
+          paths:
+            - "~/.cache/go-build"
+            - "~/.cache/golangci-lint"
+            - "~/.asdf"
 
 workflows:
-  gen:
+  rolling-shutter:
     jobs:
-      - gen:
+      - build-docker-image:
+          filters:
+            branches:
+              only: /[a-z0-9]+/
+          context:
+            - upload-release
+      - rs-generate:
           filters:
             tags:
-              only: /^.*$/
+              only: /.*/
+      - rs-build:
+          matrix:
+            parameters:
+              go-version: [go-integration]
+          filters:
+            tags:
+              only: /.*/
+      - build-release:
+          matrix:
+            parameters:
+              go-os-arch:
+                [
+                  "linux-amd64",
+                  "linux-arm64",
+                  "freebsd-amd64",
+                  "openbsd-amd64",
+                  "darwin-amd64",
+                  "darwin-arm64",
+                ]
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
+      - publish-release:
+          requires:
+            - rs-build
+            - build-release
+          context:
+            - upload-release
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
+      - rs-lint:
+          filters:
+            branches:
+              ignore: /main/
