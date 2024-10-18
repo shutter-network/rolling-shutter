@@ -8,12 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog/log"
 
-	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
+	gnosisconfig "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
 type BlocksWatcher struct {
-	config        *keyper.Config
+	config        *gnosisconfig.Config
 	blocksChannel chan *BlockReceivedEvent
 }
 
@@ -22,7 +22,7 @@ type BlockReceivedEvent struct {
 	Time   time.Time
 }
 
-func NewBlocksWatcher(config *keyper.Config, blocksChannel chan *BlockReceivedEvent) *BlocksWatcher {
+func NewBlocksWatcher(config *gnosisconfig.Config, blocksChannel chan *BlockReceivedEvent) *BlocksWatcher {
 	return &BlocksWatcher{
 		config:        config,
 		blocksChannel: blocksChannel,
