@@ -45,3 +45,8 @@ type Client interface {
 	EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
+
+type Sync interface {
+	ethereum.LogFilterer
+	ethereum.ChainReader
+}
