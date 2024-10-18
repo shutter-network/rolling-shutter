@@ -21,8 +21,10 @@ func init() {
 	}
 }
 
-var KeyBroadcastContractAddress = common.BigToAddress(big.NewInt(42))
-var KeyBroadcastContractABI *abi.ABI
+var (
+	KeyBroadcastContractAddress = common.BigToAddress(big.NewInt(42))
+	KeyBroadcastContractABI     *abi.ABI
+)
 
 func MakeChain(start int64, startParent common.Hash, numHeader uint, seed int64) []*types.Header {
 	n := numHeader
@@ -114,6 +116,7 @@ func (tkbh *TestKeyBroadcastHandler) GetEons() map[uint64]struct{} {
 	}
 	return m
 }
+
 func (tkbh *TestKeyBroadcastHandler) GetBlockHashes() map[common.Hash]struct{} {
 	m := map[common.Hash]struct{}{}
 	for hsh := range tkbh.eons {

@@ -249,7 +249,7 @@ func (bc *ChainSegment) ExtendLeft(ctx context.Context, c client.Sync, num int) 
 	}
 	for num > 0 {
 		blockNum := new(big.Int).Sub(leftMost.Number, big.NewInt(int64(1)))
-		//OPTIM: we do cap the max poll number when calling this method,
+		// OPTIM: we do cap the max poll number when calling this method,
 		// but then we make one request per block anyways.
 		// This doesn't make sense, but there currently is no batching
 		// for retrieving ranges of headers.

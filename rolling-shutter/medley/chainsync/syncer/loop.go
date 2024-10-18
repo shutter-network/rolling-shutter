@@ -45,24 +45,24 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 		updatedSegment = f.chainUpdate
 		log.Trace().Msg("internal chain cache empty, setting updated chain segment")
 	} else if err != nil {
-		//TODO: what to do on db error?
+		// TODO: what to do on db error?
 		success = false
 		return success, err
 	} else {
 		if new(big.Int).Add(syncedChain.Latest().Number, big.NewInt(1)).
 			Cmp(f.chainUpdate.Earliest().Number) == -1 {
-			//FIXME: overflow
-			diff := new(big.Int).Sub(f.chainUpdate.Earliest().Number, syncedChain.Latest().Number).Uint64()
-			queryBlocks := MaxRequestBlockRange
-			// cap the extend range at the diff to the update to not overshoot
-			if diff < uint64(queryBlocks) {
-
 			diffBig := new(big.Int).Sub(f.chainUpdate.Earliest().Number, syncedChain.Latest().Number)
 			if !diffBig.IsUint64() {
 				success = false
 				return success, fmt.Errorf("chain-update difference too big: %w", errUint64Overflow)
 			}
 			diff := diffBig.Uint64()
+			queryBlocks := MaxRequestBlockRange
+			// cap the extend range at the diff to the update to not overshoot
+			// FIXME: int overflwo
+			if diff < uint64(queryBlocks) {
+				queryBlocks = int(diff)
+			}
 
 			// we are not synced to the chain-update
 			// so first construct an update to the right of the synced chain
@@ -74,11 +74,10 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 			updatedSegment, err = syncedChain.NewSegmentRight(ctx, f.ethClient, queryBlocks)
 			if errors.Is(err, chainsegment.ErrReorg) {
 				// this means we reorged the old chain segment.
-				f.chainUpdate.ExtendLeft(ctx, f.ethClient, queryBlocks)
-				f.chainUpdate.ExtendLeft(ctx, f.client, queryBlocks)
-				err = nil
-				f.chainUpdate, err = f.chainUpdate.ExtendLeft(ctx, f.ethClient, queryBlocks)
-				if err != nil {
+				// extend the chain update to the left in chunks and try again
+				var extendErr error
+				f.chainUpdate, extendErr = f.chainUpdate.ExtendLeft(ctx, f.ethClient, queryBlocks)
+				if extendErr != nil {
 					err = fmt.Errorf("error while querying older blocks from reorg update: %w", err)
 				}
 				success = false
@@ -86,15 +85,16 @@ func (f *Fetcher) handlerSync(ctx context.Context) (success bool, err error) {
 			}
 			removedSegment = nil
 			success = false
-			result, errr := syncedChain.UpdateLatest(ctx, f.ethClient, f.chainUpdate)
-			result, errr := syncedChain.UpdateLatest(ctx, f.client, f.chainUpdate)
-			if errr != nil {
+		} else {
+			result, updateErr := syncedChain.UpdateLatest(ctx, f.ethClient, f.chainUpdate)
+			if updateErr != nil {
 				// TODO: for ErrUpdateBlockTooFarInPast this should shut down the
 				// client? Since we can't really play back a reorg that reaches too far in the past.
-				// Now as long as the chain-cache eviction policy is not agressive (easily doable)
+				// Now as long as the chain-cache eviction policy is not aggressive (easily doable)
+				// this will never happen except for initially when the cache is not filled yet..
 				log.Error().Err(err).Msg("error updating chain")
 				err = updateErr
-				// Now as long as the chain-cache eviction policy is not aggressive (easily doable)
+			}
 			removedSegment = result.RemovedSegment
 			updatedSegment = result.UpdatedSegment
 			// we will process the whole segment of the chain update
@@ -130,16 +130,16 @@ func (f *Fetcher) loop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case newHeader, ok := <-f.inChan:
+			if !ok {
 				log.Debug().Msg("latest head stream closed, exiting handler loop")
-				f.log.Info("latest head stream closed, exiting handler loop")
 				return nil
+			}
 			log.Debug().Uint64("block-number", newHeader.Number.Uint64()).Msg("new latest head from l2 ws-stream")
-			f.log.Debug("new latest head from l2 ws-stream", "block-number", newHeader.Number.Uint64())
 			newSegment := chainsegment.NewChainSegment(newHeader)
 			if f.chainUpdate != nil {
 				// apply the updates to the chain-update buffer that hasn't been processed
+				// yet by the handlers
 				result, err := f.chainUpdate.Copy().UpdateLatest(ctx, f.ethClient, newSegment)
-				result, err := f.chainUpdate.Copy().UpdateLatest(ctx, f.client, newSegment)
 				fullUpdated := result.FullSegment
 				removed := result.RemovedSegment
 				if err != nil {
@@ -150,11 +150,11 @@ func (f *Fetcher) loop(ctx context.Context) error {
 					}
 					if errors.Is(err, errs.ErrCritical) {
 						return err
+					}
 					log.Error().Err(err).Msg("error updating chain segment")
-					f.log.Error("error updating chain segment", "error", err)
 				}
+				if removed != nil {
 					log.Info().Uint64("block-number", newHeader.Number.Uint64()).Msg("received a new reorg block")
-					f.log.Info("received a new reorg block", "block-number", newHeader.Number.Uint64())
 				}
 				f.chainUpdate = fullUpdated
 			} else {
@@ -162,13 +162,13 @@ func (f *Fetcher) loop(ctx context.Context) error {
 			}
 			f.triggerHandlerProcessing()
 
-			f.log.Trace("fetcher loop: received handler sync trigger")
+		case <-f.processingTrig:
 			success, err := f.handlerSync(ctx)
 			if err != nil {
 				if errors.Is(err, errs.ErrCritical) {
 					return err
+				}
 				log.Error().Err(err).Msg("error during handler-sync")
-				f.log.Error("error during handler-sync", "error", err)
 			}
 			if !success {
 				// keep processing the handler without waiting for updates

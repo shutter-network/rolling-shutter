@@ -56,7 +56,7 @@ type TestClientController struct {
 
 func NewTestClient(logger gethLog.Logger) (*TestClient, *TestClientController) {
 	c := &TestClient{
-		log:                    log,
+		log:                    logger,
 		mux:                    &sync.RWMutex{},
 		subsMux:                &sync.RWMutex{},
 		headerChain:            []*types.Header{},
@@ -107,6 +107,7 @@ func (c *TestClientController) WaitSubscribed(ctx context.Context) {
 		time.After(50 * time.Millisecond)
 	}
 }
+
 func (c *TestClientController) EmitLatestHead(ctx context.Context) error {
 	c.c.subsMux.RLock()
 	defer c.c.subsMux.RUnlock()
@@ -226,7 +227,7 @@ func (t *TestClient) SubscribeNewHead(_ context.Context, ch chan<- *types.Header
 	return su, nil
 }
 
-func (t *TestClient) getLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
+func (t *TestClient) getLogs(_ context.Context, query ethereum.FilterQuery) ([]types.Log, error) {
 	logs := []types.Log{}
 	if query.BlockHash != nil {
 		log, ok := t.logs[*query.BlockHash]
@@ -254,7 +255,7 @@ func (t *TestClient) getLogs(ctx context.Context, query ethereum.FilterQuery) ([
 			logs = append(logs, log...)
 		}
 	}
-	//FIXME: also return no logs found if empty?
+	// FIXME: also return no logs found if empty?
 	return logs, nil
 }
 
@@ -298,20 +299,18 @@ func (t *TestClient) CodeAt(_ context.Context, _ common.Address, _ *big.Int) ([]
 	panic(ErrNotImplemented)
 }
 
-func (t *TestClient) TransactionReceipt(_ context.Context, _ common.Hash) (*types.Receipt, error) {
-	panic(ErrNotImplemented)
-}
-
 func (t *TestClient) BlockByHash(_ context.Context, _ common.Hash) (*types.Block, error) {
 	panic(ErrNotImplemented)
 }
 
 func (t *TestClient) TransactionCount(_ context.Context, _ common.Hash) (uint, error) {
 	panic(ErrNotImplemented)
+}
 
+func (t *TestClient) BlockByNumber(_ context.Context, _ *big.Int) (*types.Block, error) {
+	panic(ErrNotImplemented)
 }
 
 func (t *TestClient) TransactionInBlock(_ context.Context, _ common.Hash, _ uint) (*types.Transaction, error) {
 	panic(ErrNotImplemented)
-
 }

@@ -120,7 +120,7 @@ func (vu *ValidatorUpdated) Handle(
 			}
 		}
 		err = db.SetValidatorRegistrationsSyncedUntil(ctx, database.SetValidatorRegistrationsSyncedUntilParams{
-			//TODO: check int64 overflow
+			// TODO: check int64 overflow
 			BlockNumber: update.Append.Latest().Number.Int64(),
 			BlockHash:   update.Append.Latest().Hash().Bytes(),
 		})

@@ -64,7 +64,7 @@ func (mcc *MemoryChainCache) Update(_ context.Context, update ChainUpdateContext
 			newSegment = append(newSegment, update.Append.Get()...)
 		}
 		if len(newSegment) > mcc.maxSize {
-			//TODO: check for oneoff.
+			// TODO: check for oneoff.
 			newSegment = newSegment[len(newSegment)-mcc.maxSize:]
 		}
 	} else {

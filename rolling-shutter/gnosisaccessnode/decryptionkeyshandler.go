@@ -10,19 +10,20 @@ import (
 
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosisaccessnode/storage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 type DecryptionKeysHandler struct {
 	config  *Config
-	storage *Storage
+	storage *storage.Memory
 }
 
-func NewDecryptionKeysHandler(config *Config, storage *Storage) *DecryptionKeysHandler {
+func NewDecryptionKeysHandler(config *Config, store *storage.Memory) *DecryptionKeysHandler {
 	return &DecryptionKeysHandler{
 		config:  config,
-		storage: storage,
+		storage: store,
 	}
 }
 
