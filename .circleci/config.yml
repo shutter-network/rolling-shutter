@@ -19,7 +19,7 @@ orbs:
 executors:
   py:
     docker:
-      - image: cimg/python:3.11.1-node@sha256:fac71c651914675c788807a3024d3730d897d3c898c47fa207268082fcba41c8
+      - image: cimg/python:3.12.7-node
         environment:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
@@ -56,7 +56,6 @@ jobs:
       - run:
           name: Prepare system
           command: |
-            cp .circleci/.nodeenvrc ~
             cp .tool-versions ~
       - install-asdf
       - run:
@@ -120,7 +119,7 @@ jobs:
             - ~/.asdf
       - run: git diff --exit-code
 
-  rs-build:
+  rs-test:
     parameters:
       go-version:
         type: string
@@ -175,90 +174,6 @@ jobs:
           paths:
             - "~/.cache/go-build"
 
-  build-docker-image:
-    docker:
-      - image: cimg/base:2023.08
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - run:
-          name: "Build docker image"
-          command: |
-            export DOCKER_BUILDKIT=1
-            docker build -f docker/build-src/snapshot/Dockerfile -t snapshot:latest .
-      - run:
-          name: "Upload docker image"
-          command: |
-            TAG=ghcr.io/shutter-network/snapshot-$CIRCLE_BRANCH:$(git rev-list --count HEAD)
-            echo "Uploading $TAG"
-            echo $UPLOAD_GHCR_IO | docker login ghcr.io -u rolling-shutter-deployment --password-stdin
-            docker tag snapshot:latest $TAG
-            docker push $TAG
-
-  build-release:
-    parameters:
-      go-os-arch:
-        type: string
-    executor: go
-    working_directory: ~/
-    steps:
-      - run:
-          name: Configure environment for private repository
-          command: |
-            mkdir ~/.ssh; chmod 700 ~/.ssh
-            echo >>~/.ssh/known_hosts github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
-            git config --global url."git@github.com:shutter-network/rolling-shutter".insteadOf https://github.com/shutter-network/rolling-shutter
-            echo >>${BASH_ENV} export GOPRIVATE=github.com/shutter-network/rolling-shutter/rolling-shutter
-      - run:
-          name: Configure environment
-          command: |
-            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
-            test -z ${version} && version=${CIRCLE_SHA1}
-            echo >>${BASH_ENV} export VERSION="${version}"
-
-            echo >>${BASH_ENV} osarch=<< parameters.go-os-arch >>
-            # set GOOS, GOARCH from osarch:
-            echo SUZTPSctJyByZWFkIC1yIEdPT1MgR09BUkNIIDw8PCAke29zYXJjaH0K |base64 --decode >>${BASH_ENV}
-            echo >>${BASH_ENV} export GOOS GOARCH
-      - run:
-          name: Go install
-          command: |
-            env CGO_ENABLED=0 go install github.com/shutter-network/rolling-shutter/rolling-shutter@${CIRCLE_SHA1}
-      - run:
-          name: Copy binary
-          command: |
-            dst=${HOME}/release-bin/rolling-shutter-$GOOS-$GOARCH-$VERSION
-            mkdir ${HOME}/release-bin
-            if test -e ${HOME}/go/bin/rolling-shutter; then
-              mv ${HOME}/go/bin/rolling-shutter ${dst}
-            else
-              mv ${HOME}/go/bin/${GOOS}_${GOARCH}/rolling-shutter ${dst}
-            fi
-            du -h ${dst}
-      - persist_to_workspace:
-          root: "~"
-          paths:
-            - "release-bin/"
-
-  publish-release:
-    executor: go
-    working_directory: ~/
-    steps:
-      - attach_workspace:
-          at: ~/
-      - run:
-          name: Configure environment
-          command: |
-            version=$(echo ${CIRCLE_TAG} | sed -e s#^rolling-shutter/##)
-            echo >>${BASH_ENV} export VERSION="${version}"
-      - run: go install github.com/tcnksm/ghr@v0.14.0
-      - run:
-          name: Upload binaries
-          command: |
-            du -hc release-bin/*
-            ghr -u shutter-network -r rolling-shutter ${CIRCLE_TAG} release-bin
-
   rs-lint:
     executor: go
     resource_class: medium+
@@ -287,55 +202,82 @@ jobs:
             - "~/.cache/golangci-lint"
             - "~/.asdf"
 
+  build-docker-image:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Configure Docker tag
+          # Set the DOCKER_TAG environment variable based on the branch or tag.
+          # Final release tags (i.e. without a, b, or rc) are only allowed on the "main" branch.
+          command: |
+            DOCKER_BASE=ghcr.io/shutter-network
+            if [[ -z "$CIRCLE_TAG" ]]; then
+              if [[ -z "$CIRCLE_PR_NUMBER" ]]; then
+                DOCKER_TAG=${DOCKER_BASE}/unverified-dev-build-do-not-use:branch-${CIRCLE_BRANCH//\//_}-${CIRCLE_BUILD_NUM}
+              else
+                DOCKER_TAG=${DOCKER_BASE}/unverified-dev-build-do-not-use:PR${CIRCLE_PR_NUMBER}-${CIRCLE_BUILD_NUM}
+              fi
+            else
+              if [[ $CIRCLE_BRANCH != "main" && ! $CIRCLE_TAG =~ (a|b|rc) ]]; then
+                echo "Final release tags are only allowed on main branch."
+                exit 1
+              else
+                DOCKER_TAG=${DOCKER_BASE}/keyper:${CIRCLE_TAG}
+              fi
+            fi
+            echo "${DOCKER_TAG}"
+            echo "DOCKER_TAG=${DOCKER_TAG}" >> $BASH_ENV
+      - run:
+          name: Docker login
+          command: |
+            echo $UPLOAD_GHCR_IO | docker login ghcr.io -u rolling-shutter-deployment --password-stdin
+      - run:
+          name: "Build and push docker image"
+          command: |
+            docker buildx create --use
+            docker buildx build \
+              --push \
+              --progress plain \
+              --platform linux/arm64,linux/amd64 \
+              -f docker/build-src/rolling-shutter/Dockerfile \
+              -t "${DOCKER_TAG}" \
+              .
+
 workflows:
   rolling-shutter:
     jobs:
-      - build-docker-image:
+      - pre-commit:
           filters:
-            branches:
-              only: /[a-z0-9]+/
-          context:
-            - upload-release
+            tags:
+              only: /.*/
+
+      - rs-lint:
+          filters:
+            tags:
+              only: /.*/
+
       - rs-generate:
           filters:
             tags:
               only: /.*/
-      - rs-build:
+
+      - rs-test:
           matrix:
             parameters:
               go-version: [go-integration]
           filters:
             tags:
               only: /.*/
-      - build-release:
-          matrix:
-            parameters:
-              go-os-arch:
-                [
-                  "linux-amd64",
-                  "linux-arm64",
-                  "freebsd-amd64",
-                  "openbsd-amd64",
-                  "darwin-amd64",
-                  "darwin-arm64",
-                ]
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
-      - publish-release:
+
+      - build-docker-image:
           requires:
-            - rs-build
-            - build-release
+            - rs-lint
+          filters:
+            tags:
+              only: /v[0-9]+\.[0-9]+.*/
           context:
             - upload-release
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^rolling-shutter\/v\d+\.\d+\.\d+$/
-      - rs-lint:
-          filters:
-            branches:
-              ignore: /main/
