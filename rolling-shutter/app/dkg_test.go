@@ -10,7 +10,7 @@ import (
 
 var polyEval = []*big.Int{new(big.Int).SetBytes([]byte{})}
 
-func TestRegisterMsgs(t *testing.T) {
+func TestRegisterMsgs(t *testing.T) { //nolint:funlen
 	eon := uint64(10)
 	keypers := []common.Address{}
 	for i := 0; i < 3; i++ {
