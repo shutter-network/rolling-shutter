@@ -83,15 +83,13 @@ repos:
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
-              ^rolling-shutter/shmsg/.*\.pb\.go$|
-              ^rolling-shutter/p2pmsg/.*\.pb\.go$|
+              ^rolling-shutter/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )
       - id: gofumpt
         exclude: |
           (?x)(
               ^.*\.gen\.go$|
-              ^rolling-shutter/shmsg/.*\.pb\.go$|
-              ^rolling-shutter/p2pmsg/.*\.pb\.go$|
+              ^rolling-shutter/.*\.pb\.go$|
               ^rolling-shutter/shcryptowasm/.*_wasm\.go$
           )

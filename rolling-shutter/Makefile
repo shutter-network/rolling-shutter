@@ -116,7 +116,7 @@ lint:
 
 lint-changes:
 	base=`git merge-base HEAD origin/main`; \
-	golangci-lint run --new-from-rev $${base}
+	golangci-lint --verbose run --new-from-rev $${base}
 
 abigen:
 	go generate -x ./contract
