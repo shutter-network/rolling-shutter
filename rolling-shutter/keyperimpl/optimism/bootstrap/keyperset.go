@@ -6,9 +6,9 @@ import (
 	"errors"
 	"os"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
+	chainsync "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 )
 
 func GetKeyperSet(ctx context.Context, config *Config) error {

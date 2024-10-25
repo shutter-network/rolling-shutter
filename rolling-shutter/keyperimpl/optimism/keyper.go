@@ -17,11 +17,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/optimism/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
+	legacychainsync "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync"
+	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -30,7 +30,7 @@ var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
 
 type Keyper struct {
 	core     *keyper.KeyperCore
-	l2Client *chainsync.Client
+	l2Client *legacychainsync.Client
 	dbpool   *pgxpool.Pool
 	config   *config.Config
 
@@ -79,12 +79,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 	// TODO: wrap the logger and pass in
-	kpr.l2Client, err = chainsync.NewClient(
+	kpr.l2Client, err = legacychainsync.NewClient(
 		ctx,
-		chainsync.WithClientURL(kpr.config.Optimism.JSONRPCURL),
-		chainsync.WithSyncNewBlock(kpr.newBlock),
-		chainsync.WithSyncNewKeyperSet(kpr.newKeyperSet),
-		chainsync.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
+		legacychainsync.WithClientURL(kpr.config.Optimism.JSONRPCURL),
+		legacychainsync.WithSyncNewBlock(kpr.newBlock),
+		legacychainsync.WithSyncNewKeyperSet(kpr.newKeyperSet),
+		legacychainsync.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
 	)
 	if err != nil {
 		return err

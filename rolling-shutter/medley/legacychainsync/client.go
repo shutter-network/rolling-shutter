@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/client"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/logger"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
