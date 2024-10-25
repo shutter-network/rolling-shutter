@@ -61,6 +61,7 @@ func (e *Event[T]) SetResult(err error) error {
 	// capacity 1 and empty channel,
 	// so this can never block
 	e.resultC <- e.result
+	close(e.resultC)
 	return nil
 }
 
