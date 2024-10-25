@@ -4,22 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/shop-contracts/bindings"
+
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/shop-contracts/bindings"
 )
 
 var ErrParseKeyperSet = errors.New("can't parse KeyperSet")
@@ -93,7 +93,7 @@ func (handler *KeyperSetAdded) Accept(
 
 func (handler *KeyperSetAdded) Handle(
 	ctx context.Context,
-	update syncer.ChainUpdateContext,
+	_ syncer.ChainUpdateContext,
 	events []bindings.KeyperSetManagerKeyperSetAdded,
 ) error {
 	// TODO: we don't handle reorgs here.
