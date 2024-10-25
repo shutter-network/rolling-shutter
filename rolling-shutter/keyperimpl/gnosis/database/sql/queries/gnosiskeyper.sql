@@ -26,13 +26,6 @@ WHERE eon = $1 AND index >= $2 AND index < $2 + $3
 ORDER BY index ASC
 LIMIT $3;
 
--- name: SetTransactionSubmittedEventsSyncedUntil :exec
-INSERT INTO transaction_submitted_events_synced_until (block_hash, block_number, slot) VALUES ($1, $2, $3)
-ON CONFLICT (enforce_one_row) DO UPDATE
-SET block_hash = $1, block_number = $2, slot = $3;
-
--- name: GetTransactionSubmittedEventsSyncedUntil :one
-SELECT * FROM transaction_submitted_events_synced_until LIMIT 1;
 -- name: GetLatestTransactionSubmittedEvent :one
 SELECT * FROM transaction_submitted_event
 ORDER BY block_number DESC

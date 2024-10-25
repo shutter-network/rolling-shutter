@@ -2,20 +2,17 @@ package gnosisaccessnode
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/shutter/shlib/shcrypto"
-
-	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosisaccessnode/storage"
-	chainsync "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosisaccessnode/synchandler"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 type GnosisAccessNode struct {
@@ -40,59 +37,39 @@ func (node *GnosisAccessNode) Start(ctx context.Context, runner service.Runner) 
 	messageSender.AddMessageHandler(NewDecryptionKeysHandler(node.config, node.storage))
 	services = append(services, messageSender)
 
-	chainSyncClient, err := chainsync.NewClient(
-		ctx,
-		chainsync.WithClientURL(node.config.GnosisNode.EthereumURL),
-		chainsync.WithKeyperSetManager(node.config.Contracts.KeyperSetManager),
-		chainsync.WithKeyBroadcastContract(node.config.Contracts.KeyBroadcastContract),
-		chainsync.WithSyncNewKeyperSet(node.onNewKeyperSet),
-		chainsync.WithSyncNewEonKey(node.onNewEonKey),
+	ethClient, err := ethclient.DialContext(ctx, node.config.GnosisNode.EthereumURL)
+	if err != nil {
+		return err
+	}
+	keyperSetAdded, err := synchandler.NewKeyperSetAdded(
+		ethClient,
+		node.storage,
+		node.config.Contracts.KeyperSetManager,
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to initialize chain sync client")
+		return err
 	}
-	services = append(services, chainSyncClient)
-
+	eonKeyBroadcast, err := synchandler.NewEonKeyBroadcast(
+		node.storage,
+		node.config.Contracts.KeyBroadcastContract,
+	)
+	if err != nil {
+		return err
+	}
+	chainsyncOpts := []chainsync.Option{
+		chainsync.WithClient(ethClient),
+		chainsync.WithContractEventHandler(keyperSetAdded),
+		chainsync.WithContractEventHandler(eonKeyBroadcast),
+	}
+	chainsyncer, err := chainsync.New(chainsyncOpts...)
+	if err != nil {
+		return fmt.Errorf("can't instantiate chainsync: %w", err)
+	}
+	services = append(services, chainsyncer)
 	if node.config.Metrics.Enabled {
 		metricsServer := metricsserver.New(node.config.Metrics)
 		services = append(services, metricsServer)
 	}
 
 	return runner.StartService(services...)
-}
-
-func (node *GnosisAccessNode) onNewKeyperSet(_ context.Context, keyperSet *syncevent.KeyperSet) error {
-	obsKeyperSet := obskeyperdatabase.KeyperSet{
-		KeyperConfigIndex:     int64(keyperSet.Eon),
-		ActivationBlockNumber: int64(keyperSet.ActivationBlock),
-		Keypers:               shdb.EncodeAddresses(keyperSet.Members),
-		Threshold:             int32(keyperSet.Threshold),
-	}
-	log.Info().
-		Uint64("keyper-config-index", keyperSet.Eon).
-		Uint64("activation-block-number", keyperSet.ActivationBlock).
-		Int("num-keypers", len(keyperSet.Members)).
-		Uint64("threshold", keyperSet.Threshold).
-		Msg("adding keyper set")
-	node.storage.AddKeyperSet(keyperSet.Eon, &obsKeyperSet)
-	return nil
-}
-
-func (node *GnosisAccessNode) onNewEonKey(_ context.Context, eonKey *syncevent.EonPublicKey) error {
-	key := new(shcrypto.EonPublicKey)
-	err := key.Unmarshal(eonKey.Key)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Hex("key", eonKey.Key).
-			Int("keyper-config-index", int(eonKey.Eon)).
-			Msg("received invalid eon key")
-		return nil
-	}
-	log.Info().
-		Int("keyper-config-index", int(eonKey.Eon)).
-		Hex("key", eonKey.Key).
-		Msg("adding eon key")
-	node.storage.AddEonKey(eonKey.Eon, key)
-	return nil
 }

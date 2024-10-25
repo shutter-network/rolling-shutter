@@ -184,22 +184,6 @@ func (q *Queries) GetTransactionSubmittedEvents(ctx context.Context, arg GetTran
 	return items, nil
 }
 
-const getTransactionSubmittedEventsSyncedUntil = `-- name: GetTransactionSubmittedEventsSyncedUntil :one
-SELECT enforce_one_row, block_hash, block_number, slot FROM transaction_submitted_events_synced_until LIMIT 1
-`
-
-func (q *Queries) GetTransactionSubmittedEventsSyncedUntil(ctx context.Context) (TransactionSubmittedEventsSyncedUntil, error) {
-	row := q.db.QueryRow(ctx, getTransactionSubmittedEventsSyncedUntil)
-	var i TransactionSubmittedEventsSyncedUntil
-	err := row.Scan(
-		&i.EnforceOneRow,
-		&i.BlockHash,
-		&i.BlockNumber,
-		&i.Slot,
-	)
-	return i, err
-}
-
 const getTxPointer = `-- name: GetTxPointer :one
 SELECT eon, age, value FROM tx_pointer
 WHERE eon = $1
@@ -441,23 +425,6 @@ func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurren
 		arg.TxPointer,
 		arg.IdentitiesHash,
 	)
-	return err
-}
-
-const setTransactionSubmittedEventsSyncedUntil = `-- name: SetTransactionSubmittedEventsSyncedUntil :exec
-INSERT INTO transaction_submitted_events_synced_until (block_hash, block_number, slot) VALUES ($1, $2, $3)
-ON CONFLICT (enforce_one_row) DO UPDATE
-SET block_hash = $1, block_number = $2, slot = $3
-`
-
-type SetTransactionSubmittedEventsSyncedUntilParams struct {
-	BlockHash   []byte
-	BlockNumber int64
-	Slot        int64
-}
-
-func (q *Queries) SetTransactionSubmittedEventsSyncedUntil(ctx context.Context, arg SetTransactionSubmittedEventsSyncedUntilParams) error {
-	_, err := q.db.Exec(ctx, setTransactionSubmittedEventsSyncedUntil, arg.BlockHash, arg.BlockNumber, arg.Slot)
 	return err
 }
 
