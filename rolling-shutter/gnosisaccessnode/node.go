@@ -9,6 +9,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosisaccessnode/storage"
 	chainsync "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -19,13 +20,13 @@ import (
 
 type GnosisAccessNode struct {
 	config  *Config
-	storage *Storage
+	storage *storage.Memory
 }
 
 func New(config *Config) *GnosisAccessNode {
 	return &GnosisAccessNode{
 		config:  config,
-		storage: NewStorage(),
+		storage: storage.NewMemory(),
 	}
 }
 

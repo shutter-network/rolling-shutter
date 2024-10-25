@@ -11,6 +11,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/gnosiskeyperwatcher"
 	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
+	keyperconfig "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
@@ -38,7 +39,7 @@ Shuttermint node which have to be started separately in advance.`,
 	return builder.Command()
 }
 
-func main(config *keyper.Config) error {
+func main(config *keyperconfig.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Str("address", config.GetAddress().Hex()).
@@ -49,7 +50,7 @@ func main(config *keyper.Config) error {
 	return service.RunWithSighandler(context.Background(), kpr)
 }
 
-func initDB(cfg *keyper.Config) error {
+func initDB(cfg *keyperconfig.Config) error {
 	ctx := context.Background()
 	dbpool, err := pgxpool.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -59,7 +60,7 @@ func initDB(cfg *keyper.Config) error {
 	return db.InitDB(ctx, dbpool, database.Definition.Name(), database.Definition)
 }
 
-func watch(cfg *keyper.Config) error {
+func watch(cfg *keyperconfig.Config) error {
 	log.Info().Msg("starting monitor")
 	return service.RunWithSighandler(context.Background(), gnosiskeyperwatcher.New(cfg))
 }

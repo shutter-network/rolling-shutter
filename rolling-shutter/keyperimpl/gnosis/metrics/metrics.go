@@ -1,8 +1,8 @@
-package gnosis
+package metrics
 
 import "github.com/prometheus/client_golang/prometheus"
 
-var metricsTxPointer = prometheus.NewGaugeVec(
+var TxPointer = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -12,7 +12,7 @@ var metricsTxPointer = prometheus.NewGaugeVec(
 	[]string{"eon"},
 )
 
-var metricsTxPointerAge = prometheus.NewGaugeVec(
+var TxPointerAge = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -22,7 +22,7 @@ var metricsTxPointerAge = prometheus.NewGaugeVec(
 	[]string{"eon"},
 )
 
-var metricsLatestTxSubmittedEventIndex = prometheus.NewGaugeVec(
+var LatestTxSubmittedEventIndex = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -32,7 +32,7 @@ var metricsLatestTxSubmittedEventIndex = prometheus.NewGaugeVec(
 	[]string{"eon"},
 )
 
-var metricsTxSubmittedEventsSyncedUntil = prometheus.NewGauge(
+var TxSubmittedEventsSyncedUntil = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -41,7 +41,7 @@ var metricsTxSubmittedEventsSyncedUntil = prometheus.NewGauge(
 	},
 )
 
-var metricsValidatorRegistrationsSyncedUntil = prometheus.NewGauge(
+var ValidatorRegistrationsSyncedUntil = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -50,7 +50,7 @@ var metricsValidatorRegistrationsSyncedUntil = prometheus.NewGauge(
 	},
 )
 
-var metricsNumValidatorRegistrations = prometheus.NewGauge(
+var NumValidatorRegistrations = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -61,7 +61,7 @@ var metricsNumValidatorRegistrations = prometheus.NewGauge(
 
 var slotTimeDeltaBuckets = []float64{-5, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, -0, 1.0, 100}
 
-var metricsKeysSentTimeDelta = prometheus.NewHistogramVec(
+var KeysSentTimeDelta = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -72,7 +72,7 @@ var metricsKeysSentTimeDelta = prometheus.NewHistogramVec(
 	[]string{"eon"},
 )
 
-var metricsKeySharesSentTimeDelta = prometheus.NewHistogramVec(
+var KeySharesSentTimeDelta = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "shutter",
 		Subsystem: "gnosis",
@@ -84,12 +84,12 @@ var metricsKeySharesSentTimeDelta = prometheus.NewHistogramVec(
 )
 
 func init() {
-	prometheus.MustRegister(metricsTxPointer)
-	prometheus.MustRegister(metricsTxPointerAge)
-	prometheus.MustRegister(metricsLatestTxSubmittedEventIndex)
-	prometheus.MustRegister(metricsTxSubmittedEventsSyncedUntil)
-	prometheus.MustRegister(metricsValidatorRegistrationsSyncedUntil)
-	prometheus.MustRegister(metricsNumValidatorRegistrations)
-	prometheus.MustRegister(metricsKeysSentTimeDelta)
-	prometheus.MustRegister(metricsKeySharesSentTimeDelta)
+	prometheus.MustRegister(TxPointer)
+	prometheus.MustRegister(TxPointerAge)
+	prometheus.MustRegister(LatestTxSubmittedEventIndex)
+	prometheus.MustRegister(TxSubmittedEventsSyncedUntil)
+	prometheus.MustRegister(ValidatorRegistrationsSyncedUntil)
+	prometheus.MustRegister(NumValidatorRegistrations)
+	prometheus.MustRegister(KeysSentTimeDelta)
+	prometheus.MustRegister(KeySharesSentTimeDelta)
 }

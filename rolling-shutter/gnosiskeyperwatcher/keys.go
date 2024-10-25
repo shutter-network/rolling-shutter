@@ -9,14 +9,14 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog/log"
 
-	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
+	gnosisconfig "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/config"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 )
 
 type KeysWatcher struct {
-	config        *keyper.Config
+	config        *gnosisconfig.Config
 	blocksChannel chan *BlockReceivedEvent
 
 	recentBlocksMux sync.Mutex
@@ -24,7 +24,7 @@ type KeysWatcher struct {
 	mostRecentBlock uint64
 }
 
-func NewKeysWatcher(config *keyper.Config, blocksChannel chan *BlockReceivedEvent) *KeysWatcher {
+func NewKeysWatcher(config *gnosisconfig.Config, blocksChannel chan *BlockReceivedEvent) *KeysWatcher {
 	return &KeysWatcher{
 		config:          config,
 		blocksChannel:   blocksChannel,

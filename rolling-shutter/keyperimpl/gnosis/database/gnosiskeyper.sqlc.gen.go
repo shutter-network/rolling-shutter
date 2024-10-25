@@ -12,6 +12,15 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const deleteTransactionSubmittedEventsFromBlockHash = `-- name: DeleteTransactionSubmittedEventsFromBlockHash :exec
+DELETE FROM transaction_submitted_event WHERE block_hash == $1
+`
+
+func (q *Queries) DeleteTransactionSubmittedEventsFromBlockHash(ctx context.Context, blockHash []byte) error {
+	_, err := q.db.Exec(ctx, deleteTransactionSubmittedEventsFromBlockHash, blockHash)
+	return err
+}
+
 const deleteTransactionSubmittedEventsFromBlockNumber = `-- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
 DELETE FROM transaction_submitted_event WHERE block_number >= $1
 `
@@ -34,6 +43,29 @@ func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (C
 		&i.Slot,
 		&i.TxPointer,
 		&i.IdentitiesHash,
+	)
+	return i, err
+}
+
+const getLatestTransactionSubmittedEvent = `-- name: GetLatestTransactionSubmittedEvent :one
+SELECT index, block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, gas_limit FROM transaction_submitted_event
+ORDER BY block_number DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestTransactionSubmittedEvent(ctx context.Context) (TransactionSubmittedEvent, error) {
+	row := q.db.QueryRow(ctx, getLatestTransactionSubmittedEvent)
+	var i TransactionSubmittedEvent
+	err := row.Scan(
+		&i.Index,
+		&i.BlockNumber,
+		&i.BlockHash,
+		&i.TxIndex,
+		&i.LogIndex,
+		&i.Eon,
+		&i.IdentityPrefix,
+		&i.Sender,
+		&i.GasLimit,
 	)
 	return i, err
 }

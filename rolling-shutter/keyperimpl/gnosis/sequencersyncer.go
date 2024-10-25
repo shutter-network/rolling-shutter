@@ -17,6 +17,7 @@ import (
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/metrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -182,7 +183,7 @@ func (s *SequencerSyncer) syncRange(
 		Int("num-inserted-events", len(filteredEvents)).
 		Int("num-discarded-events", len(events)-len(filteredEvents)).
 		Msg("synced sequencer contract")
-	metricsTxSubmittedEventsSyncedUntil.Set(float64(end))
+	metrics.TxSubmittedEventsSyncedUntil.Set(float64(end))
 	return nil
 }
 
@@ -254,7 +255,7 @@ func (s *SequencerSyncer) insertTransactionSubmittedEvents(
 		if err != nil {
 			return errors.Wrap(err, "failed to insert transaction submitted event into db")
 		}
-		metricsLatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
+		metrics.LatestTxSubmittedEventIndex.WithLabelValues(fmt.Sprint(event.Eon)).Set(float64(event.TxIndex))
 		log.Debug().
 			Uint64("index", event.TxIndex).
 			Uint64("block", event.Raw.BlockNumber).

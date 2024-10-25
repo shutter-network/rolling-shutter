@@ -33,6 +33,10 @@ SET block_hash = $1, block_number = $2, slot = $3;
 
 -- name: GetTransactionSubmittedEventsSyncedUntil :one
 SELECT * FROM transaction_submitted_events_synced_until LIMIT 1;
+-- name: GetLatestTransactionSubmittedEvent :one
+SELECT * FROM transaction_submitted_event
+ORDER BY block_number DESC
+LIMIT 1;
 
 -- name: GetTransactionSubmittedEventCount :one
 SELECT max(index) + 1 FROM transaction_submitted_event
@@ -40,6 +44,9 @@ WHERE eon = $1;
 
 -- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
 DELETE FROM transaction_submitted_event WHERE block_number >= $1;
+
+-- name: DeleteTransactionSubmittedEventsFromBlockHash :exec
+DELETE FROM transaction_submitted_event WHERE block_hash == $1;
 
 -- name: GetTxPointer :one
 SELECT * FROM tx_pointer
