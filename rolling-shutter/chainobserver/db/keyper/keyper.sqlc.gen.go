@@ -9,6 +9,26 @@ import (
 	"context"
 )
 
+const deleteSyncedBlockByHash = `-- name: DeleteSyncedBlockByHash :exec
+DELETE FROM recent_block
+WHERE block_hash = $1
+`
+
+func (q *Queries) DeleteSyncedBlockByHash(ctx context.Context, blockHash []byte) error {
+	_, err := q.db.Exec(ctx, deleteSyncedBlockByHash, blockHash)
+	return err
+}
+
+const evictSyncedBlocksBefore = `-- name: EvictSyncedBlocksBefore :exec
+DELETE FROM recent_block
+WHERE block_number < $1
+`
+
+func (q *Queries) EvictSyncedBlocksBefore(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, evictSyncedBlocksBefore, blockNumber)
+	return err
+}
+
 const getKeyperSet = `-- name: GetKeyperSet :one
 SELECT keyper_config_index, activation_block_number, keypers, threshold FROM keyper_set
 WHERE activation_block_number <= $1
@@ -73,6 +93,87 @@ func (q *Queries) GetKeyperSets(ctx context.Context) ([]KeyperSet, error) {
 	return items, nil
 }
 
+const getLatestSyncedBlocks = `-- name: GetLatestSyncedBlocks :many
+SELECT block_hash, block_number, parent_hash, timestamp, header FROM recent_block
+ORDER BY block_number DESC
+LIMIT $1
+`
+
+func (q *Queries) GetLatestSyncedBlocks(ctx context.Context, limit int32) ([]RecentBlock, error) {
+	rows, err := q.db.Query(ctx, getLatestSyncedBlocks, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecentBlock
+	for rows.Next() {
+		var i RecentBlock
+		if err := rows.Scan(
+			&i.BlockHash,
+			&i.BlockNumber,
+			&i.ParentHash,
+			&i.Timestamp,
+			&i.Header,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSyncedBlockByHash = `-- name: GetSyncedBlockByHash :one
+SELECT block_hash, block_number, parent_hash, timestamp, header FROM recent_block
+WHERE block_hash = $1
+`
+
+func (q *Queries) GetSyncedBlockByHash(ctx context.Context, blockHash []byte) (RecentBlock, error) {
+	row := q.db.QueryRow(ctx, getSyncedBlockByHash, blockHash)
+	var i RecentBlock
+	err := row.Scan(
+		&i.BlockHash,
+		&i.BlockNumber,
+		&i.ParentHash,
+		&i.Timestamp,
+		&i.Header,
+	)
+	return i, err
+}
+
+const getSyncedBlocks = `-- name: GetSyncedBlocks :many
+SELECT block_hash, block_number, parent_hash, timestamp, header FROM recent_block
+ORDER BY block_number DESC
+`
+
+func (q *Queries) GetSyncedBlocks(ctx context.Context) ([]RecentBlock, error) {
+	rows, err := q.db.Query(ctx, getSyncedBlocks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecentBlock
+	for rows.Next() {
+		var i RecentBlock
+		if err := rows.Scan(
+			&i.BlockHash,
+			&i.BlockNumber,
+			&i.ParentHash,
+			&i.Timestamp,
+			&i.Header,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertKeyperSet = `-- name: InsertKeyperSet :exec
 INSERT INTO keyper_set (
     keyper_config_index,
@@ -97,6 +198,42 @@ func (q *Queries) InsertKeyperSet(ctx context.Context, arg InsertKeyperSetParams
 		arg.ActivationBlockNumber,
 		arg.Keypers,
 		arg.Threshold,
+	)
+	return err
+}
+
+const insertSyncedBlock = `-- name: InsertSyncedBlock :exec
+INSERT INTO recent_block (
+       block_hash,
+       block_number,
+       parent_hash,
+       timestamp,
+       header
+) VALUES (
+    $1, $2, $3, $4, $5
+) ON CONFLICT DO UPDATE SET
+       block_hash = $1,
+       block_number =$2 ,
+       parent_hash =$3,
+       timestamp =$4 ,
+       header =$5
+`
+
+type InsertSyncedBlockParams struct {
+	BlockHash   []byte
+	BlockNumber int64
+	ParentHash  []byte
+	Timestamp   int64
+	Header      []byte
+}
+
+func (q *Queries) InsertSyncedBlock(ctx context.Context, arg InsertSyncedBlockParams) error {
+	_, err := q.db.Exec(ctx, insertSyncedBlock,
+		arg.BlockHash,
+		arg.BlockNumber,
+		arg.ParentHash,
+		arg.Timestamp,
+		arg.Header,
 	)
 	return err
 }
