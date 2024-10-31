@@ -150,7 +150,7 @@ func (v *ValidatorSyncer) filterEvents(
 			Uint("log-index", event.Raw.Index).
 			Logger()
 
-		msg := new(validatorregistry.RegistrationMessage)
+		msg := new(validatorregistry.LegacyRegistrationMessage)
 		err := msg.Unmarshal(event.Message)
 		if err != nil {
 			evLog.Warn().
@@ -215,7 +215,7 @@ func (v *ValidatorSyncer) filterEvents(
 func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []*validatorRegistryBindings.ValidatorregistryUpdated) error {
 	db := database.New(tx)
 	for _, event := range events {
-		msg := new(validatorregistry.RegistrationMessage)
+		msg := new(validatorregistry.LegacyRegistrationMessage)
 		err := msg.Unmarshal(event.Message)
 		if err != nil {
 			return errors.Wrap(err, "failed to unmarshal registration message")
@@ -237,7 +237,7 @@ func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []
 }
 
 func checkStaticRegistrationMessageFields(
-	msg *validatorregistry.RegistrationMessage,
+	msg *validatorregistry.LegacyRegistrationMessage,
 	chainID uint64,
 	validatorRegistryAddress common.Address,
 	logger zerolog.Logger,
