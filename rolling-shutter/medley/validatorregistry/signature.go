@@ -1,8 +1,6 @@
 package validatorregistry
 
 import (
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	blst "github.com/supranational/blst/bindings/go"
 )
@@ -10,11 +8,10 @@ import (
 var dst = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 
 func VerifyAggregateSignature(sig *blst.P2Affine, pks []*blst.P1Affine, msg *AggregateRegistrationMessage) bool {
-	if msg.Version < 1 {
+	if msg.Version < AggregateValidatorRegistrationMessageVersion {
 		return false
 	}
 	if len(pks) != int(msg.Count) {
-		fmt.Println(len(pks), int(msg.Count))
 		return false
 	}
 	msgHash := crypto.Keccak256(msg.Marshal())
@@ -38,7 +35,7 @@ func CreateAggregateSignature(sks []*blst.SecretKey, msg *AggregateRegistrationM
 		sig := aff.Sign(sk, msgHash, dst)
 		ok := aggregate.Add(sig, true)
 		if !ok {
-			panic("failure")
+			return nil
 		}
 	}
 	return aggregate.ToAffine()

@@ -46,7 +46,6 @@ func TestAggSignature(t *testing.T) {
 	var sks []*blst.SecretKey
 	var pks []*blst.P1Affine
 	for i := 0; i < int(msg.Count); i++ {
-
 		privkey := blst.KeyGen(ikm[:])
 		pubkey := new(blst.P1Affine).From(privkey)
 		sks = append(sks, privkey)
