@@ -222,6 +222,11 @@ jobs:
                 DOCKER_TAG=${DOCKER_BASE}/unverified-dev-build-do-not-use:PR${CIRCLE_PR_NUMBER}-${CIRCLE_BUILD_NUM}
               fi
             else
+              if [[ -z $CIRCLE_BRANCH ]]; then
+                BRANCHES=$(git branch -a --contains tags/$CIRCLE_TAG)
+                CIRCLE_BRANCH=${BRANCHES##*/}
+                echo "CIRCLE_BRANCH is empty, trying to set it from git, result: $CIRCLE_BRANCH"
+              fi
               if [[ $CIRCLE_BRANCH != "main" && ! $CIRCLE_TAG =~ (a|b|rc) ]]; then
                 echo "Final release tags are only allowed on main branch."
                 exit 1
