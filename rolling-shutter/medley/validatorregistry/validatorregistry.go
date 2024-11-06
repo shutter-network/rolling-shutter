@@ -69,13 +69,12 @@ func (m *AggregateRegistrationMessage) Unmarshal(b []byte) error {
 func (m *AggregateRegistrationMessage) ValidatorIndices() []int64 {
 	if m.Version == LegacyValidatorRegistrationMessageVersion {
 		return []int64{int64(m.ValidatorIndex)}
-	} else {
-		indices := make([]int64, 0)
-		for i := 0; i < int(m.Count); i++ {
-			indices = append(indices, int64(m.ValidatorIndex)+int64(i))
-		}
-		return indices
 	}
+	indices := make([]int64, 0)
+	for i := 0; i < int(m.Count); i++ {
+		indices = append(indices, int64(m.ValidatorIndex)+int64(i))
+	}
+	return indices
 }
 
 type LegacyRegistrationMessage struct {

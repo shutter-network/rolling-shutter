@@ -8,6 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	blst "github.com/supranational/blst/bindings/go"
+	"gotest.tools/assert"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
@@ -15,8 +18,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/validatorregistry"
-	blst "github.com/supranational/blst/bindings/go"
-	"gotest.tools/assert"
 )
 
 func TestLegacyValidatorRegisterFilterEvent(t *testing.T) {
@@ -52,7 +53,7 @@ func TestLegacyValidatorRegisterFilterEvent(t *testing.T) {
 		ChainID:         msg.ChainID,
 	}
 
-	events := []*validatorRegistryBindings.ValidatorregistryUpdated{&validatorRegistryBindings.ValidatorregistryUpdated{
+	events := []*validatorRegistryBindings.ValidatorregistryUpdated{{
 		Signature: sig.Compress(),
 		Message:   msg.Marshal(),
 		Raw: types.Log{
@@ -106,7 +107,7 @@ func TestAggregateValidatorRegisterFilterEvent(t *testing.T) {
 		ChainID:         msg.ChainID,
 	}
 
-	events := []*validatorRegistryBindings.ValidatorregistryUpdated{&validatorRegistryBindings.ValidatorregistryUpdated{
+	events := []*validatorRegistryBindings.ValidatorregistryUpdated{{
 		Signature: sig.Compress(),
 		Message:   msg.Marshal(),
 		Raw: types.Log{
@@ -121,6 +122,7 @@ func TestAggregateValidatorRegisterFilterEvent(t *testing.T) {
 }
 
 func mockBeaconClient(t *testing.T, pubKeyHex string) string {
+	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		x := beaconapiclient.GetValidatorByIndexResponse{
 			Finalized: true,
