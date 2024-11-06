@@ -8,12 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	blst "github.com/supranational/blst/bindings/go"
-	"gotest.tools/assert"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
+	blst "github.com/supranational/blst/bindings/go"
+	"gotest.tools/assert"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
@@ -135,6 +135,7 @@ func mockBeaconClient(t *testing.T, pubKeyHex string) string {
 		res, err := json.Marshal(x)
 		assert.NilError(t, err)
 		w.WriteHeader(http.StatusOK)
-		w.Write(res)
+		_, err = w.Write(res)
+		assert.NilError(t, err)
 	})).URL
 }
