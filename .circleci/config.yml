@@ -225,10 +225,10 @@ jobs:
               # For tag only builds the branch is not set, so we need to (try to) extract it from the git repo.
               if [[ -z $CIRCLE_BRANCH ]]; then
                 BRANCHES=$(git branch -a --contains tags/$CIRCLE_TAG)
-                CIRCLE_BRANCH=${BRANCHES##*/}
+                CIRCLE_BRANCH=${${BRANCHES%%/*}##\* }
                 echo "CIRCLE_BRANCH is empty, trying to set it from git, result: $CIRCLE_BRANCH"
               fi
-              if [[ $CIRCLE_BRANCH != "main" && ! $CIRCLE_TAG =~ (a|b|rc) ]]; then
+              if [[ $CIRCLE_BRANCH != "main" && $CIRCLE_BRANCH != "release" && ! $CIRCLE_TAG =~ (a|b|rc) ]]; then
                 echo "Final release tags are only allowed on main branch."
                 exit 1
               else
