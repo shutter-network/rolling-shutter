@@ -39,11 +39,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, slot uint64) erro
 	}
 	kpr.latestTriggeredSlot = &slot
 
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Println(slot)
-	fmt.Println("")
-	fmt.Println("")
+	log.Info().Msgf("\n\n%d\n\n", slot)
 
 	gnosisKeyperDB := gnosisdatabase.New(kpr.dbpool)
 	syncedUntil, err := gnosisKeyperDB.GetTransactionSubmittedEventsSyncedUntil(ctx)

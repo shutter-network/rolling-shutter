@@ -76,7 +76,7 @@ func (pd *FloodsubPeerDiscovery) Start(ctx context.Context) error {
 		case <-timer.C:
 			err := pd.broadcast()
 			if err != nil {
-				log.Warn().Msgf("error in broadcasting floodsub msg | %v", err)
+				log.Warn().Err(err).Msg("error in broadcasting floodsub msg")
 				return err
 			}
 		case <-ctx.Done():
@@ -125,7 +125,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 
 	for _, topic := range pd.Topics {
-		log.Info().Msgf("broadcasting our peer data on topic %s", topic)
+		log.Debug().Str("topic", topic.String()).Msg("Sending floodsub message")
 
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
 			return fmt.Errorf("failed to publish to topic | err %w", err)
@@ -147,19 +147,19 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 
 		var peerMsg Peer
 		if err := proto.Unmarshal(msg.GetData(), &peerMsg); err != nil {
-			log.Warn().Msgf("failed to unmarshal the floodsub peer message | %v", err)
+			log.Debug().Err(err).Msg("failed to unmarshal the floodsub peer message")
 			continue
 		}
 
 		pubKey, err := crypto.UnmarshalPublicKey(peerMsg.PublicKey)
 		if err != nil {
-			log.Warn().Msgf("failed to get pub key from floodsub message | %v", err)
+			log.Debug().Err(err).Msg("failed to get pub key from floodsub message")
 			continue
 		}
 
 		pID, err := peer.IDFromPublicKey(pubKey)
 		if err != nil {
-			log.Warn().Msgf("failed to get peer id from floodsub message | %v", err)
+			log.Debug().Err(err).Msg("failed to get peer id from floodsub message")
 			continue
 		}
 
@@ -167,13 +167,12 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 		for _, addr := range peerMsg.Addrs {
 			mulAddr, err := multiaddr.NewMultiaddrBytes(addr)
 			if err != nil {
-				log.Warn().Msgf("failed to get multi address from floodsub message | %v", err)
+				log.Warn().Err(err).Msg("failed to get multi address from floodsub message")
 				continue
 			}
 			multiAddresses = append(multiAddresses, mulAddr.String())
 		}
 
-		log.Info().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]",
-			pID.String(), strings.Join(multiAddresses, ", "))
+		log.Debug().Str("peer-id", pID.String()).Str("multiaddrs", strings.Join(multiAddresses, ", ")).Msg("floodsub discovery")
 	}
 }

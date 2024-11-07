@@ -222,6 +222,7 @@ jobs:
                 DOCKER_TAG=${DOCKER_BASE}/unverified-dev-build-do-not-use:PR${CIRCLE_PR_NUMBER}-${CIRCLE_BUILD_NUM}
               fi
             else
+              # For tag only builds the branch is not set, so we need to (try to) extract it from the git repo.
               if [[ -z $CIRCLE_BRANCH ]]; then
                 BRANCHES=$(git branch -a --contains tags/$CIRCLE_TAG)
                 CIRCLE_BRANCH=${BRANCHES##*/}
