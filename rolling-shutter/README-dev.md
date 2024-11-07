@@ -19,7 +19,7 @@ can install them to the `bin` directory by running
 
 Run `make test` to run the tests
 
-For any static test data, please use `../testdata` folder
+For any static test data, please use `../testdata` folder.
 
 ## Linting
 
