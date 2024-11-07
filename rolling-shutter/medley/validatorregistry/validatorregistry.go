@@ -33,8 +33,8 @@ func (m *AggregateRegistrationMessage) Marshal() []byte {
 	b = binary.BigEndian.AppendUint64(b, m.ChainID)
 	b = append(b, m.ValidatorRegistryAddress.Bytes()...)
 	b = binary.BigEndian.AppendUint64(b, m.ValidatorIndex)
-	b = binary.BigEndian.AppendUint32(b, m.Nonce)
 	b = binary.BigEndian.AppendUint32(b, m.Count)
+	b = binary.BigEndian.AppendUint32(b, m.Nonce)
 	if m.IsRegistration {
 		b = append(b, 1)
 	} else {
@@ -53,8 +53,8 @@ func (m *AggregateRegistrationMessage) Unmarshal(b []byte) error {
 	m.ChainID = binary.BigEndian.Uint64(b[1:9])
 	m.ValidatorRegistryAddress = common.BytesToAddress(b[9:29])
 	m.ValidatorIndex = binary.BigEndian.Uint64(b[29:37])
-	m.Nonce = binary.BigEndian.Uint32(b[37:41])
-	m.Count = binary.BigEndian.Uint32(b[41:45])
+	m.Count = binary.BigEndian.Uint32(b[37:41])
+	m.Nonce = binary.BigEndian.Uint32(b[41:45])
 	switch b[45] {
 	case 0:
 		m.IsRegistration = false
