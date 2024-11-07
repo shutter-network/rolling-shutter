@@ -61,13 +61,13 @@ func TestAggregateValidationWithData(t *testing.T) {
 
 func mockBeaconClientWithJSONData(t *testing.T) string {
 	t.Helper()
-	jsonFile, err := os.Open("../../../testdata/validatorInfo.json")
+	jsonFile, err := os.Open("../../../testdata/validatorInfo_0x01.json")
 	assert.NilError(t, err)
 	defer jsonFile.Close()
 
 	byteValue, _ := io.ReadAll(jsonFile)
 	var result map[string]string
-	err = json.Unmarshal([]byte(byteValue), &result)
+	err = json.Unmarshal(byteValue, &result)
 	assert.NilError(t, err)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -91,13 +91,13 @@ func mockBeaconClientWithJSONData(t *testing.T) string {
 
 func readMsg(t *testing.T) map[string]string {
 	t.Helper()
-	jsonFile, err := os.Open("../../../testdata/signedRegistrations.json")
+	jsonFile, err := os.Open("../../../testdata/signedRegistrations_0x01.json")
 	assert.NilError(t, err)
 	defer jsonFile.Close()
 
 	byteValue, _ := io.ReadAll(jsonFile)
 	var result map[string]string
-	err = json.Unmarshal([]byte(byteValue), &result)
+	err = json.Unmarshal(byteValue, &result)
 	assert.NilError(t, err)
 	return result
 }

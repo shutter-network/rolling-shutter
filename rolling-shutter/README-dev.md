@@ -19,6 +19,8 @@ can install them to the `bin` directory by running
 
 Run `make test` to run the tests
 
+For any static test data, please use `../testdata` folder
+
 ## Linting
 
 Run `make lint` to run `golangci-lint`. Run `make lint-changes` to run
