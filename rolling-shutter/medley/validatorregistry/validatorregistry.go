@@ -44,7 +44,7 @@ func (m *AggregateRegistrationMessage) Marshal() []byte {
 }
 
 func (m *AggregateRegistrationMessage) Unmarshal(b []byte) error {
-	expectedLength := 1 + 8 + 20 + 8 + 8 + 1
+	expectedLength := 1 + 8 + 20 + 8 + 4 + 4 + 1
 	if len(b) != expectedLength {
 		return fmt.Errorf("invalid registration message length %d, expected %d", len(b), expectedLength)
 	}
