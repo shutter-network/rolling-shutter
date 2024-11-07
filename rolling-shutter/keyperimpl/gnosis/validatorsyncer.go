@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/big"
 
@@ -24,8 +25,7 @@ import (
 )
 
 const (
-	ValidatorRegistrationMessageVersion = 0
-	maxRequestBlockRange                = 10_000
+	maxRequestBlockRange = 10_000
 )
 
 type ValidatorSyncer struct {
@@ -150,7 +150,7 @@ func (v *ValidatorSyncer) filterEvents(
 			Uint("log-index", event.Raw.Index).
 			Logger()
 
-		msg := new(validatorregistry.RegistrationMessage)
+		msg := new(validatorregistry.AggregateRegistrationMessage)
 		err := msg.Unmarshal(event.Message)
 		if err != nil {
 			evLog.Warn().
@@ -158,53 +158,75 @@ func (v *ValidatorSyncer) filterEvents(
 				Msg("failed to unmarshal registration message")
 			continue
 		}
-		evLog = evLog.With().Uint64("validator-index", msg.ValidatorIndex).Logger()
 
 		if !checkStaticRegistrationMessageFields(msg, v.ChainID, event.Raw.Address, evLog) {
 			continue
 		}
 
-		latestNonce, err := db.GetValidatorRegistrationNonceBefore(ctx, database.GetValidatorRegistrationNonceBeforeParams{
-			ValidatorIndex: int64(msg.ValidatorIndex),
-			BlockNumber:    int64(event.Raw.BlockNumber),
-			TxIndex:        int64(event.Raw.TxIndex),
-			LogIndex:       int64(event.Raw.Index),
-		})
-		if err != nil && err != pgx.ErrNoRows {
-			return nil, errors.Wrapf(err, "failed to query latest nonce for validator %d", msg.ValidatorIndex)
-		}
-		if err == pgx.ErrNoRows {
-			latestNonce = -1
-		}
-		if msg.Nonce > math.MaxInt64 || int64(msg.Nonce) <= latestNonce {
-			evLog.Warn().
-				Uint64("nonce", msg.Nonce).
-				Int64("latest-nonce", latestNonce).
-				Msg("ignoring registration message with invalid nonce")
-			continue
+		pubKeys := make([]*blst.P1Affine, 0)
+		for _, validatorIndex := range msg.ValidatorIndices() {
+			evLog = evLog.With().Int64("validator-index", validatorIndex).Logger()
+			latestNonce, err := db.GetValidatorRegistrationNonceBefore(ctx, database.GetValidatorRegistrationNonceBeforeParams{
+				ValidatorIndex: validatorIndex,
+				BlockNumber:    int64(event.Raw.BlockNumber),
+				TxIndex:        int64(event.Raw.TxIndex),
+				LogIndex:       int64(event.Raw.Index),
+			})
+			if err != nil && err != pgx.ErrNoRows {
+				return nil, errors.Wrapf(err, "failed to query latest nonce for validator %d", msg.ValidatorIndex)
+			}
+			if err == pgx.ErrNoRows {
+				latestNonce = -1
+			}
+
+			if msg.Nonce > math.MaxInt32 || int64(msg.Nonce) <= latestNonce {
+				evLog.Warn().
+					Uint32("nonce", msg.Nonce).
+					Int64("latest-nonce", latestNonce).
+					Msg("ignoring registration message with invalid nonce")
+				continue
+			}
+
+			validator, err := v.BeaconAPIClient.GetValidatorByIndex(ctx, "head", uint64(validatorIndex))
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get validator %d", msg.ValidatorIndex)
+			}
+			if validator == nil {
+				evLog.Warn().Msg("ignoring registration message for unknown validator")
+				continue
+			}
+			pubkey, err := validator.Data.Validator.GetPubkey()
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get pubkey of validator %d", msg.ValidatorIndex)
+			}
+			pubKeys = append(pubKeys, pubkey)
 		}
 
-		validator, err := v.BeaconAPIClient.GetValidatorByIndex(ctx, "head", msg.ValidatorIndex)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get validator %d", msg.ValidatorIndex)
-		}
-		if validator == nil {
-			evLog.Warn().Msg("ignoring registration message for unknown validator")
-			continue
-		}
-		pubkey, err := validator.Data.Validator.GetPubkey()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get pubkey of validator %d", msg.ValidatorIndex)
-		}
 		sig := new(blst.P2Affine).Uncompress(event.Signature)
 		if sig == nil {
 			evLog.Warn().Msg("ignoring registration message with undecodable signature")
 			continue
 		}
-		validSignature := validatorregistry.VerifySignature(sig, pubkey, msg)
-		if !validSignature {
-			evLog.Warn().Msg("ignoring registration message with invalid signature")
-			continue
+
+		if msg.Version == validatorregistry.LegacyValidatorRegistrationMessageVersion {
+			msg := new(validatorregistry.LegacyRegistrationMessage)
+			err := msg.Unmarshal(event.Message)
+			if err != nil {
+				evLog.Warn().
+					Err(err).
+					Msg("failed to unmarshal registration message")
+				continue
+			}
+			if validSignature := validatorregistry.VerifySignature(sig, pubKeys[0], msg); !validSignature {
+				evLog.Warn().Msg("ignoring registration message with invalid signature")
+				continue
+			}
+		} else {
+			validSignature := validatorregistry.VerifyAggregateSignature(sig, pubKeys, msg)
+			if !validSignature {
+				evLog.Warn().Msg("ignoring registration message with invalid signature")
+				continue
+			}
 		}
 
 		filteredEvents = append(filteredEvents, event)
@@ -215,37 +237,41 @@ func (v *ValidatorSyncer) filterEvents(
 func (v *ValidatorSyncer) insertEvents(ctx context.Context, tx pgx.Tx, events []*validatorRegistryBindings.ValidatorregistryUpdated) error {
 	db := database.New(tx)
 	for _, event := range events {
-		msg := new(validatorregistry.RegistrationMessage)
+		msg := new(validatorregistry.AggregateRegistrationMessage)
 		err := msg.Unmarshal(event.Message)
 		if err != nil {
 			return errors.Wrap(err, "failed to unmarshal registration message")
 		}
-		err = db.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
-			BlockNumber:    int64(event.Raw.BlockNumber),
-			BlockHash:      event.Raw.BlockHash.Bytes(),
-			TxIndex:        int64(event.Raw.TxIndex),
-			LogIndex:       int64(event.Raw.Index),
-			ValidatorIndex: int64(msg.ValidatorIndex),
-			Nonce:          int64(msg.Nonce),
-			IsRegistration: msg.IsRegistration,
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to insert validator registration into db")
+		for _, validatorIndex := range msg.ValidatorIndices() {
+			err = db.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
+				BlockNumber:    int64(event.Raw.BlockNumber),
+				BlockHash:      event.Raw.BlockHash.Bytes(),
+				TxIndex:        int64(event.Raw.TxIndex),
+				LogIndex:       int64(event.Raw.Index),
+				ValidatorIndex: validatorIndex,
+				Nonce:          int64(msg.Nonce),
+				IsRegistration: msg.IsRegistration,
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to insert validator registration into db")
+			}
 		}
 	}
 	return nil
 }
 
 func checkStaticRegistrationMessageFields(
-	msg *validatorregistry.RegistrationMessage,
+	msg *validatorregistry.AggregateRegistrationMessage,
 	chainID uint64,
 	validatorRegistryAddress common.Address,
 	logger zerolog.Logger,
 ) bool {
-	if msg.Version != ValidatorRegistrationMessageVersion {
+	if msg.Version != validatorregistry.AggregateValidatorRegistrationMessageVersion &&
+		msg.Version != validatorregistry.LegacyValidatorRegistrationMessageVersion {
 		logger.Warn().
 			Uint8("version", msg.Version).
-			Uint8("expected-version", ValidatorRegistrationMessageVersion).
+			Str("expected-version", fmt.Sprintf("%d or %d", validatorregistry.LegacyValidatorRegistrationMessageVersion,
+				validatorregistry.AggregateValidatorRegistrationMessageVersion)).
 			Uint64("validator-index", msg.ValidatorIndex).
 			Msg("ignoring registration message with invalid version")
 		return false
