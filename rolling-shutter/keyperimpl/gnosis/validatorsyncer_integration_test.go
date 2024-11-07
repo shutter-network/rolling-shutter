@@ -67,7 +67,8 @@ func mockBeaconClientWithJSONData(t *testing.T) string {
 
 	byteValue, _ := io.ReadAll(jsonFile)
 	var result map[string]string
-	json.Unmarshal([]byte(byteValue), &result)
+	err = json.Unmarshal([]byte(byteValue), &result)
+	assert.NilError(t, err)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(r.URL.Path, "/")
@@ -96,6 +97,7 @@ func readMsg(t *testing.T) map[string]string {
 
 	byteValue, _ := io.ReadAll(jsonFile)
 	var result map[string]string
-	json.Unmarshal([]byte(byteValue), &result)
+	err = json.Unmarshal([]byte(byteValue), &result)
+	assert.NilError(t, err)
 	return result
 }
