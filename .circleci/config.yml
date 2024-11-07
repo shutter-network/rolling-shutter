@@ -225,7 +225,8 @@ jobs:
               # For tag only builds the branch is not set, so we need to (try to) extract it from the git repo.
               if [[ -z $CIRCLE_BRANCH ]]; then
                 BRANCHES=$(git branch -a --contains tags/$CIRCLE_TAG)
-                CIRCLE_BRANCH=${${BRANCHES%%/*}##\* }
+                BRANCHES=${BRANCHES%%/*}
+                CIRCLE_BRANCH=${BRANCHES##\* }
                 echo "CIRCLE_BRANCH is empty, trying to set it from git, result: $CIRCLE_BRANCH"
               fi
               if [[ $CIRCLE_BRANCH != "main" && $CIRCLE_BRANCH != "release" && ! $CIRCLE_TAG =~ (a|b|rc) ]]; then
@@ -248,7 +249,7 @@ jobs:
             docker buildx build \
               --push \
               --progress plain \
-              --platform linux/arm64,linux/amd64 \
+              --platform linux/amd64 \
               -f docker/build-src/rolling-shutter/Dockerfile \
               -t "${DOCKER_TAG}" \
               .
