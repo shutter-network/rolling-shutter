@@ -9,8 +9,8 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	chainsync "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync"
+	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
