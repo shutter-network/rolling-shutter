@@ -13,7 +13,9 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/eonkeypublish"
+	"github.com/shutter-network/contracts/v2/bindings/keyperset"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
@@ -32,7 +34,7 @@ const (
 type EonKeyPublisher struct {
 	dbpool           *pgxpool.Pool
 	client           *ethclient.Client
-	keyperSetManager *bindings.KeyperSetManager
+	keyperSetManager *keypersetmanager.Keypersetmanager
 	privateKey       *ecdsa.PrivateKey
 
 	keys chan keyper.EonPublicKey
@@ -44,7 +46,7 @@ func NewEonKeyPublisher(
 	keyperSetManagerAddress common.Address,
 	privateKey *ecdsa.PrivateKey,
 ) (*EonKeyPublisher, error) {
-	keyperSetManager, err := bindings.NewKeyperSetManager(keyperSetManagerAddress, client)
+	keyperSetManager, err := keypersetmanager.NewKeypersetmanager(keyperSetManagerAddress, client)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to instantiate keyper set manager contract at address %s", keyperSetManagerAddress.Hex())
 	}
@@ -221,13 +223,13 @@ func (p *EonKeyPublisher) tryPublish(ctx context.Context, key []byte, keyperSetI
 	return nil
 }
 
-func (p *EonKeyPublisher) getEonKeyPublisherContract(keyperSetIndex uint64) (*bindings.EonKeyPublish, error) {
+func (p *EonKeyPublisher) getEonKeyPublisherContract(keyperSetIndex uint64) (*eonkeypublish.Eonkeypublish, error) {
 	opts := &bind.CallOpts{}
 	keyperSetAddress, err := p.keyperSetManager.GetKeyperSetAddress(opts, keyperSetIndex)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get keyper set address from manager for index %d", keyperSetIndex)
 	}
-	keyperSet, err := bindings.NewKeyperSet(keyperSetAddress, p.client)
+	keyperSet, err := keyperset.NewKeyperset(keyperSetAddress, p.client)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to instantiate keyper set contract at address %s", keyperSetAddress.Hex())
 	}
@@ -235,7 +237,7 @@ func (p *EonKeyPublisher) getEonKeyPublisherContract(keyperSetIndex uint64) (*bi
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get eon key publisher contract from keyper set at address %s", keyperSetAddress.Hex())
 	}
-	eonKeyPublisher, err := bindings.NewEonKeyPublish(eonKeyPublisherAddress, p.client)
+	eonKeyPublisher, err := eonkeypublish.NewEonkeypublish(eonKeyPublisherAddress, p.client)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to instantiate eon key publisher contract at address %s", eonKeyPublisherAddress.Hex())
 	}

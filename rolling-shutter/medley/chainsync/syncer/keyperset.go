@@ -7,7 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/shutter-network/shop-contracts/bindings"
+	"github.com/shutter-network/contracts/v2/bindings/keyperset"
+	"github.com/shutter-network/contracts/v2/bindings/keypersetmanager"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -23,12 +24,12 @@ const channelSize = 10
 
 type KeyperSetSyncer struct {
 	Client     client.Client
-	Contract   *bindings.KeyperSetManager
+	Contract   *keypersetmanager.Keypersetmanager
 	Log        log.Logger
 	StartBlock *number.BlockNumber
 	Handler    event.KeyperSetHandler
 
-	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
+	keyperAddedCh chan *keypersetmanager.KeypersetmanagerKeyperSetAdded
 }
 
 func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -65,7 +66,7 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 			)
 		}
 	}
-	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
+	s.keyperAddedCh = make(chan *keypersetmanager.KeypersetmanagerKeyperSetAdded, channelSize)
 	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
 	// FIXME: what to do on subs.Error()
 	if err != nil {
@@ -171,7 +172,7 @@ func (s *KeyperSetSyncer) newEvent(
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	ks, err := bindings.NewKeyperSet(keyperSetContract, s.Client)
+	ks, err := keyperset.NewKeyperset(keyperSetContract, s.Client)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not bind to KeyperSet contract")
 	}

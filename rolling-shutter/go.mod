@@ -31,8 +31,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/rs/zerolog v1.28.0
-	github.com/shutter-network/gnosh-contracts v0.4.0
-	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
+	github.com/shutter-network/contracts/v2 v2.0.0-beta.2
+	github.com/shutter-network/shop-contracts v0.0.0-20240826093107-e2022678a13f
 	github.com/shutter-network/shutter/shlib v0.1.19
 	github.com/spf13/afero v1.8.2
 	github.com/spf13/cobra v1.6.1
