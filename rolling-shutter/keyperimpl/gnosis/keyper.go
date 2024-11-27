@@ -49,6 +49,7 @@ type Keyper struct {
 	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
+	syncMonitor         *SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -62,7 +63,8 @@ type Keyper struct {
 
 func New(c *Config) *Keyper {
 	return &Keyper{
-		config: c,
+		config:      c,
+		syncMonitor: &SyncMonitor{},
 	}
 }
 
@@ -154,8 +156,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to reset transaction pointer age")
 	}
 
+	kpr.syncMonitor = &SyncMonitor{
+		DBPool: kpr.dbpool,
+	}
+
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher, kpr.syncMonitor)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
