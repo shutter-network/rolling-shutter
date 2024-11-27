@@ -12,6 +12,7 @@ CREATE TABLE identity_registered_event (
     identity_prefix bytea NOT NULL,
     sender text NOT NULL,
     timestamp bigint NOT NULL,
+    decrypted boolean NOT NULL,
     PRIMARY KEY (index, eon)
 );
 
@@ -19,5 +20,4 @@ CREATE TABLE identity_registered_events_synced_until(
     enforce_one_row bool PRIMARY KEY DEFAULT true,
     block_hash bytea NOT NULL,
     block_number bigint NOT NULL CHECK (block_number >= 0),
-    slot bigint NOT NULL CHECK (slot >= 0)
 );

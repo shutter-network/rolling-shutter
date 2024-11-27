@@ -9,8 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 )
 
@@ -47,41 +45,45 @@ func (s *RegistrySyncer) resetSyncStatus(ctx context.Context, numReorgedBlocks i
 		return nil
 	}
 	return s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		queries := database.New(tx)
+		// queries := database.New(tx)
 
-		syncStatus, err := queries.GetTransactionSubmittedEventsSyncedUntil(ctx)
-		if err != nil {
-			return errors.Wrap(err, "failed to query sync status from db in order to reset it")
-		}
-		if syncStatus.BlockNumber < int64(numReorgedBlocks) {
-			return errors.Wrapf(err, "detected reorg deeper (%d) than blocks synced (%d)", syncStatus.BlockNumber, numReorgedBlocks)
-		}
+		// syncStatus, err := queries.GetTransactionSubmittedEventsSyncedUntil(ctx)
+		// if err != nil {
+		// 	return errors.Wrap(err, "failed to query sync status from db in order to reset it")
+		// }
+		// if syncStatus.BlockNumber < int64(numReorgedBlocks) {
+		// 	return errors.Wrapf(err, "detected reorg deeper (%d) than blocks synced (%d)", syncStatus.BlockNumber, numReorgedBlocks)
+		// }
 
-		deleteFromInclusive := syncStatus.BlockNumber - int64(numReorgedBlocks) + 1
+		// deleteFromInclusive := syncStatus.BlockNumber - int64(numReorgedBlocks) + 1
 
-		err = queries.DeleteTransactionSubmittedEventsFromBlockNumber(ctx, deleteFromInclusive)
-		if err != nil {
-			return errors.Wrap(err, "failed to delete transaction submitted events from db")
-		}
+		// err = queries.DeleteTransactionSubmittedEventsFromBlockNumber(ctx, deleteFromInclusive)
+		// if err != nil {
+		// 	return errors.Wrap(err, "failed to delete transaction submitted events from db")
+		// }
 		// Currently, we don't have enough information in the db to populate block hash and slot.
 		// However, using default values here is fine since the syncer is expected to resync
 		// immediately after this function call which will set the correct values. When we do proper
 		// reorg handling, we should store the full block data of the previous blocks so that we can
 		// avoid this.
-		newSyncedUntilBlockNumber := deleteFromInclusive - 1
-		err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
-			BlockHash:   []byte{},
-			BlockNumber: newSyncedUntilBlockNumber,
-			Slot:        0,
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to reset transaction submitted event sync status in db")
-		}
-		log.Info().
-			Int("depth", numReorgedBlocks).
-			Int64("previous-synced-until", syncStatus.BlockNumber).
-			Int64("new-synced-until", newSyncedUntilBlockNumber).
-			Msg("sync status reset due to reorg")
+
+		// newSyncedUntilBlockNumber := deleteFromInclusive - 1
+
+		//TODO: need to change sync status to use registry event sync
+
+		// err = queries.SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
+		// 	BlockHash:   []byte{},
+		// 	BlockNumber: newSyncedUntilBlockNumber,
+		// 	Slot:        0,
+		// })
+		// if err != nil {
+		// 	return errors.Wrap(err, "failed to reset transaction submitted event sync status in db")
+		// }
+		// log.Info().
+		// 	Int("depth", numReorgedBlocks).
+		// 	Int64("previous-synced-until", syncStatus.BlockNumber).
+		// 	Int64("new-synced-until", newSyncedUntilBlockNumber).
+		// 	Msg("sync status reset due to reorg")
 		return nil
 	})
 }
