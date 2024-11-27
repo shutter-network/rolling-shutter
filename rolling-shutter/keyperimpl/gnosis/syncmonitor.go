@@ -2,14 +2,14 @@ package gnosis
 
 import (
 	"context"
+	"time"
+
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
-	"time"
-
-	_ "github.com/lib/pq"
 )
 
 const (

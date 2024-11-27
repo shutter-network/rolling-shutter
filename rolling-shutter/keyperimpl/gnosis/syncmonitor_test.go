@@ -2,14 +2,16 @@ package gnosis_test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/rs/zerolog/log"
+	"gotest.tools/assert"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
-	"gotest.tools/assert"
-	"testing"
-	"time"
 )
 
 func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
@@ -61,7 +63,6 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected an error, but none was returned")
 	}
-
 }
 
 func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
@@ -118,7 +119,7 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 			log.Info().
 				Int64("previous-block-number", initialBlockNumber+int64(i)).
 				Int64("new-block-number", newBlockNumber).
-				Msg("comparing blocks")
+				Msg("comparing consecutive blocks")
 
 			_, err := dbpool.Exec(ctx, `
         UPDATE transaction_submitted_events_synced_until
@@ -126,7 +127,8 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
         WHERE block_number = $2;
 `, newBlockNumber, initialBlockNumber+int64(i))
 			if err != nil {
-				t.Fatalf("failed to update block number: %v", err)
+				t.Errorf("failed to update block number: %v", err)
+				return
 			}
 
 			time.Sleep(30 * time.Second)
@@ -135,14 +137,12 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 		doneCh <- struct{}{}
 	}()
 
-	select {
-	case <-doneCh:
-		var finalBlockNumber int64
-		err = dbpool.QueryRow(ctx, `SELECT block_number FROM transaction_submitted_events_synced_until LIMIT 1;`).Scan(&finalBlockNumber)
-		if err != nil {
-			t.Fatalf("failed to retrieve final block number: %v", err)
-		}
-
-		assert.Equal(t, initialBlockNumber+5, finalBlockNumber, "block number should have been incremented correctly")
+	<-doneCh
+	var finalBlockNumber int64
+	err = dbpool.QueryRow(ctx, `SELECT block_number FROM transaction_submitted_events_synced_until LIMIT 1;`).Scan(&finalBlockNumber)
+	if err != nil {
+		t.Fatalf("failed to retrieve final block number: %v", err)
 	}
+
+	assert.Equal(t, initialBlockNumber+5, finalBlockNumber, "block number should have been incremented correctly")
 }
