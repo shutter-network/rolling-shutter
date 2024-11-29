@@ -6,6 +6,12 @@ package database
 
 import ()
 
+type CurrentDecryptionTrigger struct {
+	Eon             int64
+	LastBlockNumber int64
+	IdentitiesHash  []byte
+}
+
 type IdentityRegisteredEvent struct {
 	Index          int64
 	BlockNumber    int64
@@ -23,5 +29,4 @@ type IdentityRegisteredEventsSyncedUntil struct {
 	EnforceOneRow bool
 	BlockHash     []byte
 	BlockNumber   int64
-	Slot          int64
 }

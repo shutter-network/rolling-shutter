@@ -47,23 +47,27 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx, int64(*lastTriggeredTime))
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
-		// That's because non-keypers don't sync transaction submitted events.
+		// That's because non-keypers don't sync identity registered events. TODO: this needs to be implemented
 		return errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
 
 	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
-		if kpr.shouldTriggerDecryption(ctx, obsDB, event) {
+		if kpr.shouldTriggerDecryption(ctx, obsDB, event, block) {
 			eventsToDecrypt = append(eventsToDecrypt, event)
 		}
 	}
 
-	//TODO: decryption needs to be implemented
 	return kpr.triggerDecryption(ctx, eventsToDecrypt)
 }
 
-func (kpr *Keyper) shouldTriggerDecryption(ctx context.Context, obsDB *obskeyper.Queries, event servicedatabase.IdentityRegisteredEvent) bool {
+func (kpr *Keyper) shouldTriggerDecryption(
+	ctx context.Context,
+	obsDB *obskeyper.Queries,
+	event servicedatabase.IdentityRegisteredEvent,
+	triggeredBlock *syncevent.LatestBlock,
+) bool {
 	nextBlock := event.BlockNumber + 1
 	keyperSet, err := obsDB.GetKeyperSet(ctx, nextBlock)
 	if err == pgx.ErrNoRows {
@@ -72,6 +76,11 @@ func (kpr *Keyper) shouldTriggerDecryption(ctx context.Context, obsDB *obskeyper
 			Msg("skipping event as no keyper set has been found for it")
 		return false
 	}
+
+	if event.Timestamp <= int64(triggeredBlock.Header.Time) {
+		return false
+	}
+
 	if err != nil {
 		log.Warn().Msgf("%w | failed to query keyper set for block %d", err, nextBlock)
 		return false
@@ -90,15 +99,12 @@ func (kpr *Keyper) shouldTriggerDecryption(ctx context.Context, obsDB *obskeyper
 
 func (kpr *Keyper) triggerDecryption(ctx context.Context, triggeredEvents []servicedatabase.IdentityRegisteredEvent) error {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+	serviceDB := servicedatabase.New(kpr.dbpool)
 
-	lastBlock := 0
-	identityPreimages := make([]identitypreimage.IdentityPreimage, 0)
+	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage, 0)
+	triggerBlocks := make(map[int64]int64)
 	for _, event := range triggeredEvents {
 		nextBlock := event.BlockNumber + 1
-
-		if lastBlock < int(nextBlock) {
-			lastBlock = int(nextBlock)
-		}
 
 		eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
 		if err != nil {
@@ -123,21 +129,48 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context, triggeredEvents []serv
 		var buf bytes.Buffer
 		buf.Write(event.IdentityPrefix)
 		buf.Write(sender.Bytes())
-		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(buf.Bytes()))
-	}
-	sortedIdentityPreimages := sortIdentityPreimages(identityPreimages)
 
-	trigger := epochkghandler.DecryptionTrigger{
-		BlockNumber:       uint64(lastBlock),
-		IdentityPreimages: sortedIdentityPreimages,
+		if identityPreimages[event.Eon] == nil {
+			identityPreimages[event.Eon] = make([]identitypreimage.IdentityPreimage, 0)
+		}
+		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(buf.Bytes()))
+
+		if triggerBlocks[event.Eon] < event.BlockNumber {
+			triggerBlocks[event.Eon] = event.BlockNumber
+		}
 	}
 
-	event := broker.NewEvent(&trigger)
-	log.Debug().
-		Uint64("block-number", uint64(lastBlock)).
-		Int("num-identities", len(trigger.IdentityPreimages)).
-		Msg("sending decryption trigger")
-	kpr.decryptionTriggerChannel <- event
+	for eon, preImages := range identityPreimages {
+		sortedIdentityPreimages := sortIdentityPreimages(preImages)
+		//TODO: need to update database here, for events - should be updated when decryption shares are sent or when decryption keys are received?
+		// and for decryption triggers, should we store them based on blocks and send triggers based on blocks?
+
+		err := serviceDB.SetCurrentDecryptionTrigger(ctx, servicedatabase.SetCurrentDecryptionTriggerParams{
+			Eon:             eon,
+			LastBlockNumber: triggerBlocks[eon],
+			IdentitiesHash:  computeIdentitiesHash(sortedIdentityPreimages),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to insert published decryption trigger into db")
+		}
+
+		trigger := epochkghandler.DecryptionTrigger{
+			// here we are taking last block available for the eon, to trigger decryption for all identities in that eon
+			BlockNumber:       uint64(triggerBlocks[eon]),
+			IdentityPreimages: sortedIdentityPreimages,
+		}
+		event := broker.NewEvent(&trigger)
+		log.Debug().
+			Uint64("block-number", uint64(triggerBlocks[eon])).
+			Int("num-identities", len(trigger.IdentityPreimages)).
+			Msg("sending decryption trigger")
+		kpr.decryptionTriggerChannel <- event
+	}
+
+	//TODO: can the decryption triggers here have different eons?? or do we need to separate eons based on triggers
+	//TODO: or do we separate by block numbers instead?
+	//TODO: what happens if the eon is changed in between these triggered events??
+
 	return nil
 }
 

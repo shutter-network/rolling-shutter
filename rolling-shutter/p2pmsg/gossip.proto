@@ -25,6 +25,10 @@ message GnosisDecryptionKeySharesExtra {
   bytes signature = 3;
 }
 
+message ShutterServiceDecryptionKeySharesExtra {
+  bytes signature = 3;
+}
+
 message OptimismDecryptionKeySharesExtra {}
 
 message DecryptionKeyShares {
@@ -35,6 +39,7 @@ message DecryptionKeyShares {
   oneof extra {
     GnosisDecryptionKeySharesExtra gnosis = 10;
     OptimismDecryptionKeySharesExtra optimism = 11;
+    ShutterServiceDecryptionKeySharesExtra service = 12;
   }
 }
 

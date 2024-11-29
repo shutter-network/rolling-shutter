@@ -9,19 +9,26 @@ import (
 	"context"
 )
 
+const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
+SELECT eon, last_block_number, identities_hash FROM current_decryption_trigger
+WHERE eon = $1
+`
+
+func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (CurrentDecryptionTrigger, error) {
+	row := q.db.QueryRow(ctx, getCurrentDecryptionTrigger, eon)
+	var i CurrentDecryptionTrigger
+	err := row.Scan(&i.Eon, &i.LastBlockNumber, &i.IdentitiesHash)
+	return i, err
+}
+
 const getIdentityRegisteredEventsSyncedUntil = `-- name: GetIdentityRegisteredEventsSyncedUntil :one
-SELECT enforce_one_row, block_hash, block_number, slot FROM identity_registered_events_synced_until LIMIT 1
+SELECT enforce_one_row, block_hash, block_number FROM identity_registered_events_synced_until LIMIT 1
 `
 
 func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (IdentityRegisteredEventsSyncedUntil, error) {
 	row := q.db.QueryRow(ctx, getIdentityRegisteredEventsSyncedUntil)
 	var i IdentityRegisteredEventsSyncedUntil
-	err := row.Scan(
-		&i.EnforceOneRow,
-		&i.BlockHash,
-		&i.BlockNumber,
-		&i.Slot,
-	)
+	err := row.Scan(&i.EnforceOneRow, &i.BlockHash, &i.BlockNumber)
 	return i, err
 }
 
@@ -60,4 +67,22 @@ func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, t
 		return nil, err
 	}
 	return items, nil
+}
+
+const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
+INSERT INTO current_decryption_trigger (eon, last_block_number, identities_hash)
+VALUES ($1, $2, $3)
+ON CONFLICT (eon, last_block_number) DO UPDATE
+SET last_block_number = $2, identities_hash = $3
+`
+
+type SetCurrentDecryptionTriggerParams struct {
+	Eon             int64
+	LastBlockNumber int64
+	IdentitiesHash  []byte
+}
+
+func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurrentDecryptionTriggerParams) error {
+	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger, arg.Eon, arg.LastBlockNumber, arg.IdentitiesHash)
+	return err
 }

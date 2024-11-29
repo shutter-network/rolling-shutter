@@ -19,5 +19,11 @@ CREATE TABLE identity_registered_event (
 CREATE TABLE identity_registered_events_synced_until(
     enforce_one_row bool PRIMARY KEY DEFAULT true,
     block_hash bytea NOT NULL,
-    block_number bigint NOT NULL CHECK (block_number >= 0),
+    block_number bigint NOT NULL CHECK (block_number >= 0)
+);
+
+CREATE TABLE current_decryption_trigger(
+    eon bigint PRIMARY KEY CHECK (eon >= 0),
+    last_block_number bigint NOT NULL CHECK (last_block_number >= 0),
+    identities_hash bytea NOT NULL
 );

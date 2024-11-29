@@ -69,6 +69,8 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
 	}
 	//TODO: need to add msg handlers
+	// messageSender.AddMessageHandler(&DecryptionKeySharesHandler{kpr.dbpool})
+	// messageSender.AddMessageHandler(&DecryptionKeysHandler{kpr.dbpool})
 	messagingMiddleware := NewMessagingMiddleware(messageSender, kpr.dbpool, kpr.config)
 
 	kpr.core, err = NewKeyper(kpr, messagingMiddleware)
