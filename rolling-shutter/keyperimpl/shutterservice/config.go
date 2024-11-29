@@ -37,6 +37,11 @@ type Config struct {
 	MaxNumKeysPerMessage uint64
 }
 
+func (c *Config) Validate() error {
+	//TODO: needs to be implemented
+	return nil
+}
+
 func (c *Config) Name() string {
 	return "shutterservice"
 }
