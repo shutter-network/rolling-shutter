@@ -43,7 +43,8 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	}
 
 	monitor := &gnosis.SyncMonitor{
-		DBPool: dbpool,
+		DBPool:        dbpool,
+		CheckInterval: 30 * time.Second,
 	}
 
 	errCh := make(chan error, 1)

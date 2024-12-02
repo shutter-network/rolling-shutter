@@ -12,12 +12,9 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
-const (
-	checkInterval = 30 * time.Second
-)
-
 type SyncMonitor struct {
-	DBPool *pgxpool.Pool
+	DBPool        *pgxpool.Pool
+	CheckInterval time.Duration
 }
 
 func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
@@ -32,9 +29,11 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 	var lastBlockNumber int64
 	db := database.New(s.DBPool)
 
+	log.Debug().Msg("starting the sync monitor")
+
 	for {
 		select {
-		case <-time.After(checkInterval):
+		case <-time.After(s.CheckInterval):
 			record, err := db.GetTransactionSubmittedEventsSyncedUntil(ctx)
 			if err != nil {
 				log.Warn().Err(err).Msg("error fetching block number")

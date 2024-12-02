@@ -15,6 +15,9 @@ CustomBootstrapAddresses = ['/ip4/127.0.0.1/tcp/2001/p2p/12D3KooWMyutShWdqYj7fre
 Environment = "local"
 DiscoveryNamespace = "shutter-42"
 
+[P2P.FloodSubDiscovery]
+enabled = false
+
 [Gnosis]
 EncryptedGasLimit = 1000000
 MinGasPerTransaction = 21000
@@ -23,6 +26,7 @@ SecondsPerSlot = 5
 SlotsPerEpoch = 16
 GenesisSlotTimestamp = 1665396300
 SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 30
 
 [Gnosis.Node]
 PrivateKey = 'a4e901b1df81ff8fc5fa77f5bf0c15a4c8410e85fcaf19fbec47a2241b9d65d6'
