@@ -2,9 +2,9 @@ package gnosis
 
 import (
 	"context"
-	"github.com/jackc/pgx/v4"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -36,7 +36,6 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 		select {
 		case <-time.After(s.CheckInterval):
 			record, err := db.GetTransactionSubmittedEventsSyncedUntil(ctx)
-
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					log.Warn().Err(err).Msg("no rows found in table transaction_submitted_events_synced_until")
