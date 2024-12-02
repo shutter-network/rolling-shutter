@@ -34,7 +34,7 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 
 	monitor := &gnosis.SyncMonitor{
 		DBPool:        dbpool,
-		CheckInterval: 30 * time.Second,
+		CheckInterval: 5 * time.Second,
 	}
 
 	errCh := make(chan error, 1)
@@ -46,7 +46,7 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(80 * time.Second)
+	time.Sleep(12 * time.Second)
 
 	select {
 	case err := <-errCh:
@@ -76,7 +76,7 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 
 	monitor := &gnosis.SyncMonitor{
 		DBPool:        dbpool,
-		CheckInterval: 30 * time.Second,
+		CheckInterval: 5 * time.Second,
 	}
 
 	_, deferFn := service.RunBackground(ctx, monitor)
@@ -96,7 +96,7 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 				return
 			}
 
-			time.Sleep(30 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 
 		doneCh <- struct{}{}
