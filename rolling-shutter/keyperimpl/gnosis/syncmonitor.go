@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"github.com/jackc/pgx/v4"
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -35,9 +36,13 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 		select {
 		case <-time.After(s.CheckInterval):
 			record, err := db.GetTransactionSubmittedEventsSyncedUntil(ctx)
+
 			if err != nil {
-				log.Warn().Err(err).Msg("error fetching block number")
-				continue
+				if errors.Is(err, pgx.ErrNoRows) {
+					log.Warn().Err(err).Msg("no rows found in table transaction_submitted_events_synced_until")
+					continue
+				}
+				return errors.Wrap(err, "error getting transaction_submitted_events_synced_until")
 			}
 
 			currentBlockNumber := record.BlockNumber

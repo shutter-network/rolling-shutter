@@ -147,3 +147,51 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 
 	assert.Equal(t, initialBlockNumber+5, finalBlockNumber, "block number should have been incremented correctly")
 }
+
+func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
+	parentCtx, cancelParent := context.WithCancel(context.Background())
+	defer cancelParent()
+
+	dbpool, closeDB := testsetup.NewTestDBPool(parentCtx, t, database.Definition)
+	defer func() {
+		closeDB()
+		cancelParent()
+	}()
+
+	_, err := dbpool.Exec(parentCtx, `
+    CREATE TABLE IF NOT EXISTS transaction_submitted_events_synced_until(
+        enforce_one_row bool PRIMARY KEY DEFAULT true,
+        block_hash bytea NOT NULL,
+        block_number bigint NOT NULL CHECK (block_number >= 0),
+        slot bigint NOT NULL CHECK (slot >= 0)
+    );
+    `)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	monitor := &gnosis.SyncMonitor{
+		DBPool:        dbpool,
+		CheckInterval: 5 * time.Second,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(parentCtx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	time.Sleep(15 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+}
