@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -126,6 +127,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 			continue
 		}
 
+		//TODO: may need to change this if we want to create identity other way
 		sender, err := shdb.DecodeAddress(event.Sender)
 		if err != nil {
 			log.Warn().
@@ -139,7 +141,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 		if identityPreimages[event.Eon] == nil {
 			identityPreimages[event.Eon] = make([]identitypreimage.IdentityPreimage, 0)
 		}
-		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(buf.Bytes()))
+		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(crypto.Keccak256(buf.Bytes())))
 
 		if lastEonBlock[event.Eon] < event.BlockNumber {
 			lastEonBlock[event.Eon] = event.BlockNumber

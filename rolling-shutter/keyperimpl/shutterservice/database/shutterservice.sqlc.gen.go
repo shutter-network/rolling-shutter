@@ -7,7 +7,18 @@ package database
 
 import (
 	"context"
+
+	"github.com/jackc/pgconn"
 )
+
+const deleteIdentityRegisteredEventsFromBlockNumber = `-- name: DeleteIdentityRegisteredEventsFromBlockNumber :exec
+DELETE FROM identity_registered_event WHERE block_number >= $1
+`
+
+func (q *Queries) DeleteIdentityRegisteredEventsFromBlockNumber(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, deleteIdentityRegisteredEventsFromBlockNumber, blockNumber)
+	return err
+}
 
 const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
 SELECT eon, triggered_block_number, identities_hash FROM current_decryption_trigger
@@ -135,6 +146,51 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 	return err
 }
 
+const insertIdentityRegisteredEvent = `-- name: InsertIdentityRegisteredEvent :execresult
+INSERT INTO identity_registered_event (
+    block_number,
+    block_hash,
+    tx_index,
+    log_index,
+    eon,
+    identity_prefix,
+    sender,
+    timestamp
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (eon, identity_prefix) DO UPDATE SET
+block_number = $1,
+block_hash = $2,
+tx_index = $3,
+log_index = $4,
+sender = $7,
+timestamp = $8
+`
+
+type InsertIdentityRegisteredEventParams struct {
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	Eon            int64
+	IdentityPrefix []byte
+	Sender         string
+	Timestamp      int64
+}
+
+func (q *Queries) InsertIdentityRegisteredEvent(ctx context.Context, arg InsertIdentityRegisteredEventParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertIdentityRegisteredEvent,
+		arg.BlockNumber,
+		arg.BlockHash,
+		arg.TxIndex,
+		arg.LogIndex,
+		arg.Eon,
+		arg.IdentityPrefix,
+		arg.Sender,
+		arg.Timestamp,
+	)
+}
+
 const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
 INSERT INTO current_decryption_trigger (eon, triggered_block_number, identities_hash)
 VALUES ($1, $2, $3)
@@ -150,6 +206,22 @@ type SetCurrentDecryptionTriggerParams struct {
 
 func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurrentDecryptionTriggerParams) error {
 	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger, arg.Eon, arg.TriggeredBlockNumber, arg.IdentitiesHash)
+	return err
+}
+
+const setIdentityRegisteredEventSyncedUntil = `-- name: SetIdentityRegisteredEventSyncedUntil :exec
+INSERT INTO identity_registered_events_synced_until (block_hash, block_number) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_hash = $1, block_number = $2
+`
+
+type SetIdentityRegisteredEventSyncedUntilParams struct {
+	BlockHash   []byte
+	BlockNumber int64
+}
+
+func (q *Queries) SetIdentityRegisteredEventSyncedUntil(ctx context.Context, arg SetIdentityRegisteredEventSyncedUntilParams) error {
+	_, err := q.db.Exec(ctx, setIdentityRegisteredEventSyncedUntil, arg.BlockHash, arg.BlockNumber)
 	return err
 }
 

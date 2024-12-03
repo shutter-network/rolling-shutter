@@ -3,12 +3,12 @@ package shutterservice
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -149,14 +149,14 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 		Str("contract-address", kpr.config.Chain.Contracts.KeyperSetManager.Hex()).
 		Msg("initializing registry syncer")
 
-	// contract, err := sequencerBindings.NewSequencer(kpr.config.Chain.Contracts.ShutterRegistry, client)
-	// if err != nil {
-	// 	return err
-	// }
+	contract, err := registryBindings.NewShutterregistry(kpr.config.Chain.Contracts.ShutterRegistry, client)
+	if err != nil {
+		return err
+	}
 
-	//TODO: initialise with registry abi bindings
+	//TODO: need to update go module after contract is finalised
 	kpr.registrySyncer = &RegistrySyncer{
-		Contract:             common.Address{},
+		Contract:             contract,
 		DBPool:               kpr.dbpool,
 		ExecutionClient:      client,
 		SyncStartBlockNumber: kpr.config.Chain.SyncStartBlockNumber,
