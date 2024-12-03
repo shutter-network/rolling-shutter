@@ -20,6 +20,7 @@ func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Shuttermint = kprconfig.NewShuttermintConfig()
 	c.Metrics = metricsserver.NewConfig()
+	c.Chain = NewChainConfig()
 }
 
 type Config struct {
@@ -131,7 +132,7 @@ func NewContractsConfig() *ContractsConfig {
 func (c *ContractsConfig) Init() {}
 
 func (c *ContractsConfig) Name() string {
-	return "shutterservicecontracts"
+	return "contracts"
 }
 
 func (c *ContractsConfig) Validate() error {
