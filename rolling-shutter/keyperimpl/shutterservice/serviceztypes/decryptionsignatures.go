@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 )
@@ -49,4 +50,17 @@ func (d *DecryptionSignatureData) ComputeSignature(key *ecdsa.PrivateKey) ([]byt
 		return nil, errors.Wrap(err, "failed to compute hash tree root of slot decryption signature data")
 	}
 	return crypto.Sign(h[:], key)
+}
+
+func (d *DecryptionSignatureData) CheckSignature(signature []byte, address common.Address) (bool, error) {
+	h, err := d.HashTreeRoot()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to compute hash tree root of slot decryption signature data")
+	}
+	signerPubkey, err := crypto.SigToPub(h[:], signature)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to recover public key from slot decryption signature")
+	}
+	signerAddress := crypto.PubkeyToAddress(*signerPubkey)
+	return signerAddress == address, nil
 }
