@@ -152,3 +152,21 @@ func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurren
 	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger, arg.Eon, arg.TriggeredBlockNumber, arg.IdentitiesHash)
 	return err
 }
+
+const updateDecryptedFlag = `-- name: UpdateDecryptedFlag :exec
+UPDATE identity_registered_event
+SET decrypted = TRUE
+WHERE (eon, identity_prefix) IN (
+    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
+)
+`
+
+type UpdateDecryptedFlagParams struct {
+	Column1 []int64
+	Column2 [][]byte
+}
+
+func (q *Queries) UpdateDecryptedFlag(ctx context.Context, arg UpdateDecryptedFlagParams) error {
+	_, err := q.db.Exec(ctx, updateDecryptedFlag, arg.Column1, arg.Column2)
+	return err
+}

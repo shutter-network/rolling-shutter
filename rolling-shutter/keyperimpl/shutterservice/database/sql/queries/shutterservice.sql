@@ -26,3 +26,10 @@ SELECT * FROM decryption_signatures
 WHERE eon = $1 AND identities_hash = $2
 ORDER BY keyper_index ASC
 LIMIT $3;
+
+-- name: UpdateDecryptedFlag :exec
+UPDATE identity_registered_event
+SET decrypted = TRUE
+WHERE (eon, identity_prefix) IN (
+    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
+);

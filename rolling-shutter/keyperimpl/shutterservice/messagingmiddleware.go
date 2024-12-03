@@ -177,7 +177,6 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	originalMsg *p2pmsg.DecryptionKeys,
 ) (p2pmsg.Message, error) {
 	//TODO: update flag in event table to notify the decryption is already done
-	//TODO: do we need to store the signature on p2p message in db??
 	if originalMsg.Extra != nil {
 		return originalMsg, nil
 	}
@@ -231,6 +230,22 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		Signature:     signaturesCum,
 	}
 	msg.Extra = &p2pmsg.DecryptionKeys_Service{Service: extra}
+
+	column1 := make([]int64, 0)
+	column2 := make([][]byte, 0)
+	for _, key := range originalMsg.Keys {
+		column1 = append(column1, int64(originalMsg.Eon))
+		column2 = append(column2, key.IdentityPreimage)
+	}
+	err = serviceDB.UpdateDecryptedFlag(ctx, database.UpdateDecryptedFlagParams{
+		Column1: column1,
+		Column2: column2,
+	})
+	if err != nil {
+		log.Warn().
+			Msg("failed to update events for decryption keys released")
+		return nil, nil
+	}
 
 	log.Info().
 		Uint64("eon", originalMsg.Eon).
