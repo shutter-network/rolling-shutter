@@ -7,9 +7,16 @@ package database
 import ()
 
 type CurrentDecryptionTrigger struct {
-	Eon             int64
-	LastBlockNumber int64
-	IdentitiesHash  []byte
+	Eon                  int64
+	TriggeredBlockNumber int64
+	IdentitiesHash       []byte
+}
+
+type DecryptionSignature struct {
+	Eon            int64
+	KeyperIndex    int64
+	IdentitiesHash []byte
+	Signature      []byte
 }
 
 type IdentityRegisteredEvent struct {

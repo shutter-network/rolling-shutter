@@ -24,6 +24,14 @@ CREATE TABLE identity_registered_events_synced_until(
 
 CREATE TABLE current_decryption_trigger(
     eon bigint PRIMARY KEY CHECK (eon >= 0),
-    last_block_number bigint NOT NULL CHECK (last_block_number >= 0),
+    triggered_block_number bigint NOT NULL CHECK (triggered_block_number >= 0),
     identities_hash bytea NOT NULL
+);
+
+CREATE TABLE decryption_signatures(
+    eon bigint NOT NULL CHECK (eon >= 0),
+    keyper_index bigint NOT NULL,
+    identities_hash bytea NOT NULL,
+    signature bytea NOT NULL,
+    PRIMARY KEY (eon, keyper_index)
 );

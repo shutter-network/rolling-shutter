@@ -44,7 +44,10 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	fmt.Println("--------------")
 
 	serviceDB := servicedatabase.New(kpr.dbpool)
-	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx, int64(*lastTriggeredTime))
+	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx, servicedatabase.GetNotDecryptedIdentityRegisteredEventsParams{
+		Timestamp:   int64(*lastTriggeredTime),
+		Timestamp_2: int64(block.Header.Time),
+	})
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
 		// That's because non-keypers don't sync identity registered events. TODO: this needs to be implemented
@@ -59,7 +62,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		}
 	}
 
-	return kpr.triggerDecryption(ctx, eventsToDecrypt)
+	return kpr.triggerDecryption(ctx, eventsToDecrypt, block)
 }
 
 func (kpr *Keyper) shouldTriggerDecryption(
@@ -97,12 +100,15 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	return true
 }
 
-func (kpr *Keyper) triggerDecryption(ctx context.Context, triggeredEvents []servicedatabase.IdentityRegisteredEvent) error {
+func (kpr *Keyper) triggerDecryption(ctx context.Context,
+	triggeredEvents []servicedatabase.IdentityRegisteredEvent,
+	triggeredBlock *syncevent.LatestBlock,
+) error {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 	serviceDB := servicedatabase.New(kpr.dbpool)
 
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage, 0)
-	triggerBlocks := make(map[int64]int64)
+	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
 		nextBlock := event.BlockNumber + 1
 
@@ -135,41 +141,36 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context, triggeredEvents []serv
 		}
 		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(buf.Bytes()))
 
-		if triggerBlocks[event.Eon] < event.BlockNumber {
-			triggerBlocks[event.Eon] = event.BlockNumber
+		if lastEonBlock[event.Eon] < event.BlockNumber {
+			lastEonBlock[event.Eon] = event.BlockNumber
 		}
 	}
 
 	for eon, preImages := range identityPreimages {
 		sortedIdentityPreimages := sortIdentityPreimages(preImages)
-		//TODO: need to update database here, for events - should be updated when decryption shares are sent or when decryption keys are received?
-		// and for decryption triggers, should we store them based on blocks and send triggers based on blocks?
 
 		err := serviceDB.SetCurrentDecryptionTrigger(ctx, servicedatabase.SetCurrentDecryptionTriggerParams{
-			Eon:             eon,
-			LastBlockNumber: triggerBlocks[eon],
-			IdentitiesHash:  computeIdentitiesHash(sortedIdentityPreimages),
+			Eon:                  eon,
+			TriggeredBlockNumber: triggeredBlock.Number.Int64(),
+			IdentitiesHash:       computeIdentitiesHash(sortedIdentityPreimages),
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to insert published decryption trigger into db")
 		}
 
 		trigger := epochkghandler.DecryptionTrigger{
-			// here we are taking last block available for the eon, to trigger decryption for all identities in that eon
-			BlockNumber:       uint64(triggerBlocks[eon]),
+			// sending last block available for that eon as the key shares will be generated based on the eon associated with this block number
+			BlockNumber:       uint64(lastEonBlock[eon]),
 			IdentityPreimages: sortedIdentityPreimages,
 		}
+
 		event := broker.NewEvent(&trigger)
 		log.Debug().
-			Uint64("block-number", uint64(triggerBlocks[eon])).
+			Uint64("block-number", uint64(lastEonBlock[eon])).
 			Int("num-identities", len(trigger.IdentityPreimages)).
 			Msg("sending decryption trigger")
 		kpr.decryptionTriggerChannel <- event
 	}
-
-	//TODO: can the decryption triggers here have different eons?? or do we need to separate eons based on triggers
-	//TODO: or do we separate by block numbers instead?
-	//TODO: what happens if the eon is changed in between these triggered events??
 
 	return nil
 }

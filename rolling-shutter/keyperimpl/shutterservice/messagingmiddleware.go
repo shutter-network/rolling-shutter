@@ -9,6 +9,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/serviceztypes"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
@@ -103,9 +104,6 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 ) (p2pmsg.Message, error) {
 	queries := database.New(i.dbpool)
 
-	//TODO: if we need to store decryption triggers then we need to check them here
-	//TODO: what all things should we need in extras here?
-
 	currentDecryptionTrigger, err := queries.GetCurrentDecryptionTrigger(ctx, int64(originalMsg.Eon))
 	if err == pgx.ErrNoRows {
 		log.Warn().
@@ -122,6 +120,8 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 			Msg("intercepted decryption key shares message with unexpected eon")
 		return nil, nil
 	}
+	//TODO: this could also fail and can result into not generating key shares, needs to be tested thoroughly
+	//TODO: we might need triggered block in the decryptionTrigger if this scenario does not work
 	identitiesHash := computeIdentitiesHashFromShares(originalMsg.Shares)
 	if !bytes.Equal(identitiesHash, currentDecryptionTrigger.IdentitiesHash) {
 		log.Warn().
@@ -150,6 +150,20 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 		return nil, errors.Wrapf(err, "failed to compute decryption signature")
 	}
 
+	err = queries.InsertDecryptionSignature(ctx, database.InsertDecryptionSignatureParams{
+		Eon:            int64(originalMsg.Eon),
+		KeyperIndex:    int64(originalMsg.KeyperIndex),
+		IdentitiesHash: identitiesHash,
+		Signature:      signature,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err,
+			"failed to insert decryption signature for eon %d and keyperIndex %d",
+			originalMsg.Eon,
+			originalMsg.KeyperIndex,
+		)
+	}
+
 	extra := &p2pmsg.ShutterServiceDecryptionKeySharesExtra{
 		Signature: signature,
 	}
@@ -163,10 +177,66 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	originalMsg *p2pmsg.DecryptionKeys,
 ) (p2pmsg.Message, error) {
 	//TODO: update flag in event table to notify the decryption is already done
+	//TODO: do we need to store the signature on p2p message in db??
 	if originalMsg.Extra != nil {
 		return originalMsg, nil
 	}
 
-	//TODO: needs to be implemented
-	return nil, nil
+	serviceDB := database.New(i.dbpool)
+	obsKeyperDB := obskeyperdatabase.New(i.dbpool)
+	trigger, err := serviceDB.GetCurrentDecryptionTrigger(ctx, int64(originalMsg.Eon))
+	if err == pgx.ErrNoRows {
+		log.Warn().
+			Uint64("eon", originalMsg.Eon).
+			Msg("unknown decryption trigger for intercepted keys message")
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get current decryption trigger for eon %d", originalMsg.Eon)
+	}
+
+	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(originalMsg.Eon))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get keyper set from database for eon %d", originalMsg.Eon)
+	}
+
+	signatures, err := serviceDB.GetDecryptionSignatures(ctx, database.GetDecryptionSignaturesParams{
+		Eon:            int64(originalMsg.Eon),
+		IdentitiesHash: trigger.IdentitiesHash,
+		Limit:          keyperSet.Threshold,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to count decryption signatures for eon %d and keyperConfigIndex %d", originalMsg.Eon, keyperSet.KeyperConfigIndex)
+	}
+
+	if len(signatures) < int(keyperSet.Threshold) {
+		log.Debug().
+			Uint64("eon", originalMsg.Eon).
+			Hex("identities-hash", trigger.IdentitiesHash).
+			Int32("threshold", keyperSet.Threshold).
+			Int("num-signatures", len(signatures)).
+			Msg("dropping intercepted keys message as signature count is not high enough yet")
+		return nil, nil
+	}
+
+	signerIndices := []uint64{}
+	signaturesCum := [][]byte{}
+	for _, signature := range signatures {
+		signerIndices = append(signerIndices, uint64(signature.KeyperIndex))
+		signaturesCum = append(signaturesCum, signature.Signature)
+	}
+	msg := proto.Clone(originalMsg).(*p2pmsg.DecryptionKeys)
+	extra := &p2pmsg.ShutterServiceDecryptionKeysExtra{
+		SignerIndices: signerIndices,
+		Signature:     signaturesCum,
+	}
+	msg.Extra = &p2pmsg.DecryptionKeys_Service{Service: extra}
+
+	log.Info().
+		Uint64("eon", originalMsg.Eon).
+		Hex("identities-hash", trigger.IdentitiesHash).
+		Int("num-signatures", len(signatures)).
+		Int("num-keys", len(msg.Keys)).
+		Msg("sending keys")
+	return msg, nil
 }

@@ -10,15 +10,53 @@ import (
 )
 
 const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
-SELECT eon, last_block_number, identities_hash FROM current_decryption_trigger
+SELECT eon, triggered_block_number, identities_hash FROM current_decryption_trigger
 WHERE eon = $1
 `
 
 func (q *Queries) GetCurrentDecryptionTrigger(ctx context.Context, eon int64) (CurrentDecryptionTrigger, error) {
 	row := q.db.QueryRow(ctx, getCurrentDecryptionTrigger, eon)
 	var i CurrentDecryptionTrigger
-	err := row.Scan(&i.Eon, &i.LastBlockNumber, &i.IdentitiesHash)
+	err := row.Scan(&i.Eon, &i.TriggeredBlockNumber, &i.IdentitiesHash)
 	return i, err
+}
+
+const getDecryptionSignatures = `-- name: GetDecryptionSignatures :many
+SELECT eon, keyper_index, identities_hash, signature FROM decryption_signatures
+WHERE eon = $1 AND identities_hash = $2
+ORDER BY keyper_index ASC
+LIMIT $3
+`
+
+type GetDecryptionSignaturesParams struct {
+	Eon            int64
+	IdentitiesHash []byte
+	Limit          int32
+}
+
+func (q *Queries) GetDecryptionSignatures(ctx context.Context, arg GetDecryptionSignaturesParams) ([]DecryptionSignature, error) {
+	rows, err := q.db.Query(ctx, getDecryptionSignatures, arg.Eon, arg.IdentitiesHash, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DecryptionSignature
+	for rows.Next() {
+		var i DecryptionSignature
+		if err := rows.Scan(
+			&i.Eon,
+			&i.KeyperIndex,
+			&i.IdentitiesHash,
+			&i.Signature,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getIdentityRegisteredEventsSyncedUntil = `-- name: GetIdentityRegisteredEventsSyncedUntil :one
@@ -34,12 +72,17 @@ func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (I
 
 const getNotDecryptedIdentityRegisteredEvents = `-- name: GetNotDecryptedIdentityRegisteredEvents :many
 SELECT index, block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted FROM identity_registered_event
-WHERE timestamp >= $1
+WHERE timestamp >= $1 AND timestamp <= $2
 ORDER BY index ASC
 `
 
-func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, timestamp int64) ([]IdentityRegisteredEvent, error) {
-	rows, err := q.db.Query(ctx, getNotDecryptedIdentityRegisteredEvents, timestamp)
+type GetNotDecryptedIdentityRegisteredEventsParams struct {
+	Timestamp   int64
+	Timestamp_2 int64
+}
+
+func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, arg GetNotDecryptedIdentityRegisteredEventsParams) ([]IdentityRegisteredEvent, error) {
+	rows, err := q.db.Query(ctx, getNotDecryptedIdentityRegisteredEvents, arg.Timestamp, arg.Timestamp_2)
 	if err != nil {
 		return nil, err
 	}
@@ -69,20 +112,43 @@ func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, t
 	return items, nil
 }
 
+const insertDecryptionSignature = `-- name: InsertDecryptionSignature :exec
+INSERT INTO decryption_signatures (eon, keyper_index, identities_hash, signature)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDecryptionSignatureParams struct {
+	Eon            int64
+	KeyperIndex    int64
+	IdentitiesHash []byte
+	Signature      []byte
+}
+
+func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecryptionSignatureParams) error {
+	_, err := q.db.Exec(ctx, insertDecryptionSignature,
+		arg.Eon,
+		arg.KeyperIndex,
+		arg.IdentitiesHash,
+		arg.Signature,
+	)
+	return err
+}
+
 const setCurrentDecryptionTrigger = `-- name: SetCurrentDecryptionTrigger :exec
-INSERT INTO current_decryption_trigger (eon, last_block_number, identities_hash)
+INSERT INTO current_decryption_trigger (eon, triggered_block_number, identities_hash)
 VALUES ($1, $2, $3)
-ON CONFLICT (eon, last_block_number) DO UPDATE
-SET last_block_number = $2, identities_hash = $3
+ON CONFLICT (eon, triggered_block_number) DO UPDATE
+SET triggered_block_number = $2, identities_hash = $3
 `
 
 type SetCurrentDecryptionTriggerParams struct {
-	Eon             int64
-	LastBlockNumber int64
-	IdentitiesHash  []byte
+	Eon                  int64
+	TriggeredBlockNumber int64
+	IdentitiesHash       []byte
 }
 
 func (q *Queries) SetCurrentDecryptionTrigger(ctx context.Context, arg SetCurrentDecryptionTriggerParams) error {
-	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger, arg.Eon, arg.LastBlockNumber, arg.IdentitiesHash)
+	_, err := q.db.Exec(ctx, setCurrentDecryptionTrigger, arg.Eon, arg.TriggeredBlockNumber, arg.IdentitiesHash)
 	return err
 }
