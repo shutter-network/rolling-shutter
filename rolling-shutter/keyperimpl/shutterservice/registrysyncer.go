@@ -125,7 +125,7 @@ func (s *RegistrySyncer) Sync(ctx context.Context, header *types.Header) error {
 	queries := database.New(s.DBPool)
 	syncedUntil, err := queries.GetIdentityRegisteredEventsSyncedUntil(ctx)
 	if err != nil && err != pgx.ErrNoRows {
-		return errors.Wrap(err, "failed to query transaction submitted events sync status")
+		return errors.Wrap(err, "failed to query identity registered events sync status")
 	}
 	var start uint64
 	if err == pgx.ErrNoRows {
@@ -194,7 +194,7 @@ func (s *RegistrySyncer) fetchEvents(
 	}
 	it, err := s.Contract.ShutterregistryFilterer.FilterIdentityRegistered(&opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query transaction submitted events")
+		return nil, errors.Wrap(err, "failed to query identity registered events")
 	}
 	events := []*registryBindings.ShutterregistryIdentityRegistered{}
 	for it.Next() {
