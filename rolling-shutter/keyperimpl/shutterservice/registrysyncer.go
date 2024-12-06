@@ -25,7 +25,7 @@ const (
 )
 
 type RegistrySyncer struct {
-	Contract             *registryBindings.Shutterregistry //TODO: need to be changed to contract binding
+	Contract             *registryBindings.Shutterregistry
 	DBPool               *pgxpool.Pool
 	ExecutionClient      *ethclient.Client
 	SyncStartBlockNumber uint64

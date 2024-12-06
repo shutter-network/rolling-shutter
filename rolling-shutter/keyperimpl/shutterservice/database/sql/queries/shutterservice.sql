@@ -1,6 +1,6 @@
 -- name: GetNotDecryptedIdentityRegisteredEvents :many
 SELECT * FROM identity_registered_event
-WHERE timestamp >= $1 AND timestamp <= $2
+WHERE timestamp >= $1 AND timestamp <= $2 AND decrypted = false
 ORDER BY index ASC;
 
 -- name: GetIdentityRegisteredEventsSyncedUntil :one

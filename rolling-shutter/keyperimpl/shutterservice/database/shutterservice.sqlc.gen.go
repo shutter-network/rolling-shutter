@@ -83,7 +83,7 @@ func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (I
 
 const getNotDecryptedIdentityRegisteredEvents = `-- name: GetNotDecryptedIdentityRegisteredEvents :many
 SELECT index, block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted FROM identity_registered_event
-WHERE timestamp >= $1 AND timestamp <= $2
+WHERE timestamp >= $1 AND timestamp <= $2 AND decrypted = false
 ORDER BY index ASC
 `
 
