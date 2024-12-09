@@ -1,7 +1,7 @@
 -- name: GetNotDecryptedIdentityRegisteredEvents :many
 SELECT * FROM identity_registered_event
 WHERE timestamp >= $1 AND timestamp <= $2 AND decrypted = false
-ORDER BY index ASC;
+ORDER BY timestamp ASC;
 
 -- name: GetIdentityRegisteredEventsSyncedUntil :one
 SELECT * FROM identity_registered_events_synced_until LIMIT 1;
@@ -46,7 +46,7 @@ INSERT INTO identity_registered_event (
     timestamp
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT (eon, identity_prefix) DO UPDATE SET
+ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
