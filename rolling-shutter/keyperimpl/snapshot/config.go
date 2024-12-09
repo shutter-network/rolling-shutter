@@ -46,7 +46,7 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Name() string {
-	return "keyper"
+	return "snapshot"
 }
 
 func (c *Config) SetDefaultValues() error {
