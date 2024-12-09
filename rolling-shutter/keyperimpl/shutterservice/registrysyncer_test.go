@@ -13,7 +13,7 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestFilterIdentityRegisteredEvent(t *testing.T) {
+func TestFilterIdentityRegisteredEvents(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

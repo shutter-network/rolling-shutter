@@ -3,7 +3,6 @@
 -- the schema. We'll use this to check we're using the right schema.
 
 CREATE TABLE identity_registered_event (
-    index bigint CHECK (index >= 0),
     block_number bigint NOT NULL CHECK (block_number >= 0),
     block_hash bytea NOT NULL,
     tx_index bigint NOT NULL CHECK (tx_index >= 0),
@@ -12,8 +11,8 @@ CREATE TABLE identity_registered_event (
     identity_prefix bytea NOT NULL,
     sender text NOT NULL,
     timestamp bigint NOT NULL,
-    decrypted boolean NOT NULL,
-    PRIMARY KEY (index, eon)
+    decrypted boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (identity_prefix, sender)
 );
 
 CREATE TABLE identity_registered_events_synced_until(
