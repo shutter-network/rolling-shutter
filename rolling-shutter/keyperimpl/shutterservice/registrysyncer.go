@@ -69,7 +69,7 @@ func (s *RegistrySyncer) resetSyncStatus(ctx context.Context, numReorgedBlocks i
 
 		err = queries.DeleteIdentityRegisteredEventsFromBlockNumber(ctx, deleteFromInclusive)
 		if err != nil {
-			return errors.Wrap(err, "failed to delete transaction submitted events from db")
+			return errors.Wrap(err, "failed to delete identity registered events from db")
 		}
 		// Currently, we don't have enough information in the db to populate block hash.
 		// However, using default values here is fine since the syncer is expected to resync
@@ -86,7 +86,7 @@ func (s *RegistrySyncer) resetSyncStatus(ctx context.Context, numReorgedBlocks i
 			BlockNumber: newSyncedUntilBlockNumber,
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to reset transaction submitted event sync status in db")
+			return errors.Wrap(err, "failed to reset identity registered event sync status in db")
 		}
 		log.Info().
 			Int("depth", numReorgedBlocks).
@@ -201,7 +201,7 @@ func (s *RegistrySyncer) fetchEvents(
 		events = append(events, it.Event)
 	}
 	if it.Error() != nil {
-		return nil, errors.Wrap(it.Error(), "failed to iterate transaction submitted events")
+		return nil, errors.Wrap(it.Error(), "failed to iterate identity registered events")
 	}
 	return events, nil
 }
@@ -218,7 +218,7 @@ func (s *RegistrySyncer) filterEvents(
 				Str("block-hash", event.Raw.BlockHash.Hex()).
 				Uint("tx-index", event.Raw.TxIndex).
 				Uint("log-index", event.Raw.Index).
-				Msg("ignoring transaction submitted event with high eon")
+				Msg("ignoring identity registered event with high eon")
 			continue
 		}
 		filteredEvents = append(filteredEvents, event)
