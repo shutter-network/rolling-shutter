@@ -245,7 +245,7 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Timestamp:      int64(event.Timestamp),
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to insert transaction submitted event into db")
+			return errors.Wrap(err, "failed to insert identity registered event into db")
 		}
 		log.Debug().
 			Uint64("block", event.Raw.BlockNumber).
