@@ -11,7 +11,7 @@ import (
 )
 
 type IdentityPreimage struct {
-	Bytes []byte `ssz-size:"52"`
+	Bytes []byte `ssz-size:"32"`
 }
 
 type DecryptionSignatureData struct {
@@ -47,7 +47,7 @@ func NewDecryptionSignatureData(
 func (d *DecryptionSignatureData) ComputeSignature(key *ecdsa.PrivateKey) ([]byte, error) {
 	h, err := d.HashTreeRoot()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compute hash tree root of slot decryption signature data")
+		return nil, errors.Wrap(err, "failed to compute hash tree root of decryption signature data")
 	}
 	return crypto.Sign(h[:], key)
 }
@@ -55,11 +55,11 @@ func (d *DecryptionSignatureData) ComputeSignature(key *ecdsa.PrivateKey) ([]byt
 func (d *DecryptionSignatureData) CheckSignature(signature []byte, address common.Address) (bool, error) {
 	h, err := d.HashTreeRoot()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to compute hash tree root of slot decryption signature data")
+		return false, errors.Wrap(err, "failed to compute hash tree root of decryption signature data")
 	}
 	signerPubkey, err := crypto.SigToPub(h[:], signature)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to recover public key from slot decryption signature")
+		return false, errors.Wrap(err, "failed to recover public key from decryption signature")
 	}
 	signerAddress := crypto.PubkeyToAddress(*signerPubkey)
 	return signerAddress == address, nil
