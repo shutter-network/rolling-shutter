@@ -89,7 +89,7 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	}
 
 	if err != nil {
-		log.Warn().Msgf("%w | failed to query keyper set for block %d", err, nextBlock)
+		log.Err(err).Msgf("failed to query keyper set for block %d", nextBlock)
 		return false
 	}
 	// don't trigger if we're not part of the keyper set
