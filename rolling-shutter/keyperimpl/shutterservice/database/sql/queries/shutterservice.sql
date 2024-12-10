@@ -14,7 +14,7 @@ SET triggered_block_number = $2, identities_hash = $3;
 
 -- name: GetCurrentDecryptionTrigger :one
 SELECT * FROM current_decryption_trigger
-WHERE eon = $1;
+WHERE eon = $1 ORDER BY triggered_block_number DESC LIMIT 1;
 
 -- name: InsertDecryptionSignature :exec
 INSERT INTO decryption_signatures (eon, keyper_index, identities_hash, signature)

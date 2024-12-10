@@ -75,7 +75,7 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	event servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
 ) bool {
-	nextBlock := event.BlockNumber + 1
+	nextBlock := triggeredBlock.Number.Int64()
 	keyperSet, err := obsDB.GetKeyperSet(ctx, nextBlock)
 	if err == pgx.ErrNoRows {
 		log.Info().
@@ -84,7 +84,7 @@ func (kpr *Keyper) shouldTriggerDecryption(
 		return false
 	}
 
-	if event.Timestamp <= int64(triggeredBlock.Header.Time) {
+	if event.Timestamp >= int64(triggeredBlock.Header.Time) {
 		return false
 	}
 
@@ -114,7 +114,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage, 0)
 	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
-		nextBlock := event.BlockNumber + 1
+		nextBlock := triggeredBlock.Header.Number.Int64()
 
 		eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
 		if err != nil {
