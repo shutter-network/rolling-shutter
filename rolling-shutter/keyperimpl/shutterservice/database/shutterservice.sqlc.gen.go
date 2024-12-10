@@ -82,9 +82,9 @@ func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (I
 }
 
 const getNotDecryptedIdentityRegisteredEvents = `-- name: GetNotDecryptedIdentityRegisteredEvents :many
-SELECT index, block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted FROM identity_registered_event
+SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted FROM identity_registered_event
 WHERE timestamp >= $1 AND timestamp <= $2 AND decrypted = false
-ORDER BY index ASC
+ORDER BY timestamp ASC
 `
 
 type GetNotDecryptedIdentityRegisteredEventsParams struct {
@@ -102,7 +102,6 @@ func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, a
 	for rows.Next() {
 		var i IdentityRegisteredEvent
 		if err := rows.Scan(
-			&i.Index,
 			&i.BlockNumber,
 			&i.BlockHash,
 			&i.TxIndex,
@@ -155,9 +154,10 @@ INSERT INTO identity_registered_event (
     eon,
     identity_prefix,
     sender,
-    timestamp
+    timestamp,
+    decrypted
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
 ON CONFLICT (eon, identity_prefix) DO UPDATE SET
 block_number = $1,
 block_hash = $2,

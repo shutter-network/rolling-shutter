@@ -37,7 +37,10 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		return nil
 	}
 
-	lastTriggeredTime := kpr.latestTriggeredTime
+	lastTriggeredTime := 0
+	if kpr.latestTriggeredTime != nil {
+		lastTriggeredTime = int(*kpr.latestTriggeredTime)
+	}
 	kpr.latestTriggeredTime = &block.Header.Time
 
 	fmt.Println("--------------")
@@ -46,7 +49,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 
 	serviceDB := servicedatabase.New(kpr.dbpool)
 	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx, servicedatabase.GetNotDecryptedIdentityRegisteredEventsParams{
-		Timestamp:   int64(*lastTriggeredTime),
+		Timestamp:   int64(lastTriggeredTime),
 		Timestamp_2: int64(block.Header.Time),
 	})
 	if err != nil && err != pgx.ErrNoRows {

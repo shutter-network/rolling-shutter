@@ -173,6 +173,9 @@ func (s *RegistrySyncer) syncRange(
 			BlockHash:   header.Hash().Bytes(),
 		})
 	})
+	if err != nil {
+		log.Warn().AnErr("error adding identity registered event into db", err)
+	}
 	log.Info().
 		Uint64("start-block", start).
 		Uint64("end-block", end).

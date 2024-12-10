@@ -20,7 +20,6 @@ type DecryptionSignature struct {
 }
 
 type IdentityRegisteredEvent struct {
-	Index          int64
 	BlockNumber    int64
 	BlockHash      []byte
 	TxIndex        int64
