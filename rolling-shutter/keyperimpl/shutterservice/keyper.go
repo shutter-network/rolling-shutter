@@ -110,7 +110,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	//TODO: need to handle db initialisation
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher)
 }

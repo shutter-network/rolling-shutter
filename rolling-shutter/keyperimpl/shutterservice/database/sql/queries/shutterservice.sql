@@ -43,11 +43,10 @@ INSERT INTO identity_registered_event (
     eon,
     identity_prefix,
     sender,
-    timestamp,
-    decrypted
+    timestamp
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
-ON CONFLICT (eon, identity_prefix) DO UPDATE SET
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,

@@ -11,8 +11,8 @@ CREATE TABLE identity_registered_event (
     identity_prefix bytea NOT NULL,
     sender text NOT NULL,
     timestamp bigint NOT NULL,
-    decrypted boolean NOT NULL,
-    PRIMARY KEY (eon, identity_prefix)
+    decrypted boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (identity_prefix, sender)
 );
 
 CREATE TABLE identity_registered_events_synced_until(

@@ -79,8 +79,6 @@ func (s *RegistrySyncer) resetSyncStatus(ctx context.Context, numReorgedBlocks i
 
 		newSyncedUntilBlockNumber := deleteFromInclusive - 1
 
-		// TODO: need to change sync status to use registry event sync
-
 		err = queries.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
 			BlockHash:   []byte{},
 			BlockNumber: newSyncedUntilBlockNumber,
