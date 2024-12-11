@@ -168,7 +168,8 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 	keyper2Signature, err := decryptionData.ComputeSignature(keyper2PrivateKey)
 	assert.NilError(t, err)
 
-	// threshold is two, so no outgoing message after first input
+	// now thrsehold will be reached after this message causing to send out
+	// the message
 	shares = []*p2pmsg.KeyShare{}
 	encodedDecryptionKeys := [][]byte{}
 	for _, identityPreimage := range identityPreimages {
