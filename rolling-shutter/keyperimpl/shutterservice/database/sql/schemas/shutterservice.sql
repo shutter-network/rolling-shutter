@@ -33,5 +33,5 @@ CREATE TABLE decryption_signatures(
     keyper_index bigint NOT NULL,
     identities_hash bytea NOT NULL,
     signature bytea NOT NULL,
-    PRIMARY KEY (eon, keyper_index)
+    PRIMARY KEY (eon, keyper_index, identities_hash)
 );
