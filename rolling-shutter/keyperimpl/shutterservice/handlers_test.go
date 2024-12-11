@@ -84,7 +84,7 @@ func TestHandleDecryptionKeySharesThresholdNotReached(t *testing.T) {
 		},
 	}
 	validation, err := handler.ValidateMessage(ctx, msg)
-	assert.NilError(t, err, "validation returned error")
+	assert.NilError(t, err)
 	assert.Equal(t, validation, pubsub.ValidationAccept)
 	msgs, err := handler.HandleMessage(ctx, msg)
 	assert.NilError(t, err)
@@ -203,7 +203,7 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 	}
 
 	validation, err = handler.ValidateMessage(ctx, msg)
-	assert.NilError(t, err, "validation returned error")
+	assert.NilError(t, err)
 	assert.Equal(t, validation, pubsub.ValidationAccept)
 	msgs, err = handler.HandleMessage(ctx, msg)
 	assert.NilError(t, err)
