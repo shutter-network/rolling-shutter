@@ -218,6 +218,94 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 	}
 }
 
+func TestValidateAndHandleDecryptionKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+
+	obsKeyperDB := obskeyperdatabase.New(dbpool)
+
+	keyperConfigIndex := uint64(1)
+	keyper1Index := uint64(0)
+	keyper2Index := uint64(1)
+	keyper1PrivateKey, keyper1Address, err := generateRandomAccount()
+	assert.NilError(t, err)
+	keyper2PrivateKey, keyper2Address, err := generateRandomAccount()
+	assert.NilError(t, err)
+
+	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
+		KeyperConfigIndex:     int64(keyperConfigIndex),
+		ActivationBlockNumber: rand.Int63(),
+		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
+		Threshold:             2,
+	})
+	assert.NilError(t, err)
+
+	identityPreimages := []serviceztypes.IdentityPreimage{}
+	for i := 0; i < 3; i++ {
+		identityPreimage := serviceztypes.IdentityPreimage{
+			Bytes: intTo32ByteArray(i),
+		}
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+
+	decryptionData := &serviceztypes.DecryptionSignatureData{
+		InstanceID:        config.GetInstanceID(),
+		Eon:               keyperConfigIndex,
+		IdentityPreimages: identityPreimages,
+	}
+
+	keyper1Signature, err := decryptionData.ComputeSignature(keyper1PrivateKey)
+	assert.NilError(t, err)
+	keyper2Signature, err := decryptionData.ComputeSignature(keyper2PrivateKey)
+	assert.NilError(t, err)
+
+	keyperIndex := uint64(1)
+
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+
+	var handler p2p.MessageHandler = &DecryptionKeysHandler{dbpool: dbpool}
+	encodedDecryptionKeys := [][]byte{}
+	for _, identityPreimage := range identityPreimages {
+		decryptionKey, err := keys.EpochSecretKey(identityPreimage.Bytes)
+		assert.NilError(t, err)
+		encodedDecryptionKey := decryptionKey.Marshal()
+		encodedDecryptionKeys = append(encodedDecryptionKeys, encodedDecryptionKey)
+	}
+
+	decryptionKeys := []*p2pmsg.Key{}
+	for i, identityPreimage := range identityPreimages {
+		key := &p2pmsg.Key{
+			IdentityPreimage: identityPreimage.Bytes,
+			Key:              encodedDecryptionKeys[i],
+		}
+		decryptionKeys = append(decryptionKeys, key)
+	}
+
+	msg := &p2pmsg.DecryptionKeys{
+		InstanceId: config.GetInstanceID(),
+		Eon:        keyperConfigIndex,
+		Keys:       decryptionKeys,
+		Extra: &p2pmsg.DecryptionKeys_Service{
+			Service: &p2pmsg.ShutterServiceDecryptionKeysExtra{
+				SignerIndices: []uint64{keyper1Index, keyper2Index},
+				Signature:     [][]byte{keyper1Signature, keyper2Signature},
+			},
+		},
+	}
+	validation, err := handler.ValidateMessage(ctx, msg)
+	assert.NilError(t, err)
+	assert.Equal(t, validation, pubsub.ValidationAccept)
+	msgs, err := handler.HandleMessage(ctx, msg)
+	assert.NilError(t, err)
+
+	assert.Check(t, len(msgs) == 0)
+}
+
 func intTo32ByteArray(num int) []byte {
 	b := make([]byte, 32)
 	tempBuffer := make([]byte, 8)
