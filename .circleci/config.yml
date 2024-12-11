@@ -247,7 +247,7 @@ jobs:
             docker buildx build \
               --push \
               --progress plain \
-              --platform linux/arm64,linux/amd64 \
+              --platform linux/amd64 \
               -f docker/build-src/rolling-shutter/Dockerfile \
               -t "${DOCKER_TAG}" \
               .
