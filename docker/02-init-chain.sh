@@ -14,6 +14,9 @@ ${BB} chmod -R a+rwX data/chain-{0..3}-validator/config data/chain-seed/config
 ${BB} rm -rf data/deployments
 
 # has geth as dependency
+$DC up -d geth
+sleep 5
+sh tools.sh
 $DC up deploy-contracts
 
 # setup chain-seed

@@ -1,13 +1,15 @@
-FROM node:16.16
+FROM alpine/git AS builder
 
-RUN mkdir /contracts
+RUN git clone https://github.com/shutter-network/contracts /contracts
 
 COPY /contracts/package*.json /contracts/
 WORKDIR /contracts
 
-RUN --mount=type=cache,target=/root/.npm npm install
+#COPY /contracts /contracts
 
-COPY /contracts /contracts
+FROM ghcr.io/foundry-rs/foundry:latest AS runner
+WORKDIR /contracts
+COPY --from=builder /contracts /contracts
 
-ENTRYPOINT ["npx", "hardhat", "--network", "dockerGeth"]
-CMD ["deploy"]
+RUN forge build
+ENTRYPOINT ["forge", "script"]

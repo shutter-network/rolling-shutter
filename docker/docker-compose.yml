@@ -34,8 +34,8 @@ services:
     command: >
       --datadir /data
       --dev
-      --dev.period 1
       --ipcdisable
+      --dev.period 1
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
@@ -48,13 +48,21 @@ services:
     logging: *logging
 
   deploy-contracts:
+    image: footest
     build:
       dockerfile: docker/build-src/deploy_contracts/Dockerfile
       context: ..
+    command:
+      - "script/Deploy.gnosh.s.sol"
+      - "--rpc-url" 
+      - "http://geth:8545"
+      - "--broadcast"
     volumes:
       - ./data/deployments:/contracts/deployments
       - ./config:/config
     environment:
+      DEPLOY_KEY: ${DEPLOY_KEY}
+      PRIVATE_KEY: ${DEPLOY_KEY}
       DEPLOY_CONF: /config/node-deploy.json
       KEYPER_SET_INDEX: 0
     depends_on:
@@ -217,7 +225,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-0.toml"
     volumes:
       - ./config:/config
@@ -243,7 +251,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-1.toml"
     volumes:
       - ./config:/config
@@ -269,7 +277,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-2.toml"
     volumes:
       - ./config:/config
@@ -295,7 +303,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-3.toml"
     volumes:
       - ./config:/config
