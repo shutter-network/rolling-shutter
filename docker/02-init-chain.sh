@@ -19,6 +19,7 @@ sleep 5
 sh tools.sh
 $DC up deploy-contracts
 
+bash get-contracts.sh
 # setup chain-seed
 $DC run --rm --no-deps chain-seed init \
     --root /chain \

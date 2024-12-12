@@ -58,7 +58,7 @@ services:
       - "http://geth:8545"
       - "--broadcast"
     volumes:
-      - ./data/deployments:/contracts/deployments
+      - ./data/deployments:/contracts/broadcast
       - ./config:/config
     environment:
       DEPLOY_KEY: ${DEPLOY_KEY}

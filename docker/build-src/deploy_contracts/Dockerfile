@@ -1,6 +1,7 @@
 FROM alpine/git AS builder
 
-RUN git clone https://github.com/shutter-network/contracts /contracts
+RUN date
+RUN git clone --branch=docker_deploy_gnosis https://github.com/shutter-network/contracts /contracts
 
 COPY /contracts/package*.json /contracts/
 WORKDIR /contracts
