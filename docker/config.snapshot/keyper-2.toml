@@ -1,0 +1,45 @@
+# Peer identity: /p2p/12D3KooWLwtKMLJqRGWB3AGi87u8Sc7hwp6a6PDMAyWEAsHnjGJG
+# Ethereum address: 0x4F01A5A4Ef09c08Df83A85885516424A4a53be68
+
+
+InstanceID = 0
+# If it's empty, we use the standard PG_ environment variables
+DatabaseURL		= "postgres://postgres@db:5432/keyper-2"
+HTTPEnabled = false
+HTTPListenAddress = ':3000'
+
+[P2P]
+P2PKey = 'CAESQJrsyuTYZZpjqfbXTtMbrQOuS1XtzD+M6ssAZLo5R26fpV218+TTRXw4mkAdaxWpIDX0ZEQH5NC8A8+1nWvbF2U='
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+DiscoveryNamespace = 'shutter-local'
+
+[Ethereum]
+PrivateKey = 'e9383a24352f05bc11895c0da19efb6b83c726f05643c38f64b4146f19215125'
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL = 'http://127.0.0.1:8555/'
+# Contract source directory
+DeploymentDir       = "/deployments/dockerGeth/"
+# The layer 1 JSON RPC endpoint
+EthereumURL         = "http://geth:8545/"
+
+[Shuttermint]
+ShuttermintURL		= "http://chain-2-validator-1:26657"
+ValidatorPublicKey = "129f3ff4871a4d938843cdbb862fabe3ddea5a6dde2b615f1abf0d896ac428f0"
+EncryptionKey = 'ee014227e5b6209682f31c967b4a21c6617a02bc5f11f644f5f54f6d613906b9'
+DKGPhaseLength = 8
+DKGStartBlockDelta = 200
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100

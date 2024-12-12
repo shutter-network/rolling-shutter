@@ -1,0 +1,70 @@
+
+# Peer identity: /p2p/12D3KooWQ8iKQe4iEfkTh3gdBtpxWsKwx3BwrA18km5rq3Zwt2QF
+# Ethereum address: 0xCDD50A6F9B1439dc14c4f2A7eaF14dA1EF5A476c
+
+
+InstanceID = 0
+# If it's empty, we use the standard PG_ environment variables
+DatabaseURL		= "postgres://postgres@db:5432/keyper-0"
+BeaconAPIURL = 'http://localhost:5052'
+HTTPEnabled = false
+HTTPListenAddress = ':3000'
+
+[P2P]
+P2PKey = 'CAESQJ3NdZ6mRrDAW/Z59OKwcKdOCbZQ45z5o8K+tLHOL8Xw1LbawPZLk3mXNyiDyADcLk1bqYMe3uQ6T8xi65zkM0A='
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+DiscoveryNamespace = 'shutter-local'
+
+[Gnosis]
+EncryptedGasLimit = 1000000
+MinGasPerTransaction = 21000
+MaxTxPointerAge = 5
+SecondsPerSlot = 5
+SlotsPerEpoch = 16
+GenesisSlotTimestamp = 1665410700
+SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 30
+
+[Gnosis.Node]
+PrivateKey = '82904d1c48d3a27d218408fc2db3e743f554a69b05b91d28c2897a9026ea47df'
+# Contract source directory
+DeploymentDir = '/deployments/localhost/'
+# The layer 1 JSON RPC endpoint
+EthereumURL         = "http://geth:8545/"
+
+[Gnosis.Contracts]
+KeyperSetManager = "0xd9013c930ca8a417138e5103002a3444208c920c"
+KeyBroadcastContract = "0x11389b254727b0cdd3ec6b874b688b4a664090fb"
+Sequencer = "0x813d13b8b75528e301afc1f0ff5c4d34fde37f36"
+ValidatorRegistry = "0xd96291f87495f81421bba525a205a652768e1828"
+
+[Ethereum]
+PrivateKey = '82904d1c48d3a27d218408fc2db3e743f554a69b05b91d28c2897a9026ea47df'
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL = 'http://127.0.0.1:8555/'
+# Contract source directory
+DeploymentDir       = "/deployments/dockerGeth/"
+# The layer 1 JSON RPC endpoint
+EthereumURL         = "http://geth:8545/"
+
+[Shuttermint]
+ShuttermintURL		= "http://chain-0-validator:26657"
+ValidatorPublicKey = "a2d003fcfd2547e8e0d7865b0cee3557e04d5bd806660874baa327d909368acf"
+EncryptionKey = 'e5c124eb4d3c13fa46532107b69b5abfa11e8aaf3a7a86d11ef370470834e076'
+DKGPhaseLength = 8
+DKGStartBlockDelta = 200
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100

@@ -1,0 +1,29 @@
+# Peer identity: /p2p/12D3KooWEUQAo6evsiqAbwGaoXT4WcmLATdgikQ9w4KDmGNa4kK7
+# Peer role: bootstrap
+
+
+# whether to register handlers on the messages and log them
+ListenMessages = true
+
+[P2P]
+P2PKey = 'CAESQEJ6NhABhjCtDfPfaPoAsLIq9UK9jdpxvQYODZmRTJwFRS0UsuQQY3/PX19cVqrc9pBXRiDTxQIcnVNNshXIBI4='
+ListenAddresses = ['/ip4/0.0.0.0/tcp/0', '/ip4/0.0.0.0/udp/0/quic-v1', '/ip4/0.0.0.0/udp/0/quic-v1/webtransport', '/ip6/::/tcp/0', '/ip6/::/udp/0/quic-v1', '/ip6/::/udp/0/quic-v1/webtransport']
+# Optional, addresses to be advertised to other peers instead of auto-detected ones.
+AdvertiseAddresses = []
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses = ['/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg', '/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP']
+Environment = 'production'
+# Must be unique for each instance id.
+DiscoveryNamespace = 'shutter-42'
+# Optional, to be set to true if running an access node
+IsAccessNode = false
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled = false
+Host = '[::]'
+Port = 9100
