@@ -25,7 +25,7 @@ func TestFilterIdentityRegisteredEvents(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		identityPrefix, err := generateRandomBytes(32)
 		assert.NilError(t, err)
-		sender, err := generateRandomAddress()
+		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
 		events[i] = &registryBindings.ShutterregistryIdentityRegistered{
 			Eon:            uint64(i),
@@ -51,7 +51,7 @@ func TestInsertIdentityRegisteredEvents(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		identityPrefix, err := generateRandomBytes(32)
 		assert.NilError(t, err)
-		sender, err := generateRandomAddress()
+		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
 		events[i] = &registryBindings.ShutterregistryIdentityRegistered{
 			Eon:            uint64(i),
@@ -82,18 +82,18 @@ func generateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func generateRandomAddress() (common.Address, error) {
+func generateRandomAccount() (*ecdsa.PrivateKey, common.Address, error) {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
-		return common.Address{}, err
+		return nil, common.Address{}, err
 	}
 
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		return common.Address{}, err
+		return nil, common.Address{}, err
 	}
 	address := crypto.PubkeyToAddress(*publicKeyECDSA)
 
-	return address, nil
+	return privateKey, address, nil
 }
