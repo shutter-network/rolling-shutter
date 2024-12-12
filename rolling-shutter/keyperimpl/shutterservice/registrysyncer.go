@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -235,6 +236,7 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 ) error {
 	queries := database.New(tx)
 	for _, event := range events {
+		identity := computeIdentity(event)
 		_, err := queries.InsertIdentityRegisteredEvent(ctx, database.InsertIdentityRegisteredEventParams{
 			BlockNumber:    int64(event.Raw.BlockNumber),
 			BlockHash:      event.Raw.BlockHash[:],
@@ -244,6 +246,7 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			IdentityPrefix: event.IdentityPrefix[:],
 			Sender:         shdb.EncodeAddress(event.Sender),
 			Timestamp:      int64(event.Timestamp),
+			Identity:       identity,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to insert identity registered event into db")
@@ -257,4 +260,12 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Msg("synced new identity registered event")
 	}
 	return nil
+}
+
+func computeIdentity(event *registryBindings.ShutterregistryIdentityRegistered) []byte {
+	//TODO: may need to change this if we want to create identity other way
+	var buf bytes.Buffer
+	buf.Write(event.IdentityPrefix[:])
+	buf.Write(event.Sender.Bytes())
+	return crypto.Keccak256(buf.Bytes())
 }

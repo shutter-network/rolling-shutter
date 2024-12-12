@@ -30,7 +30,7 @@ LIMIT $3;
 -- name: UpdateDecryptedFlag :exec
 UPDATE identity_registered_event
 SET decrypted = TRUE
-WHERE (eon, identity_prefix) IN (
+WHERE (eon, identity) IN (
     SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
 );
 
@@ -43,16 +43,18 @@ INSERT INTO identity_registered_event (
     eon,
     identity_prefix,
     sender,
-    timestamp
+    timestamp,
+    identity
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
 log_index = $4,
 sender = $7,
-timestamp = $8;
+timestamp = $8,
+identity = $9;
 
 -- name: SetIdentityRegisteredEventSyncedUntil :exec
 INSERT INTO identity_registered_events_synced_until (block_hash, block_number) VALUES ($1, $2)

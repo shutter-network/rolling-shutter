@@ -82,7 +82,7 @@ func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (I
 }
 
 const getNotDecryptedIdentityRegisteredEvents = `-- name: GetNotDecryptedIdentityRegisteredEvents :many
-SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted FROM identity_registered_event
+SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, timestamp, decrypted, identity FROM identity_registered_event
 WHERE timestamp >= $1 AND timestamp <= $2 AND decrypted = false
 ORDER BY timestamp ASC
 `
@@ -111,6 +111,7 @@ func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, a
 			&i.Sender,
 			&i.Timestamp,
 			&i.Decrypted,
+			&i.Identity,
 		); err != nil {
 			return nil, err
 		}
@@ -154,16 +155,18 @@ INSERT INTO identity_registered_event (
     eon,
     identity_prefix,
     sender,
-    timestamp
+    timestamp,
+    identity
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
 log_index = $4,
 sender = $7,
-timestamp = $8
+timestamp = $8,
+identity = $9
 `
 
 type InsertIdentityRegisteredEventParams struct {
@@ -175,6 +178,7 @@ type InsertIdentityRegisteredEventParams struct {
 	IdentityPrefix []byte
 	Sender         string
 	Timestamp      int64
+	Identity       []byte
 }
 
 func (q *Queries) InsertIdentityRegisteredEvent(ctx context.Context, arg InsertIdentityRegisteredEventParams) (pgconn.CommandTag, error) {
@@ -187,6 +191,7 @@ func (q *Queries) InsertIdentityRegisteredEvent(ctx context.Context, arg InsertI
 		arg.IdentityPrefix,
 		arg.Sender,
 		arg.Timestamp,
+		arg.Identity,
 	)
 }
 
@@ -227,7 +232,7 @@ func (q *Queries) SetIdentityRegisteredEventSyncedUntil(ctx context.Context, arg
 const updateDecryptedFlag = `-- name: UpdateDecryptedFlag :exec
 UPDATE identity_registered_event
 SET decrypted = TRUE
-WHERE (eon, identity_prefix) IN (
+WHERE (eon, identity) IN (
     SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
 )
 `

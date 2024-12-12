@@ -12,6 +12,7 @@ CREATE TABLE identity_registered_event (
     sender text NOT NULL,
     timestamp bigint NOT NULL,
     decrypted boolean NOT NULL DEFAULT false,
+    identity bytea NOT NULL,
     PRIMARY KEY (identity_prefix, sender)
 );
 

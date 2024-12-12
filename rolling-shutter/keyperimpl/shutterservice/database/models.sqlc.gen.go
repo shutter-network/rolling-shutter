@@ -29,6 +29,7 @@ type IdentityRegisteredEvent struct {
 	Sender         string
 	Timestamp      int64
 	Decrypted      bool
+	Identity       []byte
 }
 
 type IdentityRegisteredEventsSyncedUntil struct {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -17,7 +16,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
@@ -130,21 +128,10 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 			continue
 		}
 
-		//TODO: may need to change this if we want to create identity other way
-		sender, err := shdb.DecodeAddress(event.Sender)
-		if err != nil {
-			log.Warn().
-				AnErr("failed to decode sender address of identity registered event from db", err)
-			continue
-		}
-		var buf bytes.Buffer
-		buf.Write(event.IdentityPrefix)
-		buf.Write(sender.Bytes())
-
 		if identityPreimages[event.Eon] == nil {
 			identityPreimages[event.Eon] = make([]identitypreimage.IdentityPreimage, 0)
 		}
-		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(crypto.Keccak256(buf.Bytes())))
+		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(event.Identity))
 
 		if lastEonBlock[event.Eon] < event.BlockNumber {
 			lastEonBlock[event.Eon] = event.BlockNumber
