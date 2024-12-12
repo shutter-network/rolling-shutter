@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -264,5 +265,13 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 			return []p2pmsg.Message{}, errors.Wrap(err, "failed to insert decryption signature")
 		}
 	}
+
+	err := updateEventFlag(ctx, serviceDB, keys)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Msg("failed to update events for decryption keys released")
+	}
+
 	return []p2pmsg.Message{}, nil
 }

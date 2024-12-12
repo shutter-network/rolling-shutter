@@ -120,8 +120,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 			Msg("intercepted decryption key shares message with unexpected eon")
 		return nil, nil
 	}
-	//TODO: this could also fail and can result into not generating key shares, needs to be tested thoroughly
-	//TODO: we might need triggered block in the decryptionTrigger if this scenario does not work
+
 	identitiesHash := computeIdentitiesHashFromShares(originalMsg.Shares)
 	if !bytes.Equal(identitiesHash, currentDecryptionTrigger.IdentitiesHash) {
 		log.Warn().
@@ -231,20 +230,11 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	}
 	msg.Extra = &p2pmsg.DecryptionKeys_Service{Service: extra}
 
-	column1 := make([]int64, 0)
-	column2 := make([][]byte, 0)
-	for _, key := range originalMsg.Keys {
-		column1 = append(column1, int64(originalMsg.Eon))
-		column2 = append(column2, key.IdentityPreimage)
-	}
-	err = serviceDB.UpdateDecryptedFlag(ctx, database.UpdateDecryptedFlagParams{
-		Column1: column1,
-		Column2: column2,
-	})
+	err = updateEventFlag(ctx, serviceDB, originalMsg)
 	if err != nil {
 		log.Warn().
+			Err(err).
 			Msg("failed to update events for decryption keys released")
-		return nil, nil
 	}
 
 	log.Info().
@@ -254,4 +244,22 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		Int("num-keys", len(msg.Keys)).
 		Msg("sending keys")
 	return msg, nil
+}
+
+func updateEventFlag(ctx context.Context, serviceDB *database.Queries, keys *p2pmsg.DecryptionKeys) error {
+	column1 := make([]int64, 0)
+	column2 := make([][]byte, 0)
+	for _, key := range keys.Keys {
+		column1 = append(column1, int64(keys.Eon))
+		column2 = append(column2, key.IdentityPreimage)
+	}
+
+	err := serviceDB.UpdateDecryptedFlag(ctx, database.UpdateDecryptedFlagParams{
+		Column1: column1,
+		Column2: column2,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to update decrypted flag")
+	}
+	return nil
 }
