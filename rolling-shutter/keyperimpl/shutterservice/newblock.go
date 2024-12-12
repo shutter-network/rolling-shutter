@@ -75,10 +75,14 @@ func (kpr *Keyper) shouldTriggerDecryption(
 ) bool {
 	nextBlock := triggeredBlock.Number.Int64()
 	keyperSet, err := obsDB.GetKeyperSet(ctx, nextBlock)
-	if err == pgx.ErrNoRows {
-		log.Info().
-			Int64("block-number", nextBlock).
-			Msg("skipping event as no keyper set has been found for it")
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			log.Info().
+				Int64("block-number", nextBlock).
+				Msg("skipping event as no keyper set has been found for it")
+		} else {
+			log.Err(err).Msgf("failed to query keyper set for block %d", nextBlock)
+		}
 		return false
 	}
 
@@ -86,10 +90,6 @@ func (kpr *Keyper) shouldTriggerDecryption(
 		return false
 	}
 
-	if err != nil {
-		log.Err(err).Msgf("failed to query keyper set for block %d", nextBlock)
-		return false
-	}
 	// don't trigger if we're not part of the keyper set
 	if !keyperSet.Contains(kpr.config.GetAddress()) {
 		log.Info().
