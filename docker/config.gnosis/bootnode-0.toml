@@ -14,3 +14,13 @@ CustomBootstrapAddresses  = [
     "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 DiscoveryNamespace = 'shutter-local'
+
+[P2P.FloodSubDiscovery]
+Enabled = true
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled = false
+Host = '[::]'
+Port = 9100
