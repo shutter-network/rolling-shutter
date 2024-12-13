@@ -39,7 +39,6 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	if kpr.latestTriggeredTime != nil {
 		lastTriggeredTime = int(*kpr.latestTriggeredTime)
 	}
-	kpr.latestTriggeredTime = &block.Header.Time
 
 	fmt.Println("--------------")
 	fmt.Println(block.Header.Time)
@@ -55,6 +54,8 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		// That's because non-keypers don't sync identity registered events. TODO: this needs to be implemented
 		return errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
+
+	kpr.latestTriggeredTime = &block.Header.Time
 
 	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
