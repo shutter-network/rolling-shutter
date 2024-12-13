@@ -110,7 +110,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 	serviceDB := servicedatabase.New(kpr.dbpool)
 
-	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage, 0)
+	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
 	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
 		nextBlock := triggeredBlock.Header.Number.Int64()
