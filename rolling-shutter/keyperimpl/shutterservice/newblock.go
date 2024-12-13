@@ -55,8 +55,6 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		return errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
 
-	kpr.latestTriggeredTime = &block.Header.Time
-
 	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
@@ -65,7 +63,12 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		}
 	}
 
-	return kpr.triggerDecryption(ctx, eventsToDecrypt, block)
+	err = kpr.triggerDecryption(ctx, eventsToDecrypt, block)
+	if err != nil {
+		return err
+	}
+	kpr.latestTriggeredTime = &block.Header.Time
+	return nil
 }
 
 func (kpr *Keyper) shouldTriggerDecryption(
