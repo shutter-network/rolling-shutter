@@ -121,3 +121,65 @@ func TestProcessBlockSuccess(t *testing.T) {
 	})
 	assert.NilError(t, err)
 }
+
+func TestShouldTriggerDecryption(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
+	t.Cleanup(dbclose)
+
+	obsDB := obskeyper.New(dbpool)
+
+	privateKey, sender, _ := generateRandomAccount()
+
+	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
+
+	activationBlockNumber := 100
+	keyperConfigIndex := uint64(1)
+	eventTimestamp := time.Now().Unix()
+	blockNumber := 100
+	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+
+	kpr := &Keyper{
+		dbpool: dbpool,
+		config: &Config{
+			Chain: &ChainConfig{
+				Node: &configuration.EthnodeConfig{
+					PrivateKey: &keys.ECDSAPrivate{
+						Key: privateKey,
+					},
+				},
+			},
+		},
+		decryptionTriggerChannel: decryptionTriggerChannel,
+	}
+
+	err := obsDB.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
+		KeyperConfigIndex:     int64(keyperConfigIndex),
+		ActivationBlockNumber: int64(activationBlockNumber),
+		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
+		Threshold:             2,
+	})
+	assert.NilError(t, err)
+
+	trigger := kpr.shouldTriggerDecryption(
+		ctx,
+		obsDB,
+		&servicedatabase.IdentityRegisteredEvent{
+			Timestamp: eventTimestamp,
+		},
+		&event.LatestBlock{
+			Number: &number.BlockNumber{
+				Int: big.NewInt(int64(blockNumber)),
+			},
+			Header: &types.Header{
+				Time:   uint64(blockTimestamp),
+				Number: big.NewInt(int64(blockNumber)),
+			},
+		},
+	)
+	assert.Equal(t, trigger, true)
+}

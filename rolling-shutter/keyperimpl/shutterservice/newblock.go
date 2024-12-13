@@ -59,7 +59,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
-		if kpr.shouldTriggerDecryption(ctx, obsDB, event, block) {
+		if kpr.shouldTriggerDecryption(ctx, obsDB, &event, block) {
 			eventsToDecrypt = append(eventsToDecrypt, event)
 		}
 	}
@@ -70,7 +70,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 func (kpr *Keyper) shouldTriggerDecryption(
 	ctx context.Context,
 	obsDB *obskeyper.Queries,
-	event servicedatabase.IdentityRegisteredEvent,
+	event *servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
 ) bool {
 	nextBlock := triggeredBlock.Number.Int64()
