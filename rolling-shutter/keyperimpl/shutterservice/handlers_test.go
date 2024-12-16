@@ -91,6 +91,7 @@ func TestHandleDecryptionKeySharesThresholdNotReached(t *testing.T) {
 	assert.Equal(t, len(msgs), 0)
 }
 
+//nolint
 func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
