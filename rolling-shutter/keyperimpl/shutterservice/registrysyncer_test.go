@@ -3,8 +3,8 @@ package shutterservice
 import (
 	"context"
 	"crypto/ecdsa"
-	"math/rand"
 	"testing"
+	"time"
 
 	cryptoRand "crypto/rand"
 
@@ -31,7 +31,7 @@ func TestFilterIdentityRegisteredEvents(t *testing.T) {
 			Eon:            uint64(i),
 			IdentityPrefix: [32]byte(identityPrefix),
 			Sender:         sender,
-			Timestamp:      rand.Uint64(),
+			Timestamp:      uint64(time.Now().Unix()),
 		}
 	}
 
@@ -57,7 +57,7 @@ func TestInsertIdentityRegisteredEvents(t *testing.T) {
 			Eon:            uint64(i),
 			IdentityPrefix: [32]byte(identityPrefix),
 			Sender:         sender,
-			Timestamp:      rand.Uint64(),
+			Timestamp:      uint64(time.Now().Unix()),
 		}
 	}
 
