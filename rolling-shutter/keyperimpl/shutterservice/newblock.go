@@ -39,6 +39,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	if kpr.latestTriggeredTime != nil {
 		lastTriggeredTime = int(*kpr.latestTriggeredTime)
 	}
+	kpr.latestTriggeredTime = &block.Header.Time
 
 	fmt.Println("--------------")
 	fmt.Println(block.Header.Time)
@@ -63,12 +64,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		}
 	}
 
-	err = kpr.triggerDecryption(ctx, eventsToDecrypt, block)
-	if err != nil {
-		return err
-	}
-	kpr.latestTriggeredTime = &block.Header.Time
-	return nil
+	return kpr.triggerDecryption(ctx, eventsToDecrypt, block)
 }
 
 func (kpr *Keyper) shouldTriggerDecryption(
