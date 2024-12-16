@@ -57,7 +57,7 @@ for num in {0..3}; do
     ${BB} sed -i "/ValidatorPublicKey/c\ValidatorPublicKey = \"$(cat data/${validator_cmd}/config/priv_validator_pubkey.hex)\"" /config/keyper-${num}.toml
 
     # set seed node for chain bootstrap
-    ${BB} sed -i "/^bootstrap_peers =/c\bootstrap_peers = \"${seed_node}\"" "${validator_config_path}"
+    ${BB} sed -i "/^seeds =/c\seeds = \"${seed_node}\"" "${validator_config_path}"
     # fix external address for docker internal communication
     ${BB} sed -i "/^external_address =/c\external_address = \"${validator_cmd}:${TM_P2P_PORT}\"" "${validator_config_path}"
     # give a nice name

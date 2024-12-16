@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 ## Needs to be bash, for the variable expansion to work!
 source ./common.sh
+source .env
 set -e
 
 CONTRACTS_JSON=$(jq '.transactions[]|(select(.function==null))|{(.contractName|tostring): .contractAddress}' data/deployments/Deploy.gnosh.s.sol/1337/run-latest.json)
@@ -23,3 +24,7 @@ do
 	${BB} sed -i "/^$key =/c$key = \"$value\"" "${config_path}"
   done
 done
+
+echo "Setting up bootstrap.toml"
+${BB} sed -i "/^KeyperSetManager =/cKeyperSetManager = \"${KeyperSetManager}\"" "config/bootstrap.toml"
+${BB} sed -i "/^SigningKey =/cSigningKey = \"$(echo $DEPLOY_KEY|cut -b3-)\"" "config/bootstrap.toml"
