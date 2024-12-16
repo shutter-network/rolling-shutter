@@ -229,7 +229,7 @@ func (s *RegistrySyncer) filterEvents(
 	return filteredEvents
 }
 
-// insertIdentityRegisteredEvents inserts the given events into the database and updates the
+// insertIdentityRegisteredEvents inserts the given events into the database.
 func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 	ctx context.Context,
 	tx pgx.Tx,
