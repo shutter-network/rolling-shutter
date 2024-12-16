@@ -55,12 +55,12 @@ func TestProcessBlockSuccess(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	blockHash, _ := generateRandomBytes(32)
+	blockHash, _ := generateRandom32Bytes()
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
 	blockNumber := 102
 	activationBlockNumber := 100
 
-	identityPrefix, _ := generateRandomBytes(32)
+	identityPrefix, _ := generateRandom32Bytes()
 	identity := computeIdentity(&shutterregistry.ShutterregistryIdentityRegistered{
 		IdentityPrefix: [32]byte(identityPrefix),
 		Sender:         sender,

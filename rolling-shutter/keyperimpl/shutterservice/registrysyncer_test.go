@@ -23,7 +23,7 @@ func TestFilterIdentityRegisteredEvents(t *testing.T) {
 	}
 	events := make([]*registryBindings.ShutterregistryIdentityRegistered, 2)
 	for i := 0; i < 2; i++ {
-		identityPrefix, err := generateRandomBytes(32)
+		identityPrefix, err := generateRandom32Bytes()
 		assert.NilError(t, err)
 		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
@@ -49,7 +49,7 @@ func TestInsertIdentityRegisteredEvents(t *testing.T) {
 	ctx := context.Background()
 	events := make([]*registryBindings.ShutterregistryIdentityRegistered, 2)
 	for i := 0; i < 2; i++ {
-		identityPrefix, err := generateRandomBytes(32)
+		identityPrefix, err := generateRandom32Bytes()
 		assert.NilError(t, err)
 		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
@@ -73,8 +73,8 @@ func TestInsertIdentityRegisteredEvents(t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func generateRandomBytes(n int) ([]byte, error) {
-	b := make([]byte, n)
+func generateRandom32Bytes() ([]byte, error) {
+	b := make([]byte, 32)
 	_, err := cryptoRand.Read(b)
 	if err != nil {
 		return nil, err

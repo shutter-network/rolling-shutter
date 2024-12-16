@@ -178,7 +178,7 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 		}
 		shares = append(shares, share)
 
-		decKey, _ := generateRandomBytes(32)
+		decKey, _ := generateRandom32Bytes()
 		_, err := keyperCoreDB.InsertDecryptionKey(ctx, corekeyperdatabase.InsertDecryptionKeyParams{
 			Eon:           int64(keyperConfigIndex),
 			EpochID:       identityPreimage.Bytes,
