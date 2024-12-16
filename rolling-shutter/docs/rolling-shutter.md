@@ -21,6 +21,7 @@ A collection of commands to run and interact with Rolling Shutter nodes
 * [rolling-shutter op-bootstrap](rolling-shutter_op-bootstrap.md)	 - Bootstrap validator utility functions for a shuttermint chain
 * [rolling-shutter op-keyper](rolling-shutter_op-keyper.md)	 - Run a Shutter optimism keyper node
 * [rolling-shutter p2pnode](rolling-shutter_p2pnode.md)	 - Run a Shutter p2p bootstrap node
+* [rolling-shutter shutterservice](rolling-shutter_shutterservice.md)	 - Run a Shutter keyper for Shutter Service
 * [rolling-shutter snapshot](rolling-shutter_snapshot.md)	 - Run the Snapshot Hub communication module
 * [rolling-shutter snapshotkeyper](rolling-shutter_snapshotkeyper.md)	 - Run a Shutter snapshotkeyper node
 
