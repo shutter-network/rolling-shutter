@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"math/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,7 +37,7 @@ func TestHandleDecryptionKeySharesThresholdNotReached(t *testing.T) {
 
 	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: rand.Int63(),
+		ActivationBlockNumber: 1,
 		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
 		Threshold:             2,
 	})
@@ -112,7 +111,7 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 
 	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: rand.Int63(),
+		ActivationBlockNumber: 1,
 		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
 		Threshold:             2,
 	})
@@ -180,7 +179,7 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 		}
 		shares = append(shares, share)
 
-		decKey, _ := generateRandomBytes(32)
+		decKey, _ := generateRandom32Bytes()
 		_, err := keyperCoreDB.InsertDecryptionKey(ctx, corekeyperdatabase.InsertDecryptionKeyParams{
 			Eon:           int64(keyperConfigIndex),
 			EpochID:       identityPreimage.Bytes,
@@ -240,7 +239,7 @@ func TestValidateAndHandleDecryptionKey(t *testing.T) {
 
 	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: rand.Int63(),
+		ActivationBlockNumber: 1,
 		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
 		Threshold:             2,
 	})
@@ -328,7 +327,7 @@ func TestInValidateDecryptionKey(t *testing.T) {
 
 	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
 		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: rand.Int63(),
+		ActivationBlockNumber: 1,
 		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
 		Threshold:             2,
 	})
