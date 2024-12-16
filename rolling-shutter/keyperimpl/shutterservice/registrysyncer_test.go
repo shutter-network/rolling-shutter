@@ -3,18 +3,18 @@ package shutterservice
 import (
 	"context"
 	"crypto/ecdsa"
+	cryptoRand "crypto/rand"
 	"testing"
 	"time"
-
-	cryptoRand "crypto/rand"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
+	"gotest.tools/assert"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
-	"gotest.tools/assert"
 )
 
 func TestFilterIdentityRegisteredEvents(t *testing.T) {

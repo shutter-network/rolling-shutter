@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -39,7 +40,7 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	//TODO: needs to be implemented
+	// TODO: needs to be implemented
 	return nil
 }
 
@@ -50,7 +51,7 @@ func (c *Config) Name() string {
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
-	c.MaxNumKeysPerMessage = 500 //TODO: need to confirm on this
+	c.MaxNumKeysPerMessage = 500 // TODO: need to confirm on this
 	return nil
 }
 
@@ -104,7 +105,7 @@ func (c *ChainConfig) Validate() error {
 
 func (c *ChainConfig) SetDefaultValues() error {
 	c.SyncStartBlockNumber = 0
-	return nil
+	return c.Contracts.SetDefaultValues()
 }
 
 func (c *ChainConfig) SetExampleValues() error {

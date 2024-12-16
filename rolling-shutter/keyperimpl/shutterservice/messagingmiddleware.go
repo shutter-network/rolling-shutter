@@ -9,6 +9,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/proto"
+
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/serviceztypes"
@@ -17,7 +19,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
-	"google.golang.org/protobuf/proto"
 )
 
 type MessagingMiddleware struct {
@@ -175,7 +176,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	ctx context.Context,
 	originalMsg *p2pmsg.DecryptionKeys,
 ) (p2pmsg.Message, error) {
-	//TODO: update flag in event table to notify the decryption is already done
+	// TODO: update flag in event table to notify the decryption is already done
 	if originalMsg.Extra != nil {
 		return originalMsg, nil
 	}
@@ -204,7 +205,8 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		Limit:          keyperSet.Threshold,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to count decryption signatures for eon %d and keyperConfigIndex %d", originalMsg.Eon, keyperSet.KeyperConfigIndex)
+		return nil, errors.Wrapf(err, "failed to count decryption signatures for eon %d and keyperConfigIndex %d",
+			originalMsg.Eon, keyperSet.KeyperConfigIndex)
 	}
 
 	if len(signatures) < int(keyperSet.Threshold) {

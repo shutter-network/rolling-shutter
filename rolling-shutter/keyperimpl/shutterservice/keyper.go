@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
+	"golang.org/x/exp/slog"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -20,7 +22,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
-	"golang.org/x/exp/slog"
 )
 
 var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
@@ -153,7 +154,7 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 		return err
 	}
 
-	//TODO: need to update go module after contract is finalised
+	// TODO: need to update go module after contract is finalized
 	kpr.registrySyncer = &RegistrySyncer{
 		Contract:             contract,
 		DBPool:               kpr.dbpool,
@@ -185,7 +186,6 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			err = kpr.processNewKeyperSet(ctx, ev)
 		case ev := <-kpr.newEonPublicKeys:
 			err = kpr.processNewEonPublicKey(ctx, ev)
-		//TODO: handle explicit decryption trigger, if needed
 		case <-ctx.Done():
 			return ctx.Err()
 		}

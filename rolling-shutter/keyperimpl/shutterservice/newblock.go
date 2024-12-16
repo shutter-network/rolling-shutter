@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -46,10 +47,11 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	fmt.Println("--------------")
 
 	serviceDB := servicedatabase.New(kpr.dbpool)
-	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx, servicedatabase.GetNotDecryptedIdentityRegisteredEventsParams{
-		Timestamp:   int64(lastTriggeredTime),
-		Timestamp_2: int64(block.Header.Time),
-	})
+	nonTriggeredEvents, err := serviceDB.GetNotDecryptedIdentityRegisteredEvents(ctx,
+		servicedatabase.GetNotDecryptedIdentityRegisteredEventsParams{
+			Timestamp:   int64(lastTriggeredTime),
+			Timestamp_2: int64(block.Header.Time),
+		})
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
 		// That's because non-keypers don't sync identity registered events. TODO: this needs to be implemented
