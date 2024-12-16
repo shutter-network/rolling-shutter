@@ -39,6 +39,8 @@ services:
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
+      --ws
+      --ws.addr 0.0.0.0
     # No idea why this is suddenly needed - the HEALTHCHECK is defined in the dockerfile but doesn't get picked up anymore...
     healthcheck:
       test: >

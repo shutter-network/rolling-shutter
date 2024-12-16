@@ -27,7 +27,7 @@ ContractsURL = 'http://127.0.0.1:8555/'
 # Contract source directory
 DeploymentDir       = "/deployments/dockerGeth/"
 # The layer 1 JSON RPC endpoint
-EthereumURL         = "http://geth:8545/"
+EthereumURL         = "ws://geth:8546/"
 
 [Gnosis]
 EncryptedGasLimit = 1000000
@@ -44,7 +44,7 @@ PrivateKey = '939babbad75cbcc42eef92496ce86ede989ba96918bbc6cc0efcc498f9cc0887'
 # Contract source directory
 DeploymentDir = '/deployments/localhost/'
 # The layer 1 JSON RPC endpoint
-EthereumURL = 'http://geth:8545/'
+EthereumURL = "ws://geth:8546/"
 
 [Gnosis.Contracts]
 KeyperSetManager = "0xd9013c930ca8a417138e5103002a3444208c920c"
@@ -54,7 +54,7 @@ ValidatorRegistry = "0xd96291f87495f81421bba525a205a652768e1828"
 
 [Shuttermint]
 ShuttermintURL		= "http://chain-1-validator:26657"
-ValidatorPublicKey = "baa575e63e3a686d6c4ce61a0075f8b8d5107badf5e38121feb93f7c46f83443"
+ValidatorPublicKey = "7ab992829d9826ed71602ec9088ae6f101f8a1621385f0803af24e2cefdb7568"
 EncryptionKey = '8972bbbcf5b4a9eaef0030b1eff64332e7188ff4dd523314176956b5c624ca8b'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 200
