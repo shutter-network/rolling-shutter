@@ -29,7 +29,6 @@ func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	// TODO: should we implement some check that this identity is to be decrypted even or not, or this can be taken care of by implementing triggered block in decTrigger?
 	keyShares := msg.(*p2pmsg.DecryptionKeyShares)
 	extra, ok := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Service)
 	if !ok {

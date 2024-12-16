@@ -105,7 +105,7 @@ func (c *ChainConfig) Validate() error {
 
 func (c *ChainConfig) SetDefaultValues() error {
 	c.SyncStartBlockNumber = 0
-	return nil
+	return c.Contracts.SetDefaultValues()
 }
 
 func (c *ChainConfig) SetExampleValues() error {

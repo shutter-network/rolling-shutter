@@ -205,7 +205,8 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 		Limit:          keyperSet.Threshold,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to count decryption signatures for eon %d and keyperConfigIndex %d", originalMsg.Eon, keyperSet.KeyperConfigIndex)
+		return nil, errors.Wrapf(err, "failed to count decryption signatures for eon %d and keyperConfigIndex %d",
+			originalMsg.Eon, keyperSet.KeyperConfigIndex)
 	}
 
 	if len(signatures) < int(keyperSet.Threshold) {
