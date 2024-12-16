@@ -3,6 +3,7 @@ package shutterservice
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/serviceztypes"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -91,73 +93,26 @@ func TestHandleDecryptionKeySharesThresholdNotReached(t *testing.T) {
 	assert.Equal(t, len(msgs), 0)
 }
 
-//nolint
 func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 	ctx := context.Background()
-
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	t.Cleanup(dbclose)
-
-	obsKeyperDB := obskeyperdatabase.New(dbpool)
 	keyperCoreDB := corekeyperdatabase.New(dbpool)
+
 	keyper1PrivateKey, keyper1Address, err := generateRandomAccount()
 	assert.NilError(t, err)
 	keyper2PrivateKey, keyper2Address, err := generateRandomAccount()
 	assert.NilError(t, err)
-	keyperIndex := uint64(1)
 	keyperConfigIndex := uint64(1)
 
-	err = obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: 1,
-		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
-		Threshold:             2,
-	})
-	assert.NilError(t, err)
-	identityPreimages := []serviceztypes.IdentityPreimage{}
-	for i := 0; i < 3; i++ {
-		identityPreimage := serviceztypes.IdentityPreimage{
-			Bytes: intTo32ByteArray(i),
-		}
-		identityPreimages = append(identityPreimages, identityPreimage)
-	}
+	keys, handler := initiateHandler(t, keyper1Address, keyper2Address, keyperConfigIndex)
 
-	decryptionData := &serviceztypes.DecryptionSignatureData{
-		InstanceID:        config.GetInstanceID(),
-		Eon:               keyperConfigIndex,
-		IdentityPreimages: identityPreimages,
-	}
+	identityPreimages := generateIdentityPreimages(t)
 
-	keyper1Signature, err := decryptionData.ComputeSignature(keyper1PrivateKey)
-	assert.NilError(t, err)
-
-	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
-
-	var handler p2p.MessageHandler = &DecryptionKeySharesHandler{dbpool: dbpool}
-
-	// threshold is two, so no outgoing message after first input
-	shares := []*p2pmsg.KeyShare{}
-	for _, identityPreimage := range identityPreimages {
-		share := &p2pmsg.KeyShare{
-			IdentityPreimage: identityPreimage.Bytes,
-			Share:            keys.EpochSecretKeyShare(identityPreimage.Bytes, 0).Marshal(),
-		}
-		shares = append(shares, share)
-	}
-	msg := &p2pmsg.DecryptionKeyShares{
-		InstanceId:  config.GetInstanceID(),
-		Eon:         keyperConfigIndex,
-		KeyperIndex: 0,
-		Shares:      shares,
-		Extra: &p2pmsg.DecryptionKeyShares_Service{
-			Service: &p2pmsg.ShutterServiceDecryptionKeySharesExtra{
-				Signature: keyper1Signature,
-			},
-		},
-	}
+	decryptionData, msg := generateDecryptionMessage(t, keyperConfigIndex, 0, identityPreimages, keyper1PrivateKey, keys)
 	validation, err := handler.ValidateMessage(ctx, msg)
 	assert.NilError(t, err, "validation returned error")
 	assert.Equal(t, validation, pubsub.ValidationAccept)
@@ -171,7 +126,7 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 
 	// now thrsehold will be reached after this message causing to send out
 	// the message
-	shares = []*p2pmsg.KeyShare{}
+	shares := []*p2pmsg.KeyShare{}
 	encodedDecryptionKeys := [][]byte{}
 	for _, identityPreimage := range identityPreimages {
 		share := &p2pmsg.KeyShare{
@@ -217,6 +172,77 @@ func TestHandleDecryptionKeySharesThresholdReached(t *testing.T) {
 		assert.Check(t, bytes.Equal(key.IdentityPreimage, identityPreimages[i].Bytes))
 		assert.Check(t, bytes.Equal(key.Key, encodedDecryptionKeys[i]))
 	}
+}
+
+func initiateHandler(t *testing.T, keyper1Address, keyper2Address common.Address,
+	keyperConfigIndex uint64,
+) (*testkeygen.EonKeys, p2p.MessageHandler) {
+	t.Helper()
+	ctx := context.Background()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+
+	obsKeyperDB := obskeyperdatabase.New(dbpool)
+
+	keyperIndex := uint64(1)
+
+	err := obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
+		KeyperConfigIndex:     int64(keyperConfigIndex),
+		ActivationBlockNumber: 1,
+		Keypers:               shdb.EncodeAddresses([]common.Address{keyper1Address, keyper2Address}),
+		Threshold:             2,
+	})
+	assert.NilError(t, err)
+
+	keys := testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+	return keys, &DecryptionKeySharesHandler{dbpool: dbpool}
+}
+
+func generateIdentityPreimages(t *testing.T) []serviceztypes.IdentityPreimage {
+	t.Helper()
+	identityPreimages := []serviceztypes.IdentityPreimage{}
+	for i := 0; i < 3; i++ {
+		identityPreimage := serviceztypes.IdentityPreimage{
+			Bytes: intTo32ByteArray(i),
+		}
+		identityPreimages = append(identityPreimages, identityPreimage)
+	}
+	return identityPreimages
+}
+
+func generateDecryptionMessage(t *testing.T, keyperConfigIndex, keyperIndex uint64, identityPreimages []serviceztypes.IdentityPreimage,
+	pvtKey *ecdsa.PrivateKey, keys *testkeygen.EonKeys,
+) (*serviceztypes.DecryptionSignatureData, *p2pmsg.DecryptionKeyShares) {
+	t.Helper()
+	decryptionData := &serviceztypes.DecryptionSignatureData{
+		InstanceID:        config.GetInstanceID(),
+		Eon:               keyperConfigIndex,
+		IdentityPreimages: identityPreimages,
+	}
+
+	signature, err := decryptionData.ComputeSignature(pvtKey)
+	assert.NilError(t, err)
+	// threshold is two, so no outgoing message after first input
+	shares := []*p2pmsg.KeyShare{}
+	for _, identityPreimage := range identityPreimages {
+		share := &p2pmsg.KeyShare{
+			IdentityPreimage: identityPreimage.Bytes,
+			Share:            keys.EpochSecretKeyShare(identityPreimage.Bytes, 0).Marshal(),
+		}
+		shares = append(shares, share)
+	}
+	msg := &p2pmsg.DecryptionKeyShares{
+		InstanceId:  config.GetInstanceID(),
+		Eon:         keyperConfigIndex,
+		KeyperIndex: keyperIndex,
+		Shares:      shares,
+		Extra: &p2pmsg.DecryptionKeyShares_Service{
+			Service: &p2pmsg.ShutterServiceDecryptionKeySharesExtra{
+				Signature: signature,
+			},
+		},
+	}
+	return decryptionData, msg
 }
 
 func TestValidateAndHandleDecryptionKey(t *testing.T) {
