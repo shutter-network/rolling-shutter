@@ -31,6 +31,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/rs/zerolog v1.28.0
+	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20241129172533-e843e747ddb1
 	github.com/shutter-network/gnosh-contracts v0.4.0
 	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
 	github.com/shutter-network/shutter/shlib v0.1.19
@@ -217,7 +218,6 @@ require (
 	github.com/rs/cors v1.9.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20241129172533-e843e747ddb1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect

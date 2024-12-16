@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 

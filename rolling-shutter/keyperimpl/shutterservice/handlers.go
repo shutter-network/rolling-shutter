@@ -8,6 +8,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -28,7 +29,7 @@ func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (h *DecryptionKeySharesHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	//TODO: should we implement some check that this identity is to be decrypted even or not, or this can be taken care of by implementing triggered block in decTrigger?
+	// TODO: should we implement some check that this identity is to be decrypted even or not, or this can be taken care of by implementing triggered block in decTrigger?
 	keyShares := msg.(*p2pmsg.DecryptionKeyShares)
 	extra, ok := keyShares.Extra.(*p2pmsg.DecryptionKeyShares_Service)
 	if !ok {

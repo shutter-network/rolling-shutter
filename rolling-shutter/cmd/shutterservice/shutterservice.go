@@ -6,13 +6,14 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
 	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
-	"github.com/spf13/cobra"
 )
 
 func Cmd() *cobra.Command {

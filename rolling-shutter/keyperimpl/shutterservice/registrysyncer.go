@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -263,7 +264,7 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 }
 
 func computeIdentity(event *registryBindings.ShutterregistryIdentityRegistered) []byte {
-	//TODO: may need to change this if we want to create identity other way
+	// TODO: may need to change this if we want to create identity other way
 	var buf bytes.Buffer
 	buf.Write(event.IdentityPrefix[:])
 	buf.Write(event.Sender.Bytes())
