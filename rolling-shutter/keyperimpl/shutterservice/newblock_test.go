@@ -167,7 +167,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 	trigger := kpr.shouldTriggerDecryption(
 		ctx,
 		obsDB,
-		&servicedatabase.IdentityRegisteredEvent{
+		servicedatabase.IdentityRegisteredEvent{
 			Timestamp: eventTimestamp,
 		},
 		&event.LatestBlock{
@@ -229,7 +229,7 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 	trigger := kpr.shouldTriggerDecryption(
 		ctx,
 		obsDB,
-		&servicedatabase.IdentityRegisteredEvent{
+		servicedatabase.IdentityRegisteredEvent{
 			Timestamp: eventTimestamp,
 		},
 		&event.LatestBlock{
