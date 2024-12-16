@@ -3,7 +3,6 @@ package shutterservice
 import (
 	"context"
 	"math/big"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -79,8 +78,8 @@ func TestProcessBlockSuccess(t *testing.T) {
 	_, err = serviceDB.InsertIdentityRegisteredEvent(ctx, servicedatabase.InsertIdentityRegisteredEventParams{
 		BlockNumber:    int64(activationBlockNumber + 1),
 		BlockHash:      blockHash,
-		TxIndex:        rand.Int63(),
-		LogIndex:       rand.Int63(),
+		TxIndex:        1,
+		LogIndex:       1,
 		Eon:            int64(config.GetEon()),
 		IdentityPrefix: identityPrefix,
 		Sender:         sender.Hex(),
