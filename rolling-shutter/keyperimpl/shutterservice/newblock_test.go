@@ -163,7 +163,6 @@ func TestShouldTriggerDecryption(t *testing.T) {
 		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
 		Threshold:             2,
 	})
-	assert.NilError(t, err)
 
 	trigger := kpr.shouldTriggerDecryption(
 		ctx,
@@ -181,6 +180,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 			},
 		},
 	)
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, true)
 }
 
