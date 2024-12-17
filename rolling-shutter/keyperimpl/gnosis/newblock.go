@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 )
 
 func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
