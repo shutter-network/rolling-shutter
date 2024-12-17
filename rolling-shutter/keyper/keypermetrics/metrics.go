@@ -1,7 +1,23 @@
 package keypermetrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+var startTime = time.Now()
+
+var metricsKeyperUptime = prometheus.NewGaugeFunc(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "uptime_seconds",
+		Help:      "Number of seconds the Keyper has been running",
+	},
+	func() float64 {
+		return float64(time.Since(startTime).Milliseconds()) / 1000
+	},
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -80,6 +96,7 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	[]string{"batch_config_index", "keyper_addresses"})
 
 func InitMetrics() {
+	prometheus.MustRegister(metricsKeyperUptime)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
