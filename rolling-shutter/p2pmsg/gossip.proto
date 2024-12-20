@@ -25,6 +25,10 @@ message GnosisDecryptionKeySharesExtra {
   bytes signature = 3;
 }
 
+message ShutterServiceDecryptionKeySharesExtra {
+  bytes signature = 1;
+}
+
 message OptimismDecryptionKeySharesExtra {}
 
 message DecryptionKeyShares {
@@ -35,6 +39,7 @@ message DecryptionKeyShares {
   oneof extra {
     GnosisDecryptionKeySharesExtra gnosis = 10;
     OptimismDecryptionKeySharesExtra optimism = 11;
+    ShutterServiceDecryptionKeySharesExtra service = 12;
   }
 }
 
@@ -52,6 +57,11 @@ message GnosisDecryptionKeysExtra {
 
 message OptimismDecryptionKeysExtra {}
 
+message ShutterServiceDecryptionKeysExtra {
+  repeated uint64 signer_indices = 1;
+  repeated bytes signature = 2;
+}
+
 message DecryptionKeys {
   uint64 instance_id = 1;
   uint64 eon = 2;
@@ -59,6 +69,7 @@ message DecryptionKeys {
   oneof extra {
     GnosisDecryptionKeysExtra gnosis = 4;
     OptimismDecryptionKeysExtra optimism = 5;
+    ShutterServiceDecryptionKeysExtra service = 6;
   }
 }
 
