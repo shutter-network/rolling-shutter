@@ -1,0 +1,350 @@
+x-logging: &logging
+  driver: local
+  options:
+    max-file: 10
+
+services:
+  rs-build:
+    build:
+      dockerfile: docker/build-src/rolling-shutter/Dockerfile
+      context: ..
+    image: rolling-shutter
+    command: "-v"
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+      start_period: "30s"
+      start_interval: "2s"
+    logging: *logging
+
+  blockchain:
+    build:
+      dockerfile: docker-service/build-src/setup-blockchain/Dockerfile
+      context: ..
+    restart: always
+    volumes:
+      - ./data/geth:/data
+    # currently health checks fail
+    healthcheck:
+      test: >
+        curl -sSf -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" --data-raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[], "id": 1}' | grep -o '"result":"0x'
+      start_period: "30s"
+      start_interval: "2s"
+    logging: *logging
+
+  deploy-contracts:
+    build:
+      dockerfile: docker-service/build-src/deploy_contracts/Dockerfile
+      context: ..
+    command:
+      - "./script/Deploy.service.s.sol"
+      - "--rpc-url"
+      - "http://blockchain:8545"
+      - "--broadcast"
+    environment:
+      DEPLOY_KEY: ${DEPLOY_KEY}
+      PRIVATE_KEY: ${DEPLOY_KEY}
+      # DEPLOY_CONF: /config/node-deploy.json
+      # KEYPER_SET_INDEX: 0
+    volumes:
+      - ./data/deployments:/contracts/deployments
+      - ./config:/config
+    depends_on:
+      - blockchain
+    logging: *logging
+
+  chain-0-validator:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-0-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  chain-1-validator:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-1-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  chain-2-validator:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-2-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  chain-3-validator:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-3-validator:/chain
+      - ./data/deployments:/deployments
+    command: "--config /chain/config/config.toml"
+    depends_on:
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  chain-seed:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - chain
+    volumes:
+      - ./data/chain-seed:/chain
+    command: "--config /chain/config/config.toml"
+    logging: *logging
+
+  snapshot:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - snapshot
+    command: "--config /config/snapshot.toml"
+    volumes:
+      - ./config:/config
+    ports:
+      - "8754:8754"
+      - "9100:9100"
+    depends_on:
+      db:
+        condition: service_healthy
+      keyper-0:
+        condition: service_started
+      keyper-1:
+        condition: service_started
+      keyper-2:
+        condition: service_started
+      keyper-3:
+        condition: service_started
+    logging: *logging
+    labels:
+      caddy: live.snapshot.shutter.network
+      caddy.reverse_proxy: "{{upstreams 8754}}"
+
+  bootnode-0:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - p2pnode
+    command: "--config /config/bootnode-0.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  bootnode-1:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - p2pnode
+    command: "--config /config/bootnode-1.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  keyper-0:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
+      - snapshotkeyper
+    command: "--config /config/keyper-0.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    ports:
+      - "9200:9100"
+    depends_on:
+      db:
+        condition: service_healthy
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  keyper-1:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
+      - snapshotkeyper
+    command: "--config /config/keyper-1.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    ports:
+      - "9201:9100"
+    depends_on:
+      db:
+        condition: service_healthy
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  keyper-2:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
+      - snapshotkeyper
+    command: "--config /config/keyper-2.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    ports:
+      - "9202:9100"
+    depends_on:
+      db:
+        condition: service_healthy
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  keyper-3:
+    image: rolling-shutter
+    restart: always
+    entrypoint:
+      - /rolling-shutter
+      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
+      - snapshotkeyper
+    command: "--config /config/keyper-3.toml"
+    volumes:
+      - ./config:/config
+      - ./data/deployments:/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+      bootnode-0:
+        condition: service_started
+      bootnode-1:
+        condition: service_started
+      blockchain:
+        condition: service_healthy
+    logging: *logging
+
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/caddy:/data
+    profiles:
+      - live
+    environment:
+      CADDY_INGRESS_NETWORKS: rolling-shutter_default
+    labels:
+      caddy.email: devops@brainbot.com
+    logging: *logging
+
+  dummyserver:
+    build:
+      dockerfile: docker/build-src/dummyserver/Dockerfile
+      context: ..
+    restart: always
+    profiles:
+      - dev
+    logging: *logging
+
+  metrics:
+    build:
+      context: build-src/metrics
+    restart: always
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./data/metrics:/victoria-metrics-data
+    profiles:
+      - dev
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana-oss
+    restart: always
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./data/grafana/data:/var/lib/grafana
+    profiles:
+      - dev
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: victoriametrics-datasource
+      GF_INSTALL_PLUGINS: https://github.com/VictoriaMetrics/grafana-datasource/releases/download/v0.8.1/victoriametrics-datasource-v0.8.1.zip;victoriametrics-datasource
+
+  dockerize:
+    image: jwilder/dockerize
+    profiles:
+      - script
+    logging: *logging
