@@ -1,9 +1,9 @@
-## rolling-shutter shutterservice dump-config
+## rolling-shutter shutterservicekeyper dump-config
 
-Dump a 'shutterservice' configuration file, based on given config and env vars
+Dump a 'shutterservicekeyper' configuration file, based on given config and env vars
 
 ```
-rolling-shutter shutterservice dump-config [flags]
+rolling-shutter shutterservicekeyper dump-config [flags]
 ```
 
 ### Options
@@ -25,5 +25,5 @@ rolling-shutter shutterservice dump-config [flags]
 
 ### SEE ALSO
 
-* [rolling-shutter shutterservice](rolling-shutter_shutterservice.md)	 - Run a Shutter keyper for Shutter Service
+* [rolling-shutter shutterservicekeyper](rolling-shutter_shutterservicekeyper.md)	 - Run a Shutter keyper for Shutter Service
 

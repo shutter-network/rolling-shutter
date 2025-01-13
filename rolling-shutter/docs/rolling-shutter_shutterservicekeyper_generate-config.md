@@ -1,9 +1,9 @@
-## rolling-shutter shutterservice generate-config
+## rolling-shutter shutterservicekeyper generate-config
 
-Generate a 'shutterservice' configuration file
+Generate a 'shutterservicekeyper' configuration file
 
 ```
-rolling-shutter shutterservice generate-config [flags]
+rolling-shutter shutterservicekeyper generate-config [flags]
 ```
 
 ### Options
@@ -25,5 +25,5 @@ rolling-shutter shutterservice generate-config [flags]
 
 ### SEE ALSO
 
-* [rolling-shutter shutterservice](rolling-shutter_shutterservice.md)	 - Run a Shutter keyper for Shutter Service
+* [rolling-shutter shutterservicekeyper](rolling-shutter_shutterservicekeyper.md)	 - Run a Shutter keyper for Shutter Service
 

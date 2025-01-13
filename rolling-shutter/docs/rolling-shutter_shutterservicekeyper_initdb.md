@@ -1,9 +1,9 @@
-## rolling-shutter shutterservice initdb
+## rolling-shutter shutterservicekeyper initdb
 
-Initialize the database of the 'shutterservice'
+Initialize the database of the 'shutterservicekeyper'
 
 ```
-rolling-shutter shutterservice initdb [flags]
+rolling-shutter shutterservicekeyper initdb [flags]
 ```
 
 ### Options
@@ -23,5 +23,5 @@ rolling-shutter shutterservice initdb [flags]
 
 ### SEE ALSO
 
-* [rolling-shutter shutterservice](rolling-shutter_shutterservice.md)	 - Run a Shutter keyper for Shutter Service
+* [rolling-shutter shutterservicekeyper](rolling-shutter_shutterservicekeyper.md)	 - Run a Shutter keyper for Shutter Service
 

@@ -11,6 +11,12 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
+var (
+	_ configuration.Config = &Config{}
+	_ configuration.Config = &ChainConfig{}
+	_ configuration.Config = &ContractsConfig{}
+)
+
 func NewConfig() *Config {
 	c := &Config{}
 	c.Init()
@@ -45,7 +51,7 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Name() string {
-	return "shutterservice"
+	return "shutterservicekeyper"
 }
 
 func (c *Config) SetDefaultValues() error {

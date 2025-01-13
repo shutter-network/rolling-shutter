@@ -1,4 +1,4 @@
-package shutterservice
+package shutterservicekeyper
 
 import (
 	"context"
