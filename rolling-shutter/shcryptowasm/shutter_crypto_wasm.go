@@ -27,6 +27,7 @@ func main() {
 
 	jsRegistry.Set("encrypt", encrypt)
 	jsRegistry.Set("decrypt", decrypt)
+	jsRegistry.Set("computeEpochID", computeEpochID)
 	jsRegistry.Set("verifyDecryptionKey", verifyDecryptionKey)
 
 	// Tell JS we're loaded
@@ -115,6 +116,21 @@ var verifyDecryptionKey = js.FuncOf(func(this js.Value, args []js.Value) interfa
 	}
 	return ok
 })
+
+var computeEpochID = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+    if len(args) != 1 {
+        return encodeResult(nil, fmt.Errorf("expected 1 argument, got %d", len(args)))
+    }
+    b, err := decodeBytesArg(args[0], "epochIDBytes")
+    if err != nil {
+        return encodeResult(nil, err)
+    }
+    e, err := shcrypto.ComputeEpochID(b)
+    if err != nil {
+        return encodeResult(nil, err)
+    }
+    return encodeResult(e, nil)
+}
 
 func encodeResult(encryptedMessage []byte, err error) string {
 	if err != nil {
