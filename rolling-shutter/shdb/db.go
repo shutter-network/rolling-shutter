@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 )
@@ -90,13 +91,18 @@ func EncodePureDKG(p *puredkg.PureDKG) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buff.Bytes(), nil
+	return tee.SealSecret(buff.Bytes())
 }
 
 func DecodePureDKG(data []byte) (*puredkg.PureDKG, error) {
-	buf := bytes.NewBuffer(data)
+	unsealed, err := tee.UnsealSecret(data)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(unsealed)
 	p := &puredkg.PureDKG{}
-	err := gob.NewDecoder(buf).Decode(p)
+	err = gob.NewDecoder(buf).Decode(p)
 	if err != nil {
 		return nil, err
 	}
@@ -127,25 +133,36 @@ func EncodePureDKGResult(result *puredkg.Result) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	return tee.SealSecret(buf.Bytes())
 }
 
 func DecodePureDKGResult(b []byte) (*puredkg.Result, error) {
+	unsealed, err := tee.UnsealSecret(b)
+	if err != nil {
+		return nil, err
+	}
+
 	res := puredkg.Result{}
-	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(&res)
+
+	err = gob.NewDecoder(bytes.NewBuffer(unsealed)).Decode(&res)
 	if err != nil {
 		return nil, err
 	}
 	return &res, nil
 }
 
-func EncodeEpochSecretKeyShare(share *shcrypto.EpochSecretKeyShare) []byte {
-	return share.Marshal()
+func EncodeEpochSecretKeyShare(share *shcrypto.EpochSecretKeyShare) ([]byte, error) {
+	return tee.SealSecret(share.Marshal())
 }
 
 func DecodeEpochSecretKeyShare(b []byte) (*shcrypto.EpochSecretKeyShare, error) {
+	unsealed, err := tee.UnsealSecret(b)
+	if err != nil {
+		return nil, err
+	}
+
 	share := new(shcrypto.EpochSecretKeyShare)
-	err := share.Unmarshal(b)
+	err = share.Unmarshal(unsealed)
 	if err != nil {
 		return nil, err
 	}
