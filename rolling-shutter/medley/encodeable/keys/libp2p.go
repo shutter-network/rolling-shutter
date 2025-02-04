@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/address"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 )
 
 func GenerateLibp2pPrivate(src io.Reader) (*Libp2pPrivate, error) {
@@ -103,7 +104,7 @@ func (k *Libp2pPrivate) Equal(b *Libp2pPrivate) bool {
 }
 
 func (k *Libp2pPrivate) UnmarshalText(b []byte) error {
-	dec, err := crypto.ConfigDecodeKey(string(b))
+	dec, err := tee.UnsealSecretFromCustomText(string(b), crypto.ConfigDecodeKey)
 	if err != nil {
 		return errors.Wrap(errFailedUnmarshalLibp2pPrivate, err.Error())
 	}
@@ -127,8 +128,8 @@ func (k *Libp2pPrivate) MarshalText() ([]byte, error) {
 	if err != nil {
 		return []byte{}, errors.Wrap(errFailedMarshalLibp2pPrivate, err.Error())
 	}
-	enc := crypto.ConfigEncodeKey(b)
-	return []byte(enc), nil
+	str, err := tee.SealSecretAsCustomText(b, crypto.ConfigEncodeKey)
+	return []byte(str), err
 }
 
 func (k *Libp2pPrivate) String() string {
