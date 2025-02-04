@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/hex"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 )
 
 func GenerateECDSAKey(src io.Reader) (*ECDSAPrivate, error) {
@@ -60,7 +61,7 @@ func (k *ECDSAPrivate) Equal(b *ECDSAPrivate) bool {
 }
 
 func (k *ECDSAPrivate) UnmarshalText(b []byte) error {
-	dec, err := hex.DecodeHex(b)
+	dec, err := tee.UnsealSecretFromHex(string(b))
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,8 @@ func (k *ECDSAPrivate) UnmarshalText(b []byte) error {
 }
 
 func (k *ECDSAPrivate) MarshalText() ([]byte, error) {
-	return hex.EncodeHex(k.Bytes()), nil
+	str, err := tee.SealSecretAsHex(k.Bytes())
+	return []byte(str), err
 }
 
 func (k *ECDSAPrivate) String() string {
