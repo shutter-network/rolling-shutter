@@ -12,6 +12,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 )
 
 func GetKeyperIndex(addr common.Address, keypers []string) (uint64, bool) {
@@ -31,10 +32,16 @@ func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool)
 func (q *Queries) InsertDecryptionKeysMsg(ctx context.Context, msg *p2pmsg.DecryptionKeys) error {
 	for _, key := range msg.Keys {
 		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
+
+		sealedKey, err := tee.SealSecret(key.Key)
+		if err != nil {
+			return err
+		}
+
 		tag, err := q.InsertDecryptionKey(ctx, InsertDecryptionKeyParams{
 			Eon:           int64(msg.Eon),
 			EpochID:       identityPreimage.Bytes(),
-			DecryptionKey: key.Key,
+			DecryptionKey: sealedKey,
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert decryption key for identity %s", identityPreimage)
@@ -49,11 +56,16 @@ func (q *Queries) InsertDecryptionKeysMsg(ctx context.Context, msg *p2pmsg.Decry
 
 func (q *Queries) InsertDecryptionKeySharesMsg(ctx context.Context, msg *p2pmsg.DecryptionKeyShares) error {
 	for _, share := range msg.GetShares() {
-		err := q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
+		sealedShare, err := tee.SealSecret(share.Share)
+		if err != nil {
+			return err
+		}
+
+		err = q.InsertDecryptionKeyShare(ctx, InsertDecryptionKeyShareParams{
 			Eon:                int64(msg.Eon),
 			EpochID:            share.IdentityPreimage,
 			KeyperIndex:        int64(msg.KeyperIndex),
-			DecryptionKeyShare: share.Share,
+			DecryptionKeyShare: sealedShare,
 		})
 		if err != nil {
 			return errors.Wrapf(
