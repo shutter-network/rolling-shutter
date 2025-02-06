@@ -1,8 +1,8 @@
 InstanceID = 0
 # The op-geth JSON RPC endpoint
 JSONRPCURL = 'http://blockchain:8545'
-KeyperSetManager = "0xafe1b5bdebd4ae65af2024738bf0735fbb65d44b"
+KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
 ByIndex = 1
 KeyperSetFilePath = '/config/keyperset.json'
 ShuttermintURL = 'http://chain:26657'
-SigningKey = "479968ffa5ee4c84514a477a8f15f3db0413964fd4c20b08a55fed9fed790fad"
+SigningKey = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"

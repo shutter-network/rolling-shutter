@@ -34,16 +34,16 @@ PrivateKey = '939babbad75cbcc42eef92496ce86ede989ba96918bbc6cc0efcc498f9cc0887'
 # Contract source directory
 DeploymentDir = '/deployments/localhost/'
 # The layer 1 JSON RPC endpoint
-EthereumURL = "ws://geth:8546/"
+EthereumURL = "ws://blockchain:8546/"
 
 [Chain.Contracts]
-KeyperSetManager = "0xafe1b5bdebd4ae65af2024738bf0735fbb65d44b"
-ShutterRegistry = "0xed17543171c1459714cdc6519b58ffcc29a3c3c9"
-KeyBroadcastContract = "0x505d59fffd312983cc0ed114d7f117b91520d742"
+KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
+ShutterRegistry = "0xc6ba8c3233ecf65b761049ef63466945c362edd2"
+KeyBroadcastContract = "0x59f2f1fcfe2474fd5f0b9ba1e73ca90b143eb8d0"
 
 [Shuttermint]
 ShuttermintURL		= "http://chain-0-validator:26657"
-ValidatorPublicKey = "f2a38321e4411697f71e704817906650b49e3b36bd974d0b0e6bb2af923cfcaf"
+ValidatorPublicKey = "394784520c7c6b3e78d88d3e8bc2068c9a3babd125000093ad0733c4077c52f7"
 EncryptionKey = 'd10fcd3a9db97ecf80a41b5fb30bb91ea16bf6a8575e389912a335b19cc4b3b8'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 5

@@ -30,7 +30,7 @@ services:
       context: ..
     restart: always
     volumes:
-      - ./data/geth:/data
+      - ./data/blockchain:/data
     # currently health checks fail
     healthcheck:
       test: >
@@ -54,7 +54,7 @@ services:
       # DEPLOY_CONF: /config/node-deploy.json
       # KEYPER_SET_INDEX: 0
     volumes:
-      - ./data/deployments:/contracts/deployments
+      - ./data/deployments:/contracts/broadcast
       - ./config:/config
     depends_on:
       - blockchain
@@ -142,11 +142,12 @@ services:
     ports:
       - "9200:9100"
     depends_on:
-      - db:
+      db:
           condition: service_healthy
-      - bootnode-0:
+      bootnode-0:
           condition: service_started
-      - chain-0-validator
+      chain-0-validator:
+        condition: service_started
     logging: *logging
 
   keyper-1:
@@ -163,11 +164,12 @@ services:
     ports:
       - "9201:9100"
     depends_on:
-      - db:
+      db:
           condition: service_healthy
-      - bootnode-0:
+      bootnode-0:
           condition: service_started
-      - chain-1-validator
+      chain-1-validator:
+        condition: service_started
     logging: *logging
 
   keyper-2:
@@ -184,11 +186,12 @@ services:
     ports:
       - "9202:9100"
     depends_on:
-      - db:
+      db:
           condition: service_healthy
-      - bootnode-0:
+      bootnode-0:
           condition: service_started
-      - chain-2-validator
+      chain-2-validator:
+        condition: service_started
     logging: *logging
 
   dummyserver:
