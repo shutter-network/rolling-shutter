@@ -122,6 +122,15 @@ func (q *Queries) DeleteShutterMessage(ctx context.Context, id int32) error {
 	return err
 }
 
+const deleteShutterMessageByDesc = `-- name: DeleteShutterMessageByDesc :exec
+DELETE FROM tendermint_outgoing_messages WHERE description=$1
+`
+
+func (q *Queries) DeleteShutterMessageByDesc(ctx context.Context, description string) error {
+	_, err := q.db.Exec(ctx, deleteShutterMessageByDesc, description)
+	return err
+}
+
 const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1

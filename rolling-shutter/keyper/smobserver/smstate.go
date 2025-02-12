@@ -274,7 +274,7 @@ func (st *ShuttermintState) handleBatchConfig(
 		keypers = append(keypers, shdb.EncodeAddress(k))
 	}
 	keypermetrics.MetricsKeyperBatchConfigInfo.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10), strings.Join(keypers, ",")).Set(1)
-	return queries.InsertBatchConfig(
+	if err := queries.InsertBatchConfig(
 		ctx,
 		database.InsertBatchConfigParams{
 			KeyperConfigIndex:     int32(e.KeyperConfigIndex),
@@ -284,7 +284,12 @@ func (st *ShuttermintState) handleBatchConfig(
 			Started:               e.Started,
 			ActivationBlockNumber: int64(e.ActivationBlockNumber),
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	return queries.DeleteShutterMessageByDesc(ctx, fmt.Sprintf("new batch config (activation-block-number=%d, config-index=%d)",
+		e.ActivationBlockNumber, e.KeyperConfigIndex))
 }
 
 func (st *ShuttermintState) handleBatchConfigStarted(
