@@ -29,14 +29,14 @@ executors:
 
   go:
     docker:
-      - image: cimg/go:1.21.1
+      - image: cimg/go:1.23.6
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
   go-integration:
     docker:
-      - image: cimg/go:1.21.1
+      - image: cimg/go:1.23.6
         environment:
           GO111MODULE: "on"
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -176,7 +176,7 @@ jobs:
 
   rs-lint:
     executor: go
-    resource_class: medium+
+    resource_class: xlarge
     working_directory: ~/src/rolling-shutter
     steps:
       - checkout:
@@ -194,7 +194,7 @@ jobs:
             asdf plugin add golangci-lint || true
             asdf install golangci-lint
       - run: |
-          make lint-changes
+          GOLINT_CONCURRENCY=3 make lint-changes
       - save_cache:
           key: rs-lint-v14-{{ checksum "go.sum" }}-{{ checksum "go.mod" }}
           paths:
