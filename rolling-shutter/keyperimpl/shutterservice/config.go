@@ -81,16 +81,18 @@ func (c *Config) GetAddress() common.Address {
 }
 
 type ChainConfig struct {
-	Node                 *configuration.EthnodeConfig `shconfig:",required"`
-	Contracts            *ContractsConfig             `shconfig:",required"`
-	SyncStartBlockNumber uint64                       `shconfig:",required"`
+	Node                     *configuration.EthnodeConfig `shconfig:",required"`
+	Contracts                *ContractsConfig             `shconfig:",required"`
+	SyncStartBlockNumber     uint64                       `shconfig:",required"`
+	SyncMonitorCheckInterval uint64                       `shconfig:",required"`
 }
 
 func NewChainConfig() *ChainConfig {
 	c := &ChainConfig{
-		Node:                 configuration.NewEthnodeConfig(),
-		Contracts:            NewContractsConfig(),
-		SyncStartBlockNumber: 0,
+		Node:                     configuration.NewEthnodeConfig(),
+		Contracts:                NewContractsConfig(),
+		SyncStartBlockNumber:     0,
+		SyncMonitorCheckInterval: 0,
 	}
 	c.Init()
 	return c
@@ -111,10 +113,12 @@ func (c *ChainConfig) Validate() error {
 
 func (c *ChainConfig) SetDefaultValues() error {
 	c.SyncStartBlockNumber = 0
+	c.SyncMonitorCheckInterval = 30
 	return c.Contracts.SetDefaultValues()
 }
 
 func (c *ChainConfig) SetExampleValues() error {
+	c.SyncMonitorCheckInterval = 30
 	return nil
 }
 

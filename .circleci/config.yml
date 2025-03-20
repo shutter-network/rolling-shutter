@@ -156,7 +156,7 @@ jobs:
           name: "Run unit tests with gotestsum"
           command: |
             mkdir -p report/unit report/integration
-            gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short -race ./...
+            gotestsum -f standard-verbose --junitfile report/unit/tests.xml -- -short -race -count=1 -p 1 ./...
       - run:
           name: Wait for PostgreSQL
           command: |
