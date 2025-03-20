@@ -1,4 +1,4 @@
-package shutterservice
+package shutterservice_test
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 
 	"gotest.tools/assert"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
-func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
+func TestAPISyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -30,7 +31,7 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 		t.Fatalf("failed to set initial synced data: %v", err)
 	}
 
-	monitor := &SyncMonitor{
+	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 	}
@@ -54,7 +55,7 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	}
 }
 
-func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
+func TestAPISyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -71,7 +72,7 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 		t.Fatalf("failed to set initial synced data: %v", err)
 	}
 
-	monitor := &SyncMonitor{
+	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 	}
@@ -107,7 +108,7 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	assert.Equal(t, initialBlockNumber+5, syncedData.BlockNumber, "block number should have been incremented correctly")
 }
 
-func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
+func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -115,7 +116,7 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	defer closeDB()
 	_ = database.New(dbpool)
 
-	monitor := &SyncMonitor{
+	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 	}
