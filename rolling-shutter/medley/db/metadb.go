@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -49,6 +50,7 @@ func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string
 
 func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 	haveVal, err := New(tx).GetMeta(ctx, key)
+	println(haveVal, "metainf value")
 	if err == pgx.ErrNoRows {
 		return errors.Wrapf(ErrKeyNotFound, "key: %s", key)
 	} else if err != nil {
@@ -66,4 +68,18 @@ func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 // versions would match exactly.
 func ValidateDatabaseVersion(ctx context.Context, tx pgx.Tx, version string) error {
 	return expectMetaKeyVal(ctx, tx, DatabaseVersionKey, version)
+}
+
+func GetSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) (int, error) {
+	haveVal, err := New(tx).GetMeta(ctx, MakeSchemaVersionKey(definitionName, schema.Name))
+	if err == pgx.ErrNoRows {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	version, err := strconv.ParseInt(haveVal, 10, 0)
+	if err != nil {
+		return 0, err
+	}
+	return int(version), nil
 }

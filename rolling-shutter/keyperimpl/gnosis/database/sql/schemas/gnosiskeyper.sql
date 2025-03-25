@@ -1,4 +1,4 @@
--- schema-version: gnosiskeyper-1 --
+-- schema-version: gnosiskeyper-2 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
 
@@ -67,3 +67,7 @@ CREATE TABLE validator_registrations_synced_until(
     block_hash bytea NOT NULL,
     block_number bigint NOT NULL CHECK (block_number >= 0)
 );
+
+-- ALTER TABLE validator_registrations
+--  DROP CONSTRAINT validator_registrations_pkey CASCADE,
+--  ADD PRIMARY KEY (block_number, tx_index, log_index, validator_index);

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"path"
 	"strings"
@@ -31,6 +32,7 @@ type entry struct {
 // The schema file will then be stored in the object's state
 // together with the passed in `version`.
 func ParseSQLC(filesystem fs.FS, sqlcPath string, version int) ([]Schema, error) {
+	println(sqlcPath, "sqlcpath")
 	b, err := fs.ReadFile(filesystem, sqlcPath)
 	if err != nil {
 		return nil, err
@@ -69,10 +71,16 @@ func ParseSQLC(filesystem fs.FS, sqlcPath string, version int) ([]Schema, error)
 			if !isSQL {
 				continue
 			}
+			pathstr := path.Join(schemaDirPath, i.Name())
+			if version != 1 {
+				pathstr = path.Join(schemaDirPath, fmt.Sprintf("v%d", version), i.Name())
+			}
+
+			println(base, "base", pathstr, "pathstr")
 			schema := Schema{
 				Version: version,
 				Name:    base,
-				Path:    path.Join(schemaDirPath, i.Name()),
+				Path:    pathstr,
 			}
 			schemas = append(schemas, schema)
 		}
@@ -103,6 +111,7 @@ func NewSQLCDefinition(filesystem fs.FS, sqlcPath string, name string, version i
 	if err != nil {
 		return nil, err
 	}
+	print("name", name)
 	return &SQLC{
 		schemas:    schemas,
 		filesystem: filesystem,
