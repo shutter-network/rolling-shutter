@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -9,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	keyperDB "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
@@ -29,36 +31,68 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 	var lastBlockNumber int64
 	db := database.New(s.DBPool)
+	keyperdb := keyperDB.New(s.DBPool)
 
 	log.Debug().Msg("starting the sync monitor")
 
 	for {
 		select {
 		case <-time.After(s.CheckInterval):
-			record, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					log.Warn().Err(err).Msg("no rows found in table identity_registered_events_synced_until")
-					continue
+			if err := s.runCheck(ctx, db, keyperdb, &lastBlockNumber); err != nil {
+				if errors.Is(err, ErrBlockNotIncreasing) {
+					return err
 				}
-				return errors.Wrap(err, "error getting identity_registered_events_synced_until")
-			}
-
-			currentBlockNumber := record.BlockNumber
-			log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
-
-			if currentBlockNumber > lastBlockNumber {
-				lastBlockNumber = currentBlockNumber
-			} else {
-				log.Error().
-					Int64("last-block-number", lastBlockNumber).
-					Int64("current-block-number", currentBlockNumber).
-					Msg("block number has not increased between checks")
-				return errors.New("block number has not increased between checks")
+				log.Debug().Err(err).Msg("skipping sync check due to error")
 			}
 		case <-ctx.Done():
 			log.Info().Msg("stopping syncMonitor due to context cancellation")
 			return ctx.Err()
 		}
 	}
+}
+
+var ErrBlockNotIncreasing = errors.New("block number has not increased between checks")
+
+func (s *SyncMonitor) runCheck(
+	ctx context.Context,
+	db *database.Queries,
+	keyperdb *keyperDB.Queries,
+	lastBlockNumber *int64,
+) error {
+	batchConfig, err := keyperdb.GetLatestBatchConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting batchconfig: %w", err)
+	}
+
+	dkgResult, err := keyperdb.GetDKGResult(ctx, int64(batchConfig.KeyperConfigIndex))
+	if err != nil {
+		return fmt.Errorf("error getting dkgresult: %w", err)
+	}
+
+	record, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Warn().Err(err).Msg("no rows found in table identity_registered_events_synced_until")
+			return nil // This is not an error condition that should stop monitoring
+		}
+		return errors.Wrap(err, "error getting identity_registered_events_synced_until")
+	}
+
+	currentBlockNumber := record.BlockNumber
+	log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
+
+	if currentBlockNumber > *lastBlockNumber {
+		*lastBlockNumber = currentBlockNumber
+		return nil
+	}
+
+	if dkgResult.Success {
+		log.Error().
+			Int64("last-block-number", *lastBlockNumber).
+			Int64("current-block-number", currentBlockNumber).
+			Msg("block number has not increased between checks")
+		return ErrBlockNotIncreasing
+	}
+
+	return nil
 }
