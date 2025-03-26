@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/assert"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	keyperDB "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -16,6 +16,7 @@ import (
 )
 
 func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, blockNumber int64) {
+	t.Helper()
 	db := database.New(dbpool)
 	keyperdb := keyperDB.New(dbpool)
 
