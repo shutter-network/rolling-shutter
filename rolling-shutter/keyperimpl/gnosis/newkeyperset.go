@@ -9,7 +9,7 @@ import (
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
-	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/legacychainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
