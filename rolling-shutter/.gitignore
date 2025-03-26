@@ -9,3 +9,7 @@
 /godoc.idx
 /go.work
 /go.work.sum
+
+enclave.json
+private.pem
+public.pem

@@ -28,6 +28,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 )
 
 type Config interface {
@@ -227,7 +228,13 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 		if !ok {
 			panic("key not loaded into ShuttermintState")
 		}
-		encrypted, err := ecies.Encrypt(rand.Reader, pubkey, eval.Eval, nil, nil)
+
+		plainEval, err := tee.UnsealSecret(eval.Eval)
+		if err != nil {
+			return err
+		}
+
+		encrypted, err := ecies.Encrypt(rand.Reader, pubkey, plainEval, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -396,10 +403,15 @@ func (st *ShuttermintState) startPhase1Dealing(
 	}
 
 	for _, eval := range polyEvals {
+		sealedEval, err := tee.SealSecret(shdb.EncodeBigint(eval.Eval))
+		if err != nil {
+			return err
+		}
+
 		err = queries.InsertPolyEval(ctx, database.InsertPolyEvalParams{
 			Eon:             int64(eon),
 			ReceiverAddress: shdb.EncodeAddress(dkg.keypers[eval.Receiver]),
-			Eval:            shdb.EncodeBigint(eval.Eval),
+			Eval:            sealedEval,
 		})
 		if err != nil {
 			return err
