@@ -1,4 +1,4 @@
-FROM golang:1.21 AS builder
+FROM golang:1.23 AS builder
 ENV GOMODCACHE=/root/.cache/mod
 # Fetch go modules separately to improve cache usage
 RUN mkdir /gomod
