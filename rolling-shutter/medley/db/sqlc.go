@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,7 +34,6 @@ type entry struct {
 // The schema file will then be stored in the object's state
 // together with the passed in `version`.
 func ParseSQLC(filesystem fs.FS, sqlcPath string, version int) ([]Schema, error) {
-	println(sqlcPath, "sqlcpath")
 	b, err := fs.ReadFile(filesystem, sqlcPath)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,6 @@ func ParseSQLC(filesystem fs.FS, sqlcPath string, version int) ([]Schema, error)
 				pathstr = path.Join(schemaDirPath, fmt.Sprintf("v%d", version), i.Name())
 			}
 
-			println(base, "base", pathstr, "pathstr")
 			schema := Schema{
 				Version: version,
 				Name:    base,
@@ -116,6 +116,7 @@ func NewSQLCDefinition(filesystem fs.FS, sqlcPath string, name string, version i
 		schemas:    schemas,
 		filesystem: filesystem,
 		name:       name,
+		sqlcPath:   sqlcPath,
 	}, nil
 }
 
@@ -125,6 +126,7 @@ type SQLC struct {
 	schemas    []Schema
 	filesystem fs.FS
 	name       string
+	sqlcPath   string
 }
 
 func (d *SQLC) Name() string {
@@ -147,7 +149,10 @@ func (d *SQLC) Create(ctx context.Context, tx pgx.Tx) error {
 			return errors.Wrapf(err, "failed to execute SQL statements for definition '%s'", d.Name())
 		}
 	}
+
 	for _, schema := range d.schemas {
+		// this is initial creation of db, so create version as one here
+		schema.Version = 1
 		err := InsertSchemaVersion(ctx, tx, d.Name(), schema)
 		if err != nil {
 			return err
@@ -178,4 +183,97 @@ func (d *SQLC) sqlCreateStatements() []string {
 		sqlStatements = append(sqlStatements, string(b))
 	}
 	return sqlStatements
+}
+
+func (d *SQLC) LoadMigrations() ([]Migration, error) {
+	migrationsPath := path.Join(path.Dir(d.sqlcPath), "migrations")
+	entries, err := fs.ReadDir(d.filesystem, migrationsPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "error reading migrations directory")
+	}
+
+	var migrations []Migration
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".sql") {
+			continue
+		}
+
+		var fileversion int
+		_, err := fmt.Sscanf(name, "V%d_", &fileversion)
+		if err != nil {
+			continue
+		}
+
+		_, err = fs.ReadFile(d.filesystem, path.Join(migrationsPath, name))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read migration %s", name)
+		}
+
+		migrations = append(migrations, Migration{
+			Version: fileversion,
+			Path:    path.Join(migrationsPath, name),
+			Up:      true,
+		})
+	}
+
+	sort.Slice(migrations, func(i, j int) bool {
+		return migrations[i].Version < migrations[j].Version
+	})
+
+	return migrations, nil
+}
+
+func (d *SQLC) Migrate(ctx context.Context, tx pgx.Tx) error {
+	for _, schema := range d.schemas {
+		// Get current version from meta-inf
+		version, err := GetSchemaVersion(ctx, tx, d.Name(), schema)
+		if err != nil {
+			return err
+		}
+
+		migrations, err := d.LoadMigrations()
+		if err != nil {
+			return errors.Wrap(err, "failed to load migrations")
+		}
+
+		// Apply only migrations that are newer than current version
+		for _, migration := range migrations {
+			println(migration.Path, migration.Version, "migration")
+			if migration.Version <= version {
+				continue
+			}
+
+			content, err := fs.ReadFile(d.filesystem, migration.Path)
+			if err != nil {
+				return errors.Wrapf(err, "failed to read migration file %s", migration.Path)
+			}
+
+			log.Info().
+				Str("definition", d.Name()).
+				Int("from_version", version).
+				Int("to_version", migration.Version).
+				Str("path", migration.Path).
+				Msg("applying migration")
+
+			_, err = tx.Exec(ctx, string(content))
+			if err != nil {
+				return errors.Wrapf(err, "failed to apply migration %d", migration.Version)
+			}
+
+			// Update version after each successful migration
+			err = UpdateSchemaVersion(ctx, tx, d.Name(), schema)
+			if err != nil {
+				return errors.Wrapf(err, "failed to update schema version to %d", migration.Version)
+			}
+		}
+	}
+
+	return nil
 }

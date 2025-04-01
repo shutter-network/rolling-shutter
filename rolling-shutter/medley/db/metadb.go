@@ -13,6 +13,7 @@ import (
 var (
 	ErrValueMismatch = errors.New("database has unexpected value")
 	ErrKeyNotFound   = errors.New("key does not exist")
+	ErrNeedsMigation = errors.New("needs migration")
 )
 
 var DatabaseVersionKey string = "database-version"
@@ -43,6 +44,13 @@ func insertMetaInf(ctx context.Context, tx pgx.Tx, key, val string) error {
 	})
 }
 
+func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema Schema) error {
+	return New(tx).UpdateMeta(ctx, UpdateMetaParams{
+		Key:   MakeSchemaVersionKey(defName, schema.Name),
+		Value: fmt.Sprint(schema.Version),
+	})
+}
+
 // ValidateSchemaVersion checks that the database schema is compatible.
 func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) error {
 	return expectMetaKeyVal(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(schema.Version))
@@ -50,11 +58,13 @@ func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string
 
 func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 	haveVal, err := New(tx).GetMeta(ctx, key)
-	println(haveVal, "metainf value")
 	if err == pgx.ErrNoRows {
 		return errors.Wrapf(ErrKeyNotFound, "key: %s", key)
 	} else if err != nil {
 		return errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
+	}
+	if haveVal < val {
+		return errors.Wrapf(ErrNeedsMigation, "expected %s, have %s", val, haveVal)
 	}
 	if haveVal != val {
 		return errors.Wrapf(ErrValueMismatch, "expected %s, have %s", val, haveVal)
