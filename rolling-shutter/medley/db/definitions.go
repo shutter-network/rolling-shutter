@@ -30,7 +30,7 @@ func InitDB(ctx context.Context, dbpool *pgxpool.Pool, role string, definition D
 			return errors.Wrap(err, "failed to apply migrations")
 		}
 		return nil
-	} else if !errors.Is(err, ErrValueMismatch) && !errors.Is(err, ErrKeyNotFound) {
+	} else if errors.Is(err, ErrValueMismatch) {
 		return err
 	}
 	// Schema doesn't exist or is invalid, create it

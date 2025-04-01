@@ -65,22 +65,14 @@ func ParseSQLC(filesystem fs.FS, sqlcPath string, version int) ([]Schema, error)
 			if i.IsDir() {
 				continue
 			}
-			// TODO: allow database migrations.
-			// For now assume only schemas, no migrations.
-			// However sqlc does recognize migration files from different tools.
 			base, isSQL := strings.CutSuffix(i.Name(), ".sql")
 			if !isSQL {
 				continue
 			}
-			pathstr := path.Join(schemaDirPath, i.Name())
-			if version != 1 {
-				pathstr = path.Join(schemaDirPath, fmt.Sprintf("v%d", version), i.Name())
-			}
-
 			schema := Schema{
 				Version: version,
 				Name:    base,
-				Path:    pathstr,
+				Path:    path.Join(schemaDirPath, i.Name()),
 			}
 			schemas = append(schemas, schema)
 		}
@@ -111,7 +103,6 @@ func NewSQLCDefinition(filesystem fs.FS, sqlcPath string, name string, version i
 	if err != nil {
 		return nil, err
 	}
-	print("name", name)
 	return &SQLC{
 		schemas:    schemas,
 		filesystem: filesystem,
