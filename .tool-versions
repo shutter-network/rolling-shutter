@@ -7,4 +7,4 @@ pre-commit 4.1.0
 protoc 29.3
 shfmt 3.10.0
 solidity 0.8.9
-sqlc 1.27.0
+sqlc 1.28.0

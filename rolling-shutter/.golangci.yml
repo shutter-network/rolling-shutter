@@ -113,7 +113,7 @@ linters:
   # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
-# `staticcheck` and `gosimple` are disabled because of https://github.com/golangci/golangci-lint/issues/5449
+    # `staticcheck` and `gosimple` are disabled because of https://github.com/golangci/golangci-lint/issues/5449
     # - depguard
     # - unused
     - bodyclose
@@ -131,7 +131,7 @@ linters:
     - gofumpt
     - goprintffuncname
     - gosec
-#    - gosimple
+    #    - gosimple
     - govet
     - ineffassign
     - lll
@@ -141,7 +141,7 @@ linters:
     - noctx
     - nolintlint
     - revive
-#    - staticcheck
+    #    - staticcheck
     - stylecheck
     - thelper
     - typecheck

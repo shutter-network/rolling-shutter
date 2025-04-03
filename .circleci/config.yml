@@ -149,7 +149,7 @@ jobs:
       - run:
           name: "Install asdf managed executables"
           command: |
-            asdf install tinygo
+            asdf install tinygo latest
             asdf install binaryen
             asdf install nodejs
       - run:

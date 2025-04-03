@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -11,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
-	"golang.org/x/exp/slog"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
