@@ -16,8 +16,9 @@ import (
 )
 
 type SyncMonitor struct {
-	DBPool        *pgxpool.Pool
-	CheckInterval time.Duration
+	DBPool             *pgxpool.Pool
+	CheckInterval      time.Duration
+	DKGStartBlockDelta uint64
 }
 
 func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
@@ -59,14 +60,9 @@ func (s *SyncMonitor) runCheck(
 	keyperdb *keyperDB.Queries,
 	lastBlockNumber *int64,
 ) error {
-	batchConfig, err := keyperdb.GetLatestBatchConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting batchconfig: %w", err)
-	}
-
-	dkgResult, err := keyperdb.GetDKGResult(ctx, int64(batchConfig.KeyperConfigIndex))
-	if err != nil {
-		return fmt.Errorf("error getting dkgresult: %w", err)
+	if s.dkgIsRunning(ctx, keyperdb) {
+		log.Debug().Msg("dkg is running, skipping sync monitor checks")
+		return nil
 	}
 
 	record, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
@@ -75,7 +71,7 @@ func (s *SyncMonitor) runCheck(
 			log.Warn().Err(err).Msg("no rows found in table identity_registered_events_synced_until")
 			return nil // This is not an error condition that should stop monitoring
 		}
-		return errors.Wrap(err, "error getting identity_registered_events_synced_until")
+		return fmt.Errorf("error getting identity_registered_events_synced_until: %w", err)
 	}
 
 	currentBlockNumber := record.BlockNumber
@@ -86,13 +82,37 @@ func (s *SyncMonitor) runCheck(
 		return nil
 	}
 
-	if dkgResult.Success {
+	log.Error().
+		Int64("last-block-number", *lastBlockNumber).
+		Int64("current-block-number", currentBlockNumber).
+		Msg("block number has not increased between checks")
+	return ErrBlockNotIncreasing
+}
+
+func (s *SyncMonitor) dkgIsRunning(ctx context.Context, keyperdb *keyperDB.Queries) bool {
+	batchConfig, err := keyperdb.GetLatestBatchConfig(ctx)
+	if err != nil {
 		log.Error().
-			Int64("last-block-number", *lastBlockNumber).
-			Int64("current-block-number", currentBlockNumber).
-			Msg("block number has not increased between checks")
-		return ErrBlockNotIncreasing
+			Err(err).
+			Msg("syncMonitor | error getting latest batchconfig")
+		return true
 	}
 
-	return nil
+	tmSyncData, err := keyperdb.TMGetSyncMeta(ctx)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("syncMonitor | error getting TMSyncMeta")
+		return true
+	}
+
+	// if batchConfig submission height + DKGStartBlockDelta is greater than shuttermint height then dkg has not started yet
+	if batchConfig.Height+int64(s.DKGStartBlockDelta) < tmSyncData.LastCommittedHeight {
+		// if we get an error in getting dkg result then dkg is not completed
+		_, err := keyperdb.GetDKGResult(ctx, int64(batchConfig.KeyperConfigIndex))
+		if err != nil {
+			return true
+		}
+	}
+	return false
 }

@@ -24,6 +24,7 @@ func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, bloc
 	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
+		Height:            50,
 	})
 	assert.NilError(t, err)
 
@@ -31,6 +32,12 @@ func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, bloc
 	err = keyperdb.InsertDKGResult(ctx, keyperDB.InsertDKGResultParams{
 		Eon:     1,
 		Success: true,
+	})
+	assert.NilError(t, err)
+
+	// Set up TMSyncMeta
+	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
+		LastCommittedHeight: 100,
 	})
 	assert.NilError(t, err)
 
@@ -183,6 +190,13 @@ func TestAPISyncMonitor_ContinuesWhenNoDKGResult(t *testing.T) {
 	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
+		Height:            50,
+	})
+	assert.NilError(t, err)
+
+	// Set up TMSyncMeta
+	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
+		LastCommittedHeight: 100,
 	})
 	assert.NilError(t, err)
 
@@ -260,6 +274,76 @@ func TestAPISyncMonitor_ContinuesWhenNoBatchConfig(t *testing.T) {
 	}()
 
 	// Let it run for a while without incrementing the block number
+	time.Sleep(15 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+		// Test passes if no error is received
+	}
+
+	// Verify the block number hasn't changed
+	syncedData, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, initialBlockNumber, syncedData.BlockNumber, "block number should remain unchanged")
+}
+
+func TestAPISyncMonitor_ContinuesWhenNoTMSyncMeta(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	defer closeDB()
+	db := database.New(dbpool)
+	keyperdb := keyperDB.New(dbpool)
+
+	batchConfigHeight := int64(50)
+	// Set TMSyncData height to be less than batchConfigHeight + DKGStartBlockDelta
+	// This simulates a scenario where DKG hasn't started yet
+	tmSyncHeight := int64(60)
+
+	// Set up batch config
+	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
+		KeyperConfigIndex: 1,
+		Keypers:           []string{},
+		Height:            batchConfigHeight,
+	})
+	assert.NilError(t, err)
+
+	// Set up TMSyncMeta with lower height
+	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
+		LastCommittedHeight: tmSyncHeight,
+	})
+	assert.NilError(t, err)
+
+	// Set up initial block data
+	initialBlockNumber := int64(100)
+	err = db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
+		BlockHash:   []byte{0x01, 0x02, 0x03},
+		BlockNumber: initialBlockNumber,
+	})
+	assert.NilError(t, err)
+
+	monitor := &shutterservice.SyncMonitor{
+		DBPool:             dbpool,
+		CheckInterval:      5 * time.Second,
+		DKGStartBlockDelta: 5,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Let it run for a while
 	time.Sleep(15 * time.Second)
 	cancelMonitor()
 
