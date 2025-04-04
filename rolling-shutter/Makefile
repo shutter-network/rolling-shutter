@@ -64,7 +64,11 @@ clean:
 install-tools: install-codegen-tools install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
-install-codegen-tools: install-npm install-protoc-gen-go  install-oapi-codegen install-go-enum
+install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-go-enum
+
+${GOPATH}/bin/sqlc:
+	${GO} install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0
+install-sqlc: ${GOPATH}/bin/sqlc
 
 ../contracts/node_modules/.mark-npm-install: ../contracts/package.json ../contracts/package-lock.json
 	cd ../contracts && npm install
