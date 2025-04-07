@@ -114,9 +114,8 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	kpr.syncMonitor = &SyncMonitor{
-		DBPool:             kpr.dbpool,
-		CheckInterval:      time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
-		DKGStartBlockDelta: kpr.config.Shuttermint.DKGStartBlockDelta,
+		DBPool:        kpr.dbpool,
+		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
 	}
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher, kpr.syncMonitor)

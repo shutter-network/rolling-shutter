@@ -20,11 +20,12 @@ func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, bloc
 	db := database.New(dbpool)
 	keyperdb := keyperDB.New(dbpool)
 
-	// Set up batch config
+	// Set up batch config with Started flag
 	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
 		Height:            50,
+		Started:           true,
 	})
 	assert.NilError(t, err)
 
@@ -32,12 +33,6 @@ func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, bloc
 	err = keyperdb.InsertDKGResult(ctx, keyperDB.InsertDKGResultParams{
 		Eon:     1,
 		Success: true,
-	})
-	assert.NilError(t, err)
-
-	// Set up TMSyncMeta
-	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
-		LastCommittedHeight: 100,
 	})
 	assert.NilError(t, err)
 
@@ -142,6 +137,7 @@ func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
+		Started:           true,
 	})
 	assert.NilError(t, err)
 
@@ -177,7 +173,7 @@ func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	}
 }
 
-func TestAPISyncMonitor_ContinuesWhenNoDKGResult(t *testing.T) {
+func TestAPISyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -191,12 +187,7 @@ func TestAPISyncMonitor_ContinuesWhenNoDKGResult(t *testing.T) {
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
 		Height:            50,
-	})
-	assert.NilError(t, err)
-
-	// Set up TMSyncMeta
-	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
-		LastCommittedHeight: 100,
+		Started:           true,
 	})
 	assert.NilError(t, err)
 
@@ -241,7 +232,7 @@ func TestAPISyncMonitor_ContinuesWhenNoDKGResult(t *testing.T) {
 	assert.Equal(t, initialBlockNumber, syncedData.BlockNumber, "block number should remain unchanged")
 }
 
-func TestAPISyncMonitor_ContinuesWhenNoBatchConfig(t *testing.T) {
+func TestAPISyncMonitor_RunsNormallyWhenNoBatchConfig(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -279,9 +270,9 @@ func TestAPISyncMonitor_ContinuesWhenNoBatchConfig(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+		assert.ErrorContains(t, err, shutterservice.ErrBlockNotIncreasing.Error())
 	case <-time.After(1 * time.Second):
-		// Test passes if no error is received
+		t.Fatalf("expected monitor to throw error, but no error returned")
 	}
 
 	// Verify the block number hasn't changed
@@ -290,7 +281,7 @@ func TestAPISyncMonitor_ContinuesWhenNoBatchConfig(t *testing.T) {
 	assert.Equal(t, initialBlockNumber, syncedData.BlockNumber, "block number should remain unchanged")
 }
 
-func TestAPISyncMonitor_ContinuesWhenNoTMSyncMeta(t *testing.T) {
+func TestAPISyncMonitor_RunsNormallyWhenBatchConfigNotStarted(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -299,22 +290,12 @@ func TestAPISyncMonitor_ContinuesWhenNoTMSyncMeta(t *testing.T) {
 	db := database.New(dbpool)
 	keyperdb := keyperDB.New(dbpool)
 
-	batchConfigHeight := int64(50)
-	// Set TMSyncData height to be less than batchConfigHeight + DKGStartBlockDelta
-	// This simulates a scenario where DKG hasn't started yet
-	tmSyncHeight := int64(60)
-
-	// Set up batch config
+	// Set up batch config with Started = false
 	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
 		KeyperConfigIndex: 1,
 		Keypers:           []string{},
-		Height:            batchConfigHeight,
-	})
-	assert.NilError(t, err)
-
-	// Set up TMSyncMeta with lower height
-	err = keyperdb.TMSetSyncMeta(ctx, keyperDB.TMSetSyncMetaParams{
-		LastCommittedHeight: tmSyncHeight,
+		Height:            50,
+		Started:           false,
 	})
 	assert.NilError(t, err)
 
@@ -327,9 +308,8 @@ func TestAPISyncMonitor_ContinuesWhenNoTMSyncMeta(t *testing.T) {
 	assert.NilError(t, err)
 
 	monitor := &shutterservice.SyncMonitor{
-		DBPool:             dbpool,
-		CheckInterval:      5 * time.Second,
-		DKGStartBlockDelta: 5,
+		DBPool:        dbpool,
+		CheckInterval: 5 * time.Second,
 	}
 
 	monitorCtx, cancelMonitor := context.WithCancel(ctx)
@@ -349,9 +329,9 @@ func TestAPISyncMonitor_ContinuesWhenNoTMSyncMeta(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+		assert.ErrorContains(t, err, shutterservice.ErrBlockNotIncreasing.Error())
 	case <-time.After(1 * time.Second):
-		// Test passes if no error is received
+		t.Fatalf("expected monitor to throw error, but no error returned")
 	}
 
 	// Verify the block number hasn't changed

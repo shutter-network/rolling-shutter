@@ -16,9 +16,8 @@ import (
 )
 
 type SyncMonitor struct {
-	DBPool             *pgxpool.Pool
-	CheckInterval      time.Duration
-	DKGStartBlockDelta uint64
+	DBPool        *pgxpool.Pool
+	CheckInterval time.Duration
 }
 
 func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
@@ -60,7 +59,11 @@ func (s *SyncMonitor) runCheck(
 	keyperdb *keyperDB.Queries,
 	lastBlockNumber *int64,
 ) error {
-	if s.dkgIsRunning(ctx, keyperdb) {
+	isRunning, err := s.isDKGRunning(ctx, keyperdb)
+	if err != nil {
+		return fmt.Errorf("syncMonitor | error in dkgIsRunning: %w", err)
+	}
+	if isRunning {
 		log.Debug().Msg("dkg is running, skipping sync monitor checks")
 		return nil
 	}
@@ -89,30 +92,28 @@ func (s *SyncMonitor) runCheck(
 	return ErrBlockNotIncreasing
 }
 
-func (s *SyncMonitor) dkgIsRunning(ctx context.Context, keyperdb *keyperDB.Queries) bool {
+func (s *SyncMonitor) isDKGRunning(ctx context.Context, keyperdb *keyperDB.Queries) (bool, error) {
 	batchConfig, err := keyperdb.GetLatestBatchConfig(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		log.Error().
 			Err(err).
 			Msg("syncMonitor | error getting latest batchconfig")
-		return true
+		return false, err
 	}
 
-	tmSyncData, err := keyperdb.TMGetSyncMeta(ctx)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("syncMonitor | error getting TMSyncMeta")
-		return true
-	}
-
-	// if batchConfig submission height + DKGStartBlockDelta is greater than shuttermint height then dkg has not started yet
-	if batchConfig.Height+int64(s.DKGStartBlockDelta) < tmSyncData.LastCommittedHeight {
-		// if we get an error in getting dkg result then dkg is not completed
+	// if batchconfig.Started is true that means dkg can happen for this keyper config index
+	if batchConfig.Started {
+		// if we get no rows in getting dkg result then dkg is not completed for that keyper config index
 		_, err := keyperdb.GetDKGResult(ctx, int64(batchConfig.KeyperConfigIndex))
-		if err != nil {
-			return true
+		if errors.Is(err, pgx.ErrNoRows) {
+			return true, nil
+		} else if err != nil {
+			log.Error().Err(err).Msg("syncMonitor | error getting dkg result")
+			return false, err
 		}
 	}
-	return false
+	return false, nil
 }
