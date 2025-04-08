@@ -13,6 +13,7 @@ GOLINT_CONCURRENCY	?= 0
 TOOL_VERSTION_GOENUM		?= 0.6.0
 TOOL_VERSION_PROTOCGENGO	?= 1.36.5
 TOOL_VERSION_OAPICODEGEN	?= 1.16.1
+TOOL_VERSION_ABIGEN			?= 1.15.7
 
 
 build:
@@ -81,6 +82,9 @@ ${GOPATH}/bin/go-enum:
 	${GO} install github.com/abice/go-enum@v${TOOL_VERSTION_GOENUM}
 install-go-enum: ${GOPATH}/bin/go-enum
 
+${GOPATH}/bin/abigen:
+	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v${TOOL_VERSION_ABIGEN}
+install-abigen: ${GOPATH}/bin/abigen
 
 ${GOPATH}/bin/protoc-gen-go:
 	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go@v${TOOL_VERSION_PROTOCGENGO}
