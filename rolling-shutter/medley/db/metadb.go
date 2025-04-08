@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrValueMismatch = errors.New("database has unexpected value")
-	ErrKeyNotFound   = errors.New("key does not exist")
-	ErrNeedsMigation = errors.New("needs migration")
+	ErrValueMismatch  = errors.New("database has unexpected value")
+	ErrKeyNotFound    = errors.New("key does not exist")
+	ErrNeedsMigration = errors.New("needs migration")
 )
 
 var DatabaseVersionKey string = "database-version"
@@ -64,7 +64,7 @@ func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 		return errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
 	}
 	if haveVal < val {
-		return errors.Wrapf(ErrNeedsMigation, "expected %s, have %s", val, haveVal)
+		return errors.Wrapf(ErrNeedsMigration, "expected %s, have %s", val, haveVal)
 	}
 	if haveVal != val {
 		return errors.Wrapf(ErrValueMismatch, "expected %s, have %s", val, haveVal)

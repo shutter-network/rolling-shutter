@@ -22,7 +22,7 @@ func InitDB(ctx context.Context, dbpool *pgxpool.Pool, role string, definition D
 	if err == nil {
 		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database already exists")
 		return nil
-	} else if errors.Is(err, ErrNeedsMigation) {
+	} else if errors.Is(err, ErrNeedsMigration) {
 		// Schema exists, just run migrations
 		shdb.AddConnectionInfo(log.Info(), dbpool).Msg("database exists, checking for migrations")
 		err = dbpool.BeginFunc(WrapContext(ctx, definition.Migrate))

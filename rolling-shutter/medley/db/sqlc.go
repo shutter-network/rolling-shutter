@@ -236,7 +236,6 @@ func (d *SQLC) Migrate(ctx context.Context, tx pgx.Tx) error {
 
 		// Apply only migrations that are newer than current version
 		for _, migration := range migrations {
-			println(migration.Path, migration.Version, "migration")
 			if migration.Version <= version {
 				continue
 			}
