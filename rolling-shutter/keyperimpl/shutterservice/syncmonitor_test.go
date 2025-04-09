@@ -20,12 +20,9 @@ func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, bloc
 	db := database.New(dbpool)
 	keyperdb := keyperDB.New(dbpool)
 
-	// Set up batch config with Started flag
-	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
-		KeyperConfigIndex: 1,
-		Keypers:           []string{},
-		Height:            50,
-		Started:           true,
+	// Set up eon
+	err := keyperdb.InsertEon(ctx, keyperDB.InsertEonParams{
+		Eon: 1,
 	})
 	assert.NilError(t, err)
 
@@ -124,55 +121,6 @@ func TestAPISyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	assert.Equal(t, initialBlockNumber+5, syncedData.BlockNumber, "block number should have been incremented correctly")
 }
 
-func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-
-	// Only set up keyper set and DKG result, but no block data
-	keyperdb := keyperDB.New(dbpool)
-
-	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
-		KeyperConfigIndex: 1,
-		Keypers:           []string{},
-		Started:           true,
-	})
-	assert.NilError(t, err)
-
-	err = keyperdb.InsertDKGResult(ctx, keyperDB.InsertDKGResultParams{
-		Eon:     1,
-		Success: true,
-	})
-	assert.NilError(t, err)
-
-	monitor := &shutterservice.SyncMonitor{
-		DBPool:        dbpool,
-		CheckInterval: 5 * time.Second,
-	}
-
-	monitorCtx, cancelMonitor := context.WithCancel(ctx)
-	defer cancelMonitor()
-
-	errCh := make(chan error, 1)
-	go func() {
-		err := service.RunWithSighandler(monitorCtx, monitor)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-
-	time.Sleep(15 * time.Second)
-	cancelMonitor()
-
-	select {
-	case err := <-errCh:
-		t.Fatalf("expected monitor to continue without error, but got: %v", err)
-	case <-time.After(1 * time.Second):
-	}
-}
-
 func TestAPISyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -182,12 +130,9 @@ func TestAPISyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
 	db := database.New(dbpool)
 	keyperdb := keyperDB.New(dbpool)
 
-	// Set up batch config, but no DKG result
-	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
-		KeyperConfigIndex: 1,
-		Keypers:           []string{},
-		Height:            50,
-		Started:           true,
+	// Set up eon but no DKG result to simulate DKG running
+	err := keyperdb.InsertEon(ctx, keyperDB.InsertEonParams{
+		Eon: 1,
 	})
 	assert.NilError(t, err)
 
@@ -232,7 +177,7 @@ func TestAPISyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
 	assert.Equal(t, initialBlockNumber, syncedData.BlockNumber, "block number should remain unchanged")
 }
 
-func TestAPISyncMonitor_RunsNormallyWhenNoBatchConfig(t *testing.T) {
+func TestAPISyncMonitor_RunsNormallyWhenNoEons(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -240,7 +185,7 @@ func TestAPISyncMonitor_RunsNormallyWhenNoBatchConfig(t *testing.T) {
 	defer closeDB()
 	db := database.New(dbpool)
 
-	// Only set up initial block data, no keyper set
+	// Only set up initial block data, no eon entries
 	initialBlockNumber := int64(100)
 	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
 		BlockHash:   []byte{0x01, 0x02, 0x03},
@@ -281,27 +226,66 @@ func TestAPISyncMonitor_RunsNormallyWhenNoBatchConfig(t *testing.T) {
 	assert.Equal(t, initialBlockNumber, syncedData.BlockNumber, "block number should remain unchanged")
 }
 
-func TestAPISyncMonitor_RunsNormallyWhenBatchConfigNotStarted(t *testing.T) {
+func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	defer closeDB()
+
+	// Set up eon and DKG result, but no block data
+	keyperdb := keyperDB.New(dbpool)
+
+	err := keyperdb.InsertEon(ctx, keyperDB.InsertEonParams{
+		Eon: 1,
+	})
+	assert.NilError(t, err)
+
+	err = keyperdb.InsertDKGResult(ctx, keyperDB.InsertDKGResultParams{
+		Eon:     1,
+		Success: true,
+	})
+	assert.NilError(t, err)
+
+	monitor := &shutterservice.SyncMonitor{
+		DBPool:        dbpool,
+		CheckInterval: 5 * time.Second,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	time.Sleep(15 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+}
+
+func TestAPISyncMonitor_RunsNormallyWithCompletedDKG(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	defer closeDB()
 	db := database.New(dbpool)
-	keyperdb := keyperDB.New(dbpool)
 
-	// Set up batch config with Started = false
-	err := keyperdb.InsertBatchConfig(ctx, keyperDB.InsertBatchConfigParams{
-		KeyperConfigIndex: 1,
-		Keypers:           []string{},
-		Height:            50,
-		Started:           false,
-	})
-	assert.NilError(t, err)
+	initialBlockNumber := int64(100)
+	setupTestData(ctx, t, dbpool, initialBlockNumber)
 
 	// Set up initial block data
-	initialBlockNumber := int64(100)
-	err = db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
+	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
 		BlockHash:   []byte{0x01, 0x02, 0x03},
 		BlockNumber: initialBlockNumber,
 	})
@@ -323,7 +307,7 @@ func TestAPISyncMonitor_RunsNormallyWhenBatchConfigNotStarted(t *testing.T) {
 		}
 	}()
 
-	// Let it run for a while
+	// Let it run for a while without incrementing the block number
 	time.Sleep(15 * time.Second)
 	cancelMonitor()
 

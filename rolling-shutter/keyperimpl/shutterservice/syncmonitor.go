@@ -93,27 +93,29 @@ func (s *SyncMonitor) runCheck(
 }
 
 func (s *SyncMonitor) isDKGRunning(ctx context.Context, keyperdb *keyperDB.Queries) (bool, error) {
-	batchConfig, err := keyperdb.GetLatestBatchConfig(ctx)
+	// if latest eon is registered then EonStarted event has triggered, which means the dkg can start
+	eons, err := keyperdb.GetAllEons(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("syncMonitor | error getting latest batchconfig")
+			Msg("syncMonitor | error getting all eons")
 		return false, err
 	}
 
-	// if batchconfig.Started is true that means dkg can happen for this keyper config index
-	if batchConfig.Started {
-		// if we get no rows in getting dkg result then dkg is not completed for that keyper config index
-		_, err := keyperdb.GetDKGResult(ctx, int64(batchConfig.KeyperConfigIndex))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return true, nil
-		} else if err != nil {
-			log.Error().Err(err).Msg("syncMonitor | error getting dkg result")
-			return false, err
-		}
+	if len(eons) == 0 {
+		return false, nil
+	}
+
+	// if we get no rows in getting dkg result then dkg is not completed for that eon
+	_, err = keyperdb.GetDKGResult(ctx, eons[len(eons)-1].Eon)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil
+	} else if err != nil {
+		log.Error().Err(err).Msg("syncMonitor | error getting dkg result")
+		return false, err
 	}
 	return false, nil
 }

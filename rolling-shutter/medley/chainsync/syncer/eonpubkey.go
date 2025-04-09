@@ -62,7 +62,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 	}
 	runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
-		return s.watchNewEonPubkey(ctx, subs.Err())
+		return s.watchNewEonPubkey(ctx)
 	})
 	return nil
 }
@@ -126,7 +126,7 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 	}, nil
 }
 
-func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan error) error {
+func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context) error {
 	for {
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
@@ -147,8 +147,6 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 					err.Error(),
 				)
 			}
-		case err := <-subsErr:
-			s.Log.Error("subscription error for watchNewEonPubkey", err.Error())
 		case <-ctx.Done():
 			return ctx.Err()
 		}

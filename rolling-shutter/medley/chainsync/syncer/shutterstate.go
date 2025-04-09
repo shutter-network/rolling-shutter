@@ -63,7 +63,7 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	runner.Defer(subsUnpaused.Unsubscribe)
 
 	runner.Go(func() error {
-		return s.watchPaused(ctx, subs.Err(), subsUnpaused.Err())
+		return s.watchPaused(ctx)
 	})
 	return nil
 }
@@ -87,7 +87,7 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 	}
 }
 
-func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error) error {
+func (s *ShutterStateSyncer) watchPaused(ctx context.Context) error {
 	isActive, err := s.pollIsActive(ctx)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
@@ -123,10 +123,6 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 			}
 			isActive = ev.Active
 			s.handle(ctx, ev)
-		case err := <-subsErr:
-			s.Log.Error("subscription error for watchPaused", err.Error())
-		case err := <-subsErrUnpaused:
-			s.Log.Error("subscription error for watchUnpaused", err.Error())
 		case <-ctx.Done():
 			return ctx.Err()
 		}
