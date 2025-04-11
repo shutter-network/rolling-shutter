@@ -14,13 +14,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
-// MockSyncState is a mock implementation of BlockSyncState for testing
+// MockSyncState is a mock implementation of BlockSyncState for testing.
 type MockSyncState struct {
 	blockNumber int64
 	err         error
 }
 
-func (m *MockSyncState) GetSyncedBlockNumber(ctx context.Context) (int64, error) {
+func (m *MockSyncState) GetSyncedBlockNumber(_ context.Context) (int64, error) {
 	return m.blockNumber, m.err
 }
 

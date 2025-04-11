@@ -15,13 +15,13 @@ import (
 )
 
 // BlockSyncState is an interface that different keyper implementations
-// can implement to provide their own block sync state logic
+// can implement to provide their own block sync state logic.
 type BlockSyncState interface {
-	// GetSyncedBlockNumber retrieves the current synced block number
+	// GetSyncedBlockNumber retrieves the current synced block number.
 	GetSyncedBlockNumber(ctx context.Context) (int64, error)
 }
 
-// SyncMonitor monitors the sync state of the keyper
+// SyncMonitor monitors the sync state of the keyper.
 type SyncMonitor struct {
 	DBPool        *pgxpool.Pool
 	CheckInterval time.Duration
