@@ -1,23 +1,31 @@
-package shutterservice
+package syncmonitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	keyperDB "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+// BlockSyncState is an interface that different keyper implementations
+// can implement to provide their own block sync state logic
+type BlockSyncState interface {
+	// GetSyncedBlockNumber retrieves the current synced block number
+	GetSyncedBlockNumber(ctx context.Context) (int64, error)
+}
+
+// SyncMonitor monitors the sync state of the keyper
 type SyncMonitor struct {
 	DBPool        *pgxpool.Pool
 	CheckInterval time.Duration
+	SyncState     BlockSyncState
 }
 
 func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
@@ -30,15 +38,14 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 
 func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 	var lastBlockNumber int64
-	db := database.New(s.DBPool)
-	keyperdb := keyperDB.New(s.DBPool)
+	keyperdb := database.New(s.DBPool)
 
 	log.Debug().Msg("starting the sync monitor")
 
 	for {
 		select {
 		case <-time.After(s.CheckInterval):
-			if err := s.runCheck(ctx, db, keyperdb, &lastBlockNumber); err != nil {
+			if err := s.runCheck(ctx, keyperdb, &lastBlockNumber); err != nil {
 				if errors.Is(err, ErrBlockNotIncreasing) {
 					return err
 				}
@@ -55,29 +62,27 @@ var ErrBlockNotIncreasing = errors.New("block number has not increased between c
 
 func (s *SyncMonitor) runCheck(
 	ctx context.Context,
-	db *database.Queries,
-	keyperdb *keyperDB.Queries,
+	keyperdb *database.Queries,
 	lastBlockNumber *int64,
 ) error {
 	isRunning, err := s.isDKGRunning(ctx, keyperdb)
 	if err != nil {
-		return fmt.Errorf("syncMonitor | error in dkgIsRunning: %w", err)
+		return fmt.Errorf("syncMonitor | error in isDKGRunning: %w", err)
 	}
 	if isRunning {
 		log.Debug().Msg("dkg is running, skipping sync monitor checks")
 		return nil
 	}
 
-	record, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	currentBlockNumber, err := s.SyncState.GetSyncedBlockNumber(ctx)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Warn().Err(err).Msg("no rows found in table identity_registered_events_synced_until")
+			log.Warn().Err(err).Msg("no rows found in sync state table")
 			return nil // This is not an error condition that should stop monitoring
 		}
-		return fmt.Errorf("error getting identity_registered_events_synced_until: %w", err)
+		return fmt.Errorf("error getting synced block number: %w", err)
 	}
 
-	currentBlockNumber := record.BlockNumber
 	log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
 
 	if currentBlockNumber > *lastBlockNumber {
@@ -92,7 +97,7 @@ func (s *SyncMonitor) runCheck(
 	return ErrBlockNotIncreasing
 }
 
-func (s *SyncMonitor) isDKGRunning(ctx context.Context, keyperdb *keyperDB.Queries) (bool, error) {
+func (s *SyncMonitor) isDKGRunning(ctx context.Context, keyperdb *database.Queries) (bool, error) {
 	// if latest eon is registered then EonStarted event has triggered, which means the dkg can start
 	eons, err := keyperdb.GetAllEons(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {

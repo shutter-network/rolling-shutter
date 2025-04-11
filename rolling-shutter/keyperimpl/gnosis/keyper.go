@@ -25,6 +25,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/slotticker"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/syncmonitor"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -49,7 +50,7 @@ type Keyper struct {
 	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
-	syncMonitor         *SyncMonitor
+	syncMonitor         *syncmonitor.SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -63,8 +64,7 @@ type Keyper struct {
 
 func New(c *Config) *Keyper {
 	return &Keyper{
-		config:      c,
-		syncMonitor: &SyncMonitor{},
+		config: c,
 	}
 }
 
@@ -156,9 +156,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to reset transaction pointer age")
 	}
 
-	kpr.syncMonitor = &SyncMonitor{
+	kpr.syncMonitor = &syncmonitor.SyncMonitor{
 		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Gnosis.SyncMonitorCheckInterval) * time.Second,
+		SyncState: &GnosisSyncState{
+			kpr.dbpool,
+		},
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })

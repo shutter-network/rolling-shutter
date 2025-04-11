@@ -22,6 +22,7 @@ import (
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/syncmonitor"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
@@ -36,7 +37,7 @@ type Keyper struct {
 	registrySyncer      *RegistrySyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredTime *uint64
-	syncMonitor         *SyncMonitor
+	syncMonitor         *syncmonitor.SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -113,10 +114,14 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	kpr.syncMonitor = &SyncMonitor{
+	kpr.syncMonitor = &syncmonitor.SyncMonitor{
 		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
+		SyncState: &ShutterServiceSyncState{
+			kpr.dbpool,
+		},
 	}
+
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher, kpr.syncMonitor)
 }
