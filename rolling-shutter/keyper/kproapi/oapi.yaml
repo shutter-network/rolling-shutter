@@ -102,11 +102,11 @@ components:
   schemas:
     EpochID:
       type: string
-      pattern: "^0x[0-9a-f]{16}$"
+      pattern: "^0x[0-9a-f]{64}$"
 
     DecryptionKey:
       type: string
-      pattern: "^0x[0-9a-f]{16}$"
+      pattern: "^0x[0-9a-f]{64}$"
 
     DecryptionTrigger:
       type: object
@@ -116,7 +116,7 @@ components:
       properties:
         epoch_id:
           type: string
-          pattern: "^0x[0-9a-f]{16}$"
+          pattern: "^0x[0-9a-f]{64}$"
         block_number:
           type: integer
           format: uint64
