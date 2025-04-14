@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
 )
 
 var metricsP2PMessageValidationTime = prometheus.NewHistogramVec(
@@ -57,6 +58,16 @@ var metricsP2PPeerPing = prometheus.NewGaugeVec(
 	[]string{"our_id", "peer_id"},
 )
 
+var metricsP2PPeerUserAgent = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "p2p",
+		Name:      "peer_user_agent",
+		Help:      "Collection of the user agent of a peer ID.",
+	},
+	[]string{"peer_id", "user_agent"},
+)
+
 func collectPeerAddresses(p peer.AddrInfo) {
 	for _, multiAddr := range p.Addrs {
 		metricsP2PPeerTuples.WithLabelValues(p.ID.String(), multiAddr.String()).Set(1)
@@ -69,6 +80,7 @@ func init() {
 	prometheus.MustRegister(metricsP2PPeerTuples)
 	prometheus.MustRegister(metricsP2PPeerConnectedness)
 	prometheus.MustRegister(metricsP2PPeerPing)
+	prometheus.MustRegister(metricsP2PPeerUserAgent)
 }
 
 func updatePeersMetrics(h host.Host, peerIds mapset.Set[peer.ID]) {
@@ -79,6 +91,14 @@ func updatePeersMetrics(h host.Host, peerIds mapset.Set[peer.ID]) {
 		peerPing := h.Peerstore().LatencyEWMA(p)
 		if peerPing != 0 {
 			metricsP2PPeerPing.WithLabelValues(ourID, p.String()).Set(peerPing.Seconds())
+		}
+		ua, err := h.Peerstore().Get(p, "AgentVersion")
+		if err != nil {
+			log.Warn().Str("peer", p.String()).Msg("Can't get user agent for peer")
+			continue
+		}
+		if ua != nil {
+			metricsP2PPeerUserAgent.WithLabelValues(p.String(), ua.(string)).Set(1)
 		}
 	}
 }
