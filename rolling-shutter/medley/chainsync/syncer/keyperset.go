@@ -67,13 +67,12 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	}
 	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
 	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
-	// FIXME: what to do on subs.Error()
 	if err != nil {
 		return err
 	}
 	runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
-		return s.watchNewKeypersService(ctx)
+		return s.watchNewKeypersService(ctx, subs.Err())
 	})
 	return nil
 }
@@ -205,7 +204,7 @@ func (s *KeyperSetSyncer) newEvent(
 	}, nil
 }
 
-func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context) error {
+func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-chan error) error {
 	for {
 		select {
 		case newKeypers, ok := <-s.keyperAddedCh:
@@ -234,6 +233,10 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context) error {
 					"error",
 					err.Error(),
 				)
+			}
+		case err := <-subsErr:
+			if err != nil {
+				s.Log.Error("subscription error for watchNewKeypersService", err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
