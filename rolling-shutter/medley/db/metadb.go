@@ -31,8 +31,8 @@ func InsertDBVersion(ctx context.Context, tx pgx.Tx, version string) error {
 	return insertMetaInf(ctx, tx, DatabaseVersionKey, version)
 }
 
-func InsertSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) error {
-	return insertMetaInf(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(schema.Version))
+func InsertSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
+	return insertMetaInf(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(version))
 }
 
 func insertMetaInf(ctx context.Context, tx pgx.Tx, key, val string) error {
@@ -44,16 +44,16 @@ func insertMetaInf(ctx context.Context, tx pgx.Tx, key, val string) error {
 	})
 }
 
-func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema Schema) error {
+func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema Schema, version int) error {
 	return New(tx).UpdateMeta(ctx, UpdateMetaParams{
 		Key:   MakeSchemaVersionKey(defName, schema.Name),
-		Value: fmt.Sprint(schema.Version),
+		Value: fmt.Sprint(version),
 	})
 }
 
 // ValidateSchemaVersion checks that the database schema is compatible.
-func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) error {
-	return expectMetaKeyVal(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(schema.Version))
+func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
+	return expectMetaKeyVal(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(version))
 }
 
 func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {

@@ -149,9 +149,8 @@ type Definition interface {
 }
 
 type Schema struct {
-	Version int
-	Name    string
-	Path    string
+	Name string
+	Path string
 }
 
 type Migration struct {
