@@ -40,7 +40,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.9.0
-	github.com/supranational/blst v0.3.12
+	github.com/supranational/blst v0.3.14
 	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.37.0-rc2
 	go.opentelemetry.io/otel v1.27.0

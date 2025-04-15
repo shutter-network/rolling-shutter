@@ -17,7 +17,7 @@ var files embed.FS
 var Definition db.Definition
 
 func init() {
-	def, err := db.NewSQLCDefinition(files, "sql/", "gnosiskeyper", 1)
+	def, err := db.NewSQLCDefinition(files, "sql/", "gnosiskeyper")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize DB metadata")
 	}
