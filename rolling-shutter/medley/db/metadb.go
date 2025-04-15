@@ -53,7 +53,24 @@ func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema 
 
 // ValidateSchemaVersion checks that the database schema is compatible.
 func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
-	return expectMetaKeyVal(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(version))
+	key := MakeSchemaVersionKey(definitionName, schema.Name)
+	haveVal, err := New(tx).GetMeta(ctx, key)
+	if err == pgx.ErrNoRows {
+		return errors.Wrapf(ErrKeyNotFound, "key: %s", key)
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
+	}
+	haveVersion, err := strconv.ParseInt(haveVal, 10, 0)
+	if err != nil {
+		return errors.Wrapf(err, "failed to convert version '%s' from meta_inf table", key)
+	}
+	if int(haveVersion) < version {
+		return errors.Wrapf(ErrNeedsMigration, "expected %d, have %d", version, haveVersion)
+	}
+	if int(haveVersion) != version {
+		return errors.Wrapf(ErrValueMismatch, "expected %d, have %d", version, haveVersion)
+	}
+	return nil
 }
 
 func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
@@ -62,9 +79,6 @@ func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 		return errors.Wrapf(ErrKeyNotFound, "key: %s", key)
 	} else if err != nil {
 		return errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
-	}
-	if haveVal < val {
-		return errors.Wrapf(ErrNeedsMigration, "expected %s, have %s", val, haveVal)
 	}
 	if haveVal != val {
 		return errors.Wrapf(ErrValueMismatch, "expected %s, have %s", val, haveVal)
