@@ -2,6 +2,7 @@ package syncmonitor
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,12 +17,21 @@ import (
 
 // MockSyncState is a mock implementation of BlockSyncState for testing.
 type MockSyncState struct {
+	mu          sync.Mutex
 	blockNumber int64
 	err         error
 }
 
 func (m *MockSyncState) GetSyncedBlockNumber(_ context.Context) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.blockNumber, m.err
+}
+
+func (m *MockSyncState) SetBlockNumber(n int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockNumber = n
 }
 
 func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool) {
@@ -78,6 +88,11 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected an error, but none was returned")
 	}
+
+	// Verify final state
+	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, initialBlockNumber, finalBlockNumber)
 }
 
 func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
@@ -96,25 +111,30 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 
 	monitor := &SyncMonitor{
 		DBPool:        dbpool,
-		CheckInterval: 5 * time.Second,
+		CheckInterval: 200 * time.Millisecond,
 		SyncState:     mockSyncState,
 	}
 
-	_, deferFn := service.RunBackground(ctx, monitor)
-	defer deferFn()
-
-	doneCh := make(chan struct{})
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	errCh := make(chan error, 1)
 	go func() {
-		for i := 0; i < 5; i++ {
-			time.Sleep(5 * time.Second)
-			mockSyncState.blockNumber = initialBlockNumber + int64(i+1)
+		if err := service.RunWithSighandler(monitorCtx, monitor); err != nil {
+			errCh <- err
 		}
-
-		doneCh <- struct{}{}
 	}()
 
-	<-doneCh
-	assert.Equal(t, initialBlockNumber+5, mockSyncState.blockNumber, "block number should have been incremented correctly")
+	// Update block numbers more quickly
+	for i := 0; i < 5; i++ {
+		time.Sleep(200 * time.Millisecond)
+		mockSyncState.SetBlockNumber(initialBlockNumber + int64(i+1))
+	}
+
+	cancelMonitor()
+
+	// Verify final state
+	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, initialBlockNumber+5, finalBlockNumber, "block number should have been incremented correctly")
 }
 
 func TestSyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
@@ -165,7 +185,9 @@ func TestSyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
 	}
 
 	// Verify the block number hasn't changed
-	assert.Equal(t, initialBlockNumber, mockSyncState.blockNumber, "block number should remain unchanged")
+	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, initialBlockNumber, finalBlockNumber, "block number should remain unchanged")
 }
 
 func TestSyncMonitor_RunsNormallyWhenNoEons(t *testing.T) {
@@ -233,6 +255,7 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	mockSyncState := &MockSyncState{
 		err: pgx.ErrNoRows,
 	}
+	mockSyncState.SetBlockNumber(0) // Initialize block number
 
 	monitor := &SyncMonitor{
 		DBPool:        dbpool,
@@ -303,4 +326,9 @@ func TestSyncMonitor_RunsNormallyWithCompletedDKG(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatalf("expected monitor to throw error, but no error returned")
 	}
+
+	// Verify final state if needed
+	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, initialBlockNumber, finalBlockNumber)
 }
