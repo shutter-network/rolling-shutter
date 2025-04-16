@@ -236,7 +236,8 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-
 			}
 		case err := <-subsErr:
 			if err != nil {
-				s.Log.Error("subscription error for watchNewKeypersService", err)
+				s.Log.Error("subscription error for watchNewKeypersService", err.Error())
+				return err
 			}
 		case <-ctx.Done():
 			return ctx.Err()

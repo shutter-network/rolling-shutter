@@ -149,7 +149,8 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 			}
 		case err := <-subsErr:
 			if err != nil {
-				s.Log.Error("subscription error for watchNewEonPubkey", err)
+				s.Log.Error("subscription error for watchNewEonPubkey", err.Error())
+				return err
 			}
 		case <-ctx.Done():
 			return ctx.Err()

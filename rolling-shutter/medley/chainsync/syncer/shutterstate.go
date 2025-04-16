@@ -125,11 +125,13 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 			s.handle(ctx, ev)
 		case err := <-subsErr:
 			if err != nil {
-				s.Log.Error("subscription error for watchPaused")
+				s.Log.Error("subscription error for watchPaused", err.Error())
+				return err
 			}
 		case err := <-subsErrUnpaused:
 			if err != nil {
-				s.Log.Error("subscription error for watchUnpaused", err)
+				s.Log.Error("subscription error for watchUnpaused", err.Error())
+				return err
 			}
 		case <-ctx.Done():
 			return ctx.Err()
