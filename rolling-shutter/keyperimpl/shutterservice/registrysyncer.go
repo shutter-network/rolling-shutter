@@ -182,6 +182,8 @@ func (s *RegistrySyncer) syncRange(
 		Int("num-inserted-events", len(filteredEvents)).
 		Int("num-discarded-events", len(events)-len(filteredEvents)).
 		Msg("synced registry contract")
+
+	metricsRegistryEventsSyncedUntil.Set(float64(end))
 	return nil
 }
 
