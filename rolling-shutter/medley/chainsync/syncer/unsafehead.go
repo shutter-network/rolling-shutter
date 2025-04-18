@@ -60,7 +60,8 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context, subsErr <-
 			}
 		case err := <-subsErr:
 			if err != nil {
-				s.Log.Error("subscription error for watchLatestUnsafeHead", err)
+				s.Log.Error("subscription error for watchLatestUnsafeHead", err.Error())
+				return err
 			}
 		case <-ctx.Done():
 			return ctx.Err()
