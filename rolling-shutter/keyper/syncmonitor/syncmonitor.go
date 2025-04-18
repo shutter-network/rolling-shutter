@@ -65,15 +65,6 @@ func (s *SyncMonitor) runCheck(
 	keyperdb *database.Queries,
 	lastBlockNumber *int64,
 ) error {
-	isRunning, err := s.isDKGRunning(ctx, keyperdb)
-	if err != nil {
-		return fmt.Errorf("syncMonitor | error in isDKGRunning: %w", err)
-	}
-	if isRunning {
-		log.Debug().Msg("dkg is running, skipping sync monitor checks")
-		return nil
-	}
-
 	currentBlockNumber, err := s.SyncState.GetSyncedBlockNumber(ctx)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -95,32 +86,4 @@ func (s *SyncMonitor) runCheck(
 		Int64("current-block-number", currentBlockNumber).
 		Msg("block number has not increased between checks")
 	return ErrBlockNotIncreasing
-}
-
-func (s *SyncMonitor) isDKGRunning(ctx context.Context, keyperdb *database.Queries) (bool, error) {
-	// if latest eon is registered then EonStarted event has triggered, which means the dkg can start
-	eons, err := keyperdb.GetAllEons(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("syncMonitor | error getting all eons")
-		return false, err
-	}
-
-	if len(eons) == 0 {
-		return false, nil
-	}
-
-	// if we get no rows in getting dkg result then dkg is not completed for that eon
-	_, err = keyperdb.GetDKGResult(ctx, eons[len(eons)-1].Eon)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return true, nil
-	} else if err != nil {
-		log.Error().Err(err).Msg("syncMonitor | error getting dkg result")
-		return false, err
-	}
-	return false, nil
 }

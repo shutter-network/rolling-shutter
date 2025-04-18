@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -34,24 +33,6 @@ func (m *MockSyncState) SetBlockNumber(n int64) {
 	m.blockNumber = n
 }
 
-func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool) {
-	t.Helper()
-	keyperdb := database.New(dbpool)
-
-	// Set up eon
-	err := keyperdb.InsertEon(ctx, database.InsertEonParams{
-		Eon: 1,
-	})
-	assert.NilError(t, err)
-
-	// Set up DKG result
-	err = keyperdb.InsertDKGResult(ctx, database.InsertDKGResultParams{
-		Eon:     1,
-		Success: true,
-	})
-	assert.NilError(t, err)
-}
-
 func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -60,8 +41,6 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	defer dbclose()
 
 	initialBlockNumber := int64(100)
-	setupTestData(ctx, t, dbpool)
-
 	mockSyncState := &MockSyncState{
 		blockNumber: initialBlockNumber,
 	}
@@ -103,8 +82,6 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	defer closeDB()
 
 	initialBlockNumber := int64(100)
-	setupTestData(ctx, t, dbpool)
-
 	mockSyncState := &MockSyncState{
 		blockNumber: initialBlockNumber,
 	}
@@ -135,59 +112,6 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, initialBlockNumber+5, finalBlockNumber, "block number should have been incremented correctly")
-}
-
-func TestSyncMonitor_SkipsWhenDKGIsRunning(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-	keyperdb := database.New(dbpool)
-
-	// Set up eon but no DKG result to simulate DKG running
-	err := keyperdb.InsertEon(ctx, database.InsertEonParams{
-		Eon: 1,
-	})
-	assert.NilError(t, err)
-
-	initialBlockNumber := int64(100)
-	mockSyncState := &MockSyncState{
-		blockNumber: initialBlockNumber,
-	}
-
-	monitor := &SyncMonitor{
-		DBPool:        dbpool,
-		CheckInterval: 5 * time.Second,
-		SyncState:     mockSyncState,
-	}
-
-	monitorCtx, cancelMonitor := context.WithCancel(ctx)
-	defer cancelMonitor()
-
-	errCh := make(chan error, 1)
-	go func() {
-		err := service.RunWithSighandler(monitorCtx, monitor)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-
-	// Let it run for a while without incrementing the block number
-	time.Sleep(15 * time.Second)
-	cancelMonitor()
-
-	select {
-	case err := <-errCh:
-		t.Fatalf("expected monitor to continue without error, but got: %v", err)
-	case <-time.After(1 * time.Second):
-		// Test passes if no error is received
-	}
-
-	// Verify the block number hasn't changed
-	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
-	assert.NilError(t, err)
-	assert.Equal(t, initialBlockNumber, finalBlockNumber, "block number should remain unchanged")
 }
 
 func TestSyncMonitor_RunsNormallyWhenNoEons(t *testing.T) {
@@ -238,19 +162,6 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	defer closeDB()
 
-	// Set up eon and DKG result
-	keyperdb := database.New(dbpool)
-	err := keyperdb.InsertEon(ctx, database.InsertEonParams{
-		Eon: 1,
-	})
-	assert.NilError(t, err)
-
-	err = keyperdb.InsertDKGResult(ctx, database.InsertDKGResultParams{
-		Eon:     1,
-		Success: true,
-	})
-	assert.NilError(t, err)
-
 	// Set up mock sync state that returns no rows error
 	mockSyncState := &MockSyncState{
 		err: pgx.ErrNoRows,
@@ -283,52 +194,4 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		// Test passes if no error is received
 	}
-}
-
-func TestSyncMonitor_RunsNormallyWithCompletedDKG(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-
-	setupTestData(ctx, t, dbpool)
-
-	initialBlockNumber := int64(100)
-	mockSyncState := &MockSyncState{
-		blockNumber: initialBlockNumber,
-	}
-
-	monitor := &SyncMonitor{
-		DBPool:        dbpool,
-		CheckInterval: 5 * time.Second,
-		SyncState:     mockSyncState,
-	}
-
-	monitorCtx, cancelMonitor := context.WithCancel(ctx)
-	defer cancelMonitor()
-
-	errCh := make(chan error, 1)
-	go func() {
-		err := service.RunWithSighandler(monitorCtx, monitor)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-
-	// Let it run for a while without incrementing the block number
-	time.Sleep(15 * time.Second)
-	cancelMonitor()
-
-	select {
-	case err := <-errCh:
-		assert.ErrorContains(t, err, ErrBlockNotIncreasing.Error())
-	case <-time.After(1 * time.Second):
-		t.Fatalf("expected monitor to throw error, but no error returned")
-	}
-
-	// Verify final state if needed
-	finalBlockNumber, err := mockSyncState.GetSyncedBlockNumber(ctx)
-	assert.NilError(t, err)
-	assert.Equal(t, initialBlockNumber, finalBlockNumber)
 }
