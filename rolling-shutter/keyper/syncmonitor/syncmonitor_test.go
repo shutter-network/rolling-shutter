@@ -9,9 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
 // MockSyncState is a mock implementation of BlockSyncState for testing.
@@ -37,16 +35,12 @@ func TestSyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer dbclose()
-
 	initialBlockNumber := int64(100)
 	mockSyncState := &MockSyncState{
 		blockNumber: initialBlockNumber,
 	}
 
 	monitor := &SyncMonitor{
-		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 		SyncState:     mockSyncState,
 	}
@@ -78,16 +72,12 @@ func TestSyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-
 	initialBlockNumber := int64(100)
 	mockSyncState := &MockSyncState{
 		blockNumber: initialBlockNumber,
 	}
 
 	monitor := &SyncMonitor{
-		DBPool:        dbpool,
 		CheckInterval: 200 * time.Millisecond,
 		SyncState:     mockSyncState,
 	}
@@ -118,16 +108,12 @@ func TestSyncMonitor_RunsNormallyWhenNoEons(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-
 	initialBlockNumber := int64(100)
 	mockSyncState := &MockSyncState{
 		blockNumber: initialBlockNumber,
 	}
 
 	monitor := &SyncMonitor{
-		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 		SyncState:     mockSyncState,
 	}
@@ -159,9 +145,6 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
-	defer closeDB()
-
 	// Set up mock sync state that returns no rows error
 	mockSyncState := &MockSyncState{
 		err: pgx.ErrNoRows,
@@ -169,7 +152,6 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	mockSyncState.SetBlockNumber(0) // Initialize block number
 
 	monitor := &SyncMonitor{
-		DBPool:        dbpool,
 		CheckInterval: 5 * time.Second,
 		SyncState:     mockSyncState,
 	}

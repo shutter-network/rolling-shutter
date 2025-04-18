@@ -157,7 +157,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	kpr.syncMonitor = &syncmonitor.SyncMonitor{
-		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Gnosis.SyncMonitorCheckInterval) * time.Second,
 		SyncState: &GnosisSyncState{
 			kpr.dbpool,

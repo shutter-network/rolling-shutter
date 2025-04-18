@@ -7,10 +7,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
@@ -23,7 +21,6 @@ type BlockSyncState interface {
 
 // SyncMonitor monitors the sync state of the keyper.
 type SyncMonitor struct {
-	DBPool        *pgxpool.Pool
 	CheckInterval time.Duration
 	SyncState     BlockSyncState
 }
@@ -38,14 +35,13 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 
 func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 	var lastBlockNumber int64
-	keyperdb := database.New(s.DBPool)
 
 	log.Debug().Msg("starting the sync monitor")
 
 	for {
 		select {
 		case <-time.After(s.CheckInterval):
-			if err := s.runCheck(ctx, keyperdb, &lastBlockNumber); err != nil {
+			if err := s.runCheck(ctx, &lastBlockNumber); err != nil {
 				if errors.Is(err, ErrBlockNotIncreasing) {
 					return err
 				}
@@ -62,7 +58,6 @@ var ErrBlockNotIncreasing = errors.New("block number has not increased between c
 
 func (s *SyncMonitor) runCheck(
 	ctx context.Context,
-	keyperdb *database.Queries,
 	lastBlockNumber *int64,
 ) error {
 	currentBlockNumber, err := s.SyncState.GetSyncedBlockNumber(ctx)
