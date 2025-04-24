@@ -222,11 +222,14 @@ func (v *ValidatorSyncer) filterEvents(
 				continue
 			}
 		} else {
-			validSignature := validatorregistry.VerifyAggregateSignature(sig, pubKeys, msg)
-			if !validSignature {
-				evLog.Warn().Msg("ignoring registration message with invalid signature")
-				continue
-			}
+			// TODO: this disables aggregate message
+			evLog.Warn().Msg("ignoring validator registration message as the version is not compatible")
+			continue
+			// validSignature := validatorregistry.VerifyAggregateSignature(sig, pubKeys, msg)
+			// if !validSignature {
+			// 	evLog.Warn().Msg("ignoring registration message with invalid signature")
+			// 	continue
+			// }
 		}
 
 		filteredEvents = append(filteredEvents, event)
