@@ -138,3 +138,54 @@ func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 	case <-time.After(1 * time.Second):
 	}
 }
+
+func TestAPISyncMonitor_HandlesReorg(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	defer closeDB()
+	db := database.New(dbpool)
+
+	// Set up initial block at a higher number
+	initialBlockNumber := int64(100)
+	setupTestData(ctx, t, dbpool, initialBlockNumber)
+
+	monitor := &shutterservice.SyncMonitor{
+		DBPool:        dbpool,
+		CheckInterval: 5 * time.Second,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Decrease the block number
+	decreasedBlockNumber := int64(50)
+	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
+		BlockHash:   []byte{0x01, 0x02, 0x03},
+		BlockNumber: decreasedBlockNumber,
+	})
+	assert.NilError(t, err)
+
+	time.Sleep(4 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+
+	// Verify the block number was updated to the latest value
+	syncedData, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, decreasedBlockNumber, syncedData.BlockNumber, "block number should be updated to the decreased value")
+}
