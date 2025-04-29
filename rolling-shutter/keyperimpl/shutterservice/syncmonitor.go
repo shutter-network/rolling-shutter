@@ -26,7 +26,7 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 	})
 
 	runner.Go(func() error {
-		ticker := time.NewTicker(2 * time.Minute)
+		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			ctx.Done()
