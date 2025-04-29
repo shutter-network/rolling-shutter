@@ -81,7 +81,9 @@ func (s *SyncMonitor) runCheck(
 	currentBlockNumber := record.BlockNumber
 	log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
 
-	if currentBlockNumber > *lastBlockNumber {
+	// if the current block number < last block number, this means a reorg is detected, so we do not throw error
+	// if the current block number > last block number, then syncing is working as expected
+	if currentBlockNumber != *lastBlockNumber {
 		*lastBlockNumber = currentBlockNumber
 		return nil
 	}
