@@ -25,6 +25,16 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 		return s.runMonitor(ctx)
 	})
 
+	runner.Go(func() error {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx.Done()
+			return fmt.Errorf("explicitly canceled context error")
+		}
+		return nil
+	})
+
 	return nil
 }
 
