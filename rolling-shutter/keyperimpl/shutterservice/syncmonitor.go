@@ -31,7 +31,6 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 		for range ticker.C {
 			ctx.Done()
 			panic("explicitly canceled context error")
-			return fmt.Errorf("explicitly canceled context error")
 		}
 		return nil
 	})
