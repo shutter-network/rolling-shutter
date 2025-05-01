@@ -30,7 +30,7 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 		defer ticker.Stop()
 		for range ticker.C {
 			ctx.Done()
-			panic("explicitly canceled context error")
+			return fmt.Errorf("explicitly canceled context error")
 		}
 		return nil
 	})
@@ -56,7 +56,7 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			log.Info().Msg("stopping syncMonitor due to context cancellation")
-			return ctx.Err()
+			panic("context cancelled")
 		}
 	}
 }
