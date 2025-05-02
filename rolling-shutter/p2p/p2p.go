@@ -159,6 +159,9 @@ func (p *P2PNode) Run(
 		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")
 		util.Advertise(ctx, p.discovery, p.config.DiscoveryNamespace)
 		<-ctx.Done()
+		if err := p.dht.Close(); err != nil {
+			return err
+		}
 		return ctx.Err()
 	})
 	runner.Go(func() error {
