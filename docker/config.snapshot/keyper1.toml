@@ -1,0 +1,63 @@
+# Ethereum address: 0x68faB7db16eF0c9BF4cBFa40a459f50997676270
+# Peer identity: /p2p/12D3KooWPLM5fMq3Sa72ZUHj5xbSGF1KjP3QnwWGu2Pev2U14sEK
+
+
+InstanceID = 42
+# If it's empty, we use the standard PG_ environment variables
+DatabaseURL = 'postgres://pguser:pgpassword@localhost:5432/shutter'
+BeaconAPIURL = 'http://localhost:5052'
+HTTPEnabled = false
+HTTPListenAddress = ':3000'
+MaxNumKeysPerMessage = 500
+
+[Gnosis]
+EncryptedGasLimit = 1000000
+MinGasPerTransaction = 21000
+MaxTxPointerAge = 5
+SecondsPerSlot = 5
+SlotsPerEpoch = 16
+GenesisSlotTimestamp = 1665410700
+SyncStartBlockNumber = 0
+
+[Gnosis.Node]
+PrivateKey = 'ab44f3f9959bf5937c98c80d9297e375d165c47032209aaf0b4766bbf843ade2'
+# Contract source directory
+DeploymentDir = '/deployments/localhost/'
+# The layer 1 JSON RPC endpoint
+EthereumURL = 'http://127.0.0.1:8545/'
+
+[Gnosis.Contracts]
+KeyperSetManager = '0x0000000000000000000000000000000000000000'
+KeyBroadcastContract = '0x0000000000000000000000000000000000000000'
+Sequencer = '0x0000000000000000000000000000000000000000'
+ValidatorRegistry = '0x0000000000000000000000000000000000000000'
+
+[P2P]
+P2PKey = 'CAESQEK5upov0lG+cphyupljXszdC/2g5/xITGtxuQgaMiHryNYf4WRDeLquUhMi08qUvAPfLKYXNU+sRrK9HgJNMiQ='
+ListenAddresses = ['/ip4/0.0.0.0/tcp/0', '/ip4/0.0.0.0/udp/0/quic-v1', '/ip4/0.0.0.0/udp/0/quic-v1/webtransport', '/ip6/::/tcp/0', '/ip6/::/udp/0/quic-v1', '/ip6/::/udp/0/quic-v1/webtransport']
+# Optional, addresses to be advertised to other peers instead of auto-detected ones.
+AdvertiseAddresses = []
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses = ['/ip4/127.0.0.1/tcp/2001/p2p/QmdfBeR6odD1pRKendUjWejhMd9wybivDq5RjixhRhiERg', '/ip4/127.0.0.1/tcp/2002/p2p/QmV9YbMDLDi736vTzy97jn54p43o74fLxc5DnLUrcmK6WP']
+Environment = 'production'
+# Must be unique for each instance id.
+DiscoveryNamespace = 'shutter-42'
+# Optional, to be set to true if running an access node
+IsAccessNode = false
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Shuttermint]
+ShuttermintURL = 'http://localhost:26657'
+ValidatorPublicKey = '252c0cae4661dd6b10781887e218215d81a48b4645d2d5cfe5b48d60bd2efb4a'
+EncryptionKey = 'c2f4f975c32c4253d4fad4b5e9a41d7f699e03f810b4c86cdcadb06ef19185bc'
+DKGPhaseLength = 30
+DKGStartBlockDelta = 200
+
+[Metrics]
+Enabled = false
+Host = '[::]'
+Port = 9100
