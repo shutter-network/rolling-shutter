@@ -46,7 +46,7 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			log.Info().Msg("stopping syncMonitor due to context cancellation")
-			return ctx.Err()
+			panic("context was canceled")
 		}
 	}
 }
