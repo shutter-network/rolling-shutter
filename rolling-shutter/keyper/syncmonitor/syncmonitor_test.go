@@ -177,3 +177,46 @@ func TestSyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 		// Test passes if no error is received
 	}
 }
+
+func TestSyncMonitor_HandlesReorg(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Set up mock sync state that returns no rows error
+	mockSyncState := &MockSyncState{}
+	mockSyncState.SetBlockNumber(0) // Initialize block number
+
+	monitor := &SyncMonitor{
+		CheckInterval: 5 * time.Second,
+		SyncState:     mockSyncState,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Decrease the block number
+	decreasedBlockNumber := int64(50)
+	mockSyncState.SetBlockNumber(decreasedBlockNumber)
+
+	time.Sleep(4 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+
+	// Verify the block number was updated to the latest value
+	syncedData, err := mockSyncState.GetSyncedBlockNumber(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, decreasedBlockNumber, syncedData, "block number should be updated to the decreased value")
+}
