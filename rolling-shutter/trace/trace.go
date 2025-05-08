@@ -43,7 +43,7 @@ type ErrorWrapper func(error) error
 // If additional attributes etc. should be attached to the span, this can still be done
 // on the returned span instance as described by the `oteltrace.Span` interface.
 // The returned ErrorWrapper `errWrap` can be used to report failure of the span
-// by simply using it as a passtrhough functio for the error. This is not required,
+// by simply using it as a passtrhough function for the error. This is not required,
 // but is helpful for observability.
 func StartSpan(ctx context.Context) (nctx context.Context, span oteltrace.Span, errWrap ErrorWrapper) {
 	callerInfo := introspection.GetCallerInfo(4)
