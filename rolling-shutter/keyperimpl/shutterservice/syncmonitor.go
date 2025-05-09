@@ -25,6 +25,11 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 		return s.runMonitor(ctx)
 	})
 
+	runner.Go(func() error {
+		<-time.After(30 * time.Minute)
+		return errors.New("explicitly canceling context")
+	})
+
 	return nil
 }
 
@@ -46,7 +51,7 @@ func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			log.Info().Msg("stopping syncMonitor due to context cancellation")
-			panic("context was canceled")
+			return ctx.Err()
 		}
 	}
 }
