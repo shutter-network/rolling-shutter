@@ -77,10 +77,6 @@ func findPeers(ctx context.Context, h host.Host, d discovery.Discoverer, ns stri
 	for {
 		select {
 		case <-ctx.Done():
-			if err := h.Close(); err != nil {
-				log.Error().Err(err).Msg("error closing host")
-				return err
-			}
 			return ctx.Err()
 		case <-ticker.C:
 			allPeerIDs := mapset.NewSet[peer.ID]()
