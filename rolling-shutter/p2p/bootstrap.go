@@ -52,7 +52,7 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 
 	waitGroup.Wait()
 	if connectedNodes.Load() == 0 {
-		panic(errBootsrpsUnreachable)
+		return errBootsrpsUnreachable
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func bootstrap(
 			// For normal peers, after trying some time it is reasonable to halt.
 			// If we don't get an initial connection to a bootsrap node,
 			// we wil'l never participate.
-			return err
+			panic(err)
 		}
 	}
 
