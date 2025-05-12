@@ -52,7 +52,7 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 
 	waitGroup.Wait()
 	if connectedNodes.Load() == 0 {
-		return errBootsrpsUnreachable
+		panic(errBootsrpsUnreachable)
 	}
 	return nil
 }
