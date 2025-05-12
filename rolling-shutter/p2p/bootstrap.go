@@ -106,7 +106,7 @@ func bootstrap(
 			// For normal peers, after trying some time it is reasonable to halt.
 			// If we don't get an initial connection to a bootsrap node,
 			// we wil'l never participate.
-			panic(err)
+			return err
 		}
 	}
 
