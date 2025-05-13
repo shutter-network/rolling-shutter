@@ -26,7 +26,7 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 	})
 
 	runner.Go(func() error {
-		<-time.After(2 * time.Minute)
+		<-time.After(10 * time.Minute)
 		return errors.New("explicitly canceling context")
 	})
 
