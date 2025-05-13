@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -193,7 +194,7 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 		case ev := <-kpr.newEonPublicKeys:
 			err = kpr.processNewEonPublicKey(ctx, ev)
 		case <-ctx.Done():
-			return ctx.Err()
+			panic(fmt.Sprintf("explicitly panicking: %v", ctx.Err()))
 		}
 		if err != nil {
 			// TODO: Check if it's safe to drop those events. If not, we should store the
