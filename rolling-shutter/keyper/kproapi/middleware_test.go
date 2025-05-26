@@ -202,7 +202,7 @@ func TestConfigMiddleware(t *testing.T) {
 	}
 
 	// Create a function that returns our test spec.
-	//nolint:golint
+	//nolint:unparam
 	getTestSpec := func() (*openapi3.T, error) {
 		return spec, nil
 	}
