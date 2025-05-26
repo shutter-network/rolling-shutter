@@ -171,6 +171,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
 			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPReadOnly:         kpr.config.HTTPReadOnly,
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Gnosis.Node,

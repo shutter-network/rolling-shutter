@@ -43,6 +43,7 @@ type Config struct {
 	BeaconAPIURL string `shconfig:",required"`
 
 	HTTPEnabled       bool
+	HTTPReadOnly      bool
 	HTTPListenAddress string
 
 	Gnosis      *GnosisConfig
@@ -71,6 +72,7 @@ func (c *Config) Name() string {
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
+	c.HTTPReadOnly = true
 	c.Gnosis.EncryptedGasLimit = 1_000_000
 	c.Gnosis.MinGasPerTransaction = 21_000
 	c.MaxNumKeysPerMessage = 500
