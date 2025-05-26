@@ -11,6 +11,7 @@ info:
 paths:
   /ping:
     get:
+      x-read-only: true
       description: |
         Pings the server
       operationId: ping
@@ -18,6 +19,7 @@ paths:
 
   /shutdown:
     post:
+      x-read-only: false
       description: |
         Shut down the served
       operationId: shutdown
@@ -25,6 +27,7 @@ paths:
 
   /eons:
     get:
+      x-read-only: true
       description: |
         Get information about all started
       operationId: getEons
@@ -45,6 +48,7 @@ paths:
 
   /decryptionKey/{eon}/{epochID}:
     get:
+      x-read-only: true
       description: Get the decryption key for an epoch ID
       operationId: getDecryptionKey
       parameters:
@@ -79,6 +83,7 @@ paths:
 
   /decryptionTrigger:
     post:
+      x-read-only: false
       description: Trigger decryption key generation for an epoch
       operationId: SubmitDecryptionTrigger
       requestBody:

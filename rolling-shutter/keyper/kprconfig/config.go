@@ -23,6 +23,7 @@ type Config struct {
 	DatabaseURL string
 
 	HTTPEnabled       bool
+	HTTPReadOnly      bool
 	HTTPListenAddress string
 
 	P2P         *p2p.Config
@@ -57,6 +58,10 @@ func (c *Config) GetInstanceID() uint64 {
 
 func (c *Config) GetHTTPListenAddress() string {
 	return c.HTTPListenAddress
+}
+
+func (c *Config) GetEnableWriteOperations() bool {
+	return c.HTTPEnabled && !c.HTTPReadOnly
 }
 
 func (c *Config) GetMaxNumKeysPerMessage() uint64 {

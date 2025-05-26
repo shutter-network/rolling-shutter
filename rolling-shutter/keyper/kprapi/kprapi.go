@@ -33,6 +33,7 @@ type Config interface {
 	GetHTTPListenAddress() string
 	GetAddress() common.Address
 	GetInstanceID() uint64
+	GetEnableWriteOperations() bool
 }
 
 type Server struct {
@@ -148,6 +149,8 @@ func (srv *Server) waitShutdown(ctx context.Context) error {
 
 func (srv *Server) setupAPIRouter(swagger *openapi3.T) http.Handler {
 	router := chi.NewRouter()
+
+	router.Use(kproapi.ConfigMiddleware(srv.config.GetEnableWriteOperations()))
 
 	router.Use(chimiddleware.OapiRequestValidator(swagger))
 	_ = kproapi.HandlerFromMux(srv, router)
