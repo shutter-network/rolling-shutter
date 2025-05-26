@@ -201,7 +201,8 @@ func TestConfigMiddleware(t *testing.T) {
 		},
 	}
 
-	// Create a function that returns our test spec
+	// Create a function that returns our test spec.
+	//nolint:golint
 	getTestSpec := func() (*openapi3.T, error) {
 		return spec, nil
 	}
@@ -245,8 +246,8 @@ func TestConfigMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test handler that always returns 200 OK
-			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Create a test handler that always returns 200 OK.
+			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
 
@@ -255,7 +256,7 @@ func TestConfigMiddleware(t *testing.T) {
 			handler := middleware(nextHandler)
 
 			// Create a test request
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			w := httptest.NewRecorder()
 
 			// Serve the request
