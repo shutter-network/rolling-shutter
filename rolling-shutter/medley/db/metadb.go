@@ -53,21 +53,14 @@ func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema 
 
 // ValidateSchemaVersion checks that the database schema is compatible.
 func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
-	key := MakeSchemaVersionKey(definitionName, schema.Name)
-	haveVal, err := New(tx).GetMeta(ctx, key)
-	if err == pgx.ErrNoRows {
-		return errors.Wrapf(ErrKeyNotFound, "key: %s", key)
-	} else if err != nil {
-		return errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
-	}
-	haveVersion, err := strconv.ParseInt(haveVal, 10, 0)
+	haveVersion, err := GetSchemaVersion(ctx, tx, definitionName, schema)
 	if err != nil {
-		return errors.Wrapf(err, "failed to convert version '%s' from meta_inf table", key)
+		return err
 	}
-	if int(haveVersion) < version {
+	if haveVersion < version {
 		return errors.Wrapf(ErrNeedsMigration, "expected version %d, have %d", version, haveVersion)
 	}
-	if int(haveVersion) != version {
+	if haveVersion != version {
 		return errors.Wrapf(ErrValueMismatch, "expected version %d, have %d", version, haveVersion)
 	}
 	return nil
@@ -95,15 +88,16 @@ func ValidateDatabaseVersion(ctx context.Context, tx pgx.Tx, version string) err
 }
 
 func GetSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) (int, error) {
-	haveVal, err := New(tx).GetMeta(ctx, MakeSchemaVersionKey(definitionName, schema.Name))
+	key := MakeSchemaVersionKey(definitionName, schema.Name)
+	haveVal, err := New(tx).GetMeta(ctx, key)
 	if err == pgx.ErrNoRows {
-		return 0, nil
+		return 0, errors.Wrapf(ErrKeyNotFound, "key: %s", key)
 	} else if err != nil {
-		return 0, err
+		return 0, errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
 	}
 	version, err := strconv.ParseInt(haveVal, 10, 0)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrapf(err, "failed to convert version '%s' from meta_inf table", key)
 	}
 	return int(version), nil
 }

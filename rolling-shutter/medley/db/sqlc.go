@@ -207,6 +207,11 @@ func (d *SQLC) LoadMigrations() ([]Migration, error) {
 			continue
 		}
 
+		// We don't support migrations before version 2
+		if fileversion < 2 {
+			return nil, errors.Errorf("migration file %s has version %d, which is less than 2", name, fileversion)
+		}
+
 		_, err = fs.ReadFile(d.filesystem, path.Join(migrationsPath, name))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read migration %s", name)

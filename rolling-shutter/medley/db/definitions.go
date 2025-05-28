@@ -50,7 +50,10 @@ func InitDB(ctx context.Context, dbpool *pgxpool.Pool, role string, definition D
 		return errors.Wrap(err, "failed to apply migrations")
 	}
 
-	// Set the database role
+	// For the outer DB initialisation, also set the database version to
+	// the overall "role", so that e.g. a snapshot keyper database won't be
+	// used by another keyper implementation, no matter if the schemas
+	// are compatible
 	err = dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		return InsertDBVersion(ctx, tx, role)
 	})
