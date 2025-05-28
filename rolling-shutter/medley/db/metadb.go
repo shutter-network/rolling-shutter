@@ -68,7 +68,7 @@ func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string
 		return errors.Wrapf(ErrNeedsMigration, "expected version %d, have %d", version, haveVersion)
 	}
 	if int(haveVersion) != version {
-		return errors.Wrapf(ErrValueMismatch, "expected %d, have %d", version, haveVersion)
+		return errors.Wrapf(ErrValueMismatch, "expected version %d, have %d", version, haveVersion)
 	}
 	return nil
 }
