@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice"
@@ -13,23 +14,27 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
+func setupTestData(ctx context.Context, t *testing.T, dbpool *pgxpool.Pool, blockNumber int64) {
+	t.Helper()
+	db := database.New(dbpool)
+
+	// Set up initial block
+	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
+		BlockHash:   []byte{0x01, 0x02, 0x03},
+		BlockNumber: blockNumber,
+	})
+	assert.NilError(t, err)
+}
+
 func TestAPISyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	defer dbclose()
-	db := database.New(dbpool)
 
 	initialBlockNumber := int64(100)
-
-	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
-		BlockHash:   []byte{0x01, 0x02, 0x03},
-		BlockNumber: initialBlockNumber,
-	})
-	if err != nil {
-		t.Fatalf("failed to set initial synced data: %v", err)
-	}
+	setupTestData(ctx, t, dbpool, initialBlockNumber)
 
 	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
@@ -37,7 +42,6 @@ func TestAPISyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 	}
 
 	errCh := make(chan error, 1)
-
 	go func() {
 		err := service.RunWithSighandler(ctx, monitor)
 		if err != nil {
@@ -49,7 +53,7 @@ func TestAPISyncMonitor_ThrowsErrorWhenBlockNotIncreasing(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		assert.ErrorContains(t, err, "block number has not increased between checks")
+		assert.ErrorContains(t, err, shutterservice.ErrBlockNotIncreasing.Error())
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected an error, but none was returned")
 	}
@@ -64,13 +68,7 @@ func TestAPISyncMonitor_HandlesBlockNumberIncreasing(t *testing.T) {
 	db := database.New(dbpool)
 
 	initialBlockNumber := int64(100)
-	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
-		BlockHash:   []byte{0x01, 0x02, 0x03},
-		BlockNumber: initialBlockNumber,
-	})
-	if err != nil {
-		t.Fatalf("failed to set initial synced data: %v", err)
-	}
+	setupTestData(ctx, t, dbpool, initialBlockNumber)
 
 	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
@@ -114,7 +112,6 @@ func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 
 	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
 	defer closeDB()
-	_ = database.New(dbpool)
 
 	monitor := &shutterservice.SyncMonitor{
 		DBPool:        dbpool,
@@ -140,4 +137,55 @@ func TestAPISyncMonitor_ContinuesWhenNoRows(t *testing.T) {
 		t.Fatalf("expected monitor to continue without error, but got: %v", err)
 	case <-time.After(1 * time.Second):
 	}
+}
+
+func TestAPISyncMonitor_HandlesReorg(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dbpool, closeDB := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	defer closeDB()
+	db := database.New(dbpool)
+
+	// Set up initial block at a higher number
+	initialBlockNumber := int64(100)
+	setupTestData(ctx, t, dbpool, initialBlockNumber)
+
+	monitor := &shutterservice.SyncMonitor{
+		DBPool:        dbpool,
+		CheckInterval: 5 * time.Second,
+	}
+
+	monitorCtx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := service.RunWithSighandler(monitorCtx, monitor)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Decrease the block number
+	decreasedBlockNumber := int64(50)
+	err := db.SetIdentityRegisteredEventSyncedUntil(ctx, database.SetIdentityRegisteredEventSyncedUntilParams{
+		BlockHash:   []byte{0x01, 0x02, 0x03},
+		BlockNumber: decreasedBlockNumber,
+	})
+	assert.NilError(t, err)
+
+	time.Sleep(4 * time.Second)
+	cancelMonitor()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected monitor to continue without error, but got: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+
+	// Verify the block number was updated to the latest value
+	syncedData, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, decreasedBlockNumber, syncedData.BlockNumber, "block number should be updated to the decreased value")
 }

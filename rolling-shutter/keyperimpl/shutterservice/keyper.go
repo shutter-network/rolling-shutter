@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -10,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
-	"golang.org/x/exp/slog"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
