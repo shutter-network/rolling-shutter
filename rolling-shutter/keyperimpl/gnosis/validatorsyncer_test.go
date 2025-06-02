@@ -121,6 +121,127 @@ func TestAggregateValidatorRegisterFilterEvent(t *testing.T) {
 	assert.DeepEqual(t, finalEvents, events)
 }
 
+func TestValidatorRegisterWithInvalidNonce(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	msg := &validatorregistry.LegacyRegistrationMessage{
+		Version:                  0,
+		ChainID:                  2,
+		ValidatorRegistryAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ValidatorIndex:           3,
+		Nonce:                    1, // This nonce will be invalid
+		IsRegistration:           true,
+	}
+	ctx := context.Background()
+
+	var ikm [32]byte
+	privkey := blst.KeyGen(ikm[:])
+	pubkey := new(blst.P1Affine).From(privkey)
+
+	sig := validatorregistry.CreateSignature(privkey, msg)
+	url := mockBeaconClient(t, hex.EncodeToString(pubkey.Compress()))
+
+	cl, err := beaconapiclient.New(url)
+	assert.NilError(t, err)
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+
+	// Insert a previous registration with a higher nonce
+	db := database.New(dbpool)
+	err = db.InsertValidatorRegistration(ctx, database.InsertValidatorRegistrationParams{
+		BlockNumber:    1,
+		BlockHash:      []byte{1, 2, 3},
+		TxIndex:        0,
+		LogIndex:       0,
+		ValidatorIndex: 3,
+		Nonce:          2, // Higher nonce than the event
+		IsRegistration: true,
+	})
+	assert.NilError(t, err)
+
+	vs := ValidatorSyncer{
+		BeaconAPIClient: cl,
+		DBPool:          dbpool,
+		ChainID:         msg.ChainID,
+	}
+
+	events := []*validatorRegistryBindings.ValidatorregistryUpdated{{
+		Signature: sig.Compress(),
+		Message:   msg.Marshal(),
+		Raw: types.Log{
+			Address:     common.HexToAddress("0x1234567890123456789012345678901234567890"),
+			BlockNumber: 2,
+			TxIndex:     0,
+			Index:       0,
+		},
+	}}
+
+	finalEvents, err := vs.filterEvents(ctx, events)
+	assert.NilError(t, err)
+
+	// The event should be filtered out due to invalid nonce
+	assert.Equal(t, len(finalEvents), 0)
+}
+
+func TestValidatorRegisterWithUnknownValidator(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	msg := &validatorregistry.LegacyRegistrationMessage{
+		Version:                  0,
+		ChainID:                  2,
+		ValidatorRegistryAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ValidatorIndex:           3,
+		Nonce:                    1,
+		IsRegistration:           true,
+	}
+	ctx := context.Background()
+
+	var ikm [32]byte
+	privkey := blst.KeyGen(ikm[:])
+
+	sig := validatorregistry.CreateSignature(privkey, msg)
+
+	// Create a mock beacon client that returns not found for the validator
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, err := w.Write([]byte(`{"finalized": false, "data": null}`))
+		assert.NilError(t, err)
+	}))
+	defer server.Close()
+
+	cl, err := beaconapiclient.New(server.URL)
+	assert.NilError(t, err)
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, database.Definition)
+	t.Cleanup(dbclose)
+
+	vs := ValidatorSyncer{
+		BeaconAPIClient: cl,
+		DBPool:          dbpool,
+		ChainID:         msg.ChainID,
+	}
+
+	events := []*validatorRegistryBindings.ValidatorregistryUpdated{{
+		Signature: sig.Compress(),
+		Message:   msg.Marshal(),
+		Raw: types.Log{
+			Address:     common.HexToAddress("0x1234567890123456789012345678901234567890"),
+			BlockNumber: 2,
+			TxIndex:     0,
+			Index:       0,
+		},
+	}}
+
+	finalEvents, err := vs.filterEvents(ctx, events)
+	assert.NilError(t, err)
+
+	// The event should be filtered out because the validator is unknown
+	assert.Equal(t, len(finalEvents), 0)
+}
+
 func mockBeaconClient(t *testing.T, pubKeyHex string) string {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -202,6 +202,11 @@ func (v *ValidatorSyncer) filterEvents(
 			pubKeys = append(pubKeys, pubkey)
 		}
 
+		if len(pubKeys) != len(msg.ValidatorIndices()) {
+			evLog.Warn().Msg("ignoring registration message as the number of correct pubkeys does not match the number of validators")
+			continue
+		}
+
 		sig := new(blst.P2Affine).Uncompress(event.Signature)
 		if sig == nil {
 			evLog.Warn().Msg("ignoring registration message with undecodable signature")
