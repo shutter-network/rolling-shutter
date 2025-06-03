@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
@@ -267,6 +268,14 @@ func createHost(
 			options = append(options,
 				libp2p.EnableRelayService(),
 			)
+		}
+		if config.IsBootstrapNode || config.IsAccessNode {
+			// No resource limits on boot and access nodes for now
+			mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+			if err != nil {
+				return nil, nil, err
+			}
+			options = append(options, libp2p.ResourceManager(mgr))
 		}
 	}
 

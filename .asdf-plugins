@@ -4,14 +4,10 @@
 # To automatically install these run `make install-asdf-plugins` inside
 # the 'rolling-shutter' directory.
 
-babashka
-binaryen      https://github.com/birros/asdf-binaryen.git
 circleci      https://github.com/ulope/asdf-circleci.git
-clojure
 direnv
 golang
 golangci-lint
-java
 nodejs
 postgres
 pre-commit
@@ -19,5 +15,4 @@ protoc
 python
 shfmt
 solidity
-sqlc          https://github.com/schmir/asdf-sqlc.git
-tinygo        https://github.com/schmir/asdf-tinygo
+sqlc          https://github.com/ulope/asdf-sqlc.git

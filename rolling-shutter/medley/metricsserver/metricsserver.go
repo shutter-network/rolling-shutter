@@ -14,6 +14,8 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+var startTime = time.Now()
+
 var metricsGoBuildInfo = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "go",
@@ -26,9 +28,22 @@ var metricsGoBuildInfo = prometheus.NewGauge(
 	},
 )
 
+var metricsUptime = prometheus.NewGaugeFunc(
+	prometheus.GaugeOpts{
+		Namespace: "",
+		Subsystem: "",
+		Name:      "uptime_seconds",
+		Help:      "Number of seconds the Node has been running",
+	},
+	func() float64 {
+		return float64(time.Since(startTime).Milliseconds()) / 1000
+	},
+)
+
 func init() {
 	metricsGoBuildInfo.Set(1)
 	prometheus.MustRegister(metricsGoBuildInfo)
+	prometheus.MustRegister(metricsUptime)
 }
 
 type MetricsServer struct {

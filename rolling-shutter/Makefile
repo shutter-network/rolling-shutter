@@ -1,13 +1,20 @@
 .POSIX:
 
-GO		?= go
-GOFLAGS		?=
-TINYGO		?= tinygo
-WASMOPT     ?= wasm-opt
-BINDIR		?= ./bin
-WASMDIR		?= ../js/shutter-crypto
-EXECUTABLE	?= ${BINDIR}/rolling-shutter
-GOPATH          ?= $(${GO} env GOPATH)
+GO					?= go
+GOFLAGS				?=
+TINYGO				?= tinygo
+WASMOPT     		?= wasm-opt
+BINDIR				?= ./bin
+WASMDIR				?= ../js/shutter-crypto
+EXECUTABLE			?= ${BINDIR}/rolling-shutter
+GOPATH				?= $(${GO} env GOPATH)
+GOLINT_CONCURRENCY	?= 0
+
+TOOL_VERSTION_GOENUM		?= 0.6.0
+TOOL_VERSION_PROTOCGENGO	?= 1.36.5
+TOOL_VERSION_OAPICODEGEN	?= 1.16.1
+TOOL_VERSION_ABIGEN			?= 1.15.7
+
 
 build:
 	${GO} build ${GOFLAGS} -ldflags="-X github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion.version=$(shell git describe --always --dirty)" -o ${EXECUTABLE}
@@ -55,10 +62,14 @@ coverage:
 clean:
 	rm -f ${EXECUTABLE}
 
-install-tools: install-codegen-tools install-golangci-lint install-cobra install-gofumpt install-gci install-gotestsum
+install-tools: install-codegen-tools install-gofumpt install-gci install-gotestsum
 
 # code generation tools: pin version
 install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-gen-go  install-oapi-codegen install-go-enum
+
+${GOPATH}/bin/sqlc:
+	${GO} install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0
+install-sqlc: ${GOPATH}/bin/sqlc
 
 ../contracts/node_modules/.mark-npm-install: ../contracts/package.json ../contracts/package-lock.json
 	cd ../contracts && npm install
@@ -66,33 +77,25 @@ install-codegen-tools: install-npm install-abigen install-sqlc install-protoc-ge
 
 install-npm: ../contracts/node_modules/.mark-npm-install
 
-${GOPATH}/bin/sqlc:
-	${GO} install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.22.0
-install-sqlc: ${GOPATH}/bin/sqlc
-
 
 ${GOPATH}/bin/go-enum:
-	${GO} install github.com/abice/go-enum@v0.5.6
+	${GO} install github.com/abice/go-enum@v${TOOL_VERSTION_GOENUM}
 install-go-enum: ${GOPATH}/bin/go-enum
 
 ${GOPATH}/bin/abigen:
-	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v1.12.0
+	${GO} install github.com/ethereum/go-ethereum/cmd/abigen@v${TOOL_VERSION_ABIGEN}
 install-abigen: ${GOPATH}/bin/abigen
 
-
 ${GOPATH}/bin/protoc-gen-go:
-	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0
+	${GO} install google.golang.org/protobuf/cmd/protoc-gen-go@v${TOOL_VERSION_PROTOCGENGO}
 install-protoc-gen-go: ${GOPATH}/bin/protoc-gen-go
 
 
 ${GOPATH}/bin/oapi-codegen:
-	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.9.1
+	${GO} install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${TOOL_VERSION_OAPICODEGEN}
 install-oapi-codegen: ${GOPATH}/bin/oapi-codegen
 
 # non code generation tools
-install-golangci-lint:
-	${GO} install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
-
 install-gofumpt:
 	${GO} install mvdan.cc/gofumpt@latest
 
@@ -116,7 +119,7 @@ lint:
 
 lint-changes:
 	base=`git merge-base HEAD origin/main`; \
-	golangci-lint --verbose run --new-from-rev $${base}
+	golangci-lint --verbose run --concurrency ${GOLINT_CONCURRENCY} --print-resources-usage --new-from-rev $${base}
 
 abigen:
 	go generate -x ./contract
