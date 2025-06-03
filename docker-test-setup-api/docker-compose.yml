@@ -26,9 +26,11 @@ services:
 
   blockchain:
     build:
-      dockerfile: docker-service/build-src/setup-blockchain/Dockerfile
+      dockerfile: docker-test-setup-api/build-src/setup-blockchain/Dockerfile
       context: ..
-    restart: always
+    restart: unless-stopped
+    ports:
+      - "8545:8545"
     volumes:
       - ./data/blockchain:/data
     # currently health checks fail
@@ -41,7 +43,7 @@ services:
 
   deploy-contracts:
     build:
-      dockerfile: docker-service/build-src/deploy_contracts/Dockerfile
+      dockerfile: docker-test-setup-api/build-src/deploy_contracts/Dockerfile
       context: ..
     command:
       - "./script/Deploy.service.s.sol"
@@ -143,9 +145,9 @@ services:
       - "9200:9100"
     depends_on:
       db:
-          condition: service_healthy
+        condition: service_healthy
       bootnode-0:
-          condition: service_started
+        condition: service_started
       chain-0-validator:
         condition: service_started
     logging: *logging
@@ -165,9 +167,9 @@ services:
       - "9201:9100"
     depends_on:
       db:
-          condition: service_healthy
+        condition: service_healthy
       bootnode-0:
-          condition: service_started
+        condition: service_started
       chain-1-validator:
         condition: service_started
     logging: *logging
@@ -187,9 +189,9 @@ services:
       - "9202:9100"
     depends_on:
       db:
-          condition: service_healthy
+        condition: service_healthy
       bootnode-0:
-          condition: service_started
+        condition: service_started
       chain-2-validator:
         condition: service_started
     logging: *logging

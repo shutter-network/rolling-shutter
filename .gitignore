@@ -9,3 +9,4 @@ node_modules
 result
 temp
 work
+.DS_Store
