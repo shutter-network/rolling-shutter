@@ -69,7 +69,7 @@ func (s *SyncMonitor) runCheck(
 		return fmt.Errorf("error getting synced block number: %w", err)
 	}
 
-	log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
+	log.Debug().Int64("current-block-number", currentBlockNumber).Int64("last-block-number", *lastBlockNumber).Msg("current block number")
 
 	// if the current block number < last block number, this means a reorg is detected, so we do not throw error
 	// if the current block number > last block number, then syncing is working as expected
