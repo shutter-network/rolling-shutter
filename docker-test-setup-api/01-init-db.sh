@@ -13,7 +13,7 @@ $DC rm -f db
 ${BB} rm -rf data/db
 
 $DC up -d db
-$DC run --rm --no-deps dockerize -wait tcp://db:5432 -timeout 40s
+$DC run --rm --no-deps wait-for-db
 
 for cmd in keyper-0 keyper-1 keyper-2; do
     mkdb $cmd &

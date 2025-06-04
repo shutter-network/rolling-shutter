@@ -136,7 +136,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - shutterservicekeyper
     command: "--config /config/keyper-0.toml"
     volumes:
       - ./config:/config
@@ -158,7 +158,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - shutterservicekeyper
     command: "--config /config/keyper-1.toml"
     volumes:
       - ./config:/config
@@ -180,7 +180,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - shutterservicekeyper
     command: "--config /config/keyper-2.toml"
     volumes:
       - ./config:/config
@@ -201,8 +201,22 @@ services:
       dockerfile: docker/build-src/dummyserver/Dockerfile
       context: ..
     restart: always
+    logging: *logging
+
+  wait-for-db:
+    image: postgres:latest
     profiles:
-      - dev
+      - script
+    command: >
+      sh -c '
+        until pg_isready -h db -p 5432 -U postgres; do
+          echo "Waiting for db to be ready..."
+          sleep 1
+        done
+        echo "db is ready"
+      '
+    depends_on:
+      - db
     logging: *logging
 
   dockerize:
