@@ -22,7 +22,7 @@ for cfg in keyper-{0..2}.toml; do
     done
 done
 
-echo "Setting up bootstrap.toml"
+echo "Setting up bootstrap.toml and op-bootstrap.toml"
 ${BB} sed -i "/^KeyperSetManager =/cKeyperSetManager = \"${KeyperSetManager}\"" "config/bootstrap.toml"
 ${BB} sed -i "/^KeyperSetManager =/cKeyperSetManager = \"${KeyperSetManager}\"" "config/op-bootstrap.toml"
 ${BB} sed -i "/^SigningKey =/cSigningKey = \"$(echo $DEPLOY_KEY | cut -b3-)\"" "config/op-bootstrap.toml"
