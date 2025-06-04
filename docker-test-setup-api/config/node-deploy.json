@@ -5,9 +5,5 @@
       "0x539cF80D345d26525A47dB80De0fAb147D588fDa",
       "0x4F01A5A4Ef09c08Df83A85885516424A4a53be68"
     ]
-  ],
-  "decryptors": ["0x0000000000000000000000000000000000000000"],
-  "collator": "0x2E135FE171fB6351026B75aF688a7F9689B66B87",
-  "fundValue": "1000",
-  "activationBlockOffset": 30
+  ]
 }

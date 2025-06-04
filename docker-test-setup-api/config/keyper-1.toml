@@ -15,7 +15,6 @@ ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
 # Overwrite p2p boostrap nodes
 CustomBootstrapAddresses  = [
     "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
-    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 DiscoveryNamespace = 'shutter-local'
 # Optional, to be set to true if running an access node
@@ -28,13 +27,14 @@ Topics = []
 
 [Chain]
 SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 60
 
 [Chain.Node]
 PrivateKey = '939babbad75cbcc42eef92496ce86ede989ba96918bbc6cc0efcc498f9cc0887'
 # Contract source directory
 DeploymentDir = '/deployments/localhost/'
 # The layer 1 JSON RPC endpoint
-EthereumURL = "ws://blockchain:8546/"
+EthereumURL = "ws://blockchain:8545/"
 
 [Chain.Contracts]
 KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
@@ -43,7 +43,7 @@ KeyBroadcastContract = "0x59f2f1fcfe2474fd5f0b9ba1e73ca90b143eb8d0"
 
 [Shuttermint]
 ShuttermintURL		= "http://chain-0-validator:26657"
-ValidatorPublicKey = "394784520c7c6b3e78d88d3e8bc2068c9a3babd125000093ad0733c4077c52f7"
+ValidatorPublicKey = "906d1cf0abcdb59ba08851c35004d0e961181e49e085d9f2169c03ab86bca4b8"
 EncryptionKey = 'd10fcd3a9db97ecf80a41b5fb30bb91ea16bf6a8575e389912a335b19cc4b3b8'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 5

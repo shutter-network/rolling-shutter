@@ -5,7 +5,6 @@
 InstanceID = 0
 # If it's empty, we use the standard PG_ environment variables
 DatabaseURL		= "postgres://postgres@db:5432/keyper-2"
-BeaconAPIURL = 'http://localhost:5052'
 HTTPEnabled = false
 HTTPListenAddress = ':3000'
 MaxNumKeysPerMessage = 500
@@ -16,7 +15,6 @@ ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
 # Overwrite p2p boostrap nodes
 CustomBootstrapAddresses  = [
     "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
-    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
 DiscoveryNamespace = 'shutter-local'
 # Optional, to be set to true if running an access node
@@ -29,13 +27,14 @@ Topics = []
 
 [Chain]
 SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 60
 
 [Chain.Node]
 PrivateKey = 'e9383a24352f05bc11895c0da19efb6b83c726f05643c38f64b4146f19215125'
 # Contract source directory
 DeploymentDir = '/deployments/localhost/'
 # The layer 1 JSON RPC endpoint
-EthereumURL = "ws://blockchain:8546/"
+EthereumURL = "ws://blockchain:8545/"
 
 [Chain.Contracts]
 KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
@@ -44,7 +43,7 @@ KeyBroadcastContract = "0x59f2f1fcfe2474fd5f0b9ba1e73ca90b143eb8d0"
 
 [Shuttermint]
 ShuttermintURL		= "http://chain-0-validator:26657"
-ValidatorPublicKey = "90278a149655f84695f390bd5e83d71ed04a67cbce490deda66110b00f4a0386"
+ValidatorPublicKey = "f058f555488d9feb60373c26daf6e4596e38aee17828d9491791a4af0c00539d"
 EncryptionKey = '782629977650cc003b122a611aa4d2e075fcfbc8bb92a49a832ca518c87b6ce8'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 5

@@ -1,8 +1,21 @@
+# Peer identity: /p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ
+# Peer role: bootstrap
+
+# whether to register handlers on the messages and log them
 InstanceID = 0
-# The op-geth JSON RPC endpoint
-JSONRPCURL = 'http://blockchain:8545'
-KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
-ByIndex = 1
-KeyperSetFilePath = '/config/keyperset.json'
-ShuttermintURL = 'http://chain:26657'
-SigningKey = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+ListenMessages = true
+
+[P2P]
+P2PKey          = "CAESQKFtiMAqd2c8bQ/mfPStxViY970MNtWUVWdn44rUoQXAfv7ztSQ9nLeqliXrkuqKi3XUObyAfH+Py3eMbHFvIpM="
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+]
+IsAccessNode = false
+DiscoveryNamespace = "shutter-local"
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []

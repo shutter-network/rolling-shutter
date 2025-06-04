@@ -1,0 +1,7 @@
+InstanceID = 42
+JSONRPCURL = 'ws://blockchain:8545'
+KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
+ByIndex = 1
+KeyperSetFilePath = '/config/keyperset.json'
+ShuttermintURL = 'http://chain-0-validator:26657'
+SigningKey = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
