@@ -2,7 +2,7 @@ package command
 
 import "github.com/spf13/afero"
 
-// CommandName overwrites the CLI invokation name of the built command.
+// CommandName overwrites the CLI invocation name of the built command.
 // If this option is not provided, the name returned by the Config struct's Name()
 // method will be used.
 func CommandName(name string) Option {

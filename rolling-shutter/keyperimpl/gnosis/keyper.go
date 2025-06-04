@@ -2,6 +2,7 @@ package gnosis
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -11,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
-	"golang.org/x/exp/slog"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
@@ -49,6 +49,7 @@ type Keyper struct {
 	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
+	syncMonitor         *SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -62,7 +63,8 @@ type Keyper struct {
 
 func New(c *Config) *Keyper {
 	return &Keyper{
-		config: c,
+		config:      c,
+		syncMonitor: &SyncMonitor{},
 	}
 }
 
@@ -154,6 +156,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to reset transaction pointer age")
 	}
 
+	kpr.syncMonitor = &SyncMonitor{
+		DBPool:        kpr.dbpool,
+		CheckInterval: time.Duration(kpr.config.Gnosis.SyncMonitorCheckInterval) * time.Second,
+	}
+
 	runner.Go(func() error { return kpr.processInputs(ctx) })
 	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
 }
@@ -164,6 +171,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
 			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPReadOnly:         kpr.config.HTTPReadOnly,
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Gnosis.Node,

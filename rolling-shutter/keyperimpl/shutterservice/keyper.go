@@ -2,6 +2,8 @@ package shutterservice
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethLog "github.com/ethereum/go-ethereum/log"
@@ -9,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
-	"golang.org/x/exp/slog"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
@@ -35,6 +36,7 @@ type Keyper struct {
 	registrySyncer      *RegistrySyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredTime *uint64
+	syncMonitor         *SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -111,8 +113,12 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	kpr.syncMonitor = &SyncMonitor{
+		DBPool:        kpr.dbpool,
+		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
+	}
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher, kpr.syncMonitor)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
@@ -121,6 +127,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
 			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPReadOnly:         kpr.config.HTTPReadOnly,
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Chain.Node,

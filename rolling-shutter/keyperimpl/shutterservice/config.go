@@ -11,6 +11,12 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
+var (
+	_ configuration.Config = &Config{}
+	_ configuration.Config = &ChainConfig{}
+	_ configuration.Config = &ContractsConfig{}
+)
+
 func NewConfig() *Config {
 	c := &Config{}
 	c.Init()
@@ -29,6 +35,7 @@ type Config struct {
 	DatabaseURL string `shconfig:",required" comment:"If it's empty, we use the standard PG_ environment variables"`
 
 	HTTPEnabled       bool
+	HTTPReadOnly      bool
 	HTTPListenAddress string
 
 	Chain       *ChainConfig
@@ -45,13 +52,14 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Name() string {
-	return "shutterservice"
+	return "shutterservicekeyper"
 }
 
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
-	c.MaxNumKeysPerMessage = 500 // TODO: need to confirm on this
+	c.MaxNumKeysPerMessage = 500
+	c.HTTPReadOnly = true
 	return nil
 }
 
@@ -62,7 +70,6 @@ func (c *Config) SetExampleValues() error {
 	}
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
-
 	return nil
 }
 
@@ -75,16 +82,18 @@ func (c *Config) GetAddress() common.Address {
 }
 
 type ChainConfig struct {
-	Node                 *configuration.EthnodeConfig `shconfig:",required"`
-	Contracts            *ContractsConfig             `shconfig:",required"`
-	SyncStartBlockNumber uint64                       `shconfig:",required"`
+	Node                     *configuration.EthnodeConfig `shconfig:",required"`
+	Contracts                *ContractsConfig             `shconfig:",required"`
+	SyncStartBlockNumber     uint64                       `shconfig:",required"`
+	SyncMonitorCheckInterval uint64                       `shconfig:",required"`
 }
 
 func NewChainConfig() *ChainConfig {
 	c := &ChainConfig{
-		Node:                 configuration.NewEthnodeConfig(),
-		Contracts:            NewContractsConfig(),
-		SyncStartBlockNumber: 0,
+		Node:                     configuration.NewEthnodeConfig(),
+		Contracts:                NewContractsConfig(),
+		SyncStartBlockNumber:     0,
+		SyncMonitorCheckInterval: 0,
 	}
 	c.Init()
 	return c
@@ -105,10 +114,12 @@ func (c *ChainConfig) Validate() error {
 
 func (c *ChainConfig) SetDefaultValues() error {
 	c.SyncStartBlockNumber = 0
+	c.SyncMonitorCheckInterval = 30
 	return c.Contracts.SetDefaultValues()
 }
 
 func (c *ChainConfig) SetExampleValues() error {
+	c.SyncMonitorCheckInterval = 30
 	return nil
 }
 

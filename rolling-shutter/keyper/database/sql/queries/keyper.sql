@@ -121,6 +121,9 @@ LIMIT 1;
 -- name: DeleteShutterMessage :exec
 DELETE FROM tendermint_outgoing_messages WHERE id=$1;
 
+-- name: DeleteShutterMessageByDesc :exec
+DELETE FROM tendermint_outgoing_messages WHERE description=$1;
+
 -- name: InsertEon :exec
 INSERT INTO eons (eon, height, activation_block_number, keyper_config_index)
 VALUES ($1, $2, $3, $4);

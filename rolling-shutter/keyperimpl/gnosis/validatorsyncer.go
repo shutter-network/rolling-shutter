@@ -202,6 +202,11 @@ func (v *ValidatorSyncer) filterEvents(
 			pubKeys = append(pubKeys, pubkey)
 		}
 
+		if len(pubKeys) != len(msg.ValidatorIndices()) {
+			evLog.Warn().Msg("ignoring registration message as the number of correct pubkeys does not match the number of validators")
+			continue
+		}
+
 		sig := new(blst.P2Affine).Uncompress(event.Signature)
 		if sig == nil {
 			evLog.Warn().Msg("ignoring registration message with undecodable signature")
@@ -222,11 +227,9 @@ func (v *ValidatorSyncer) filterEvents(
 				continue
 			}
 		} else {
-			validSignature := validatorregistry.VerifyAggregateSignature(sig, pubKeys, msg)
-			if !validSignature {
-				evLog.Warn().Msg("ignoring registration message with invalid signature")
-				continue
-			}
+			// TODO: this disables aggregate message
+			evLog.Warn().Msg("ignoring validator registration message as the version is not compatible")
+			continue
 		}
 
 		filteredEvents = append(filteredEvents, event)
