@@ -35,7 +35,7 @@ for num in {0..2}; do
 
     $DC run --rm --no-deps ${validator_cmd} init \
         --root /chain \
-        --genesis-keyper 0x346a9357D8EB6F0FbC4894ed6DBb1eCCA1051c09 \
+        --genesis-keyper 0x440Dc6F164e9241F04d282215ceF2780cd0B755e \
         --blocktime 1 \
         --listen-address tcp://0.0.0.0:${TM_RPC_PORT} \
         --role validator

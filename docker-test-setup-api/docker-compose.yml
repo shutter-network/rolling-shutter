@@ -84,6 +84,28 @@ services:
       - blockchain
     logging: *logging
 
+  register-identity:
+    build:
+      dockerfile: docker-test-setup-api/build-src/deploy_contracts/Dockerfile
+      context: ..
+    command:
+      - "./script/SubmitTransaction.service.s.sol"
+      - "--rpc-url"
+      - "http://blockchain:8545"
+      - "--broadcast"
+    environment:
+      TX_SENDER_KEY: ${DEPLOY_KEY}
+      REGISTRY_ADDRESS: ${ShutterRegistry}
+      EON: 1
+      IDENTITY_PREFIX: ${IDENTITY_PREFIX}
+      TIMESTAMP: ${TIMESTAMP}
+    volumes:
+      - ./data/deployments:/contracts/broadcast
+      - ./config:/config
+    depends_on:
+      - blockchain
+    logging: *logging
+
   chain-0-validator:
     image: rolling-shutter
     restart: always
@@ -231,4 +253,3 @@ services:
     depends_on:
       - db
     logging: *logging
-
