@@ -16,7 +16,7 @@ var Definition db.Definition
 
 func init() {
 	var err error
-	Definition, err = db.NewSQLCDefinition(files, "sql/", "chainobssync", 1)
+	Definition, err = db.NewSQLCDefinition(files, "sql/", "chainobssync")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize DB metadata")
 	}
