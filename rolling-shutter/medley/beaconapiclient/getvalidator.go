@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/pkg/errors"
 	blst "github.com/supranational/blst/bindings/go"
@@ -15,7 +16,7 @@ import (
 type GetValidatorByIndexResponse struct {
 	ExecutionOptimistic bool `json:"execution_optimistic"`
 	Finalized           bool `json:"finalized"`
-	Data                ValidatorData
+	Data                []ValidatorData
 }
 
 type ValidatorData struct {
@@ -39,9 +40,15 @@ type Validator struct {
 func (c *Client) GetValidatorByIndex(
 	ctx context.Context,
 	stateID string,
-	validatorIndex uint64,
+	validatorIndices []int64,
 ) (*GetValidatorByIndexResponse, error) {
-	path := c.url.JoinPath("/eth/v1/beacon/states/", stateID, "/validators/", fmt.Sprint(validatorIndex))
+	path := c.url.JoinPath("/eth/v1/beacon/states/", stateID, "/validators/")
+	query := url.Values{}
+	for _, index := range validatorIndices {
+		query.Add("id", fmt.Sprint(index))
+	}
+	path.RawQuery = query.Encode()
+
 	req, err := http.NewRequestWithContext(ctx, "GET", path.String(), http.NoBody)
 	if err != nil {
 		return nil, err
