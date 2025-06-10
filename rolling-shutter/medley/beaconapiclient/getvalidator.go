@@ -37,7 +37,7 @@ type Validator struct {
 	WithdrawalEpoch            uint64 `json:"withdrawal_epoch,string"`
 }
 
-func (c *Client) GetValidatorByIndex(
+func (c *Client) GetValidatorByIndices(
 	ctx context.Context,
 	stateID string,
 	validatorIndices []int64,

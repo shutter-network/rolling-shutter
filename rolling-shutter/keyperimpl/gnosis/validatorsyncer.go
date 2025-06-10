@@ -166,7 +166,7 @@ func (v *ValidatorSyncer) filterEvents(
 		pubKeys := make([]*blst.P1Affine, 0)
 		validatorIndices := msg.ValidatorIndices()
 
-		// Split indices into chunks of 64 to respect GetValidatorByIndex limit
+		// Split indices into chunks of 64 to respect GetValidatorByIndices limit
 		const maxIndicesPerRequest = 64
 		validatorMap := make(map[int64]*beaconapiclient.ValidatorData)
 
@@ -177,16 +177,9 @@ func (v *ValidatorSyncer) filterEvents(
 			}
 
 			chunk := validatorIndices[i:end]
-			validators, err := v.BeaconAPIClient.GetValidatorByIndex(ctx, "head", chunk)
+			validators, err := v.BeaconAPIClient.GetValidatorByIndices(ctx, "head", chunk)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to get validators for chunk starting at index %d", i)
-			}
-			if validators == nil || len(validators.Data) == 0 {
-				evLog.Warn().
-					Int("chunk-start", i).
-					Int("chunk-end", end).
-					Msg("ignoring registration message for unknown validators in chunk")
-				continue
 			}
 
 			// Add validators from this chunk to our map
