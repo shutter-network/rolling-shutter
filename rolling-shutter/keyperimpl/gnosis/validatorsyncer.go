@@ -191,6 +191,12 @@ func (v *ValidatorSyncer) filterEvents(
 
 			// Add validators from this chunk to our map
 			for _, validator := range validators.Data {
+				if validator.Index > math.MaxInt64 {
+					evLog.Warn().
+						Uint64("validator-index", validator.Index).
+						Msg("ignoring validator with index larger than MaxInt64")
+					continue
+				}
 				validatorMap[int64(validator.Index)] = &validator
 			}
 		}

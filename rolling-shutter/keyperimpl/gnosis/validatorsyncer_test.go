@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -271,7 +272,7 @@ func TestValidatorRegisterWithUnorderedIndices(t *testing.T) {
 	sig := validatorregistry.CreateAggregateSignature(sks, msg)
 
 	// Create a mock beacon client that returns validators in a different order
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// The message requests indices [3, 4] but we return them in reverse order [4, 3]
 		x := beaconapiclient.GetValidatorByIndexResponse{
 			Finalized: true,
@@ -366,7 +367,13 @@ func TestValidatorRegisterWithManyIndices(t *testing.T) {
 			assert.NilError(t, err)
 
 			// Use the index to determine which pubkey to use
+			if index > math.MaxInt {
+				t.Fatalf("validator index %d exceeds MaxInt", index)
+			}
 			pubkeyIndex := int(index) - 3 // Since we start from index 3
+			if pubkeyIndex < 0 || pubkeyIndex >= len(pks) {
+				t.Fatalf("invalid pubkey index %d for validator index %d", pubkeyIndex, index)
+			}
 			data = append(data, beaconapiclient.ValidatorData{
 				Index: index,
 				Validator: beaconapiclient.Validator{
