@@ -79,6 +79,16 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
+var MetricsKeyperSuccessfullDKG = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "successfull_dkg",
+		Help:      "Is DKG successful",
+	},
+	[]string{"eon"},
+)
+
 func InitMetrics() {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
@@ -88,4 +98,5 @@ func InitMetrics() {
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
+	prometheus.MustRegister(MetricsKeyperSuccessfullDKG)
 }

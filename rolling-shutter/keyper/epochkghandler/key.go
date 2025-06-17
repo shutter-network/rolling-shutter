@@ -3,6 +3,7 @@ package epochkghandler
 import (
 	"bytes"
 	"context"
+	"strconv"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -14,6 +15,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -52,18 +54,23 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, err
 	}
 	if !isKeyper {
+		keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		log.Debug().Int64("eon", eon).Msg("Ignoring decryptionKey for eon; we're not a Keyper")
 		return pubsub.ValidationReject, nil
 	}
+	keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(eon, 10)).Set(1)
 
 	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
 	if errors.Is(err, pgx.ErrNoRows) {
+		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
+		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon)
 	}
 	if !dkgResultDB.Success {
+		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -71,6 +78,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
+	keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(1)
 	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
