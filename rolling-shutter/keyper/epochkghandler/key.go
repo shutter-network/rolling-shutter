@@ -62,15 +62,15 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 
 	dkgResultDB, err := queries.GetDKGResultForKeyperConfigIndex(ctx, eon)
 	if errors.Is(err, pgx.ErrNoRows) {
-		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
+		keypermetrics.MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Errorf("no DKG result found for eon %d", eon)
 	}
 	if err != nil {
-		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
+		keypermetrics.MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Wrapf(err, "failed to get dkg result for eon %d from db", eon)
 	}
 	if !dkgResultDB.Success {
-		keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
+		keypermetrics.MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(0)
 		return pubsub.ValidationReject, errors.Errorf("no successful DKG result found for eon %d", eon)
 	}
 	pureDKGResult, err := shdb.DecodePureDKGResult(dkgResultDB.PureResult)
@@ -78,7 +78,7 @@ func (handler *DecryptionKeyHandler) ValidateMessage(ctx context.Context, msg p2
 		return pubsub.ValidationReject, errors.Wrapf(err, "error while decoding pure DKG result for eon %d", eon)
 	}
 
-	keypermetrics.MetricsKeyperSuccessfullDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(1)
+	keypermetrics.MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eon, 10)).Set(1)
 	if len(decryptionKeys.Keys) == 0 {
 		return pubsub.ValidationReject, errors.New("no keys in message")
 	}
