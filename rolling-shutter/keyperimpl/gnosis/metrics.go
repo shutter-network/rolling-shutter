@@ -1,6 +1,11 @@
 package gnosis
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
+)
 
 var metricsTxPointer = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -92,4 +97,23 @@ func init() {
 	prometheus.MustRegister(metricsNumValidatorRegistrations)
 	prometheus.MustRegister(metricsKeysSentTimeDelta)
 	prometheus.MustRegister(metricsKeySharesSentTimeDelta)
+}
+
+func InitMetrics(beaconClient *beaconapiclient.Client) {
+	version, err := beaconClient.GetBeaconNodeVersion()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get beacon node version")
+	}
+	beaconClientVersion := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "gnosis",
+			Name:      "beacon_client_version",
+			Help:      "Version of the beacon client",
+			ConstLabels: prometheus.Labels{
+				"version": version,
+			},
+		},
+	)
+	prometheus.MustRegister(beaconClientVersion)
 }
