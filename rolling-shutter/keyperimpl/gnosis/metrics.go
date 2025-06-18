@@ -118,5 +118,6 @@ func InitMetrics(beaconClient *beaconapiclient.Client) {
 			},
 		},
 	)
+	beaconClientVersion.Set(1)
 	prometheus.MustRegister(beaconClientVersion)
 }

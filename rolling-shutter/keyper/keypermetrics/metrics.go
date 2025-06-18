@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -136,8 +137,8 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	} else {
 		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
 	}
-  
-  version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
+
+	version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
 	if err != nil {
 		log.Error().Err(err).Msg("execution_client_version metrics | Failed to get execution client version")
 		return
@@ -154,6 +155,8 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 			},
 		},
 	)
+	executionClientVersion.Set(1)
+
 	prometheus.MustRegister(executionClientVersion)
 	metricsKeyperEthAddress := prometheus.NewGauge(
 		prometheus.GaugeOpts{
