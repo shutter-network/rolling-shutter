@@ -1,6 +1,8 @@
 package gnosis
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 
@@ -100,7 +102,7 @@ func init() {
 }
 
 func InitMetrics(beaconClient *beaconapiclient.Client) {
-	version, err := beaconClient.GetBeaconNodeVersion()
+	version, err := beaconClient.GetBeaconNodeVersion(context.Background())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get beacon node version")
 	}

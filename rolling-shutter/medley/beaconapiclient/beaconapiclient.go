@@ -1,6 +1,7 @@
 package beaconapiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,11 +25,15 @@ func New(rawURL string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetBeaconNodeVersion() (string, error) {
-	endpoint := "/eth/v1/node/version"
-	resp, err := c.c.Get(c.url.JoinPath(endpoint).String())
+func (c *Client) GetBeaconNodeVersion(ctx context.Context) (string, error) {
+	path := c.url.JoinPath("/eth/v1/node/version")
+	req, err := http.NewRequestWithContext(ctx, "GET", path.String(), http.NoBody)
 	if err != nil {
 		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get beacon node version from consensus node: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
