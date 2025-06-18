@@ -1,7 +1,15 @@
 package keypermetrics
 
 import (
+	"context"
+	"strconv"
+
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -89,7 +97,7 @@ var MetricsKeyperSuccessfulDKG = prometheus.NewGaugeVec(
 	[]string{"eon"},
 )
 
-func InitMetrics() {
+func InitMetrics(dbpool *pgxpool.Pool, config *kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
@@ -99,4 +107,33 @@ func InitMetrics() {
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
 	prometheus.MustRegister(MetricsKeyperSuccessfulDKG)
+
+	queries := database.New(dbpool)
+	eons, err := queries.GetAllEons(context.Background())
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get all eons")
+		return
+	}
+	keyperIndex, isKeyper, err := queries.GetKeyperIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex, config.GetAddress())
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get keyper index")
+		return
+	}
+	if isKeyper {
+		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(1)
+	} else {
+		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(0)
+	}
+
+	dkgResult, err := queries.GetDKGResultForKeyperConfigIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex)
+	if err != nil {
+		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+		log.Error().Err(err).Msg("Failed to get dkg result")
+		return
+	}
+	if dkgResult.Success {
+		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(1)
+	} else {
+		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+	}
 }
