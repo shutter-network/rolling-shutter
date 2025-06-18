@@ -71,6 +71,10 @@ func New(c *Config) *Keyper {
 func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
 
+	if kpr.config.Metrics.Enabled {
+		InitMetrics(kpr.beaconAPIClient)
+	}
+
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
 	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)

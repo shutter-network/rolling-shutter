@@ -1,9 +1,13 @@
 package keypermetrics
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -91,6 +95,24 @@ func InitMetrics(config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
 
+	version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
+	if err != nil {
+		log.Error().Err(err).Msg("execution_client_version metrics | Failed to get execution client version")
+		return
+	}
+
+	executionClientVersion := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "keyper",
+			Name:      "execution_client_version",
+			Help:      "Version of the execution client",
+			ConstLabels: prometheus.Labels{
+				"version": version,
+			},
+		},
+	)
+	prometheus.MustRegister(executionClientVersion)
 	metricsKeyperEthAddress := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: "shutter",
