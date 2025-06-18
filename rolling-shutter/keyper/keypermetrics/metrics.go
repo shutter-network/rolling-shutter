@@ -85,7 +85,8 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
-func InitMetrics(config *kprconfig.Config) {
+
+func InitMetrics(config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
@@ -113,4 +114,18 @@ func InitMetrics(config *kprconfig.Config) {
 		},
 	)
 	prometheus.MustRegister(executionClientVersion)
+	metricsKeyperEthAddress := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "keyper",
+			Name:      "address",
+			Help:      "Ethereum address of the Keyper",
+			ConstLabels: prometheus.Labels{
+				"address": config.GetAddress().Hex(),
+			},
+		},
+	)
+	metricsKeyperEthAddress.Set(1)
+
+	prometheus.MustRegister(metricsKeyperEthAddress)
 }
