@@ -97,7 +97,7 @@ var MetricsKeyperDKGstatus = prometheus.NewGaugeVec(
 	[]string{"eon"},
 )
 
-func InitMetrics(dbpool *pgxpool.Pool, config *kprconfig.Config) {
+func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
@@ -136,4 +136,37 @@ func InitMetrics(dbpool *pgxpool.Pool, config *kprconfig.Config) {
 	} else {
 		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
 	}
+  
+  version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
+	if err != nil {
+		log.Error().Err(err).Msg("execution_client_version metrics | Failed to get execution client version")
+		return
+	}
+
+	executionClientVersion := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "keyper",
+			Name:      "execution_client_version",
+			Help:      "Version of the execution client",
+			ConstLabels: prometheus.Labels{
+				"version": version,
+			},
+		},
+	)
+	prometheus.MustRegister(executionClientVersion)
+	metricsKeyperEthAddress := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "keyper",
+			Name:      "address",
+			Help:      "Ethereum address of the Keyper",
+			ConstLabels: prometheus.Labels{
+				"address": config.GetAddress().Hex(),
+			},
+		},
+	)
+	metricsKeyperEthAddress.Set(1)
+
+	prometheus.MustRegister(metricsKeyperEthAddress)
 }

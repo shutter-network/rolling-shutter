@@ -147,7 +147,11 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 	messageSender := fx.NewRPCMessageSender(shuttermintClient, config.Ethereum.PrivateKey.Key)
 
 	if kpr.config.Metrics.Enabled {
+<<<<<<< feat/keyper-dkg-metrics
 		keypermetrics.InitMetrics(kpr.dbpool, kpr.config)
+=======
+		keypermetrics.InitMetrics(*kpr.config)
+>>>>>>> main
 		epochkghandler.InitMetrics()
 		deployment.InitMetrics()
 		kpr.metricsServer = metricsserver.New(kpr.config.Metrics)
