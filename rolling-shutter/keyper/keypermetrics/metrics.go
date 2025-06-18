@@ -2,10 +2,13 @@ package keypermetrics
 
 import (
 	"context"
+	"strconv"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 )
@@ -85,7 +88,17 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
-func InitMetrics(config kprconfig.Config) {
+var MetricsKeyperDKGstatus = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "dkg_status",
+		Help:      "Is DKG successful",
+	},
+	[]string{"eon"},
+)
+
+func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
@@ -94,6 +107,36 @@ func InitMetrics(config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
+	prometheus.MustRegister(MetricsKeyperDKGstatus)
+
+	queries := database.New(dbpool)
+	eons, err := queries.GetAllEons(context.Background())
+	if err != nil {
+		log.Error().Err(err).Msg("keypermetrics | Failed to get all eons")
+		return
+	}
+	keyperIndex, isKeyper, err := queries.GetKeyperIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex, config.GetAddress())
+	if err != nil {
+		log.Error().Err(err).Msg("keypermetrics | Failed to get keyper index")
+		return
+	}
+	if isKeyper {
+		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(1)
+	} else {
+		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(0)
+	}
+
+	dkgResult, err := queries.GetDKGResultForKeyperConfigIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex)
+	if err != nil {
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+		log.Error().Err(err).Msg("keypermetrics | Failed to get dkg result")
+		return
+	}
+	if dkgResult.Success {
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(1)
+	} else {
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+	}
 
 	version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
 	if err != nil {
@@ -112,6 +155,8 @@ func InitMetrics(config kprconfig.Config) {
 			},
 		},
 	)
+	executionClientVersion.Set(1)
+
 	prometheus.MustRegister(executionClientVersion)
 	metricsKeyperEthAddress := prometheus.NewGauge(
 		prometheus.GaugeOpts{
