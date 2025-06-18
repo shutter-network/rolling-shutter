@@ -2,6 +2,8 @@ package keypermetrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -79,7 +81,7 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
-func InitMetrics() {
+func InitMetrics(config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
 	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
@@ -88,4 +90,19 @@ func InitMetrics() {
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
+
+	metricsKeyperEthAddress := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "shutter",
+			Subsystem: "keyper",
+			Name:      "address",
+			Help:      "Ethereum address of the Keyper",
+			ConstLabels: prometheus.Labels{
+				"address": config.GetAddress().Hex(),
+			},
+		},
+	)
+	metricsKeyperEthAddress.Set(1)
+
+	prometheus.MustRegister(metricsKeyperEthAddress)
 }
