@@ -87,11 +87,11 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
-var MetricsKeyperSuccessfulDKG = prometheus.NewGaugeVec(
+var MetricsKeyperDKGstatus = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "keyper",
-		Name:      "successful_dkg",
+		Name:      "dkg_status",
 		Help:      "Is DKG successful",
 	},
 	[]string{"eon"},
@@ -106,17 +106,17 @@ func InitMetrics(dbpool *pgxpool.Pool, config *kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
-	prometheus.MustRegister(MetricsKeyperSuccessfulDKG)
+	prometheus.MustRegister(MetricsKeyperDKGstatus)
 
 	queries := database.New(dbpool)
 	eons, err := queries.GetAllEons(context.Background())
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get all eons")
+		log.Error().Err(err).Msg("keypermetrics | Failed to get all eons")
 		return
 	}
 	keyperIndex, isKeyper, err := queries.GetKeyperIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex, config.GetAddress())
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get keyper index")
+		log.Error().Err(err).Msg("keypermetrics | Failed to get keyper index")
 		return
 	}
 	if isKeyper {
@@ -127,13 +127,13 @@ func InitMetrics(dbpool *pgxpool.Pool, config *kprconfig.Config) {
 
 	dkgResult, err := queries.GetDKGResultForKeyperConfigIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex)
 	if err != nil {
-		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
-		log.Error().Err(err).Msg("Failed to get dkg result")
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+		log.Error().Err(err).Msg("keypermetrics | Failed to get dkg result")
 		return
 	}
 	if dkgResult.Success {
-		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(1)
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(1)
 	} else {
-		MetricsKeyperSuccessfulDKG.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
 	}
 }
