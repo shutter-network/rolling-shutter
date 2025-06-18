@@ -71,10 +71,6 @@ func New(c *Config) *Keyper {
 func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
 
-	if kpr.config.Metrics.Enabled {
-		InitMetrics(kpr.beaconAPIClient)
-	}
-
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
 	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
@@ -148,6 +144,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	err = kpr.initValidatorSyncer(ctx)
 	if err != nil {
 		return err
+	}
+
+	if kpr.config.Metrics.Enabled {
+		InitMetrics(kpr.beaconAPIClient)
 	}
 
 	// Set all transaction pointer ages to infinity. They will be reset to zero when the next
