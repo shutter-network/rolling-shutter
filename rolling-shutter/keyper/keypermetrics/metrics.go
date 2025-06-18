@@ -3,11 +3,11 @@ package keypermetrics
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 )
 
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
@@ -95,9 +95,10 @@ func InitMetrics(config *kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
 
-	version, err := getClientVersion(config.Ethereum.EthereumURL)
+	version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get execution client version")
+		log.Error().Err(err).Msg("execution_client_version metrics | Failed to get execution client version")
+		return
 	}
 
 	executionClientVersion := prometheus.NewGauge(
@@ -112,14 +113,4 @@ func InitMetrics(config *kprconfig.Config) {
 		},
 	)
 	prometheus.MustRegister(executionClientVersion)
-}
-
-func getClientVersion(rpcURL string) (string, error) {
-	client, err := rpc.DialContext(context.Background(), rpcURL)
-	if err != nil {
-		return "", err
-	}
-	var version string
-	err = client.CallContext(context.Background(), &version, "web3_clientVersion")
-	return version, err
 }

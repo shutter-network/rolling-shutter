@@ -104,7 +104,8 @@ func init() {
 func InitMetrics(beaconClient *beaconapiclient.Client) {
 	version, err := beaconClient.GetBeaconNodeVersion(context.Background())
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get beacon node version")
+		log.Error().Err(err).Msg("beacon_client_version metrics | Failed to get beacon node version")
+		return
 	}
 	beaconClientVersion := prometheus.NewGauge(
 		prometheus.GaugeOpts{
