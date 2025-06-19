@@ -1,0 +1,54 @@
+# Peer identity: /p2p/12D3KooWQ8iKQe4iEfkTh3gdBtpxWsKwx3BwrA18km5rq3Zwt2QF
+# Ethereum address: 0xCDD50A6F9B1439dc14c4f2A7eaF14dA1EF5A476c
+
+
+InstanceID = 0
+# If it's empty, we use the standard PG_ environment variables
+DatabaseURL		= "postgres://postgres@db:5432/keyper-0"
+HTTPEnabled = false
+HTTPListenAddress = ':3000'
+MaxNumKeysPerMessage = 500
+
+[P2P]
+P2PKey = 'CAESQJ3NdZ6mRrDAW/Z59OKwcKdOCbZQ45z5o8K+tLHOL8Xw1LbawPZLk3mXNyiDyADcLk1bqYMe3uQ6T8xi65zkM0A='
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+]
+DiscoveryNamespace = 'shutter-local'
+# Optional, to be set to true if running an access node
+IsAccessNode = false
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Chain]
+SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 60
+
+[Chain.Node]
+PrivateKey = '82904d1c48d3a27d218408fc2db3e743f554a69b05b91d28c2897a9026ea47df'
+# Contract source directory
+DeploymentDir = '/deployments/localhost/'
+# The layer 1 JSON RPC endpoint
+EthereumURL = "ws://blockchain:8545/"
+
+[Chain.Contracts]
+KeyperSetManager = "0x8464135c8f25da09e49bc8782676a84730c318bc"
+ShutterRegistry = "0xc6ba8c3233ecf65b761049ef63466945c362edd2"
+KeyBroadcastContract = "0x59f2f1fcfe2474fd5f0b9ba1e73ca90b143eb8d0"
+
+[Shuttermint]
+ShuttermintURL		= "http://chain-0-validator:26657"
+ValidatorPublicKey = "feb818be329ca88d0d0588fbf695b96f9c674cbc4f08037a34ac97c9aa40c7d0"
+EncryptionKey = '6bf7e6c8d6753d435f885f398f62f221a84f0ccb0c5e2a382290489441e16f77'
+DKGPhaseLength = 8
+DKGStartBlockDelta = 5
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100
