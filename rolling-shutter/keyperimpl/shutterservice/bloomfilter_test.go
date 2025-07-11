@@ -1,6 +1,7 @@
 package shutterservice
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -14,17 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
-// Trigger definition
-// comparison operators
+// # Trigger definition
+// ## Comparison operators
 // "eq", "lt", "lte", "gt", "gte" for number types, "match" for string/bytes
 //
-// ABI-Event:
+// ## ABI-Event:
 //
 //	{
 //	 "contract": "0xdead..beef",
@@ -35,7 +37,10 @@ import (
 //		],
 //	}
 //
-// RAW-Event:
+// Note: fields that are not referenced in "conditions" are not restricted.
+//
+// ## RAW-Event:
+// A user may not have the event-ABI available, or may not want to share it.
 //
 //	{
 //	 "contract": "0xdead..beef",
@@ -45,15 +50,18 @@ import (
 //	 	{"topic2": {"match": "0xdead..beef"}},
 //	 	{"data": {
 //	 		"start": 0,
-//				"end": 32, // probably unnecessary, can be derived from "cast" type
-//				"cast": "uint256",
-//				"gte": 1
-//				}
-//			},
+//			"end": 32, // probably unnecessary, can be derived from "cast" type
+//			"cast": "uint256",
+//			"gte": 1
+//			}
+//		},
 //	 ],
 //	}
 //
-// Condensed encoding (WIP)
+// Note: in order to allow for successful matching/parsing, _all_ "topics" must be referenced -- "any" allows for no restrictions.
+//
+// ## Condensed encoding (WIP)
+//
 // We need this condensed encoding for registering trigger conditions on the blockchain (most likely as an event......)
 // [-1:0] version byte  // Note: all byte numbers need to shift 1 to the right, to have the version in there...
 // [0:32] address
@@ -62,9 +70,11 @@ import (
 // [66:matching_topics_number*32] matching hashes for topics
 // [*:end] DATA matches
 // Encoding for DATA matches:
-// [0:2] offset
+// [*:2] offset
 // [3] cast-matchtype-size {0: bytes32-match, 1: uint256-lt, 2: uint256-lte, 3: uint256-eq, 4: uint256-gte, 5:uint256-gt}
 // [4-36] matchdata
+// [$repeat for all data field conditions]
+
 func TestLogFilter(t *testing.T) {
 	// The first part of a log record consists of an array of topics. These topics are used to describe
 	// the event. The first topic usually consists of the signature (a keccak256 hash) of the name of
@@ -77,7 +87,7 @@ func TestLogFilter(t *testing.T) {
 	// only reliably be used for data that strongly narrows down search queries (like addresses).
 	//
 	// the event signature is produced by hashing the event's name and parameter types with Keccak-256.
-	sig := crypto.Keccak256([]byte("Transfer(address,address,uint256)"))
+	sig := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
 	//  ==> "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 	assert.Check(t, sig != nil, "sig is nil")
 
@@ -197,7 +207,7 @@ func TestFilterLogsQuery(t *testing.T) {
 	ERC20Transfer(t, setup, addr, addr, 1)
 
 	// topic0 signature
-	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256)"))
+	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
 
 	// topic1 address from indexed
 	topic1 := topicPad(addr.Bytes())
@@ -226,8 +236,15 @@ func TestFilterLogsQuery(t *testing.T) {
 		// uint256 amount
 		amount := big.NewInt(0).SetBytes(log.Data[:32])
 		amount256, overflow := uint256.FromBig(amount)
-		assert.Check(t, !overflow, "err doing uint256")
+		assert.Check(t, !overflow, "err parsing uint256")
 		t.Log(amount, amount256)
+		stringdata := log.Data[33:]
+
+		t.Log(string(stringdata))
+
+		val := map[string]any{}
+		rlp.Decode(bytes.NewReader(log.Data), val)
+		t.Log(val)
 
 	}
 }
@@ -242,7 +259,7 @@ func TestBloomFilterMatch(t *testing.T) {
 	assert.NilError(t, err, "error getting block")
 
 	// topic0 signature
-	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256)"))
+	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
 	assert.Check(t, latest.Bloom().Test(topic0), "could not find topic0")
 
 	// topic1 address from indexed
@@ -252,6 +269,8 @@ func TestBloomFilterMatch(t *testing.T) {
 	// topic2 address to indexed
 	topic2 := topicPad(addr.Bytes())
 	assert.Check(t, latest.Bloom().Test(topic2), "could not find topic2")
+
+	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
 }
 
 func topicPad(data []byte) []byte {
