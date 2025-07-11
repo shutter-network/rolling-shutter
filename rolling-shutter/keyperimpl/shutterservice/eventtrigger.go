@@ -1,9 +1,14 @@
 package shutterservice
 
 import (
+	"fmt"
 	"math/big"
+	"strings"
+	"text/scanner"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // # Trigger definition
@@ -14,7 +19,7 @@ import (
 //
 //	{
 //	 "contract": "0xdead..beef",
-//		"signature": "Transfer(from address indexed, to address indexed, amount uint256)",
+//		"signature": "Transfer(address from indexed, address to indexed, uint256 amount)",
 //		"conditions": [
 //			{"to": {"match": "0xdead...beef"}},
 //			{"amount": {"gte": 1}}
@@ -59,32 +64,114 @@ import (
 // [4-36] matchdata
 // [$repeat for all data field conditions]
 
-type EventTriggerDefition struct {
+type EventTriggerDefinition struct {
 	Contract   common.Address
-	Signature  string
+	Signature  EvtSignature
 	Conditions []Condition
 }
 
+func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
+	topics := [][]common.Hash{
+		{e.Signature.Topic0()},
+		// {common.Hash(topic1)},
+		// {common.Hash(topic2)},
+	}
+
+	query := ethereum.FilterQuery{
+		BlockHash: nil,
+		FromBlock: nil,
+		ToBlock:   nil,
+		Addresses: []common.Address{e.Contract},
+		Topics:    topics,
+	}
+	return query
+	/*
+		topics := [][]common.Hash{
+			{common.Hash(topic0)},
+		}
+
+		query := ethereum.FilterQuery{
+			BlockHash: nil,
+			FromBlock: big.NewInt(int64(latest)),
+			ToBlock:   nil,
+			Addresses: []common.Address{setup.contractAddress},
+			Topics:    topics,
+		}
+	*/
+}
+
+type EvtSignature string
+
+func (e EvtSignature) ToHashableSig() string {
+	var name string
+	var prev string
+	i := 0
+	args := make([]string, 3)
+	var s scanner.Scanner
+	s.Init(strings.NewReader(string(e)))
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		if s.Position.Offset == 0 {
+			name = s.TokenText()
+		} else {
+			if prev == "(" || prev == "," {
+				args[i] = s.TokenText()
+				i++
+			}
+			prev = s.TokenText()
+		}
+	}
+	result := fmt.Sprintf("%v(%v)", name, strings.Join(args, ","))
+	fmt.Printf(result)
+	return result
+}
+
+func (e EvtSignature) Topic0() common.Hash {
+	shortSig := e.ToHashableSig()
+
+	return common.Hash(crypto.Keccak256([]byte(shortSig)))
+}
+
+type Position interface {
+	String() string
+}
+
+type Topic struct {
+	number int
+}
+
+func (t Topic) String() string {
+	return fmt.Sprintf("topic%v", t.number)
+}
+
+type OffsetData struct {
+	start int
+	len   int
+}
+
+func (o OffsetData) String() string {
+	return fmt.Sprintf("[%v:%v]", o.start, o.start+o.len)
+}
+
 type Condition struct {
-	FieldName  string
+	Location   Position // FieldNames do NOT exist in the log context! only topic{N} and data[offset]
 	Constraint Constraint
 }
 
 type Constraint interface {
-	Test(any) bool
+	Test(T any) bool
 }
 
-type Operator int
+type Op int
 
 const (
-	lt Operator = iota
+	lt Op = iota
 	lte
 	eq
 	gte
 	gt
 )
 
-var operatorSymbol = map[Operator]string{
+var operatorSymbol = map[Op]string{
 	lt:  "<",
 	lte: "<=",
 	eq:  "==",
@@ -92,35 +179,43 @@ var operatorSymbol = map[Operator]string{
 	gt:  ">",
 }
 
-type NumericConstraint struct {
-	operator Operator
-	value    *big.Int
+type NumConstraint struct {
+	op  Op
+	val *big.Int
 }
 
-func (n *NumericConstraint) Test(target *big.Int) bool {
-	switch n.operator {
+func (n NumConstraint) Test(t any) bool {
+	target, ok := t.(*big.Int)
+	if !ok {
+		return false
+	}
+	switch n.op {
 	case lt:
-		return n.value.Cmp(target) < 0
+		return n.val.Cmp(target) < 0
 	case lte:
-		return n.value.Cmp(target) < 1
+		return n.val.Cmp(target) < 1
 	case eq:
-		return n.value.Cmp(target) == 0
+		return n.val.Cmp(target) == 0
 	case gte:
-		return n.value.Cmp(target) > -1
+		return n.val.Cmp(target) > -1
 	case gt:
-		return n.value.Cmp(target) > 0
+		return n.val.Cmp(target) > 0
 	default:
 		return false
 	}
 }
 
 type MatchConstraint struct {
-	value [32]byte
+	val [32]byte
 }
 
-func (m *MatchConstraint) Test(target [32]byte) bool {
-	for i := range m.value {
-		if target[i] != m.value[i] {
+func (m MatchConstraint) Test(t any) bool {
+	target, ok := t.([32]byte)
+	if !ok {
+		return false
+	}
+	for i := range m.val {
+		if target[i] != m.val[i] {
 			return false
 		}
 	}
