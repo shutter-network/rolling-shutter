@@ -22,59 +22,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
-// # Trigger definition
-// ## Comparison operators
-// "eq", "lt", "lte", "gt", "gte" for number types, "match" for string/bytes
-//
-// ## ABI-Event:
-//
-//	{
-//	 "contract": "0xdead..beef",
-//		"signature": "Transfer(from address indexed, to address indexed, amount uint256)",
-//		"conditions": [
-//			{"to": {"match": "0xdead...beef"}},
-//			{"amount": {"gte": 1}}
-//		],
-//	}
-//
-// Note: fields that are not referenced in "conditions" are not restricted.
-//
-// ## RAW-Event:
-// A user may not have the event-ABI available, or may not want to share it.
-//
-//	{
-//	 "contract": "0xdead..beef",
-//	 "rawsig": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-//	 "rawconditions": [
-//	   	{"topic1": "any"},
-//	 	{"topic2": {"match": "0xdead..beef"}},
-//	 	{"data": {
-//	 		"start": 0,
-//			"end": 32, // probably unnecessary, can be derived from "cast" type
-//			"cast": "uint256",
-//			"gte": 1
-//			}
-//		},
-//	 ],
-//	}
-//
-// Note: in order to allow for successful matching/parsing, _all_ "topics" must be referenced -- "any" allows for no restrictions.
-//
-// ## Condensed encoding (WIP)
-//
-// We need this condensed encoding for registering trigger conditions on the blockchain (most likely as an event......)
-// [-1:0] version byte  // Note: all byte numbers need to shift 1 to the right, to have the version in there...
-// [0:32] address
-// [33:64] topic0/raw signature
-// [65] OPCODE-MATCH (see event_triggers.py)
-// [66:matching_topics_number*32] matching hashes for topics
-// [*:end] DATA matches
-// Encoding for DATA matches:
-// [*:2] offset
-// [3] cast-matchtype-size {0: bytes32-match, 1: uint256-lt, 2: uint256-lte, 3: uint256-eq, 4: uint256-gte, 5:uint256-gt}
-// [4-36] matchdata
-// [$repeat for all data field conditions]
-
 func TestLogFilter(t *testing.T) {
 	// The first part of a log record consists of an array of topics. These topics are used to describe
 	// the event. The first topic usually consists of the signature (a keccak256 hash) of the name of
@@ -87,7 +34,7 @@ func TestLogFilter(t *testing.T) {
 	// only reliably be used for data that strongly narrows down search queries (like addresses).
 	//
 	// the event signature is produced by hashing the event's name and parameter types with Keccak-256.
-	sig := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
+	sig := crypto.Keccak256([]byte(TestEvtSig))
 	//  ==> "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 	assert.Check(t, sig != nil, "sig is nil")
 
@@ -106,18 +53,16 @@ func TestLogFilter(t *testing.T) {
 	// {{A, B}, {C, D}}   matches topic (A OR B) in first position AND (C OR D) in second position
 	// var Topics [][]common.Hash
 	////////////
-
-	// assert.Check(t, Addresses.len == 0, "false")
-	// assert.Check(t, Topics.len == 0, "false")
-	// abigen.Bind()
-	// backend.simulated
 }
 
+// This should match what is in help/erc20bindings.go
+const TestEvtSig = "Transfer(address,address,uint256,string)"
+
 type TestSetup struct {
-	backend  *simulated.Backend
-	address  common.Address
-	contract *help.ERC20Basic
-	key      *ecdsa.PrivateKey
+	backend         *simulated.Backend
+	contractAddress common.Address
+	contract        *help.ERC20Basic
+	key             *ecdsa.PrivateKey
 }
 
 func SetupAndDeploy() (TestSetup, error) {
@@ -143,7 +88,7 @@ func SetupAndDeploy() (TestSetup, error) {
 	if err != nil {
 		return setup, fmt.Errorf("failed to deploy %w", err)
 	}
-	setup.address = address
+	setup.contractAddress = address
 	setup.contract = contract
 	// commit all pending transactions
 	blockchain.Commit()
@@ -155,7 +100,7 @@ func TestDeployContract(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "setup and deploy failed")
 
-	if len(setup.address.Bytes()) == 0 {
+	if len(setup.contractAddress.Bytes()) == 0 {
 		t.Error("Expected a valid deployment address. Received empty address byte array instead")
 	}
 }
@@ -207,7 +152,7 @@ func TestFilterLogsQuery(t *testing.T) {
 	ERC20Transfer(t, setup, addr, addr, 1)
 
 	// topic0 signature
-	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
+	topic0 := crypto.Keccak256([]byte(TestEvtSig))
 
 	// topic1 address from indexed
 	topic1 := topicPad(addr.Bytes())
@@ -225,7 +170,7 @@ func TestFilterLogsQuery(t *testing.T) {
 		BlockHash: nil,
 		FromBlock: big.NewInt(int64(latest)),
 		ToBlock:   nil,
-		Addresses: nil,
+		Addresses: []common.Address{setup.contractAddress},
 		Topics:    topics,
 	}
 
@@ -259,7 +204,7 @@ func TestBloomFilterMatch(t *testing.T) {
 	assert.NilError(t, err, "error getting block")
 
 	// topic0 signature
-	topic0 := crypto.Keccak256([]byte("Transfer(address,address,uint256,string)"))
+	topic0 := crypto.Keccak256([]byte(TestEvtSig))
 	assert.Check(t, latest.Bloom().Test(topic0), "could not find topic0")
 
 	// topic1 address from indexed
@@ -279,7 +224,27 @@ func topicPad(data []byte) []byte {
 	return out
 }
 
-func LogFilterTest(t *testing.T) {
+func TestEventTriggerDefinition(t *testing.T) {
+	setup, err := SetupAndDeploy()
+	assert.NilError(t, err, "error during setup")
+
+	def := EventTriggerDefinition{
+		Contract:  setup.contractAddress,
+		Signature: TestEvtSig,
+		Conditions: []Condition{
+			{
+				Location: OffsetData{
+					start: 0,
+					len:   32,
+				},
+				Constraint: NumConstraint{
+					op:  gte,
+					val: big.NewInt(1),
+				},
+			},
+		},
+	}
+	assert.Check(t, len(def.Conditions) == 1, "something went wrong")
 }
 
 // LogFilterer provides access to contract log events using a one-off query or continuous
