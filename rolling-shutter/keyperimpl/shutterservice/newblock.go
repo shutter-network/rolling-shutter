@@ -25,11 +25,31 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
+	// check all our installed filters
+	err := kpr.maybeTriggerEventBased(ctx, ev)
+	if err != nil {
+		return err
+	}
 	return kpr.maybeTriggerDecryption(ctx, ev)
 }
 
+// maybeTriggerEventBased(ctx context.Context, block *syncevent.LatestBlock) error
+// will check installed filters for registered events
+
+func (kpr *Keyper) maybeTriggerEventBased(ctx context.Context, block *syncevent.LatestBlock) error {
+	// we should have a bloom filter for each registered and not resolved trigger
+	// check block headers logs bloom
+	// if match, check exact conditions:
+	// - contract address
+	// - event signature
+	// - specific conditions
+	// if match: trigger decryption
+	// mark in db as resolved
+	return errors.Errorf("not implemented")
+}
+
 // maybeTriggerDecryption triggers decryption for the identities registered if
-// - it hasn't been triggered for thos identities before and
+// - it hasn't been triggered for those identities before and
 // - the keyper is part of the corresponding keyper set.
 func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.LatestBlock) error {
 	if kpr.latestTriggeredTime != nil && block.Header.Time <= *kpr.latestTriggeredTime {
