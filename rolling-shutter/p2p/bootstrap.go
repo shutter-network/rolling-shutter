@@ -47,6 +47,7 @@ func connectBootstrapNodes(ctx context.Context, h host.Host, peers []peer.AddrIn
 				return
 			}
 			connectedNodes.Add(1)
+			log.Info().Msg("bootstrap node connected: " + a.String())
 		}(ctx, pr)
 	}
 
