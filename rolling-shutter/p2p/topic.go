@@ -3,9 +3,9 @@ package p2p
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog/log"
 )
 
 // gossipRoom represents a subscription to a single PubSub topic. Messages
@@ -43,7 +43,7 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *pubsub.Mess
 		select {
 		case messages <- msg:
 		case <-ctx.Done():
-			log.Info("subscription canceled, closing read loop")
+			log.Info().Msg("subscription canceled, closing read loop")
 			room.subscription.Cancel()
 			if err := room.topic.Close(); err != nil {
 				return err
