@@ -104,6 +104,7 @@ func (p *P2PNode) Run(
 	defer p.mux.Unlock()
 
 	runner.Defer(func() {
+		log.Print("defer from p2p rannnn")
 		close(p.GossipMessages)
 	})
 
@@ -159,9 +160,14 @@ func (p *P2PNode) Run(
 		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")
 		util.Advertise(ctx, p.discovery, p.config.DiscoveryNamespace)
 		<-ctx.Done()
+		log.Info().Msg("stopping host when context is done")
 		if err := p.host.Close(); err != nil {
 			log.Error().Err(err).Msg("error closing host")
 		}
+		if err := p.dht.Close(); err != nil {
+			log.Error().Err(err).Msg("error closing dht")
+		}
+		log.Info().Msg("host closed")
 		return ctx.Err()
 	})
 	runner.Go(func() error {
