@@ -244,4 +244,4 @@ require (
 
 replace github.com/bitwurx/jrpc2 => github.com/ulope/jrpc2 v0.0.0-20230706135348-a95cf3d96bd2
 
-replace github.com/libp2p/go-libp2p v0.41.1 => github.com/blockchainluffy/go-libp2p v0.0.0-20250714103605-68305a97dac9
+replace github.com/libp2p/go-libp2p v0.41.1 => github.com/blockchainluffy/go-libp2p v0.0.0-20250714124032-27a1c6f049ca
