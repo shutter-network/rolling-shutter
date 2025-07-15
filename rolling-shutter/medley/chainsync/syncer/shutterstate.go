@@ -53,17 +53,17 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	if err != nil {
 		return err
 	}
-	runner.Defer(subs.Unsubscribe)
+	// runner.Defer(subs.Unsubscribe)
 
 	s.unpausedCh = make(chan *bindings.KeyperSetManagerUnpaused)
 	subsUnpaused, err := s.Contract.WatchUnpaused(watchOpts, s.unpausedCh)
 	if err != nil {
 		return err
 	}
-	runner.Defer(subsUnpaused.Unsubscribe)
+	// runner.Defer(subsUnpaused.Unsubscribe)
 
 	runner.Go(func() error {
-		return s.watchPaused(ctx, subs.Err(), subsUnpaused.Err())
+		return s.watchPaused(ctx, subs.Err(), subsUnpaused.Err(), subs.Unsubscribe, subsUnpaused.Unsubscribe)
 	})
 	return nil
 }
@@ -87,7 +87,7 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 	}
 }
 
-func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error) error {
+func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error, unsubscribe func(), unsubscribeUnpaused func()) error {
 	isActive, err := s.pollIsActive(ctx)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
@@ -134,6 +134,8 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 				return err
 			}
 		case <-ctx.Done():
+			unsubscribe()
+			unsubscribeUnpaused()
 			return ctx.Err()
 		}
 	}
