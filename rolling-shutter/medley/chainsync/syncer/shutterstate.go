@@ -134,6 +134,7 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 				return err
 			}
 		case <-ctx.Done():
+			s.Log.Info("stopping watchPaused due to context cancellation")
 			return ctx.Err()
 		}
 	}

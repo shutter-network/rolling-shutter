@@ -67,6 +67,7 @@ func (p *EonKeyPublisher) Start(ctx context.Context, runner service.Runner) erro
 			case key := <-p.keys:
 				p.publishIfResponsible(ctx, key)
 			case <-ctx.Done():
+				log.Info().Msg("stopping eon key publisher, due to context cancellation")
 				return ctx.Err()
 			}
 		}

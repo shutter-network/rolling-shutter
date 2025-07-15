@@ -87,6 +87,7 @@ func (ksh *KeyShareHandler) Start(ctx context.Context, group service.Runner) err
 				}
 				ksh.handleEvent(ctx, triggerEvent)
 			case <-ctx.Done():
+				log.Info().Msg("stopping KeyShareHandler due to context cancellation")
 				return ctx.Err()
 			}
 		}

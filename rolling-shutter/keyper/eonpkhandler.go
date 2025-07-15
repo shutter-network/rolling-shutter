@@ -66,6 +66,8 @@ func (pkh *eonPubKeyHandler) loop(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
+			t.Stop()
+			log.Info().Msg("stopping eonPubKeyHandler due to context cancellation")
 			return ctx.Err()
 		case <-t.C:
 		}

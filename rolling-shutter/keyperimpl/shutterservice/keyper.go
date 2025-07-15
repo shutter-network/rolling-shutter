@@ -193,6 +193,7 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 		case ev := <-kpr.newEonPublicKeys:
 			err = kpr.processNewEonPublicKey(ctx, ev)
 		case <-ctx.Done():
+			log.Info().Msg("stopping processInputs due to context cancellation")
 			return ctx.Err()
 		}
 		if err != nil {

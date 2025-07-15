@@ -371,6 +371,7 @@ func (kpr *KeyperCore) operateShuttermint(ctx context.Context, _ service.Runner)
 		}
 		select {
 		case <-ctx.Done():
+			log.Info().Msg("stopping operateShuttermint due to context cancellation")
 			return ctx.Err()
 		case <-time.After(2 * time.Second):
 		}

@@ -64,6 +64,7 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context, subsErr <-
 				return err
 			}
 		case <-ctx.Done():
+			s.Log.Info("stopping watchLatestUnsafeHead due to context cancellation")
 			return ctx.Err()
 		}
 	}

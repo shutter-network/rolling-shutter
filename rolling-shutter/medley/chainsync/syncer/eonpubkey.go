@@ -153,6 +153,7 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 				return err
 			}
 		case <-ctx.Done():
+			s.Log.Info("stopping watchNewEonPubkey due to context cancellation")
 			return ctx.Err()
 		}
 	}
