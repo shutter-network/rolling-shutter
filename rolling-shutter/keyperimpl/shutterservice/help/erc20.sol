@@ -73,7 +73,7 @@ contract ERC20Basic is IERC20 {
             msg.sender,
             receiver,
             numTokens,
-            "Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit..."
+            "Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........"
         );
         return true;
     }

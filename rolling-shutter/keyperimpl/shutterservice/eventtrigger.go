@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -52,16 +53,17 @@ import (
 // ## Condensed encoding (WIP)
 //
 // We need this condensed encoding for registering trigger conditions on the blockchain (most likely as an event......)
-// [-1:0] version byte  // Note: all byte numbers need to shift 1 to the right, to have the version in there...
-// [0:32] address
-// [33:64] topic0/raw signature
+// [0] version byte
+// [1:33] address
+// [33:65] topic0/raw signature
 // [65] OPCODE-MATCH (see event_triggers.py)
 // [66:matching_topics_number*32] matching hashes for topics
 // [*:end] DATA matches
 // Encoding for DATA matches:
 // [*:2] offset
-// [3] cast-matchtype-size {0: bytes32-match, 1: uint256-lt, 2: uint256-lte, 3: uint256-eq, 4: uint256-gte, 5:uint256-gt}
-// [4-36] matchdata
+// [3] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, X with X>32: [X]byte-match}
+// [4:4+32] matchdata for 1 word matches OR
+// [4:4+X] matchdata for [X]byte-match
 // [$repeat for all data field conditions]
 
 type EventTriggerDefinition struct {
@@ -73,8 +75,18 @@ type EventTriggerDefinition struct {
 func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 	topics := [][]common.Hash{
 		{e.Signature.Topic0()},
-		// {common.Hash(topic1)},
-		// {common.Hash(topic2)},
+	}
+	for _, cond := range e.Conditions {
+		switch cond.Location.(type) {
+		case TopicData:
+			d, ok := cond.Constraint.(MatchConstraint)
+			if !ok {
+				continue
+			}
+			topics = append(topics, []common.Hash{common.Hash(d.target)})
+		default:
+			continue
+		}
 	}
 
 	query := ethereum.FilterQuery{
@@ -85,19 +97,20 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 		Topics:    topics,
 	}
 	return query
-	/*
-		topics := [][]common.Hash{
-			{common.Hash(topic0)},
-		}
+}
 
-		query := ethereum.FilterQuery{
-			BlockHash: nil,
-			FromBlock: big.NewInt(int64(latest)),
-			ToBlock:   nil,
-			Addresses: []common.Address{setup.contractAddress},
-			Topics:    topics,
+func (e *EventTriggerDefinition) Match(elog types.Log, testTopics bool) bool {
+	for _, c := range e.Conditions {
+		switch c.Location.(type) {
+		case TopicData:
+			continue
+		default:
+			if !c.Fullfilled(elog) {
+				return false
+			}
 		}
-	*/
+	}
+	return true
 }
 
 type EvtSignature string
@@ -106,7 +119,7 @@ func (e EvtSignature) ToHashableSig() string {
 	var name string
 	var prev string
 	i := 0
-	args := make([]string, 3)
+	args := make([]string, 1+strings.Count(string(e), ","))
 	var s scanner.Scanner
 	s.Init(strings.NewReader(string(e)))
 	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
@@ -121,7 +134,6 @@ func (e EvtSignature) ToHashableSig() string {
 		}
 	}
 	result := fmt.Sprintf("%v(%v)", name, strings.Join(args, ","))
-	fmt.Printf(result)
 	return result
 }
 
@@ -131,16 +143,21 @@ func (e EvtSignature) Topic0() common.Hash {
 	return common.Hash(crypto.Keccak256([]byte(shortSig)))
 }
 
-type Position interface {
+type LogField interface {
 	String() string
+	GetSlice(l types.Log) []byte
 }
 
-type Topic struct {
+type TopicData struct {
 	number int
 }
 
-func (t Topic) String() string {
+func (t TopicData) String() string {
 	return fmt.Sprintf("topic%v", t.number)
+}
+
+func (t TopicData) GetSlice(l types.Log) []byte {
+	return l.Topics[t.number].Bytes()
 }
 
 type OffsetData struct {
@@ -152,72 +169,120 @@ func (o OffsetData) String() string {
 	return fmt.Sprintf("[%v:%v]", o.start, o.start+o.len)
 }
 
+func (o OffsetData) GetSlice(l types.Log) []byte {
+	// if size > 32:
+	// find offset at described position
+	// return slice from complex data
+	// see https://learnevm.com/chapters/abi-encoding/anatomy#data-type-breakdown
+	// else
+	// return slice by offset/start + len
+	if o.len > 32 {
+		slice := l.Data[o.start : o.start+32]
+		offset := big.NewInt(0).SetBytes(slice).Int64()
+		size := big.NewInt(0).SetBytes(l.Data[offset : offset+32]).Int64()
+		return l.Data[offset+32 : offset+32+size]
+	}
+	slice := l.Data[o.start : o.start+o.len]
+	return slice
+}
+
+// TODO: TopicData can ONLY allow for MatchConstraint (due to values getting hashed into topics, so no numeric comparison possible)
 type Condition struct {
-	Location   Position // FieldNames do NOT exist in the log context! only topic{N} and data[offset]
+	Location   LogField
 	Constraint Constraint
 }
 
-type Constraint interface {
-	Test(T any) bool
-}
-
-type Op int
-
-const (
-	lt Op = iota
-	lte
-	eq
-	gte
-	gt
-)
-
-var operatorSymbol = map[Op]string{
-	lt:  "<",
-	lte: "<=",
-	eq:  "==",
-	gte: "=>",
-	gt:  ">",
-}
-
-type NumConstraint struct {
-	op  Op
-	val *big.Int
-}
-
-func (n NumConstraint) Test(t any) bool {
-	target, ok := t.(*big.Int)
-	if !ok {
-		return false
-	}
-	switch n.op {
-	case lt:
-		return n.val.Cmp(target) < 0
-	case lte:
-		return n.val.Cmp(target) < 1
-	case eq:
-		return n.val.Cmp(target) == 0
-	case gte:
-		return n.val.Cmp(target) > -1
-	case gt:
-		return n.val.Cmp(target) > 0
+func (c *Condition) Fullfilled(elog types.Log) bool {
+	val := c.Location.GetSlice(elog)
+	switch c.Constraint.(type) {
+	case NumConstraint:
+		num := c.Constraint.(NumConstraint)
+		return num.Test(num.GetValue(val))
+	case MatchConstraint:
+		match := c.Constraint.(MatchConstraint)
+		return match.Test(match.GetValue(val))
 	default:
 		return false
 	}
 }
 
-type MatchConstraint struct {
-	val [32]byte
+type Constraint interface {
+	Test(t any) bool
 }
 
-func (m MatchConstraint) Test(t any) bool {
-	target, ok := t.([32]byte)
+type Op int
+
+const (
+	LT Op = iota
+	LTE
+	EQ
+	GTE
+	GT
+)
+
+var operatorSymbol = map[Op]string{
+	LT:  "<",
+	LTE: "<=",
+	EQ:  "==",
+	GTE: "=>",
+	GT:  ">",
+}
+
+type NumConstraint struct {
+	op     Op
+	target *big.Int
+}
+
+func (n NumConstraint) Test(v any) bool {
+	value, ok := v.(*big.Int)
 	if !ok {
 		return false
 	}
-	for i := range m.val {
-		if target[i] != m.val[i] {
+	switch n.op {
+	case LT:
+		return n.target.Cmp(value) > 0
+	case LTE:
+		return n.target.Cmp(value) >= 0
+	case EQ:
+		return n.target.Cmp(value) == 0
+	case GTE:
+		return n.target.Cmp(value) <= 0
+	case GT:
+		return n.target.Cmp(value) < 0
+	default:
+		return false
+	}
+}
+
+func (n NumConstraint) GetValue(slice []byte) *big.Int {
+	r := big.NewInt(0)
+	result := r.SetBytes(slice)
+	return result
+}
+
+type MatchConstraint struct {
+	target []byte
+}
+
+func (m MatchConstraint) GetValue(slice []byte) []byte {
+	return slice
+}
+
+func (m MatchConstraint) Test(v any) bool {
+	value, ok := v.([]byte)
+	if !ok {
+		return false
+	}
+	for i := range m.target {
+		if value[i] != m.target[i] {
 			return false
 		}
 	}
 	return true
+}
+
+func TopicPad(data []byte) []byte {
+	out := make([]byte, 32)
+	copy(out[32-len(data):], data)
+	return out
 }

@@ -56,7 +56,10 @@ func TestLogFilter(t *testing.T) {
 }
 
 // This should match what is in help/erc20bindings.go
-const TestEvtSig = "Transfer(address,address,uint256,string)"
+const (
+	TestEvtSig     = "Transfer(address,address,uint256,string)"
+	TestEvtSigFull = "Transfer(address from indexed, address to indexed, uint256 amount, string foobar)"
+)
 
 type TestSetup struct {
 	backend         *simulated.Backend
@@ -155,10 +158,10 @@ func TestFilterLogsQuery(t *testing.T) {
 	topic0 := crypto.Keccak256([]byte(TestEvtSig))
 
 	// topic1 address from indexed
-	topic1 := topicPad(addr.Bytes())
+	topic1 := TopicPad(addr.Bytes())
 
 	// topic2 address to indexed
-	topic2 := topicPad(addr.Bytes())
+	topic2 := TopicPad(addr.Bytes())
 
 	topics := [][]common.Hash{
 		{common.Hash(topic0)},
@@ -208,152 +211,168 @@ func TestBloomFilterMatch(t *testing.T) {
 	assert.Check(t, latest.Bloom().Test(topic0), "could not find topic0")
 
 	// topic1 address from indexed
-	topic1 := topicPad(addr.Bytes())
+	topic1 := TopicPad(addr.Bytes())
 	assert.Check(t, latest.Bloom().Test(topic1), "could not find topic1")
 
 	// topic2 address to indexed
-	topic2 := topicPad(addr.Bytes())
+	topic2 := TopicPad(addr.Bytes())
 	assert.Check(t, latest.Bloom().Test(topic2), "could not find topic2")
 
 	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
-}
-
-func topicPad(data []byte) []byte {
-	out := make([]byte, 32)
-	copy(out[32-len(data):], data)
-	return out
 }
 
 func TestEventTriggerDefinition(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "error during setup")
 
-	def := EventTriggerDefinition{
+	senderAddr := crypto.PubkeyToAddress(setup.key.PublicKey)
+	zeroAddr := common.HexToAddress("0x00000000000000000000000000000000")
+	amount := int64(1)
+	stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
+	assert.Check(t, (len(stringMatch)%32) == 0, "needs padding %v ", len(stringMatch))
+
+	definition := EventTriggerDefinition{
 		Contract:  setup.contractAddress,
-		Signature: TestEvtSig,
+		Signature: TestEvtSigFull,
 		Conditions: []Condition{
+			{
+				Location: TopicData{
+					number: 1,
+				},
+				Constraint: MatchConstraint{
+					target: TopicPad(senderAddr.Bytes()),
+				},
+			},
+			{
+				Location: TopicData{
+					number: 2,
+				},
+				Constraint: MatchConstraint{
+					target: TopicPad(setup.contractAddress[:]),
+				},
+			},
 			{
 				Location: OffsetData{
 					start: 0,
 					len:   32,
 				},
 				Constraint: NumConstraint{
-					op:  gte,
-					val: big.NewInt(1),
+					op:     GTE,
+					target: big.NewInt(amount),
+				},
+			},
+			{
+				Location: OffsetData{
+					start: 32,
+					len:   len(stringMatch),
+				},
+				Constraint: MatchConstraint{
+					target: stringMatch,
 				},
 			},
 		},
 	}
-	assert.Check(t, len(def.Conditions) == 1, "something went wrong")
-}
+	assert.Check(t, len(definition.Conditions) == 4, "something went wrong")
+	f := definition.ToFilterQuery()
+	assert.Check(t, len(f.Topics) > 0, "no filterquery")
 
-// LogFilterer provides access to contract log events using a one-off query or continuous
-// event subscription.
-//
-// Logs received through a streaming query subscription may have Removed set to true,
-// indicating that the log was reverted due to a chain reorganisation.
-// type LogFilterer interface {
-// 	FilterLogs(ctx context.Context, q FilterQuery) ([]types.Log, error)
-// 	SubscribeFilterLogs(ctx context.Context, q FilterQuery, ch chan<- types.Log) (Subscription, error)
-// }
+	ERC20Transfer(t, setup, senderAddr, setup.contractAddress, amount)
 
-var _ bind.ContractBackend = (simulated.Client)(nil)
+	checkTopics := true
 
-var (
-	testKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	testAddr    = crypto.PubkeyToAddress(testKey.PublicKey)
-	testKey2, _ = crypto.HexToECDSA("7ee346e3f7efc685250053bfbafbfc880d58dc6145247053d4fb3cb0f66dfcb2")
-	testAddr2   = crypto.PubkeyToAddress(testKey2.PublicKey)
-)
-
-func simTestBackend(testAddr common.Address) *simulated.Backend {
-	return simulated.NewBackend(
-		types.GenesisAlloc{
-			testAddr: {Balance: big.NewInt(10000000000000000)},
-		},
-	)
-}
-
-func newTx(sim *simulated.Backend, key *ecdsa.PrivateKey) (*types.Transaction, error) {
-	client := sim.Client()
-
-	// create a signed transaction to send
-	head, _ := client.HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
-	addr := crypto.PubkeyToAddress(key.PublicKey)
-	chainid, _ := client.ChainID(context.Background())
-	nonce, err := client.PendingNonceAt(context.Background(), addr)
-	if err != nil {
-		return nil, err
+	logs, err := setup.backend.Client().FilterLogs(context.Background(), f)
+	assert.NilError(t, err, "error using filter query")
+	for _, elog := range logs {
+		// _abi := abi.ABI{
+		// 	Events: map[string]abi.Event{
+		// 		"Transfer(address,address,uint256,string)": abi.NewEvent("Transfer", "Transfer", false, abi.Arguments{
+		// 			abi.Argument{Name: "from", Indexed: true, Type: GetType(abi.AddressTy)},
+		// 			abi.Argument{Name: "to", Indexed: true, Type: abi.AddressTy},
+		// 			abi.Argument{Name: "amount", Indexed: false, Type: abi.Type{Size: 256, T: abi.UintTy}},
+		// 			abi.Argument{Name: "msg", Indexed: false, Type: abi.StringTy},
+		// 		}),
+		// 	},
+		// }
+		assert.Check(t, definition.Match(elog, checkTopics) == true, "did not match %v", elog.Data)
 	}
-	tx := types.NewTx(&types.DynamicFeeTx{
-		ChainID:   chainid,
-		Nonce:     nonce,
-		GasTipCap: big.NewInt(params.GWei),
-		GasFeeCap: gasPrice,
-		Gas:       21000,
-		To:        &addr,
-	})
+	// mismatch on topic2
+	ERC20Transfer(t, setup, senderAddr, zeroAddr, amount)
 
-	return types.SignTx(tx, types.LatestSignerForChainID(chainid), key)
-}
+	latest, err := setup.backend.Client().BlockNumber(context.Background())
+	assert.NilError(t, err, "no latest block number")
+	f.FromBlock = big.NewInt(int64(latest))
+	f.ToBlock = big.NewInt(int64(latest))
 
-// func DeployTokenContract(t *testing.T, sim *simulatedBackend) {
-// 	abigen
-// }
-
-func TestNewBackend(t *testing.T) {
-	sim := simulated.NewBackend(types.GenesisAlloc{})
-	defer sim.Close()
-
-	client := sim.Client()
-	num, err := client.BlockNumber(context.Background())
-	if err != nil {
-		t.Fatal(err)
+	logs, err = setup.backend.Client().FilterLogs(context.Background(), f)
+	assert.NilError(t, err, "error using filter query")
+	for _, elog := range logs {
+		assert.Check(t, definition.Match(elog, checkTopics) == false, "did match %v", elog.Data)
 	}
-	if num != 0 {
-		t.Fatalf("expected 0 got %v", num)
-	}
-	// Create a block
-	sim.Commit()
-	num, err = client.BlockNumber(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if num != 1 {
-		t.Fatalf("expected 1 got %v", num)
+	// mismatch on topic2 -- we should not find the event!)
+	ERC20Transfer(t, setup, senderAddr, zeroAddr, amount)
+
+	latest, err = setup.backend.Client().BlockNumber(context.Background())
+	assert.NilError(t, err, "no latest block number")
+	f.FromBlock = big.NewInt(int64(latest))
+	f.ToBlock = big.NewInt(int64(latest))
+
+	logs, err = setup.backend.Client().FilterLogs(context.Background(), f)
+	assert.NilError(t, err, "error using filter query")
+	assert.Check(t, len(logs) == 0, "event filter query incorrect")
+
+	// mismatch on amount
+	ERC20Transfer(t, setup, senderAddr, setup.contractAddress, 0)
+
+	latest, err = setup.backend.Client().BlockNumber(context.Background())
+	assert.NilError(t, err, "no latest block number")
+	f.FromBlock = big.NewInt(int64(latest))
+	f.ToBlock = big.NewInt(int64(latest))
+
+	logs, err = setup.backend.Client().FilterLogs(context.Background(), f)
+	assert.NilError(t, err, "error using filter query")
+	for _, elog := range logs {
+		assert.Check(t, definition.Match(elog, checkTopics) == false, "did match %v", elog.Data)
 	}
 }
 
-func TestSendTransaction(t *testing.T) {
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-
-	client := sim.Client()
-	ctx := context.Background()
-
-	signedTx, err := newTx(sim, testKey)
-	if err != nil {
-		t.Errorf("could not create transaction: %v", err)
+func TestNumConstraintTest(t *testing.T) {
+	lt1 := NumConstraint{
+		LT,
+		big.NewInt(1),
 	}
-	// send tx to simulated backend
-	err = client.SendTransaction(ctx, signedTx)
-	if err != nil {
-		t.Errorf("could not add tx to pending block: %v", err)
-	}
-	sim.Commit()
-	block, err := client.BlockByNumber(ctx, big.NewInt(1))
-	if err != nil {
-		t.Errorf("could not get block at height 1: %v", err)
-	}
+	assert.Check(t, lt1.Test(big.NewInt(0)) == true, "wrong result")
+	assert.Check(t, lt1.Test(big.NewInt(1)) == false, "wrong result")
+	assert.Check(t, lt1.Test(big.NewInt(2)) == false, "wrong result")
 
-	if signedTx.Hash() != block.Transactions()[0].Hash() {
-		t.Errorf("did not commit sent transaction. expected hash %v got hash %v", block.Transactions()[0].Hash(), signedTx.Hash())
+	lte1 := NumConstraint{
+		LTE,
+		big.NewInt(1),
 	}
-}
+	assert.Check(t, lte1.Test(big.NewInt(0)) == true, "wrong result")
+	assert.Check(t, lte1.Test(big.NewInt(1)) == true, "wrong result")
+	assert.Check(t, lte1.Test(big.NewInt(2)) == false, "wrong result")
 
-func createAndCloseSimBackend() {
-	genesisData := types.GenesisAlloc{}
-	simulatedBackend := simulated.NewBackend(genesisData)
-	defer simulatedBackend.Close()
+	eq1 := NumConstraint{
+		EQ,
+		big.NewInt(1),
+	}
+	assert.Check(t, eq1.Test(big.NewInt(0)) == false, "wrong result")
+	assert.Check(t, eq1.Test(big.NewInt(1)) == true, "wrong result")
+	assert.Check(t, eq1.Test(big.NewInt(2)) == false, "wrong result")
+
+	gte1 := NumConstraint{
+		GTE,
+		big.NewInt(1),
+	}
+	assert.Check(t, gte1.Test(big.NewInt(0)) == false, "wrong result")
+	assert.Check(t, gte1.Test(big.NewInt(1)) == true, "wrong result")
+	assert.Check(t, gte1.Test(big.NewInt(2)) == true, "wrong result")
+
+	gt1 := NumConstraint{
+		GT,
+		big.NewInt(1),
+	}
+	assert.Check(t, gt1.Test(big.NewInt(0)) == false, "wrong result")
+	assert.Check(t, gt1.Test(big.NewInt(1)) == false, "wrong result")
+	assert.Check(t, gt1.Test(big.NewInt(2)) == true, "wrong result")
 }
