@@ -128,7 +128,7 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 
 func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan error) error {
 	for {
-		log.Info("watching new eon pubkey | watchNewEonPubkey")
+		s.Log.Info("watching new eon pubkey | watchNewEonPubkey")
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
 			if !ok {

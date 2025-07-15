@@ -97,7 +97,7 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 		Active: isActive,
 	}
 	s.handle(ctx, ev)
-	log.Info("watching paused | watchPaused")
+	s.Log.Info("watching paused | watchPaused")
 	for {
 		select {
 		case _, ok := <-s.unpausedCh:
