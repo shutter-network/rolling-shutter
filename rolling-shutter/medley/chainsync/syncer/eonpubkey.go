@@ -60,6 +60,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 	if err != nil {
 		return err
 	}
+	//nolint:gocritic
 	// runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
 		return s.watchNewEonPubkey(ctx, subs.Err(), subs.Unsubscribe)

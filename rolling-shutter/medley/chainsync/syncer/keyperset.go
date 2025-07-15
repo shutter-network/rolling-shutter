@@ -70,6 +70,7 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	if err != nil {
 		return err
 	}
+	//nolint:gocritic
 	// runner.Defer(subs.Unsubscribe)
 	runner.Go(func() error {
 		return s.watchNewKeypersService(ctx, subs.Err(), subs.Unsubscribe)
