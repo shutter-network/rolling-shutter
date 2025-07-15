@@ -240,7 +240,6 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-
 				return err
 			}
 		case <-ctx.Done():
-			s.Log.Info("stopping watchNewKeypersService due to context cancellation")
 			return ctx.Err()
 		}
 	}

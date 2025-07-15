@@ -128,7 +128,6 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 
 func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan error) error {
 	for {
-		s.Log.Info("watching new eon pubkey | watchNewEonPubkey")
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
 			if !ok {
@@ -154,7 +153,6 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 				return err
 			}
 		case <-ctx.Done():
-			s.Log.Info("stopping watchNewEonPubkey due to context cancellation")
 			return ctx.Err()
 		}
 	}

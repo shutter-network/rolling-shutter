@@ -55,6 +55,7 @@ func New(c *Config) *Keyper {
 
 func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
+	defer log.Info().Msg("stopping keyper Start method")
 
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
@@ -193,6 +194,10 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 		case ev := <-kpr.newEonPublicKeys:
 			err = kpr.processNewEonPublicKey(ctx, ev)
 		case <-ctx.Done():
+			close(kpr.newBlocks)
+			close(kpr.newKeyperSets)
+			close(kpr.newEonPublicKeys)
+			close(kpr.decryptionTriggerChannel)
 			log.Info().Msg("stopping processInputs due to context cancellation")
 			return ctx.Err()
 		}
