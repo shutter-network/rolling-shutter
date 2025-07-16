@@ -12,9 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// ABI encoding word size
+const WORD = 32
+
 // # Trigger definition
 // ## Comparison operators
-// "eq", "lt", "lte", "gt", "gte" for number types, "match" for string/bytes
+// "eq", "lt", "lte", "gt", "gte" for number types, "match" for bytes32 and "cmatch" for complex []bytes
 //
 // ## ABI-Event:
 //
@@ -39,8 +42,7 @@ import (
 //	   	{"topic1": "any"},
 //	 	{"topic2": {"match": "0xdead..beef"}},
 //	 	{"data": {
-//	 		"start": 0,
-//			"end": 32, // probably unnecessary, can be derived from "cast" type
+//	 		"offset": 0,
 //			"cast": "uint256",
 //			"gte": 1
 //			}
@@ -60,8 +62,8 @@ import (
 // [66:matching_topics_number*32] matching hashes for topics
 // [*:end] DATA matches
 // Encoding for DATA matches:
-// [*:2] offset
-// [3] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, X with X>32: [X]byte-match}
+// [*:2] offset (note: for complex data types, this points to the offset marker in ABI encoding)
+// [3] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
 // [4:4+32] matchdata for 1 word matches OR
 // [4:4+X] matchdata for [X]byte-match
 // [$repeat for all data field conditions]
@@ -144,7 +146,6 @@ func (e EvtSignature) Topic0() common.Hash {
 }
 
 type LogField interface {
-	String() string
 	GetSlice(l types.Log) []byte
 }
 
@@ -161,28 +162,26 @@ func (t TopicData) GetSlice(l types.Log) []byte {
 }
 
 type OffsetData struct {
-	start int
-	len   int
+	start   int
+	complex bool
 }
 
-func (o OffsetData) String() string {
-	return fmt.Sprintf("[%v:%v]", o.start, o.start+o.len)
+func (o OffsetData) getSliceDef(l types.Log) (offset int64, size int64) {
+	if o.complex {
+		slice := l.Data[o.start : o.start+WORD]
+		sizeword := big.NewInt(0).SetBytes(slice).Int64()
+		offset = sizeword + WORD
+		size = big.NewInt(0).SetBytes(l.Data[sizeword : sizeword+WORD]).Int64()
+	} else {
+		offset = int64(o.start)
+		size = WORD
+	}
+	return offset, size
 }
 
 func (o OffsetData) GetSlice(l types.Log) []byte {
-	// if size > 32:
-	// find offset at described position
-	// return slice from complex data
-	// see https://learnevm.com/chapters/abi-encoding/anatomy#data-type-breakdown
-	// else
-	// return slice by offset/start + len
-	if o.len > 32 {
-		slice := l.Data[o.start : o.start+32]
-		offset := big.NewInt(0).SetBytes(slice).Int64()
-		size := big.NewInt(0).SetBytes(l.Data[offset : offset+32]).Int64()
-		return l.Data[offset+32 : offset+32+size]
-	}
-	slice := l.Data[o.start : o.start+o.len]
+	start, size := o.getSliceDef(l)
+	slice := l.Data[start : start+size]
 	return slice
 }
 
@@ -273,6 +272,9 @@ func (m MatchConstraint) Test(v any) bool {
 	if !ok {
 		return false
 	}
+	if len(value) != len(m.target) {
+		return false
+	}
 	for i := range m.target {
 		if value[i] != m.target[i] {
 			return false
@@ -281,8 +283,9 @@ func (m MatchConstraint) Test(v any) bool {
 	return true
 }
 
+// This kind of padding is only used for topics, which by definition are only 32byte
 func TopicPad(data []byte) []byte {
-	out := make([]byte, 32)
-	copy(out[32-len(data):], data)
+	out := make([]byte, WORD)
+	copy(out[WORD-len(data):], data)
 	return out
 }

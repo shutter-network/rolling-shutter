@@ -69,12 +69,7 @@ contract ERC20Basic is IERC20 {
         require(numTokens <= balances[msg.sender]);
         balances[msg.sender] = balances[msg.sender] - numTokens;
         balances[receiver] = balances[receiver] + numTokens;
-        emit Transfer(
-            msg.sender,
-            receiver,
-            numTokens,
-            "Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........"
-        );
+        emit Transfer(msg.sender, receiver, numTokens, "short");
         return true;
     }
 
