@@ -42,7 +42,7 @@ const WORD = 32
 //	   	{"topic1": "any"},
 //	 	{"topic2": {"match": "0xdead..beef"}},
 //	 	{"data": {
-//	 		"offset": 0,
+//	 		"arg": 0,
 //			"cast": "uint256",
 //			"gte": 1
 //			}
@@ -62,10 +62,10 @@ const WORD = 32
 // [66:matching_topics_number*32] matching hashes for topics
 // [*:end] DATA matches
 // Encoding for DATA matches:
-// [*:2] offset (note: for complex data types, this points to the offset marker in ABI encoding)
-// [3] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
-// [4:4+32] matchdata for 1 word matches OR
-// [4:4+X] matchdata for [X]byte-match
+// [0] argnumber (note: offset in data ==> argnumber * wordsize; for complex data types, this points to the offset marker in ABI encoding)
+// [1] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
+// [2:2+32] matchdata for 1 word matches OR
+// [2:2+X] matchdata for [X]byte-match
 // [$repeat for all data field conditions]
 
 type EventTriggerDefinition struct {
@@ -162,18 +162,19 @@ func (t TopicData) GetSlice(l types.Log) []byte {
 }
 
 type OffsetData struct {
-	start   int
-	complex bool
+	argnumber int
+	complex   bool
 }
 
 func (o OffsetData) getSliceDef(l types.Log) (offset int64, size int64) {
+	start := o.argnumber * WORD
 	if o.complex {
-		slice := l.Data[o.start : o.start+WORD]
+		slice := l.Data[start : start+WORD]
 		sizeword := big.NewInt(0).SetBytes(slice).Int64()
 		offset = sizeword + WORD
 		size = big.NewInt(0).SetBytes(l.Data[sizeword : sizeword+WORD]).Int64()
 	} else {
-		offset = int64(o.start)
+		offset = int64(start)
 		size = WORD
 	}
 	return offset, size
