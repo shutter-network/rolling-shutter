@@ -253,8 +253,8 @@ func TestEventTriggerDefinition(t *testing.T) {
 			},
 			{
 				Location: OffsetData{
-					start:   0,
-					complex: false,
+					argnumber: 0,
+					complex:   false,
 				},
 				Constraint: NumConstraint{
 					op:     GTE,
@@ -263,8 +263,8 @@ func TestEventTriggerDefinition(t *testing.T) {
 			},
 			{
 				Location: OffsetData{
-					start:   32,
-					complex: true,
+					argnumber: 1,
+					complex:   true,
 				},
 				Constraint: MatchConstraint{
 					target: stringMatch,
