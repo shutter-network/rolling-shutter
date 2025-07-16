@@ -228,8 +228,8 @@ func TestEventTriggerDefinition(t *testing.T) {
 	senderAddr := crypto.PubkeyToAddress(setup.key.PublicKey)
 	zeroAddr := common.HexToAddress("0x00000000000000000000000000000000")
 	amount := int64(1)
-	stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
-	assert.Check(t, (len(stringMatch)%32) == 0, "needs padding %v ", len(stringMatch))
+	// stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
+	stringMatch := []byte("short")
 
 	definition := EventTriggerDefinition{
 		Contract:  setup.contractAddress,
@@ -253,8 +253,8 @@ func TestEventTriggerDefinition(t *testing.T) {
 			},
 			{
 				Location: OffsetData{
-					start: 0,
-					len:   32,
+					start:   0,
+					complex: false,
 				},
 				Constraint: NumConstraint{
 					op:     GTE,
@@ -263,8 +263,8 @@ func TestEventTriggerDefinition(t *testing.T) {
 			},
 			{
 				Location: OffsetData{
-					start: 32,
-					len:   len(stringMatch),
+					start:   32,
+					complex: true,
 				},
 				Constraint: MatchConstraint{
 					target: stringMatch,
@@ -283,16 +283,6 @@ func TestEventTriggerDefinition(t *testing.T) {
 	logs, err := setup.backend.Client().FilterLogs(context.Background(), f)
 	assert.NilError(t, err, "error using filter query")
 	for _, elog := range logs {
-		// _abi := abi.ABI{
-		// 	Events: map[string]abi.Event{
-		// 		"Transfer(address,address,uint256,string)": abi.NewEvent("Transfer", "Transfer", false, abi.Arguments{
-		// 			abi.Argument{Name: "from", Indexed: true, Type: GetType(abi.AddressTy)},
-		// 			abi.Argument{Name: "to", Indexed: true, Type: abi.AddressTy},
-		// 			abi.Argument{Name: "amount", Indexed: false, Type: abi.Type{Size: 256, T: abi.UintTy}},
-		// 			abi.Argument{Name: "msg", Indexed: false, Type: abi.StringTy},
-		// 		}),
-		// 	},
-		// }
 		assert.Check(t, definition.Match(elog, checkTopics) == true, "did not match %v", elog.Data)
 	}
 	// mismatch on topic2
