@@ -171,8 +171,7 @@ func (p *P2PNode) Run(
 	runner.Go(func() error {
 		log.Info().Str("namespace", p.config.DiscoveryNamespace).Msg("starting advertizing discovery node")
 		util.Advertise(ctx, p.discovery, p.config.DiscoveryNamespace)
-		<-ctx.Done()
-		return ctx.Err()
+		return nil
 	})
 	runner.Go(func() error {
 		return findPeers(ctx, p.host, p.discovery, p.config.DiscoveryNamespace)

@@ -26,8 +26,12 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 	})
 
 	runner.Go(func() error {
-		<-time.After(30 * time.Minute)
-		return errors.New("explicitly canceling context")
+		select {
+		case <-time.After(30 * time.Minute):
+			return errors.New("explicitly canceling context")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	})
 
 	return nil

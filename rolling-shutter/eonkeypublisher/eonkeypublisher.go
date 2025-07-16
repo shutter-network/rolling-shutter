@@ -3,6 +3,7 @@ package eonkeypublisher
 import (
 	"context"
 	"crypto/ecdsa"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -67,6 +68,10 @@ func (p *EonKeyPublisher) Start(ctx context.Context, runner service.Runner) erro
 			case key := <-p.keys:
 				p.publishIfResponsible(ctx, key)
 			case <-ctx.Done():
+				log.Info().Msgf("stopping eon key publisher, due to context cancellation, goroutines: %d", runtime.NumGoroutine())
+				buf := make([]byte, 1024*1024)
+				stackSize := runtime.Stack(buf, true)
+				log.Info().Msgf("stack: %s", string(buf[:stackSize]))
 				return ctx.Err()
 			}
 		}
