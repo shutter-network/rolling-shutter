@@ -1,6 +1,7 @@
 package shutterservice
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
@@ -13,7 +14,10 @@ import (
 )
 
 // ABI encoding word size
-const WORD = 32
+const (
+	WORD    = 32
+	VERSION = 0x1
+)
 
 // # Trigger definition
 // ## Comparison operators
@@ -74,9 +78,72 @@ type EventTriggerDefinition struct {
 	Conditions []Condition
 }
 
+func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
+	// write version string to buffer 'work'
+	// write common fields to buffer 'work'
+	// loop through conditions
+	// for TopicData append to work
+	// for regular conditions append to buffer 'data'
+	// append 'data' to 'work'
+
+	// slice 'work' into [][WORD]array
+	var buf []byte
+	work := bytes.NewBuffer(buf)
+	work.WriteByte(VERSION)
+	work.Write(e.Contract[:])
+	work.Write(e.Signature.Topic0().Bytes())
+	work.WriteByte(e.TopicPattern())
+	var d []byte
+	data := bytes.NewBuffer(d)
+	for _, cond := range e.Conditions {
+		switch cond.Location.(type) {
+		case TopicData:
+			work.Write(cond.Constraint.(MatchConstraint).target)
+		case OffsetData:
+			data.Write(cond.Bytes())
+		}
+	}
+	work.Write(data.Bytes())
+	contents := work.Bytes()
+	words := len(contents) / WORD
+	if len(contents)%WORD != 0 {
+		words++
+	}
+	target := make([][]byte, words)
+	for i := range words {
+		target[i] = []byte(contents[i*WORD : (i+1)*WORD])
+	}
+	return target
+}
+
+func (e *EventTriggerDefinition) UnmarshalBytes() error {
+	return nil
+}
+
+func (e *EventTriggerDefinition) TopicPattern() byte {
+	// FIXME: not yet implemented
+	fmt.Println("WARNING: TOPIC PATTERN NOT YET IMPLEMENTED")
+	return 0x7
+}
+
 func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
+	// The Topic list restricts matches to particular event topics. Each event has a list
+	// of topics. Topics matches a prefix of that list. An empty element slice matches any
+	// topic. Non-empty elements represent an alternative that matches any of the
+	// contained topics.
+	//
+	// Examples:
+	// {} or nil          matches any topic list
+	// {{A}}              matches topic A in first position
+	// {{}, {B}}          matches any topic in first position AND B in second position
+	// {{A}, {B}}         matches topic A in first position AND B in second position
+	// {{A, B}, {C, D}}   matches topic (A OR B) in first position AND (C OR D) in second position
+	// var Topics [][]common.Hash
 	topics := [][]common.Hash{
 		{e.Signature.Topic0()},
+		{},
+		{},
+		{},
 	}
 	for _, cond := range e.Conditions {
 		switch cond.Location.(type) {
@@ -85,11 +152,12 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 			if !ok {
 				continue
 			}
-			topics = append(topics, []common.Hash{common.Hash(d.target)})
+			topics[cond.Location.(TopicData).number] = []common.Hash{common.Hash(d.target)}
 		default:
 			continue
 		}
 	}
+	fmt.Println(topics)
 
 	query := ethereum.FilterQuery{
 		BlockHash: nil,
@@ -204,6 +272,34 @@ func (c *Condition) Fullfilled(elog types.Log) bool {
 	default:
 		return false
 	}
+}
+
+// Encoding for DATA matches:
+// [0] argnumber (note: offset in data ==> argnumber * wordsize; for complex data types, this points to the offset marker in ABI encoding)
+// [1] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
+// [2:2+32] matchdata for 1 word matches OR
+// [2:2+X] matchdata for [X]byte-match
+func (c *Condition) Bytes() []byte {
+	var buf []byte
+	data := bytes.NewBuffer(buf)
+	switch c.Location.(type) {
+	case TopicData:
+		data.Write(c.Constraint.(MatchConstraint).target)
+	case OffsetData:
+		data.WriteByte(byte(c.Location.(OffsetData).argnumber))
+		switch c.Constraint.(type) {
+		case NumConstraint:
+			data.WriteByte(byte(c.Constraint.(NumConstraint).op))
+		case MatchConstraint:
+			if c.Location.(OffsetData).complex {
+				data.WriteByte(6)
+			} else {
+				data.WriteByte(5)
+			}
+			data.Write(c.Constraint.(MatchConstraint).target)
+		}
+	}
+	return data.Bytes()[:]
 }
 
 type Constraint interface {
