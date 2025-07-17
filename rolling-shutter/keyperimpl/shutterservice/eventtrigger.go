@@ -3,6 +3,7 @@ package shutterservice
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math/big"
 	"strings"
 	"text/scanner"
@@ -56,22 +57,15 @@ const (
 //
 // Note: in order to allow for successful matching/parsing, _all_ "topics" must be referenced -- "any" allows for no restrictions.
 //
-// ## Condensed encoding (WIP)
+// ## Condensed encoding (v1)
 // We need this condensed encoding for registering trigger conditions on the blockchain (most likely as an event......)
 //
-//
-// [0] version byte
+// [0] version byte == 1
 // [1:33] address
 // [33:65] topic0/raw signature
-// [65] OPCODE-MATCH (see event_triggers.py)
+// [65] topic pattern (3 bit mask for topic1, topic2, topic3)
 // [66:matching_topics_number*32] matching hashes for topics
-// [*:end] DATA matches
-// Encoding for DATA matches:
-// [0] argnumber (note: offset in data ==> argnumber * wordsize; for complex data types, this points to the offset marker in ABI encoding)
-// [1] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
-// [2:2+32] matchdata for 1 word matches OR
-// [2:2+X] matchdata for [X]byte-match
-// [$repeat for all data field conditions]
+// [*:end] DATA matches (see Condition.Bytes())
 
 type EventTriggerDefinition struct {
 	Contract   common.Address
@@ -83,7 +77,7 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 	// write version string to buffer 'work'
 	// write common fields to buffer 'work'
 	// loop through conditions
-	// for TopicData append to work
+	// for TopicData append to 'work'
 	// for regular conditions append to buffer 'data'
 	// append 'data' to 'work'
 
@@ -117,8 +111,130 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 	return target
 }
 
-func (e *EventTriggerDefinition) UnmarshalBytes() error {
+func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
+	b := bytes.NewBuffer(data)
+	version, err := b.ReadByte()
+	if err != nil {
+		return fmt.Errorf("failed to read version %w")
+	}
+	if version != VERSION {
+		return fmt.Errorf("version mismatch want: %v got %v", VERSION, version)
+	}
+	contract, err := readWord(b)
+	if err != nil {
+		return err
+	}
+	signature, err := readWord(b)
+	if err != nil {
+		return err
+	}
+	e.Contract = common.BytesToAddress(contract)
+	e.Signature = EvtSignature(signature)
+	topicMask, err := b.ReadByte()
+	if err != nil {
+		return err
+	}
+	if 0b100&topicMask == 0b100 {
+		topic1, err := readWord(b)
+		if err != nil {
+			return err
+		}
+		e.Conditions = append(e.Conditions, Condition{
+			Location:   TopicData{number: 1},
+			Constraint: MatchConstraint{target: topic1},
+		})
+	}
+	if 0b010&topicMask == 0b010 {
+		topic2, err := readWord(b)
+		if err != nil {
+			return err
+		}
+		e.Conditions = append(e.Conditions, Condition{
+			Location:   TopicData{number: 2},
+			Constraint: MatchConstraint{target: topic2},
+		})
+	}
+	if 0b001&topicMask == 0b001 {
+		topic3, err := readWord(b)
+		if err != nil {
+			return err
+		}
+		e.Conditions = append(e.Conditions, Condition{
+			Location:   TopicData{number: 3},
+			Constraint: MatchConstraint{target: topic3},
+		})
+	}
+	// we now have the minimum valid event trigger definition.
+	// from here on, getting 'io.EOF' can be legal.
+	for err != io.EOF {
+		argnumber, err := b.ReadByte()
+		if err != nil {
+			break
+		}
+		matchtype, err := b.ReadByte()
+		if err != nil {
+			break
+		}
+		var constraint Constraint
+		switch MatchType(matchtype) {
+		case UNDEFINED:
+			break
+		case COMPLEX:
+			wc, err := b.ReadByte()
+			if err != nil {
+				break
+			}
+			wordcount := int(wc)
+			if wordcount == 0 {
+				break
+			}
+			arg := make([]byte, WORD*wordcount)
+			read, err := b.Read(arg)
+			if err != nil || read != (WORD*wordcount) {
+				// we could not read the entire argument
+				return fmt.Errorf("trailing data when parsing complex %v", arg)
+			}
+			constraint = MatchConstraint{target: arg}
+		case MATCH:
+			arg, err := readWord(b)
+			if err != nil {
+				return fmt.Errorf("trailing data when parsing match %v", arg)
+			}
+			constraint = MatchConstraint{target: arg}
+		default:
+			// number constraint
+			arg, err := readWord(b)
+			if err != nil {
+				return fmt.Errorf("trailing data when parsing num constraint %v", arg)
+			}
+			constraint = NumConstraint{
+				op:     Op(matchtype),
+				target: big.NewInt(0).SetBytes(arg),
+			}
+		}
+		condition := Condition{
+			Location: OffsetData{
+				argnumber: int(argnumber),
+				complex:   matchtype == byte(COMPLEX),
+			},
+			Constraint: constraint,
+		}
+		e.Conditions = append(e.Conditions, condition)
+	}
+
 	return nil
+}
+
+func readWord(buf *bytes.Buffer) ([]byte, error) {
+	res := make([]byte, WORD)
+	read, err := buf.Read(res)
+	if err != nil {
+		return res, fmt.Errorf("failed to read word %w")
+	}
+	if read < WORD {
+		return res, fmt.Errorf("failed to read whole word")
+	}
+	return res, err
 }
 
 // Topic pattern: we need to specify, how many topics and in which position we reference
@@ -303,6 +419,37 @@ func (c *Condition) Fullfilled(elog types.Log) bool {
 	}
 }
 
+type Op int
+
+const (
+	LT Op = iota + 1
+	LTE
+	EQ
+	GTE
+	GT
+)
+
+var operatorSymbol = map[Op]string{
+	LT:  "<",
+	LTE: "<=",
+	EQ:  "==",
+	GTE: "=>",
+	GT:  ">",
+}
+
+type MatchType byte
+
+const (
+	UNDEFINED MatchType = iota
+	U256_LT
+	U256_LTE
+	U256_EQ
+	U256_GTE
+	U256_GT
+	MATCH
+	COMPLEX
+)
+
 // Encoding for DATA matches:
 // [0] argnumber (note: offset in data ==> argnumber * wordsize; for complex data types, this points to the offset marker in ABI encoding)
 // [1] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
@@ -323,7 +470,7 @@ func (c *Condition) Bytes() []byte {
 		case MatchConstraint:
 			matchBytes := c.Constraint.(MatchConstraint).target
 			if c.Location.(OffsetData).complex {
-				data.WriteByte(6)
+				data.WriteByte(byte(COMPLEX))
 				// align to WORD len and prepend with wordcount
 				words := len(matchBytes) / WORD
 				if len(matchBytes)%WORD != 0 {
@@ -335,7 +482,7 @@ func (c *Condition) Bytes() []byte {
 					data.Write(padBytes)
 				}
 			} else {
-				data.WriteByte(5)
+				data.WriteByte(byte(MATCH))
 				data.Write(matchBytes)
 			}
 		}
@@ -345,24 +492,6 @@ func (c *Condition) Bytes() []byte {
 
 type Constraint interface {
 	Test(t any) bool
-}
-
-type Op int
-
-const (
-	LT Op = iota
-	LTE
-	EQ
-	GTE
-	GT
-)
-
-var operatorSymbol = map[Op]string{
-	LT:  "<",
-	LTE: "<=",
-	EQ:  "==",
-	GTE: "=>",
-	GT:  ">",
 }
 
 type NumConstraint struct {
