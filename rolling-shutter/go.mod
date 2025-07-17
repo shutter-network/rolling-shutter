@@ -17,7 +17,6 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/holiman/uint256 v1.3.2
 	github.com/icza/gog v0.0.0-20240529172513-3355cf65d018
 	github.com/ipfs/go-log/v2 v2.6.0
 	github.com/jackc/pgconn v1.14.1
@@ -133,6 +132,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/billy v0.0.0-20240216141850-2abb0c79d3c4 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
+	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/boxo v0.30.0 // indirect

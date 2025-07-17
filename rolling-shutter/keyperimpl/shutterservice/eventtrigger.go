@@ -57,8 +57,9 @@ const (
 // Note: in order to allow for successful matching/parsing, _all_ "topics" must be referenced -- "any" allows for no restrictions.
 //
 // ## Condensed encoding (WIP)
-//
 // We need this condensed encoding for registering trigger conditions on the blockchain (most likely as an event......)
+//
+//
 // [0] version byte
 // [1:33] address
 // [33:65] topic0/raw signature
@@ -120,10 +121,39 @@ func (e *EventTriggerDefinition) UnmarshalBytes() error {
 	return nil
 }
 
+// Topic pattern: we need to specify, how many topics and in which position we reference
+/*
+	+-+-+-+
+	|1|2|3|
+	+-+-+-+
+	|o|o|o| => 0
+	+-+-+-+
+	|o|o|x| => 1
+	+-+-+-+
+	|o|x|o| => 2
+	+-+-+-+
+	|o|x|x| => 3
+	+-+-+-+
+	|x|o|o| => 4
+	+-+-+-+
+	|x|o|x| => 5
+	+-+-+-+
+	|x|x|o| => 6
+	+-+-+-+
+	|x|x|x| => 7
+	+-+-+-+
+*/
 func (e *EventTriggerDefinition) TopicPattern() byte {
-	// FIXME: not yet implemented
-	fmt.Println("WARNING: TOPIC PATTERN NOT YET IMPLEMENTED")
-	return 0x7
+	v := make([]uint8, 3)
+	for _, cond := range e.Conditions {
+		switch cond.Location.(type) {
+		case TopicData:
+			v[cond.Location.(TopicData).number-1] = 1
+		default:
+			continue
+		}
+	}
+	return v[0] + (v[1] << 1) + (v[2] << 2)
 }
 
 func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
@@ -157,7 +187,6 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 			continue
 		}
 	}
-	fmt.Println(topics)
 
 	query := ethereum.FilterQuery{
 		BlockHash: nil,
@@ -278,7 +307,8 @@ func (c *Condition) Fullfilled(elog types.Log) bool {
 // [0] argnumber (note: offset in data ==> argnumber * wordsize; for complex data types, this points to the offset marker in ABI encoding)
 // [1] cast-matchtype-size {0: uint256-lt, 1: uint256-lte, 2: uint256-eq, 3: uint256-gte, 4:uint256-gt, 5: byte32-match, 6: []byte-complexmatch}
 // [2:2+32] matchdata for 1 word matches OR
-// [2:2+X] matchdata for [X]byte-match
+// [3] word count
+// [3:3+X] matchdata for [X]byte-match (right padded for [WORD]byte)
 func (c *Condition) Bytes() []byte {
 	var buf []byte
 	data := bytes.NewBuffer(buf)
@@ -291,12 +321,23 @@ func (c *Condition) Bytes() []byte {
 		case NumConstraint:
 			data.WriteByte(byte(c.Constraint.(NumConstraint).op))
 		case MatchConstraint:
+			matchBytes := c.Constraint.(MatchConstraint).target
 			if c.Location.(OffsetData).complex {
 				data.WriteByte(6)
+				// align to WORD len and prepend with wordcount
+				words := len(matchBytes) / WORD
+				if len(matchBytes)%WORD != 0 {
+					words++
+					data.WriteByte(byte(words))
+					data.Write(matchBytes)
+					padBytes := make([]byte, len(matchBytes)%WORD)
+					fmt.Println(padBytes)
+					data.Write(padBytes)
+				}
 			} else {
 				data.WriteByte(5)
+				data.Write(matchBytes)
 			}
-			data.Write(c.Constraint.(MatchConstraint).target)
 		}
 	}
 	return data.Bytes()[:]
