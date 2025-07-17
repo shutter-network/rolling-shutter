@@ -1,22 +1,18 @@
 package shutterservice
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/holiman/uint256"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
@@ -140,6 +136,7 @@ func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefiniti
 
 	assert.NilError(t, err, "failed to sign")
 	marshaledTrigger := trigger.MarshalBytes()
+	t.Log(marshaledTrigger)
 	tx, err := setup.triggerContract.Register(&bind.TransactOpts{
 		From:      from,
 		Nonce:     big.NewInt(int64(nonce)),
@@ -198,60 +195,6 @@ func ERC20Transfer(t *testing.T, setup TestSetup, from common.Address, to common
 	assert.Check(t, receipt.Status == 1, "transfer failed")
 }
 
-func TestEvtFilterLogsQuery(t *testing.T) {
-	setup, err := SetupAndDeploy()
-	assert.NilError(t, err, "failure deploying")
-	client := setup.backend.Client()
-	latest, err := client.BlockNumber(context.Background())
-	assert.NilError(t, err, "error getting blocknumber")
-
-	addr := crypto.PubkeyToAddress(setup.key.PublicKey)
-
-	ERC20Transfer(t, setup, addr, addr, 1)
-
-	// topic0 signature
-	topic0 := crypto.Keccak256([]byte(TestEvtSig))
-
-	// topic1 address from indexed
-	topic1 := TopicPad(addr.Bytes())
-
-	// topic2 address to indexed
-	topic2 := TopicPad(addr.Bytes())
-
-	topics := [][]common.Hash{
-		{common.Hash(topic0)},
-		{common.Hash(topic1)},
-		{common.Hash(topic2)},
-	}
-
-	query := ethereum.FilterQuery{
-		BlockHash: nil,
-		FromBlock: big.NewInt(int64(latest)),
-		ToBlock:   nil,
-		Addresses: []common.Address{setup.erc20Address},
-		Topics:    topics,
-	}
-
-	logs, err := client.FilterLogs(context.Background(), query)
-	assert.NilError(t, err, "error getting logs")
-	assert.Check(t, len(logs) > 0, "found no logs")
-	for _, log := range logs {
-		// uint256 amount
-		amount := big.NewInt(0).SetBytes(log.Data[:32])
-		amount256, overflow := uint256.FromBig(amount)
-		assert.Check(t, !overflow, "err parsing uint256")
-		t.Log(amount, amount256)
-		stringdata := log.Data[33:]
-
-		t.Log(string(stringdata))
-
-		val := map[string]any{}
-		rlp.Decode(bytes.NewReader(log.Data), val)
-		t.Log(val)
-
-	}
-}
-
 func TestEvtBloomFilterMatch(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "failure deploying")
@@ -276,19 +219,9 @@ func TestEvtBloomFilterMatch(t *testing.T) {
 	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
 }
 
-func TestEvtEventTriggerDefinition(t *testing.T) {
-	setup, err := SetupAndDeploy()
-	assert.NilError(t, err, "error during setup")
-
-	senderAddr := crypto.PubkeyToAddress(setup.key.PublicKey)
-	zeroAddr := common.HexToAddress("0x00000000000000000000000000000000")
-	fiveAddr := common.HexToAddress("0x00000000000000000000000000000005")
-	amount := int64(1)
-	// stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
-	stringMatch := []byte("short")
-
+func CreateDefinition(contract common.Address, topic1, topic2, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
 	definition := EventTriggerDefinition{
-		Contract:  setup.erc20Address,
+		Contract:  contract,
 		Signature: TestEvtSigFull,
 		Conditions: []Condition{
 			{
@@ -296,7 +229,7 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 					number: 1,
 				},
 				Constraint: MatchConstraint{
-					target: TopicPad(senderAddr.Bytes()),
+					target: topic1,
 				},
 			},
 			{
@@ -304,7 +237,7 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 					number: 3,
 				},
 				Constraint: MatchConstraint{
-					target: TopicPad(fiveAddr.Bytes()),
+					target: topic3,
 				},
 			},
 			{
@@ -323,11 +256,26 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 					complex:   true,
 				},
 				Constraint: MatchConstraint{
-					target: stringMatch,
+					target: target,
 				},
 			},
 		},
 	}
+	return definition
+}
+
+func TestEvtEventTriggerDefinition(t *testing.T) {
+	setup, err := SetupAndDeploy()
+	assert.NilError(t, err, "error during setup")
+
+	senderAddr := crypto.PubkeyToAddress(setup.key.PublicKey)
+	zeroAddr := common.HexToAddress("0x00000000000000000000000000000000")
+	fiveAddr := common.HexToAddress("0x00000000000000000000000000000005")
+	amount := int64(1)
+	// stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
+	stringMatch := []byte("short")
+
+	definition := CreateDefinition(setup.erc20Address, TopicPad(senderAddr.Bytes()), nil, TopicPad(fiveAddr.Bytes()), int64(1), stringMatch)
 	assert.Check(t, len(definition.Conditions) == 4, "something went wrong")
 	f := definition.ToFilterQuery()
 	assert.Check(t, len(f.Topics) > 0, "no filterquery")
