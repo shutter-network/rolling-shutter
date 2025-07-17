@@ -27,6 +27,7 @@ interface IERC20 {
     event Transfer(
         address indexed from,
         address indexed to,
+        address indexed notify,
         uint256 value,
         string foobar
     );
@@ -69,7 +70,7 @@ contract ERC20Basic is IERC20 {
         require(numTokens <= balances[msg.sender]);
         balances[msg.sender] = balances[msg.sender] - numTokens;
         balances[receiver] = balances[receiver] + numTokens;
-        emit Transfer(msg.sender, receiver, numTokens, "short");
+        emit Transfer(msg.sender, receiver, address(5), numTokens, "short");
         return true;
     }
 
@@ -100,7 +101,13 @@ contract ERC20Basic is IERC20 {
         balances[owner] = balances[owner] - numTokens;
         allowed[owner][msg.sender] = allowed[owner][msg.sender] + numTokens;
         balances[buyer] = balances[buyer] + numTokens;
-        emit Transfer(owner, buyer, numTokens, "Transfer from is short");
+        emit Transfer(
+            owner,
+            buyer,
+            address(6),
+            numTokens,
+            "Transfer from is short"
+        );
         return true;
     }
 }
