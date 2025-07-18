@@ -86,14 +86,26 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 	work := bytes.NewBuffer(buf)
 	work.WriteByte(VERSION)
 	work.Write(e.Contract[:])
-	work.Write(e.Signature.Topic0().Bytes())
+	written, err := work.Write(e.Signature.Topic0().Bytes())
+	if written < 20 {
+		panic("no sig written")
+	}
+	if err != nil {
+		panic(err)
+	}
 	work.WriteByte(e.TopicPattern())
 	var d []byte
 	data := bytes.NewBuffer(d)
 	for _, cond := range e.Conditions {
 		switch cond.Location.(type) {
 		case TopicData:
-			work.Write(cond.Constraint.(MatchConstraint).target)
+			written, err := work.Write(cond.Constraint.(MatchConstraint).target)
+			if written != len(cond.Constraint.(MatchConstraint).target) {
+				panic("foo")
+			}
+			if err != nil {
+				panic("bar")
+			}
 		case OffsetData:
 			data.Write(cond.Bytes())
 		}
@@ -111,67 +123,67 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 	return target
 }
 
-func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
-	b := bytes.NewBuffer(data)
-	version, err := b.ReadByte()
+func (e *EventTriggerDefinition) UnmarshalBytes(data [][]byte) error {
+	var cat []byte
+	for i := range data {
+		cat = append(cat, data[i]...)
+	}
+
+	b := bytes.NewBuffer(cat)
+	version, err := readByte(b)
 	if err != nil {
-		return fmt.Errorf("failed to read version %w")
+		return fmt.Errorf("failed to read version %w", err)
 	}
 	if version != VERSION {
 		return fmt.Errorf("version mismatch want: %v got %v", VERSION, version)
 	}
-	contract, err := readWord(b)
-	if err != nil {
-		return err
-	}
-	signature, err := readWord(b)
-	if err != nil {
-		return err
-	}
+	contract := b.Next(common.AddressLength)
+	signature := b.Next(common.HashLength)
 	e.Contract = common.BytesToAddress(contract)
-	e.Signature = EvtSignature(signature)
-	topicMask, err := b.ReadByte()
+	signatureHash := common.Hash(signature)
+	e.Signature = EvtSignature{hashed: &signatureHash}
+	topicMask, err := readByte(b)
 	if err != nil {
 		return err
 	}
 	if 0b100&topicMask == 0b100 {
-		topic1, err := readWord(b)
+		topic1, err := readHash(b)
 		if err != nil {
 			return err
 		}
 		e.Conditions = append(e.Conditions, Condition{
 			Location:   TopicData{number: 1},
-			Constraint: MatchConstraint{target: topic1},
+			Constraint: MatchConstraint{target: topic1.Bytes()},
 		})
 	}
 	if 0b010&topicMask == 0b010 {
-		topic2, err := readWord(b)
+		topic2, err := readHash(b)
 		if err != nil {
 			return err
 		}
 		e.Conditions = append(e.Conditions, Condition{
 			Location:   TopicData{number: 2},
-			Constraint: MatchConstraint{target: topic2},
+			Constraint: MatchConstraint{target: topic2.Bytes()},
 		})
 	}
 	if 0b001&topicMask == 0b001 {
-		topic3, err := readWord(b)
+		topic3, err := readHash(b)
 		if err != nil {
 			return err
 		}
 		e.Conditions = append(e.Conditions, Condition{
 			Location:   TopicData{number: 3},
-			Constraint: MatchConstraint{target: topic3},
+			Constraint: MatchConstraint{target: topic3.Bytes()},
 		})
 	}
 	// we now have the minimum valid event trigger definition.
 	// from here on, getting 'io.EOF' can be legal.
-	for err != io.EOF {
-		argnumber, err := b.ReadByte()
+	for {
+		argnumber, err := readByte(b)
 		if err != nil {
 			break
 		}
-		matchtype, err := b.ReadByte()
+		matchtype, err := readByte(b)
 		if err != nil {
 			break
 		}
@@ -180,7 +192,7 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 		case UNDEFINED:
 			break
 		case COMPLEX:
-			wc, err := b.ReadByte()
+			wc, err := readByte(b)
 			if err != nil {
 				break
 			}
@@ -188,10 +200,8 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 			if wordcount == 0 {
 				break
 			}
-			arg := make([]byte, WORD*wordcount)
-			read, err := b.Read(arg)
-			if err != nil || read != (WORD*wordcount) {
-				// we could not read the entire argument
+			arg, err := readWords(b, wordcount)
+			if err != nil {
 				return fmt.Errorf("trailing data when parsing complex %v", arg)
 			}
 			constraint = MatchConstraint{target: arg}
@@ -207,9 +217,10 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 			if err != nil {
 				return fmt.Errorf("trailing data when parsing num constraint %v", arg)
 			}
+			argval := big.NewInt(0).SetBytes(arg)
 			constraint = NumConstraint{
 				op:     Op(matchtype),
-				target: big.NewInt(0).SetBytes(arg),
+				target: argval,
 			}
 		}
 		condition := Condition{
@@ -221,20 +232,43 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 		}
 		e.Conditions = append(e.Conditions, condition)
 	}
-
 	return nil
 }
 
+func readByte(buf *bytes.Buffer) (byte, error) {
+	res := buf.Next(1)
+	if len(res) < 1 {
+		return 0, io.EOF
+	}
+	return res[0], nil
+}
+
 func readWord(buf *bytes.Buffer) ([]byte, error) {
-	res := make([]byte, WORD)
-	read, err := buf.Read(res)
-	if err != nil {
-		return res, fmt.Errorf("failed to read word %w")
+	read := buf.Next(WORD)
+	if len(read) != WORD {
+		return read, fmt.Errorf("failed to read whole word")
 	}
-	if read < WORD {
-		return res, fmt.Errorf("failed to read whole word")
+	return read[:], nil
+}
+
+func readHash(buf *bytes.Buffer) (common.Hash, error) {
+	read := buf.Next(common.HashLength)
+	if len(read) != common.HashLength {
+		return common.BytesToHash(read), fmt.Errorf("failed to read whole word")
 	}
-	return res, err
+	return common.BytesToHash(read[:]), nil
+}
+
+func readWords(buf *bytes.Buffer, words int) ([]byte, error) {
+	read := make([]byte, words*WORD)
+	for i := 0; i < words; i++ {
+		next, err := readWord(buf)
+		if err != nil {
+			return read, fmt.Errorf("error reading %v words %w", words, err)
+		}
+		read = append(read, next...)
+	}
+	return read[:], nil
 }
 
 // Topic pattern: we need to specify, how many topics and in which position we reference
@@ -269,7 +303,8 @@ func (e *EventTriggerDefinition) TopicPattern() byte {
 			continue
 		}
 	}
-	return v[0] + (v[1] << 1) + (v[2] << 2)
+	result := v[0] + (v[1] << 1) + (v[2] << 2)
+	return result
 }
 
 func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
@@ -328,15 +363,18 @@ func (e *EventTriggerDefinition) Match(elog types.Log, testTopics bool) bool {
 	return true
 }
 
-type EvtSignature string
+type EvtSignature struct {
+	long   string
+	hashed *common.Hash
+}
 
-func (e EvtSignature) ToHashableSig() string {
+func (e EvtSignature) toHashableSig() string {
 	var name string
 	var prev string
 	i := 0
-	args := make([]string, 1+strings.Count(string(e), ","))
+	args := make([]string, 1+strings.Count(string(e.long), ","))
 	var s scanner.Scanner
-	s.Init(strings.NewReader(string(e)))
+	s.Init(strings.NewReader(string(e.long)))
 	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
 		if s.Position.Offset == 0 {
 			name = s.TokenText()
@@ -353,7 +391,10 @@ func (e EvtSignature) ToHashableSig() string {
 }
 
 func (e EvtSignature) Topic0() common.Hash {
-	shortSig := e.ToHashableSig()
+	if e.hashed != nil {
+		return *e.hashed
+	}
+	shortSig := e.toHashableSig()
 
 	return common.Hash(crypto.Keccak256([]byte(shortSig)))
 }
@@ -467,6 +508,7 @@ func (c *Condition) Bytes() []byte {
 		switch c.Constraint.(type) {
 		case NumConstraint:
 			data.WriteByte(byte(c.Constraint.(NumConstraint).op))
+			data.Write(TopicPad(c.Constraint.(NumConstraint).target.Bytes()))
 		case MatchConstraint:
 			matchBytes := c.Constraint.(MatchConstraint).target
 			if c.Location.(OffsetData).complex {
@@ -475,12 +517,11 @@ func (c *Condition) Bytes() []byte {
 				words := len(matchBytes) / WORD
 				if len(matchBytes)%WORD != 0 {
 					words++
-					data.WriteByte(byte(words))
-					data.Write(matchBytes)
-					padBytes := make([]byte, len(matchBytes)%WORD)
-					fmt.Println(padBytes)
-					data.Write(padBytes)
 				}
+				data.WriteByte(byte(words))
+				data.Write(matchBytes)
+				padBytes := make([]byte, len(matchBytes)%WORD)
+				data.Write(padBytes)
 			} else {
 				data.WriteByte(byte(MATCH))
 				data.Write(matchBytes)
