@@ -260,7 +260,7 @@ func readHash(buf *bytes.Buffer) (common.Hash, error) {
 }
 
 func readWords(buf *bytes.Buffer, words int) ([]byte, error) {
-	read := make([]byte, words*WORD)
+	var read []byte
 	for i := 0; i < words; i++ {
 		next, err := readWord(buf)
 		if err != nil {
@@ -508,7 +508,7 @@ func (c *Condition) Bytes() []byte {
 		switch c.Constraint.(type) {
 		case NumConstraint:
 			data.WriteByte(byte(c.Constraint.(NumConstraint).op))
-			data.Write(TopicPad(c.Constraint.(NumConstraint).target.Bytes()))
+			data.Write(WordPad(c.Constraint.(NumConstraint).target.Bytes()))
 		case MatchConstraint:
 			matchBytes := c.Constraint.(MatchConstraint).target
 			if c.Location.(OffsetData).complex {
@@ -591,8 +591,8 @@ func (m MatchConstraint) Test(v any) bool {
 	return true
 }
 
-// This kind of padding is only used for topics, which by definition are only 32byte
-func TopicPad(data []byte) []byte {
+// This kind of padding is used for topics and other values that should be exactly 32byte/1 word
+func WordPad(data []byte) []byte {
 	out := make([]byte, WORD)
 	copy(out[WORD-len(data):], data)
 	return out
