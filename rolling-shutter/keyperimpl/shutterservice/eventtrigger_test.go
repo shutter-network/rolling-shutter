@@ -18,39 +18,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
-func TestLogFilter(t *testing.T) {
-	// The first part of a log record consists of an array of topics. These topics are used to describe
-	// the event. The first topic usually consists of the signature (a keccak256 hash) of the name of
-	// the event that occurred, including the types (uint256, string, etc.) of its parameters. One exception
-	// where this signature is not included as the first topic is when emitting anonymous events. Since
-	// topics can only hold a maximum of 32 bytes of data, things like arrays or strings cannot be used as
-	// topics reliably. Instead, it should be included as data in the log record, not as a topic. If you
-	// were to try including a topic that’s larger than 32 bytes, the topic will be hashed instead. As a
-	// result, this hash can only be reversed if you know the original input. In conclusion, topics should
-	// only reliably be used for data that strongly narrows down search queries (like addresses).
-	//
-	// the event signature is produced by hashing the event's name and parameter types with Keccak-256.
-	sig := crypto.Keccak256([]byte(TestEvtSig))
-	//  ==> "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-	assert.Check(t, sig != nil, "sig is nil")
-
-	// var Addresses []common.Address // restricts matches to events created by specific contracts
-
-	// The Topic list restricts matches to particular event topics. Each event has a list
-	// of topics. Topics matches a prefix of that list. An empty element slice matches any
-	// topic. Non-empty elements represent an alternative that matches any of the
-	// contained topics.
-	//
-	// Examples:
-	// {} or nil          matches any topic list
-	// {{A}}              matches topic A in first position
-	// {{}, {B}}          matches any topic in first position AND B in second position
-	// {{A}, {B}}         matches topic A in first position AND B in second position
-	// {{A, B}, {C, D}}   matches topic (A OR B) in first position AND (C OR D) in second position
-	// var Topics [][]common.Hash
-	////////////
-}
-
 // This should match what is in help/erc20bindings.go
 const (
 	TestEvtSig     = "Transfer(address,address,address,uint256,string)"
@@ -136,7 +103,6 @@ func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefiniti
 
 	assert.NilError(t, err, "failed to sign")
 	marshaledTrigger := trigger.MarshalBytes()
-	t.Log(marshaledTrigger)
 	tx, err := setup.triggerContract.Register(&bind.TransactOpts{
 		From:      from,
 		Nonce:     big.NewInt(int64(nonce)),
@@ -219,10 +185,10 @@ func TestEvtBloomFilterMatch(t *testing.T) {
 	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
 }
 
-func CreateDefinition(contract common.Address, topic1, topic2, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
+func CreateDefinition(contract common.Address, topic1 []byte, topic2 []byte, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
 	definition := EventTriggerDefinition{
 		Contract:  contract,
-		Signature: TestEvtSigFull,
+		Signature: EvtSignature{long: TestEvtSigFull},
 		Conditions: []Condition{
 			{
 				Location: TopicData{
@@ -388,4 +354,57 @@ func TestEvtRegistry(t *testing.T) {
 	assert.NilError(t, err, "failed setup and deploy")
 
 	assert.Check(t, setup.backend != nil, "setup is nil")
+	def := CreateDefinition(
+		setup.erc20Address,
+		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		1, []byte("short"))
+	// RegisterTrigger(t, setup, def)
+
+	t.Log("testing marshal")
+	t.Log("contract bytes", setup.erc20Address.Bytes())
+	t.Log("signature bytes", def.Signature.Topic0().Bytes())
+	t.Log("topic1 bytes", def.Conditions[0].Constraint.(MatchConstraint).target)
+	t.Log("topic3 bytes", def.Conditions[1].Constraint.(MatchConstraint).target)
+	ser := def.MarshalBytes()
+
+	de := EventTriggerDefinition{}
+
+	t.Log("first unmarshal")
+	de.UnmarshalBytes(ser)
+	round := de.MarshalBytes()
+	for i := range round {
+		fmt.Printf("ser: %v\ndes: %v\n", ser[i], round[i])
+	}
+	assert.Check(t, deepEqual(ser, de.MarshalBytes()), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
+
+	// logs, err := setup.triggerContract.FilterEventTriggerRegistered(&bind.FilterOpts{
+	// 	Start:   uint64(0),
+	// 	End:     nil,
+	// 	Context: context.Background(),
+	// },
+	// 	[]uint64{1},
+	// )
+	// for logs.Next() {
+	// 	x := logs.Event.TriggerDefinition
+	// 	assert.Check(t, deepEqual(ser, x), "serialization mismatch")
+	// }
+}
+
+func deepEqual(a, b [][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, ar := range a {
+		if len(b[i]) != len(ar) {
+			return false
+		}
+		for j, v := range ar {
+			if b[i][j] != v {
+				return false
+			}
+		}
+	}
+	return true
 }
