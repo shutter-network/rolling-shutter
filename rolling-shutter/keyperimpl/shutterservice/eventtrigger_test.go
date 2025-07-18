@@ -175,11 +175,11 @@ func TestEvtBloomFilterMatch(t *testing.T) {
 	assert.Check(t, latest.Bloom().Test(topic0), "could not find topic0")
 
 	// topic1 address from indexed
-	topic1 := TopicPad(addr.Bytes())
+	topic1 := WordPad(addr.Bytes())
 	assert.Check(t, latest.Bloom().Test(topic1), "could not find topic1")
 
 	// topic2 address to indexed
-	topic2 := TopicPad(addr.Bytes())
+	topic2 := WordPad(addr.Bytes())
 	assert.Check(t, latest.Bloom().Test(topic2), "could not find topic2")
 
 	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
@@ -241,7 +241,7 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 	// stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
 	stringMatch := []byte("short")
 
-	definition := CreateDefinition(setup.erc20Address, TopicPad(senderAddr.Bytes()), nil, TopicPad(fiveAddr.Bytes()), int64(1), stringMatch)
+	definition := CreateDefinition(setup.erc20Address, WordPad(senderAddr.Bytes()), nil, WordPad(fiveAddr.Bytes()), int64(1), stringMatch)
 	assert.Check(t, len(definition.Conditions) == 4, "something went wrong")
 	f := definition.ToFilterQuery()
 	assert.Check(t, len(f.Topics) > 0, "no filterquery")
@@ -275,7 +275,7 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 			number: 2,
 		},
 		Constraint: MatchConstraint{
-			target: TopicPad(senderAddr.Bytes()),
+			target: WordPad(senderAddr.Bytes()),
 		},
 	})
 	overspecific := definition.ToFilterQuery()
@@ -356,40 +356,41 @@ func TestEvtRegistry(t *testing.T) {
 	assert.Check(t, setup.backend != nil, "setup is nil")
 	def := CreateDefinition(
 		setup.erc20Address,
-		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
-		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
-		TopicPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
+		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
 		1, []byte("short"))
-	// RegisterTrigger(t, setup, def)
+	RegisterTrigger(t, setup, def)
 
-	t.Log("testing marshal")
-	t.Log("contract bytes", setup.erc20Address.Bytes())
-	t.Log("signature bytes", def.Signature.Topic0().Bytes())
-	t.Log("topic1 bytes", def.Conditions[0].Constraint.(MatchConstraint).target)
-	t.Log("topic3 bytes", def.Conditions[1].Constraint.(MatchConstraint).target)
 	ser := def.MarshalBytes()
 
 	de := EventTriggerDefinition{}
 
-	t.Log("first unmarshal")
 	de.UnmarshalBytes(ser)
 	round := de.MarshalBytes()
-	for i := range round {
-		fmt.Printf("ser: %v\ndes: %v\n", ser[i], round[i])
-	}
-	assert.Check(t, deepEqual(ser, de.MarshalBytes()), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
+	assert.Check(t, deepEqual(ser, round), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
 
-	// logs, err := setup.triggerContract.FilterEventTriggerRegistered(&bind.FilterOpts{
-	// 	Start:   uint64(0),
-	// 	End:     nil,
-	// 	Context: context.Background(),
-	// },
-	// 	[]uint64{1},
-	// )
-	// for logs.Next() {
-	// 	x := logs.Event.TriggerDefinition
-	// 	assert.Check(t, deepEqual(ser, x), "serialization mismatch")
-	// }
+	logs, err := setup.triggerContract.FilterEventTriggerRegistered(&bind.FilterOpts{
+		Start:   uint64(0),
+		End:     nil,
+		Context: context.Background(),
+	},
+		[]uint64{1},
+	)
+	for logs.Next() {
+		x := logs.Event.TriggerDefinition
+		assert.Check(t, deepEqual(ser, x), "serialization mismatch")
+	}
+	var newConditions []Condition
+	for _, cond := range def.Conditions {
+		_, ok := cond.Constraint.(NumConstraint)
+		if !ok {
+			newConditions = append(newConditions, cond)
+		}
+	}
+	def.Conditions = newConditions
+	shorter := def.MarshalBytes()
+	assert.Check(t, !deepEqual(shorter, ser), "we lost a constraint")
 }
 
 func deepEqual(a, b [][]byte) bool {
