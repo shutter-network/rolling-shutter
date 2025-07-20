@@ -10,13 +10,13 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
+	registryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -156,7 +156,7 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 		Str("contract-address", kpr.config.Chain.Contracts.KeyperSetManager.Hex()).
 		Msg("initializing registry syncer")
 
-	contract, err := registryBindings.NewShutterregistry(kpr.config.Chain.Contracts.ShutterRegistry, client)
+	contract, err := registryBindings.NewShutterRegistry(kpr.config.Chain.Contracts.ShutterRegistry, client)
 	if err != nil {
 		return err
 	}

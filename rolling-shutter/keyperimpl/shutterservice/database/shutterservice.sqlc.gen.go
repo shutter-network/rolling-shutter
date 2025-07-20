@@ -146,6 +146,59 @@ func (q *Queries) InsertDecryptionSignature(ctx context.Context, arg InsertDecry
 	return err
 }
 
+const insertEventTriggerRegisteredEvent = `-- name: InsertEventTriggerRegisteredEvent :execresult
+INSERT INTO event_trigger_registered_event (
+    block_number,
+    block_hash,
+    tx_index,
+    log_index,
+    eon,
+    identity_prefix,
+    sender,
+    definition,
+    ttl,
+    identity
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (identity_prefix, sender) DO UPDATE SET
+block_number = $1,
+block_hash = $2,
+tx_index = $3,
+log_index = $4,
+sender = $7,
+definition = $8,
+ttl = $9,
+identity = $10
+`
+
+type InsertEventTriggerRegisteredEventParams struct {
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	Eon            int64
+	IdentityPrefix []byte
+	Sender         string
+	Definition     string
+	Ttl            int64
+	Identity       []byte
+}
+
+func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg InsertEventTriggerRegisteredEventParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertEventTriggerRegisteredEvent,
+		arg.BlockNumber,
+		arg.BlockHash,
+		arg.TxIndex,
+		arg.LogIndex,
+		arg.Eon,
+		arg.IdentityPrefix,
+		arg.Sender,
+		arg.Definition,
+		arg.Ttl,
+		arg.Identity,
+	)
+}
+
 const insertIdentityRegisteredEvent = `-- name: InsertIdentityRegisteredEvent :execresult
 INSERT INTO identity_registered_event (
     block_number,
@@ -244,5 +297,23 @@ type UpdateDecryptedFlagParams struct {
 
 func (q *Queries) UpdateDecryptedFlag(ctx context.Context, arg UpdateDecryptedFlagParams) error {
 	_, err := q.db.Exec(ctx, updateDecryptedFlag, arg.Column1, arg.Column2)
+	return err
+}
+
+const updateEventTriggerDecryptedFlag = `-- name: UpdateEventTriggerDecryptedFlag :exec
+UPDATE event_trigger_registered_event
+SET decrypted = TRUE
+WHERE (eon, identity) IN (
+    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
+)
+`
+
+type UpdateEventTriggerDecryptedFlagParams struct {
+	Column1 []int64
+	Column2 [][]byte
+}
+
+func (q *Queries) UpdateEventTriggerDecryptedFlag(ctx context.Context, arg UpdateEventTriggerDecryptedFlagParams) error {
+	_, err := q.db.Exec(ctx, updateEventTriggerDecryptedFlag, arg.Column1, arg.Column2)
 	return err
 }

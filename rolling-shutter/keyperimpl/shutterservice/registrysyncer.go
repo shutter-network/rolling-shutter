@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
+	registryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -27,7 +27,7 @@ const (
 )
 
 type RegistrySyncer struct {
-	Contract             *registryBindings.Shutterregistry
+	Contract             *registryBindings.ShutterRegistry
 	DBPool               *pgxpool.Pool
 	ExecutionClient      *ethclient.Client
 	SyncStartBlockNumber uint64
@@ -191,17 +191,17 @@ func (s *RegistrySyncer) fetchEvents(
 	ctx context.Context,
 	start,
 	end uint64,
-) ([]*registryBindings.ShutterregistryIdentityRegistered, error) {
+) ([]*registryBindings.ShutterRegistryEventTriggerRegistered, error) {
 	opts := bind.FilterOpts{
 		Start:   start,
 		End:     &end,
 		Context: ctx,
 	}
-	it, err := s.Contract.ShutterregistryFilterer.FilterIdentityRegistered(&opts)
+	it, err := s.Contract.ShutterRegistryFilterer.FilterEventTriggerRegistered(&opts, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query identity registered events")
 	}
-	events := []*registryBindings.ShutterregistryIdentityRegistered{}
+	events := []*registryBindings.ShutterRegistryEventTriggerRegistered{}
 	for it.Next() {
 		events = append(events, it.Event)
 	}
@@ -212,9 +212,9 @@ func (s *RegistrySyncer) fetchEvents(
 }
 
 func (s *RegistrySyncer) filterEvents(
-	events []*registryBindings.ShutterregistryIdentityRegistered,
-) []*registryBindings.ShutterregistryIdentityRegistered {
-	filteredEvents := []*registryBindings.ShutterregistryIdentityRegistered{}
+	events []*registryBindings.ShutterRegistryEventTriggerRegistered,
+) []*registryBindings.ShutterRegistryEventTriggerRegistered {
+	filteredEvents := []*registryBindings.ShutterRegistryEventTriggerRegistered{}
 	for _, event := range events {
 		if event.Eon > math.MaxInt64 {
 			log.Debug().
@@ -235,12 +235,21 @@ func (s *RegistrySyncer) filterEvents(
 func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 	ctx context.Context,
 	tx pgx.Tx,
-	events []*registryBindings.ShutterregistryIdentityRegistered,
+	events []*registryBindings.ShutterRegistryEventTriggerRegistered,
 ) error {
 	queries := database.New(tx)
 	for _, event := range events {
 		identity := computeIdentity(event)
-		_, err := queries.InsertIdentityRegisteredEvent(ctx, database.InsertIdentityRegisteredEventParams{
+		var def []byte
+		for i := range event.TriggerDefinition {
+			def = append(def, event.TriggerDefinition[i]...)
+		}
+		parsed := EventTriggerDefinition{}
+		err := parsed.UnmarshalBytes(event.TriggerDefinition)
+		if err != nil {
+			return errors.Wrap(err, "could not parse event definition from event")
+		}
+		_, err = queries.InsertEventTriggerRegisteredEvent(ctx, database.InsertEventTriggerRegisteredEventParams{
 			BlockNumber:    int64(event.Raw.BlockNumber),
 			BlockHash:      event.Raw.BlockHash[:],
 			TxIndex:        int64(event.Raw.TxIndex),
@@ -248,7 +257,8 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Eon:            int64(event.Eon),
 			IdentityPrefix: event.IdentityPrefix[:],
 			Sender:         shdb.EncodeAddress(event.Sender),
-			Timestamp:      int64(event.Timestamp),
+			Definition:     string(def[:]),
+			Ttl:            event.Ttl.Int64(),
 			Identity:       identity,
 		})
 		if err != nil {
@@ -259,13 +269,13 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Uint64("eon", event.Eon).
 			Hex("identityPrefix", event.IdentityPrefix[:]).
 			Hex("sender", event.Sender.Bytes()).
-			Uint64("timestamp", event.Timestamp).
+			Int64("ttl", event.Ttl.Int64()).
 			Msg("synced new identity registered event")
 	}
 	return nil
 }
 
-func computeIdentity(event *registryBindings.ShutterregistryIdentityRegistered) []byte {
+func computeIdentity(event *registryBindings.ShutterRegistryEventTriggerRegistered) []byte {
 	// TODO: may need to change this if we want to create identity other way
 	var buf bytes.Buffer
 	buf.Write(event.IdentityPrefix[:])

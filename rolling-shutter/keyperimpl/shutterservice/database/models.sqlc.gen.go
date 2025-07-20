@@ -17,6 +17,20 @@ type DecryptionSignature struct {
 	Signature      []byte
 }
 
+type EventTriggerRegisteredEvent struct {
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	Eon            int64
+	IdentityPrefix []byte
+	Sender         string
+	Definition     string
+	Decrypted      bool
+	Identity       []byte
+	Ttl            int64
+}
+
 type IdentityRegisteredEvent struct {
 	BlockNumber    int64
 	BlockHash      []byte

@@ -1,6 +1,21 @@
--- schema-version: shutterservice-1 --
+-- schema-version: shutterservice-2 --
 -- Please change the version above if you make incompatible changes to
 -- the schema. We'll use this to check we're using the right schema.
+
+CREATE TABLE event_trigger_registered_event (
+    block_number bigint NOT NULL CHECK (block_number >= 0),
+    block_hash bytea NOT NULL,
+    tx_index bigint NOT NULL CHECK (tx_index >= 0),
+    log_index bigint NOT NULL CHECK (log_index >= 0),
+    eon bigint NOT NULL CHECK (eon >= 0),
+    identity_prefix bytea NOT NULL,
+    sender text NOT NULL,
+    definition varchar NOT NULL,
+    decrypted boolean NOT NULL DEFAULT false,
+    identity bytea NOT NULL,
+    ttl bigint NOT NULL CHECK (ttl >= 0),
+    PRIMARY KEY (identity_prefix, sender)
+);
 
 CREATE TABLE identity_registered_event (
     block_number bigint NOT NULL CHECK (block_number >= 0),
