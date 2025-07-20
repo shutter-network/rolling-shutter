@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
-	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
+	registryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
