@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	cryptoRand "crypto/rand"
+	"math"
+	"math/rand/v2"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -17,21 +18,23 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
-func TestFilterIdentityRegisteredEvents(t *testing.T) {
+func TestFilterEventTriggerRegisteredEvents(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	events := make([]*registryBindings.ShutterregistryIdentityRegistered, 2)
+	events := make([]*registryBindings.ShutterRegistryEventTriggerRegistered, 2)
 	for i := 0; i < 2; i++ {
 		identityPrefix, err := generateRandom32Bytes()
 		assert.NilError(t, err)
 		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
-		events[i] = &registryBindings.ShutterregistryIdentityRegistered{
-			Eon:            uint64(i),
-			IdentityPrefix: [32]byte(identityPrefix),
-			Sender:         sender,
-			Timestamp:      uint64(time.Now().Unix()),
+		def, err := generateRandomEventTriggerDefinition()
+		events[i] = &registryBindings.ShutterRegistryEventTriggerRegistered{
+			Eon:               uint64(i),
+			IdentityPrefix:    [32]byte(identityPrefix),
+			Sender:            sender,
+			TriggerDefinition: def.MarshalBytes(),
+			Ttl:               rand.Uint64(),
 		}
 	}
 
@@ -41,23 +44,26 @@ func TestFilterIdentityRegisteredEvents(t *testing.T) {
 	assert.DeepEqual(t, finalEvents, events)
 }
 
-func TestInsertIdentityRegisteredEvents(t *testing.T) {
+func TestInsertEventTriggerRegisteredEvents(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 
 	ctx := context.Background()
-	events := make([]*registryBindings.ShutterregistryIdentityRegistered, 2)
+	events := make([]*registryBindings.ShutterRegistryEventTriggerRegistered, 2)
 	for i := 0; i < 2; i++ {
 		identityPrefix, err := generateRandom32Bytes()
 		assert.NilError(t, err)
 		_, sender, err := generateRandomAccount()
 		assert.NilError(t, err)
-		events[i] = &registryBindings.ShutterregistryIdentityRegistered{
-			Eon:            uint64(i),
-			IdentityPrefix: [32]byte(identityPrefix),
-			Sender:         sender,
-			Timestamp:      uint64(time.Now().Unix()),
+		def, err := generateRandomEventTriggerDefinition()
+		assert.NilError(t, err)
+		events[i] = &registryBindings.ShutterRegistryEventTriggerRegistered{
+			Eon:               uint64(i),
+			IdentityPrefix:    [32]byte(identityPrefix),
+			Sender:            sender,
+			TriggerDefinition: def.MarshalBytes(),
+			Ttl:               rand.Uint64() % math.MaxInt64,
 		}
 	}
 
@@ -67,10 +73,42 @@ func TestInsertIdentityRegisteredEvents(t *testing.T) {
 	rs := RegistrySyncer{}
 
 	err := dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		err := rs.insertIdentityRegisteredEvents(ctx, tx, events)
+		err := rs.insertEventTriggerRegisteredEvents(ctx, tx, events)
 		return err
 	})
 	assert.NilError(t, err)
+}
+
+func generateRandomEventTriggerDefinition() (*EventTriggerDefinition, error) {
+	_, randomContract, err := generateRandomAccount()
+	if err != nil {
+		return nil, err
+	}
+	randomTopic, err := generateRandom32Bytes()
+	if err != nil {
+		return nil, err
+	}
+	randomSig, err := generateRandom32Bytes()
+	if err != nil {
+		return nil, err
+	}
+	def := EventTriggerDefinition{
+		Contract: randomContract,
+		Signature: EvtSignature{
+			hashed: (*common.Hash)(randomSig),
+		},
+		Conditions: []Condition{
+			{
+				Constraint: MatchConstraint{
+					target: randomTopic,
+				},
+				Location: TopicData{
+					number: 1,
+				},
+			},
+		},
+	}
+	return &def, nil
 }
 
 func generateRandom32Bytes() ([]byte, error) {

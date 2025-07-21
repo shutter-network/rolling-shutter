@@ -10,7 +10,7 @@ CREATE TABLE event_trigger_registered_event (
     eon bigint NOT NULL CHECK (eon >= 0),
     identity_prefix bytea NOT NULL,
     sender text NOT NULL,
-    definition varchar NOT NULL,
+    definition bytea NOT NULL,
     decrypted boolean NOT NULL DEFAULT false,
     identity bytea NOT NULL,
     ttl bigint NOT NULL CHECK (ttl >= 0),

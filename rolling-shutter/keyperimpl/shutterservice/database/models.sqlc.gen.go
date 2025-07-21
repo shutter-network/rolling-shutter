@@ -25,7 +25,7 @@ type EventTriggerRegisteredEvent struct {
 	Eon            int64
 	IdentityPrefix []byte
 	Sender         string
-	Definition     string
+	Definition     []byte
 	Decrypted      bool
 	Identity       []byte
 	Ttl            int64
