@@ -23,7 +23,7 @@ contract ShutterRegistry is Ownable {
 
     struct EventTriggerRegistration {
         uint64 eon;
-        uint256 ttl;
+        uint64 ttl;
         bytes32 triggerDefinitionHash;
     }
     /**
@@ -46,7 +46,7 @@ contract ShutterRegistry is Ownable {
         bytes32 identityPrefix,
         address sender,
         bytes[] triggerDefinition,
-        uint256 ttl
+        uint64 ttl
     );
 
     /**
@@ -69,7 +69,7 @@ contract ShutterRegistry is Ownable {
         uint64 eon,
         bytes32 identityPrefix,
         bytes[] memory triggerDefinition,
-        uint256 ttl
+        uint64 ttl
     ) external {
         // Ensure the timestamp is not in the past.
         require(ttl >= block.number, TimestampInThePast());

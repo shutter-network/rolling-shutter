@@ -97,7 +97,7 @@ func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefiniti
 		return types.SignTx(tx, types.LatestSignerForChainID(chainid), setup.key)
 	}
 
-	ttl := big.NewInt(head.Number.Int64() + 10)
+	ttl := uint64(head.Number.Int64() + 10)
 	eon := uint64(1)
 	identityPrefix := crypto.Keccak256Hash([]byte("test"))
 

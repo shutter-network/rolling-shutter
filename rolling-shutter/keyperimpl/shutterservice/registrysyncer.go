@@ -164,7 +164,7 @@ func (s *RegistrySyncer) syncRange(
 		return errors.Wrap(err, "failed to get execution block header by number")
 	}
 	err = s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		err = s.insertIdentityRegisteredEvents(ctx, tx, filteredEvents)
+		err = s.insertEventTriggerRegisteredEvents(ctx, tx, filteredEvents)
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ func (s *RegistrySyncer) filterEvents(
 }
 
 // insertIdentityRegisteredEvents inserts the given events into the database.
-func (s *RegistrySyncer) insertIdentityRegisteredEvents(
+func (s *RegistrySyncer) insertEventTriggerRegisteredEvents(
 	ctx context.Context,
 	tx pgx.Tx,
 	events []*registryBindings.ShutterRegistryEventTriggerRegistered,
@@ -257,8 +257,8 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Eon:            int64(event.Eon),
 			IdentityPrefix: event.IdentityPrefix[:],
 			Sender:         shdb.EncodeAddress(event.Sender),
-			Definition:     string(def[:]),
-			Ttl:            event.Ttl.Int64(),
+			Definition:     def[:],
+			Ttl:            int64(event.Ttl),
 			Identity:       identity,
 		})
 		if err != nil {
@@ -269,8 +269,8 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 			Uint64("eon", event.Eon).
 			Hex("identityPrefix", event.IdentityPrefix[:]).
 			Hex("sender", event.Sender.Bytes()).
-			Int64("ttl", event.Ttl.Int64()).
-			Msg("synced new identity registered event")
+			Uint64("ttl", event.Ttl).
+			Msg("synced new event trigger registered event")
 	}
 	return nil
 }

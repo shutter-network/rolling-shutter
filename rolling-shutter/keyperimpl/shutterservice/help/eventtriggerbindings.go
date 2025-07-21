@@ -564,15 +564,15 @@ func (_Ownable *OwnableFilterer) ParseOwnershipTransferred(log types.Log) (*Owna
 
 // ShutterRegistryMetaData contains all meta data concerning the ShutterRegistry contract.
 var ShutterRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AlreadyRegistered\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidIdentityPrefix\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TTLTooShort\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TimestampInThePast\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"identityPrefix\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes[]\",\"name\":\"triggerDefinition\",\"type\":\"bytes[]\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"ttl\",\"type\":\"uint256\"}],\"name\":\"EventTriggerRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"identityPrefix\",\"type\":\"bytes32\"},{\"internalType\":\"bytes[]\",\"name\":\"triggerDefinition\",\"type\":\"bytes[]\"},{\"internalType\":\"uint256\",\"name\":\"ttl\",\"type\":\"uint256\"}],\"name\":\"register\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"identity\",\"type\":\"bytes32\"}],\"name\":\"registrations\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"internalType\":\"uint256\",\"name\":\"ttl\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"triggerDefinitionHash\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AlreadyRegistered\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidIdentityPrefix\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TTLTooShort\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TimestampInThePast\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"identityPrefix\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes[]\",\"name\":\"triggerDefinition\",\"type\":\"bytes[]\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"EventTriggerRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"identityPrefix\",\"type\":\"bytes32\"},{\"internalType\":\"bytes[]\",\"name\":\"triggerDefinition\",\"type\":\"bytes[]\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"register\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"identity\",\"type\":\"bytes32\"}],\"name\":\"registrations\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"eon\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"triggerDefinitionHash\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 	Sigs: map[string]string{
 		"8da5cb5b": "owner()",
-		"dc48e8e6": "register(uint64,bytes32,bytes[],uint256)",
+		"205b396f": "register(uint64,bytes32,bytes[],uint64)",
 		"da7c6a42": "registrations(bytes32)",
 		"715018a6": "renounceOwnership()",
 		"f2fde38b": "transferOwnership(address)",
 	},
-	Bin: "0x608060405234801561000f575f5ffd5b50335f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603610081575f6040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016100789190610196565b60405180910390fd5b6100908161009660201b60201c565b506101af565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61018082610157565b9050919050565b61019081610176565b82525050565b5f6020820190506101a95f830184610187565b92915050565b610c1a806101bc5f395ff3fe608060405234801561000f575f5ffd5b5060043610610055575f3560e01c8063715018a6146100595780638da5cb5b14610063578063da7c6a4214610081578063dc48e8e6146100b3578063f2fde38b146100cf575b5f5ffd5b6100616100eb565b005b61006b6100fe565b6040516100789190610582565b60405180910390f35b61009b600480360381019061009691906105df565b610125565b6040516100aa93929190610653565b60405180910390f35b6100cd60048036038101906100c891906108fa565b61015e565b005b6100e960048036038101906100e491906109a4565b610370565b005b6100f36103f4565b6100fc5f61047b565b565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6001602052805f5260405f205f91509050805f015f9054906101000a900467ffffffffffffffff16908060010154908060020154905083565b43811015610198576040517f84f8e55900000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f5f1b83036101d3576040517f63a4021d00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f83336040516020016101e7929190610a34565b6040516020818303038152906040528051906020012090505f60015f8381526020019081526020015f20905082816001015410610250576040517fb5f2184000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f8160010154146102bf578060020154846040516020016102719190610b7a565b60405160208183030381529060405280519060200120146102be576040517f3a81d6fc00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5b82816001018190555085815f015f6101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550836040516020016103029190610b7a565b6040516020818303038152906040528051906020012081600201819055508567ffffffffffffffff167fd869872bfe31d9e8b508fd5f68d6a0e40988544df65c4e84e292ed6fc117e814863387876040516103609493929190610b9a565b60405180910390a2505050505050565b6103786103f4565b5f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16036103e8575f6040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016103df9190610582565b60405180910390fd5b6103f18161047b565b50565b6103fc61053c565b73ffffffffffffffffffffffffffffffffffffffff1661041a6100fe565b73ffffffffffffffffffffffffffffffffffffffff16146104795761043d61053c565b6040517f118cdaa70000000000000000000000000000000000000000000000000000000081526004016104709190610582565b60405180910390fd5b565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f33905090565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61056c82610543565b9050919050565b61057c81610562565b82525050565b5f6020820190506105955f830184610573565b92915050565b5f604051905090565b5f5ffd5b5f5ffd5b5f819050919050565b6105be816105ac565b81146105c8575f5ffd5b50565b5f813590506105d9816105b5565b92915050565b5f602082840312156105f4576105f36105a4565b5b5f610601848285016105cb565b91505092915050565b5f67ffffffffffffffff82169050919050565b6106268161060a565b82525050565b5f819050919050565b61063e8161062c565b82525050565b61064d816105ac565b82525050565b5f6060820190506106665f83018661061d565b6106736020830185610635565b6106806040830184610644565b949350505050565b6106918161060a565b811461069b575f5ffd5b50565b5f813590506106ac81610688565b92915050565b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6106fc826106b6565b810181811067ffffffffffffffff8211171561071b5761071a6106c6565b5b80604052505050565b5f61072d61059b565b905061073982826106f3565b919050565b5f67ffffffffffffffff821115610758576107576106c6565b5b602082029050602081019050919050565b5f5ffd5b5f5ffd5b5f67ffffffffffffffff82111561078b5761078a6106c6565b5b610794826106b6565b9050602081019050919050565b828183375f83830152505050565b5f6107c16107bc84610771565b610724565b9050828152602081018484840111156107dd576107dc61076d565b5b6107e88482856107a1565b509392505050565b5f82601f830112610804576108036106b2565b5b81356108148482602086016107af565b91505092915050565b5f61082f61082a8461073e565b610724565b9050808382526020820190506020840283018581111561085257610851610769565b5b835b8181101561089957803567ffffffffffffffff811115610877576108766106b2565b5b80860161088489826107f0565b85526020850194505050602081019050610854565b5050509392505050565b5f82601f8301126108b7576108b66106b2565b5b81356108c784826020860161081d565b91505092915050565b6108d98161062c565b81146108e3575f5ffd5b50565b5f813590506108f4816108d0565b92915050565b5f5f5f5f60808587031215610912576109116105a4565b5b5f61091f8782880161069e565b9450506020610930878288016105cb565b935050604085013567ffffffffffffffff811115610951576109506105a8565b5b61095d878288016108a3565b925050606061096e878288016108e6565b91505092959194509250565b61098381610562565b811461098d575f5ffd5b50565b5f8135905061099e8161097a565b92915050565b5f602082840312156109b9576109b86105a4565b5b5f6109c684828501610990565b91505092915050565b5f819050919050565b6109e96109e4826105ac565b6109cf565b82525050565b5f8160601b9050919050565b5f610a05826109ef565b9050919050565b5f610a16826109fb565b9050919050565b610a2e610a2982610562565b610a0c565b82525050565b5f610a3f82856109d8565b602082019150610a4f8284610a1d565b6014820191508190509392505050565b5f81519050919050565b5f82825260208201905092915050565b5f819050602082019050919050565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f610aba82610a88565b610ac48185610a92565b9350610ad4818560208601610aa2565b610add816106b6565b840191505092915050565b5f610af38383610ab0565b905092915050565b5f602082019050919050565b5f610b1182610a5f565b610b1b8185610a69565b935083602082028501610b2d85610a79565b805f5b85811015610b685784840389528151610b498582610ae8565b9450610b5483610afb565b925060208a01995050600181019050610b30565b50829750879550505050505092915050565b5f6020820190508181035f830152610b928184610b07565b905092915050565b5f608082019050610bad5f830187610644565b610bba6020830186610573565b8181036040830152610bcc8185610b07565b9050610bdb6060830184610635565b9594505050505056fea2646970667358221220b48c8f3130c1b34b77b6d6f780228163158d2b0a4c0f0a5867b893c8429096e464736f6c634300081c0033",
+	Bin: "0x608060405234801561000f575f5ffd5b50335f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603610081575f6040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016100789190610196565b60405180910390fd5b6100908161009660201b60201c565b506101af565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61018082610157565b9050919050565b61019081610176565b82525050565b5f6020820190506101a95f830184610187565b92915050565b610c5a806101bc5f395ff3fe608060405234801561000f575f5ffd5b5060043610610055575f3560e01c8063205b396f14610059578063715018a6146100755780638da5cb5b1461007f578063da7c6a421461009d578063f2fde38b146100cf575b5f5ffd5b610073600480360381019061006e9190610864565b6100eb565b005b61007d61036c565b005b61008761037f565b6040516100949190610923565b60405180910390f35b6100b760048036038101906100b2919061093c565b6103a6565b6040516100c693929190610985565b60405180910390f35b6100e960048036038101906100e491906109e4565b6103f2565b005b438167ffffffffffffffff16101561012f576040517f84f8e55900000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f5f1b830361016a576040517f63a4021d00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f833360405160200161017e929190610a74565b6040516020818303038152906040528051906020012090505f60015f8381526020019081526020015f2090508267ffffffffffffffff16815f0160089054906101000a900467ffffffffffffffff1667ffffffffffffffff161061020e576040517fb5f2184000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f815f0160089054906101000a900467ffffffffffffffff1667ffffffffffffffff161461029a5780600101548460405160200161024c9190610bba565b6040516020818303038152906040528051906020012014610299576040517f3a81d6fc00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5b82815f0160086101000a81548167ffffffffffffffff021916908367ffffffffffffffff16021790555085815f015f6101000a81548167ffffffffffffffff021916908367ffffffffffffffff160217905550836040516020016102fe9190610bba565b6040516020818303038152906040528051906020012081600101819055508567ffffffffffffffff167f7aae9d6e9dc5cd3510d70ffff8db7974a922a1c919863a85f19881e61da938308633878760405161035c9493929190610bda565b60405180910390a2505050505050565b610374610476565b61037d5f6104fd565b565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6001602052805f5260405f205f91509050805f015f9054906101000a900467ffffffffffffffff1690805f0160089054906101000a900467ffffffffffffffff16908060010154905083565b6103fa610476565b5f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff160361046a575f6040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016104619190610923565b60405180910390fd5b610473816104fd565b50565b61047e6105be565b73ffffffffffffffffffffffffffffffffffffffff1661049c61037f565b73ffffffffffffffffffffffffffffffffffffffff16146104fb576104bf6105be565b6040517f118cdaa70000000000000000000000000000000000000000000000000000000081526004016104f29190610923565b60405180910390fd5b565b5f5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f33905090565b5f604051905090565b5f5ffd5b5f5ffd5b5f67ffffffffffffffff82169050919050565b6105f2816105d6565b81146105fc575f5ffd5b50565b5f8135905061060d816105e9565b92915050565b5f819050919050565b61062581610613565b811461062f575f5ffd5b50565b5f813590506106408161061c565b92915050565b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6106908261064a565b810181811067ffffffffffffffff821117156106af576106ae61065a565b5b80604052505050565b5f6106c16105c5565b90506106cd8282610687565b919050565b5f67ffffffffffffffff8211156106ec576106eb61065a565b5b602082029050602081019050919050565b5f5ffd5b5f5ffd5b5f67ffffffffffffffff82111561071f5761071e61065a565b5b6107288261064a565b9050602081019050919050565b828183375f83830152505050565b5f61075561075084610705565b6106b8565b90508281526020810184848401111561077157610770610701565b5b61077c848285610735565b509392505050565b5f82601f83011261079857610797610646565b5b81356107a8848260208601610743565b91505092915050565b5f6107c36107be846106d2565b6106b8565b905080838252602082019050602084028301858111156107e6576107e56106fd565b5b835b8181101561082d57803567ffffffffffffffff81111561080b5761080a610646565b5b8086016108188982610784565b855260208501945050506020810190506107e8565b5050509392505050565b5f82601f83011261084b5761084a610646565b5b813561085b8482602086016107b1565b91505092915050565b5f5f5f5f6080858703121561087c5761087b6105ce565b5b5f610889878288016105ff565b945050602061089a87828801610632565b935050604085013567ffffffffffffffff8111156108bb576108ba6105d2565b5b6108c787828801610837565b92505060606108d8878288016105ff565b91505092959194509250565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61090d826108e4565b9050919050565b61091d81610903565b82525050565b5f6020820190506109365f830184610914565b92915050565b5f60208284031215610951576109506105ce565b5b5f61095e84828501610632565b91505092915050565b610970816105d6565b82525050565b61097f81610613565b82525050565b5f6060820190506109985f830186610967565b6109a56020830185610967565b6109b26040830184610976565b949350505050565b6109c381610903565b81146109cd575f5ffd5b50565b5f813590506109de816109ba565b92915050565b5f602082840312156109f9576109f86105ce565b5b5f610a06848285016109d0565b91505092915050565b5f819050919050565b610a29610a2482610613565b610a0f565b82525050565b5f8160601b9050919050565b5f610a4582610a2f565b9050919050565b5f610a5682610a3b565b9050919050565b610a6e610a6982610903565b610a4c565b82525050565b5f610a7f8285610a18565b602082019150610a8f8284610a5d565b6014820191508190509392505050565b5f81519050919050565b5f82825260208201905092915050565b5f819050602082019050919050565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f610afa82610ac8565b610b048185610ad2565b9350610b14818560208601610ae2565b610b1d8161064a565b840191505092915050565b5f610b338383610af0565b905092915050565b5f602082019050919050565b5f610b5182610a9f565b610b5b8185610aa9565b935083602082028501610b6d85610ab9565b805f5b85811015610ba85784840389528151610b898582610b28565b9450610b9483610b3b565b925060208a01995050600181019050610b70565b50829750879550505050505092915050565b5f6020820190508181035f830152610bd28184610b47565b905092915050565b5f608082019050610bed5f830187610976565b610bfa6020830186610914565b8181036040830152610c0c8185610b47565b9050610c1b6060830184610967565b9594505050505056fea26469706673582212209ad31602fbb4bc228e7ee36774a68a11d1c3d06a60fa340db05278e6658e25bc64736f6c634300081c0033",
 }
 
 // ShutterRegistryABI is the input ABI used to generate the binding from.
@@ -777,10 +777,10 @@ func (_ShutterRegistry *ShutterRegistryCallerSession) Owner() (common.Address, e
 
 // Registrations is a free data retrieval call binding the contract method 0xda7c6a42.
 //
-// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint256 ttl, bytes32 triggerDefinitionHash)
+// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint64 ttl, bytes32 triggerDefinitionHash)
 func (_ShutterRegistry *ShutterRegistryCaller) Registrations(opts *bind.CallOpts, identity [32]byte) (struct {
 	Eon                   uint64
-	Ttl                   *big.Int
+	Ttl                   uint64
 	TriggerDefinitionHash [32]byte
 }, error,
 ) {
@@ -789,7 +789,7 @@ func (_ShutterRegistry *ShutterRegistryCaller) Registrations(opts *bind.CallOpts
 
 	outstruct := new(struct {
 		Eon                   uint64
-		Ttl                   *big.Int
+		Ttl                   uint64
 		TriggerDefinitionHash [32]byte
 	})
 	if err != nil {
@@ -797,7 +797,7 @@ func (_ShutterRegistry *ShutterRegistryCaller) Registrations(opts *bind.CallOpts
 	}
 
 	outstruct.Eon = *abi.ConvertType(out[0], new(uint64)).(*uint64)
-	outstruct.Ttl = *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+	outstruct.Ttl = *abi.ConvertType(out[1], new(uint64)).(*uint64)
 	outstruct.TriggerDefinitionHash = *abi.ConvertType(out[2], new([32]byte)).(*[32]byte)
 
 	return *outstruct, err
@@ -805,10 +805,10 @@ func (_ShutterRegistry *ShutterRegistryCaller) Registrations(opts *bind.CallOpts
 
 // Registrations is a free data retrieval call binding the contract method 0xda7c6a42.
 //
-// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint256 ttl, bytes32 triggerDefinitionHash)
+// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint64 ttl, bytes32 triggerDefinitionHash)
 func (_ShutterRegistry *ShutterRegistrySession) Registrations(identity [32]byte) (struct {
 	Eon                   uint64
-	Ttl                   *big.Int
+	Ttl                   uint64
 	TriggerDefinitionHash [32]byte
 }, error,
 ) {
@@ -817,34 +817,34 @@ func (_ShutterRegistry *ShutterRegistrySession) Registrations(identity [32]byte)
 
 // Registrations is a free data retrieval call binding the contract method 0xda7c6a42.
 //
-// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint256 ttl, bytes32 triggerDefinitionHash)
+// Solidity: function registrations(bytes32 identity) view returns(uint64 eon, uint64 ttl, bytes32 triggerDefinitionHash)
 func (_ShutterRegistry *ShutterRegistryCallerSession) Registrations(identity [32]byte) (struct {
 	Eon                   uint64
-	Ttl                   *big.Int
+	Ttl                   uint64
 	TriggerDefinitionHash [32]byte
 }, error,
 ) {
 	return _ShutterRegistry.Contract.Registrations(&_ShutterRegistry.CallOpts, identity)
 }
 
-// Register is a paid mutator transaction binding the contract method 0xdc48e8e6.
+// Register is a paid mutator transaction binding the contract method 0x205b396f.
 //
-// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint256 ttl) returns()
-func (_ShutterRegistry *ShutterRegistryTransactor) Register(opts *bind.TransactOpts, eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl *big.Int) (*types.Transaction, error) {
+// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint64 ttl) returns()
+func (_ShutterRegistry *ShutterRegistryTransactor) Register(opts *bind.TransactOpts, eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl uint64) (*types.Transaction, error) {
 	return _ShutterRegistry.contract.Transact(opts, "register", eon, identityPrefix, triggerDefinition, ttl)
 }
 
-// Register is a paid mutator transaction binding the contract method 0xdc48e8e6.
+// Register is a paid mutator transaction binding the contract method 0x205b396f.
 //
-// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint256 ttl) returns()
-func (_ShutterRegistry *ShutterRegistrySession) Register(eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl *big.Int) (*types.Transaction, error) {
+// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint64 ttl) returns()
+func (_ShutterRegistry *ShutterRegistrySession) Register(eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl uint64) (*types.Transaction, error) {
 	return _ShutterRegistry.Contract.Register(&_ShutterRegistry.TransactOpts, eon, identityPrefix, triggerDefinition, ttl)
 }
 
-// Register is a paid mutator transaction binding the contract method 0xdc48e8e6.
+// Register is a paid mutator transaction binding the contract method 0x205b396f.
 //
-// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint256 ttl) returns()
-func (_ShutterRegistry *ShutterRegistryTransactorSession) Register(eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl *big.Int) (*types.Transaction, error) {
+// Solidity: function register(uint64 eon, bytes32 identityPrefix, bytes[] triggerDefinition, uint64 ttl) returns()
+func (_ShutterRegistry *ShutterRegistryTransactorSession) Register(eon uint64, identityPrefix [32]byte, triggerDefinition [][]byte, ttl uint64) (*types.Transaction, error) {
 	return _ShutterRegistry.Contract.Register(&_ShutterRegistry.TransactOpts, eon, identityPrefix, triggerDefinition, ttl)
 }
 
@@ -963,13 +963,13 @@ type ShutterRegistryEventTriggerRegistered struct {
 	IdentityPrefix    [32]byte
 	Sender            common.Address
 	TriggerDefinition [][]byte
-	Ttl               *big.Int
+	Ttl               uint64
 	Raw               types.Log // Blockchain specific contextual infos
 }
 
-// FilterEventTriggerRegistered is a free log retrieval operation binding the contract event 0xd869872bfe31d9e8b508fd5f68d6a0e40988544df65c4e84e292ed6fc117e814.
+// FilterEventTriggerRegistered is a free log retrieval operation binding the contract event 0x7aae9d6e9dc5cd3510d70ffff8db7974a922a1c919863a85f19881e61da93830.
 //
-// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint256 ttl)
+// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint64 ttl)
 func (_ShutterRegistry *ShutterRegistryFilterer) FilterEventTriggerRegistered(opts *bind.FilterOpts, eon []uint64) (*ShutterRegistryEventTriggerRegisteredIterator, error) {
 	var eonRule []interface{}
 	for _, eonItem := range eon {
@@ -983,9 +983,9 @@ func (_ShutterRegistry *ShutterRegistryFilterer) FilterEventTriggerRegistered(op
 	return &ShutterRegistryEventTriggerRegisteredIterator{contract: _ShutterRegistry.contract, event: "EventTriggerRegistered", logs: logs, sub: sub}, nil
 }
 
-// WatchEventTriggerRegistered is a free log subscription operation binding the contract event 0xd869872bfe31d9e8b508fd5f68d6a0e40988544df65c4e84e292ed6fc117e814.
+// WatchEventTriggerRegistered is a free log subscription operation binding the contract event 0x7aae9d6e9dc5cd3510d70ffff8db7974a922a1c919863a85f19881e61da93830.
 //
-// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint256 ttl)
+// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint64 ttl)
 func (_ShutterRegistry *ShutterRegistryFilterer) WatchEventTriggerRegistered(opts *bind.WatchOpts, sink chan<- *ShutterRegistryEventTriggerRegistered, eon []uint64) (event.Subscription, error) {
 	var eonRule []interface{}
 	for _, eonItem := range eon {
@@ -1024,9 +1024,9 @@ func (_ShutterRegistry *ShutterRegistryFilterer) WatchEventTriggerRegistered(opt
 	}), nil
 }
 
-// ParseEventTriggerRegistered is a log parse operation binding the contract event 0xd869872bfe31d9e8b508fd5f68d6a0e40988544df65c4e84e292ed6fc117e814.
+// ParseEventTriggerRegistered is a log parse operation binding the contract event 0x7aae9d6e9dc5cd3510d70ffff8db7974a922a1c919863a85f19881e61da93830.
 //
-// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint256 ttl)
+// Solidity: event EventTriggerRegistered(uint64 indexed eon, bytes32 identityPrefix, address sender, bytes[] triggerDefinition, uint64 ttl)
 func (_ShutterRegistry *ShutterRegistryFilterer) ParseEventTriggerRegistered(log types.Log) (*ShutterRegistryEventTriggerRegistered, error) {
 	event := new(ShutterRegistryEventTriggerRegistered)
 	if err := _ShutterRegistry.contract.UnpackLog(event, "EventTriggerRegistered", log); err != nil {
