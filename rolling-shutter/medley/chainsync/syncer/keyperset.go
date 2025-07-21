@@ -71,7 +71,11 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		return err
 	}
 	runner.Go(func() error {
-		return s.watchNewKeypersService(ctx, subs.Err(), subs.Unsubscribe)
+		if err := s.watchNewKeypersService(ctx, subs.Err()); err != nil {
+			s.Log.Error("error watching new keypers", err.Error())
+		}
+		subs.Unsubscribe()
+		return err
 	})
 	return nil
 }
@@ -203,7 +207,7 @@ func (s *KeyperSetSyncer) newEvent(
 	}, nil
 }
 
-func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-chan error, unsubscribe func()) error {
+func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-chan error) error {
 	for {
 		select {
 		case newKeypers, ok := <-s.keyperAddedCh:
@@ -239,7 +243,6 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-
 				return err
 			}
 		case <-ctx.Done():
-			unsubscribe()
 			return ctx.Err()
 		}
 	}

@@ -32,12 +32,16 @@ func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) err
 		return err
 	}
 	runner.Go(func() error {
-		return s.watchLatestUnsafeHead(ctx, subs.Err(), subs.Unsubscribe)
+		if err := s.watchLatestUnsafeHead(ctx, subs.Err()); err != nil {
+			s.Log.Error("error watching latest unsafe head", err.Error())
+		}
+		subs.Unsubscribe()
+		return err
 	})
 	return nil
 }
 
-func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context, subsErr <-chan error, unsubscribe func()) error {
+func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context, subsErr <-chan error) error {
 	for {
 		select {
 		case newHeader, ok := <-s.newLatestHeadCh:
@@ -63,7 +67,6 @@ func (s *UnsafeHeadSyncer) watchLatestUnsafeHead(ctx context.Context, subsErr <-
 				return err
 			}
 		case <-ctx.Done():
-			unsubscribe()
 			return ctx.Err()
 		}
 	}

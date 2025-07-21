@@ -61,7 +61,12 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	}
 
 	runner.Go(func() error {
-		return s.watchPaused(ctx, subs.Err(), subsUnpaused.Err(), subs.Unsubscribe, subsUnpaused.Unsubscribe)
+		if err := s.watchPaused(ctx, subs.Err(), subsUnpaused.Err()); err != nil {
+			s.Log.Error("error watching paused", err.Error())
+		}
+		subs.Unsubscribe()
+		subsUnpaused.Unsubscribe()
+		return err
 	})
 	return nil
 }
@@ -85,13 +90,7 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 	}
 }
 
-func (s *ShutterStateSyncer) watchPaused(
-	ctx context.Context,
-	subsErr <-chan error,
-	subsErrUnpaused <-chan error,
-	unsubscribe func(),
-	unsubscribeUnpaused func(),
-) error {
+func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error) error {
 	isActive, err := s.pollIsActive(ctx)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
@@ -138,8 +137,6 @@ func (s *ShutterStateSyncer) watchPaused(
 				return err
 			}
 		case <-ctx.Done():
-			unsubscribe()
-			unsubscribeUnpaused()
 			return ctx.Err()
 		}
 	}
