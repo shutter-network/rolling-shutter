@@ -71,7 +71,8 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		return err
 	}
 	runner.Go(func() error {
-		if err := s.watchNewKeypersService(ctx, subs.Err()); err != nil {
+		err := s.watchNewKeypersService(ctx, subs.Err())
+		if err != nil {
 			s.Log.Error("error watching new keypers", err.Error())
 		}
 		subs.Unsubscribe()

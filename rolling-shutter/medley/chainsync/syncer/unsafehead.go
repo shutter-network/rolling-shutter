@@ -32,7 +32,8 @@ func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) err
 		return err
 	}
 	runner.Go(func() error {
-		if err := s.watchLatestUnsafeHead(ctx, subs.Err()); err != nil {
+		err := s.watchLatestUnsafeHead(ctx, subs.Err())
+		if err != nil {
 			s.Log.Error("error watching latest unsafe head", err.Error())
 		}
 		subs.Unsubscribe()

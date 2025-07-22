@@ -61,7 +61,8 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	}
 
 	runner.Go(func() error {
-		if err := s.watchPaused(ctx, subs.Err(), subsUnpaused.Err()); err != nil {
+		err := s.watchPaused(ctx, subs.Err(), subsUnpaused.Err())
+		if err != nil {
 			s.Log.Error("error watching paused", err.Error())
 		}
 		subs.Unsubscribe()
