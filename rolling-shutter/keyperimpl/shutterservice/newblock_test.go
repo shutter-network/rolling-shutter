@@ -8,13 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 	"gotest.tools/assert"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
+	shutterregistry "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
@@ -62,7 +62,7 @@ func TestProcessBlockSuccess(t *testing.T) {
 	activationBlockNumber := 100
 
 	identityPrefix, _ := generateRandom32Bytes()
-	identity := computeIdentity(&shutterregistry.ShutterregistryIdentityRegistered{
+	identity := computeIdentity(&shutterregistry.ShutterRegistryEventTriggerRegistered{
 		IdentityPrefix: [32]byte(identityPrefix),
 		Sender:         sender,
 	})
