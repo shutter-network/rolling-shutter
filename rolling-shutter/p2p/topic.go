@@ -5,6 +5,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog/log"
 )
 
 // gossipRoom represents a subscription to a single PubSub topic. Messages
@@ -42,6 +43,11 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *pubsub.Mess
 		select {
 		case messages <- msg:
 		case <-ctx.Done():
+			log.Debug().Msg("subscription canceled, closing read loop")
+			room.subscription.Cancel()
+			if err := room.topic.Close(); err != nil {
+				return err
+			}
 			return ctx.Err()
 		}
 	}

@@ -66,6 +66,7 @@ func (pkh *eonPubKeyHandler) loop(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
+			t.Stop()
 			return ctx.Err()
 		case <-t.C:
 		}
