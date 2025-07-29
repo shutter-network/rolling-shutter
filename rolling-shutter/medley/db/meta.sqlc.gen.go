@@ -33,3 +33,17 @@ func (q *Queries) InsertMeta(ctx context.Context, arg InsertMetaParams) error {
 	_, err := q.db.Exec(ctx, insertMeta, arg.Key, arg.Value)
 	return err
 }
+
+const updateMeta = `-- name: UpdateMeta :exec
+UPDATE meta_inf SET value = $1 WHERE key = $2
+`
+
+type UpdateMetaParams struct {
+	Value string
+	Key   string
+}
+
+func (q *Queries) UpdateMeta(ctx context.Context, arg UpdateMetaParams) error {
+	_, err := q.db.Exec(ctx, updateMeta, arg.Value, arg.Key)
+	return err
+}
