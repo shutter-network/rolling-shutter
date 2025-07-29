@@ -18,3 +18,18 @@ type CommittedTransaction struct {
 	BlockNumber      int64
 	TxHash           string
 }
+
+type ProviderRegistryEvent struct {
+	BlockNumber     int64
+	BlockHash       []byte
+	TxIndex         int64
+	LogIndex        int64
+	ProviderAddress string
+	BlsKeys         [][]byte
+}
+
+type ProviderRegistryEventsSyncedUntil struct {
+	EnforceOneRow bool
+	BlockHash     []byte
+	BlockNumber   int64
+}

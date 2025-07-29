@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
@@ -121,14 +122,16 @@ func (c *ChainConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 }
 
 type ContractsConfig struct {
-	KeyperSetManager     common.Address `shconfig:",required"`
-	KeyBroadcastContract common.Address `shconfig:",required"`
+	KeyperSetManager         common.Address `shconfig:",required"`
+	KeyBroadcastContract     common.Address `shconfig:",required"`
+	ProviderRegistryContract common.Address `shconfig:",required"`
 }
 
 func NewContractsConfig() *ContractsConfig {
 	return &ContractsConfig{
-		KeyperSetManager:     common.Address{},
-		KeyBroadcastContract: common.Address{},
+		KeyperSetManager:         common.Address{},
+		KeyBroadcastContract:     common.Address{},
+		ProviderRegistryContract: common.Address{},
 	}
 }
 

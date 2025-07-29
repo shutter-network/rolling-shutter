@@ -18,3 +18,19 @@ CREATE TABLE committed_transactions(
     tx_hash text NOT NULL,
     PRIMARY KEY (eon, identity_preimage, tx_hash)
 );
+
+CREATE TABLE provider_registry_events_synced_until(
+    enforce_one_row bool PRIMARY KEY DEFAULT true,
+    block_hash bytea NOT NULL,
+    block_number bigint NOT NULL CHECK (block_number >= 0)
+);
+
+CREATE TABLE provider_registry_events(
+    block_number bigint NOT NULL CHECK (block_number >= 0),
+    block_hash bytea NOT NULL,
+    tx_index bigint NOT NULL CHECK (tx_index >= 0),
+    log_index bigint NOT NULL CHECK (log_index >= 0),
+    provider_address text NOT NULL,
+    bls_keys bytea[] NOT NULL,
+    PRIMARY KEY (provider_address)
+);

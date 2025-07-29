@@ -35,3 +35,23 @@ upserted_commitment AS (
 )
 SELECT tx_hashes, provider_address FROM upserted_commitment;
 
+-- name: GetProviderRegistryEventsSyncedUntil :one
+SELECT * FROM provider_registry_events_synced_until LIMIT 1;
+
+-- name: SetProviderRegistryEventsSyncedUntil :exec
+INSERT INTO provider_registry_events_synced_until (block_hash, block_number) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_hash = $1, block_number = $2;
+
+-- name: InsertProviderRegistryEvent :execresult
+INSERT INTO provider_registry_events (block_number, block_hash, tx_index, log_index, provider_address, bls_keys)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (provider_address) DO UPDATE SET
+block_number = $1,
+block_hash = $2,
+tx_index = $3,
+log_index = $4,
+bls_keys = $6;
+
+-- name: DeleteProviderRegistryEventsFromBlockNumber :exec
+DELETE FROM provider_registry_events WHERE block_number >= $1;

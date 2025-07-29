@@ -9,11 +9,13 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
+	providerregistry "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/primev/abi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -29,10 +31,12 @@ type Keyper struct {
 	config *Config
 	dbpool *pgxpool.Pool
 
-	chainSyncClient  *chainsync.Client
-	eonKeyPublisher  *eonkeypublisher.EonKeyPublisher
-	newKeyperSets    chan *syncevent.KeyperSet
-	newEonPublicKeys chan keyper.EonPublicKey
+	chainSyncClient        *chainsync.Client
+	providerRegistrySyncer *ProviderRegistrySyncer
+	eonKeyPublisher        *eonkeypublisher.EonKeyPublisher
+	newKeyperSets          chan *syncevent.KeyperSet
+	newEonPublicKeys       chan keyper.EonPublicKey
+	newBlocks              chan *syncevent.LatestBlock
 
 	// outputs
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
@@ -49,6 +53,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	k.newKeyperSets = make(chan *syncevent.KeyperSet)
 	k.newEonPublicKeys = make(chan keyper.EonPublicKey)
+	k.newBlocks = make(chan *syncevent.LatestBlock)
 	k.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	k.dbpool, err = db.Connect(ctx, runner, k.config.DatabaseURL, database.Definition.Name())
@@ -61,7 +66,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
 	}
 
-	//TODO: do we need a middleware also here?
+	// TODO: do we need a middleware also here?
 	messageSender.AddMessageHandler(&PrimevCommitmentHandler{
 		config:                   k.config,
 		decryptionTriggerChannel: k.decryptionTriggerChannel,
@@ -78,6 +83,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithKeyperSetManager(k.config.Chain.Contracts.KeyperSetManager),
 		chainsync.WithKeyBroadcastContract(k.config.Chain.Contracts.KeyBroadcastContract),
 		chainsync.WithSyncNewKeyperSet(k.channelNewKeyperSet),
+		chainsync.WithSyncNewBlock(k.channelNewBlock),
 		chainsync.WithPrivateKey(k.config.Chain.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)
@@ -97,6 +103,11 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize eon key publisher")
+	}
+
+	err = k.initRegistrySyncer(ctx)
+	if err != nil {
+		return err
 	}
 
 	runner.Go(func() error { return k.processInputs(ctx) })
@@ -124,10 +135,49 @@ func NewKeyper(kpr *Keyper) (*keyper.KeyperCore, error) {
 	)
 }
 
+// initRegistrySyncer initializes the registry syncer.
+func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
+	client, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to dial Ethereum execution node")
+	}
+
+	log.Info().
+		Str("contract-address", kpr.config.Chain.Contracts.KeyperSetManager.Hex()).
+		Msg("initializing registry syncer")
+
+	contract, err := providerregistry.NewProviderregistry(kpr.config.Chain.Contracts.ProviderRegistryContract, client)
+	if err != nil {
+		return err
+	}
+
+	kpr.providerRegistrySyncer = &ProviderRegistrySyncer{
+		Contract:             contract,
+		DBPool:               kpr.dbpool,
+		ExecutionClient:      client,
+		SyncStartBlockNumber: kpr.config.Chain.SyncStartBlockNumber,
+	}
+
+	// Perform an initial sync now because it might take some time and doing so during regular
+	// slot processing might hold up things
+	latestHeader, err := client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block header")
+	}
+	err = kpr.providerRegistrySyncer.Sync(ctx, latestHeader)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (k *Keyper) processInputs(ctx context.Context) error {
 	var err error
 	for {
 		select {
+		case ev := <-k.newBlocks:
+			err = k.processNewBlock(ctx, ev)
 		case ev := <-k.newKeyperSets:
 			err = k.processNewKeyperSet(ctx, ev)
 		case ev := <-k.newEonPublicKeys:
@@ -152,5 +202,10 @@ func (k *Keyper) channelNewEonPublicKey(_ context.Context, key keyper.EonPublicK
 
 func (k *Keyper) channelNewKeyperSet(_ context.Context, ev *syncevent.KeyperSet) error {
 	k.newKeyperSets <- ev
+	return nil
+}
+
+func (k *Keyper) channelNewBlock(_ context.Context, ev *syncevent.LatestBlock) error {
+	k.newBlocks <- ev
 	return nil
 }

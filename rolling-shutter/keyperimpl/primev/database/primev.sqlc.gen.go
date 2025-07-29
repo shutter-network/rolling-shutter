@@ -7,7 +7,18 @@ package database
 
 import (
 	"context"
+
+	"github.com/jackc/pgconn"
 )
+
+const deleteProviderRegistryEventsFromBlockNumber = `-- name: DeleteProviderRegistryEventsFromBlockNumber :exec
+DELETE FROM provider_registry_events WHERE block_number >= $1
+`
+
+func (q *Queries) DeleteProviderRegistryEventsFromBlockNumber(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, deleteProviderRegistryEventsFromBlockNumber, blockNumber)
+	return err
+}
 
 const getCommitmentByTxHash = `-- name: GetCommitmentByTxHash :many
 SELECT
@@ -44,6 +55,17 @@ func (q *Queries) GetCommitmentByTxHash(ctx context.Context, txHashes []string) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const getProviderRegistryEventsSyncedUntil = `-- name: GetProviderRegistryEventsSyncedUntil :one
+SELECT enforce_one_row, block_hash, block_number FROM provider_registry_events_synced_until LIMIT 1
+`
+
+func (q *Queries) GetProviderRegistryEventsSyncedUntil(ctx context.Context) (ProviderRegistryEventsSyncedUntil, error) {
+	row := q.db.QueryRow(ctx, getProviderRegistryEventsSyncedUntil)
+	var i ProviderRegistryEventsSyncedUntil
+	err := row.Scan(&i.EnforceOneRow, &i.BlockHash, &i.BlockNumber)
+	return i, err
 }
 
 const insertMultipleTransactionsAndUpsertCommitment = `-- name: InsertMultipleTransactionsAndUpsertCommitment :exec
@@ -96,5 +118,52 @@ func (q *Queries) InsertMultipleTransactionsAndUpsertCommitment(ctx context.Cont
 		arg.CommitmentDigest,
 		arg.BlockNumber,
 	)
+	return err
+}
+
+const insertProviderRegistryEvent = `-- name: InsertProviderRegistryEvent :execresult
+INSERT INTO provider_registry_events (block_number, block_hash, tx_index, log_index, provider_address, bls_keys)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (provider_address) DO UPDATE SET
+block_number = $1,
+block_hash = $2,
+tx_index = $3,
+log_index = $4,
+bls_keys = $6
+`
+
+type InsertProviderRegistryEventParams struct {
+	BlockNumber     int64
+	BlockHash       []byte
+	TxIndex         int64
+	LogIndex        int64
+	ProviderAddress string
+	BlsKeys         [][]byte
+}
+
+func (q *Queries) InsertProviderRegistryEvent(ctx context.Context, arg InsertProviderRegistryEventParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, insertProviderRegistryEvent,
+		arg.BlockNumber,
+		arg.BlockHash,
+		arg.TxIndex,
+		arg.LogIndex,
+		arg.ProviderAddress,
+		arg.BlsKeys,
+	)
+}
+
+const setProviderRegistryEventsSyncedUntil = `-- name: SetProviderRegistryEventsSyncedUntil :exec
+INSERT INTO provider_registry_events_synced_until (block_hash, block_number) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_hash = $1, block_number = $2
+`
+
+type SetProviderRegistryEventsSyncedUntilParams struct {
+	BlockHash   []byte
+	BlockNumber int64
+}
+
+func (q *Queries) SetProviderRegistryEventsSyncedUntil(ctx context.Context, arg SetProviderRegistryEventsSyncedUntilParams) error {
+	_, err := q.db.Exec(ctx, setProviderRegistryEventsSyncedUntil, arg.BlockHash, arg.BlockNumber)
 	return err
 }
