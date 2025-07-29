@@ -675,7 +675,7 @@ func (app *ShutterApp) deliverMessage(msg *shmsg.Message, sender common.Address)
 	if msg.GetApology() != nil {
 		return app.handleApologyMsg(msg.GetApology(), sender)
 	}
-	log.Print("Error: cannot deliver messsage: ", msg)
+	log.Print("Error: cannot deliver message: ", msg)
 	return makeErrorResponse("cannot deliver message")
 }
 

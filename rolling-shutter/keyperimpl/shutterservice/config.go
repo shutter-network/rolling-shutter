@@ -35,6 +35,7 @@ type Config struct {
 	DatabaseURL string `shconfig:",required" comment:"If it's empty, we use the standard PG_ environment variables"`
 
 	HTTPEnabled       bool
+	HTTPReadOnly      bool
 	HTTPListenAddress string
 
 	Chain       *ChainConfig
@@ -57,7 +58,8 @@ func (c *Config) Name() string {
 func (c *Config) SetDefaultValues() error {
 	c.HTTPEnabled = false
 	c.HTTPListenAddress = ":3000"
-	c.MaxNumKeysPerMessage = 500 // TODO: need to confirm on this
+	c.MaxNumKeysPerMessage = 500
+	c.HTTPReadOnly = true
 	return nil
 }
 
@@ -68,7 +70,6 @@ func (c *Config) SetExampleValues() error {
 	}
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
-
 	return nil
 }
 

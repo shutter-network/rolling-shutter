@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
@@ -147,4 +148,14 @@ func (s *Client) ChainID(ctx context.Context) (*big.Int, error) {
 
 func (s *Client) Start(_ context.Context, runner service.Runner) error {
 	return runner.StartService(s.getServices()...)
+}
+
+func GetClientVersion(ctx context.Context, ethereumURL string) (string, error) {
+	client, err := rpc.DialContext(ctx, ethereumURL)
+	if err != nil {
+		return "", err
+	}
+	var version string
+	err = client.CallContext(ctx, &version, "web3_clientVersion")
+	return version, err
 }

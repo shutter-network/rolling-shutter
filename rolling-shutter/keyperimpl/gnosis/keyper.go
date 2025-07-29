@@ -146,6 +146,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	if kpr.config.Metrics.Enabled {
+		InitMetrics(kpr.beaconAPIClient)
+	}
+
 	// Set all transaction pointer ages to infinity. They will be reset to zero when the next
 	// decryption keys arrive, telling us the agreed upon pointer value. Pointer values that are
 	// not in the db yet are not affected. They will be initialized to zero when we first access
@@ -171,6 +175,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
 			HTTPEnabled:          kpr.config.HTTPEnabled,
+			HTTPReadOnly:         kpr.config.HTTPReadOnly,
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Gnosis.Node,
