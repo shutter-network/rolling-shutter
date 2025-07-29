@@ -254,6 +254,7 @@ func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
 		ExecutionClient:      validatorSyncerClient,
 		ChainID:              chainID.Uint64(),
 		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
+		V1MessageEnabled:     kpr.config.Gnosis.V1ValidatorMessageEnabled,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular
