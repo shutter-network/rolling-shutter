@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+const deleteEventTriggerRegisteredEventsFromBlockNumber = `-- name: DeleteEventTriggerRegisteredEventsFromBlockNumber :exec
+DELETE FROM event_trigger_registered_event WHERE block_number >= $1
+`
+
+func (q *Queries) DeleteEventTriggerRegisteredEventsFromBlockNumber(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, deleteEventTriggerRegisteredEventsFromBlockNumber, blockNumber)
+	return err
+}
+
+const deleteFiredTriggersFromBlockNumber = `-- name: DeleteFiredTriggersFromBlockNumber :exec
+DELETE FROM fired_triggers WHERE block_number >= $1
+`
+
+func (q *Queries) DeleteFiredTriggersFromBlockNumber(ctx context.Context, blockNumber int64) error {
+	_, err := q.db.Exec(ctx, deleteFiredTriggersFromBlockNumber, blockNumber)
+	return err
+}
+
 const deleteIdentityRegisteredEventsFromBlockNumber = `-- name: DeleteIdentityRegisteredEventsFromBlockNumber :exec
 DELETE FROM identity_registered_event WHERE block_number >= $1
 `
@@ -18,6 +36,55 @@ DELETE FROM identity_registered_event WHERE block_number >= $1
 func (q *Queries) DeleteIdentityRegisteredEventsFromBlockNumber(ctx context.Context, blockNumber int64) error {
 	_, err := q.db.Exec(ctx, deleteIdentityRegisteredEventsFromBlockNumber, blockNumber)
 	return err
+}
+
+const getActiveEventTriggerRegisteredEvents = `-- name: GetActiveEventTriggerRegisteredEvents :many
+SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, definition, ttl, decrypted FROM event_trigger_registered_event e
+WHERE e.block_number >= $1  -- block number not before start block
+AND e.block_number <= $2  -- block number not after end block
+AND e.block_number + ttl >= $1  -- TTL not expired at start block (might have expired at end block though)
+AND e.decrypted = false  -- not decrypted yet
+AND NOT EXISTS (  -- not fired yet
+    SELECT 1 FROM fired_triggers t
+    WHERE t.identity_prefix = e.identity_prefix
+    AND t.sender = e.sender
+)
+`
+
+type GetActiveEventTriggerRegisteredEventsParams struct {
+	StartBlock int64
+	EndBlock   int64
+}
+
+func (q *Queries) GetActiveEventTriggerRegisteredEvents(ctx context.Context, arg GetActiveEventTriggerRegisteredEventsParams) ([]EventTriggerRegisteredEvent, error) {
+	rows, err := q.db.Query(ctx, getActiveEventTriggerRegisteredEvents, arg.StartBlock, arg.EndBlock)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EventTriggerRegisteredEvent
+	for rows.Next() {
+		var i EventTriggerRegisteredEvent
+		if err := rows.Scan(
+			&i.BlockNumber,
+			&i.BlockHash,
+			&i.TxIndex,
+			&i.LogIndex,
+			&i.Eon,
+			&i.IdentityPrefix,
+			&i.Sender,
+			&i.Definition,
+			&i.Ttl,
+			&i.Decrypted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getCurrentDecryptionTrigger = `-- name: GetCurrentDecryptionTrigger :one
@@ -78,6 +145,17 @@ func (q *Queries) GetIdentityRegisteredEventsSyncedUntil(ctx context.Context) (I
 	row := q.db.QueryRow(ctx, getIdentityRegisteredEventsSyncedUntil)
 	var i IdentityRegisteredEventsSyncedUntil
 	err := row.Scan(&i.EnforceOneRow, &i.BlockHash, &i.BlockNumber)
+	return i, err
+}
+
+const getMultiEventSyncStatus = `-- name: GetMultiEventSyncStatus :one
+SELECT enforce_one_row, block_number, block_hash FROM multi_event_sync_status LIMIT 1
+`
+
+func (q *Queries) GetMultiEventSyncStatus(ctx context.Context) (MultiEventSyncStatus, error) {
+	row := q.db.QueryRow(ctx, getMultiEventSyncStatus)
+	var i MultiEventSyncStatus
+	err := row.Scan(&i.EnforceOneRow, &i.BlockNumber, &i.BlockHash)
 	return i, err
 }
 
@@ -156,10 +234,9 @@ INSERT INTO event_trigger_registered_event (
     identity_prefix,
     sender,
     definition,
-    ttl,
-    identity
+    ttl
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
@@ -167,8 +244,7 @@ tx_index = $3,
 log_index = $4,
 sender = $7,
 definition = $8,
-ttl = $9,
-identity = $10
+ttl = $9
 `
 
 type InsertEventTriggerRegisteredEventParams struct {
@@ -179,9 +255,8 @@ type InsertEventTriggerRegisteredEventParams struct {
 	Eon            int64
 	IdentityPrefix []byte
 	Sender         string
-	Definition     []byte
+	Definition     [][]byte
 	Ttl            int64
-	Identity       []byte
 }
 
 func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg InsertEventTriggerRegisteredEventParams) (pgconn.CommandTag, error) {
@@ -195,8 +270,34 @@ func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg Ins
 		arg.Sender,
 		arg.Definition,
 		arg.Ttl,
-		arg.Identity,
 	)
+}
+
+const insertFiredTrigger = `-- name: InsertFiredTrigger :exec
+INSERT INTO fired_triggers (identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (identity_prefix, sender) DO NOTHING
+`
+
+type InsertFiredTriggerParams struct {
+	IdentityPrefix []byte
+	Sender         string
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+}
+
+func (q *Queries) InsertFiredTrigger(ctx context.Context, arg InsertFiredTriggerParams) error {
+	_, err := q.db.Exec(ctx, insertFiredTrigger,
+		arg.IdentityPrefix,
+		arg.Sender,
+		arg.BlockNumber,
+		arg.BlockHash,
+		arg.TxIndex,
+		arg.LogIndex,
+	)
+	return err
 }
 
 const insertIdentityRegisteredEvent = `-- name: InsertIdentityRegisteredEvent :execresult
@@ -279,6 +380,22 @@ type SetIdentityRegisteredEventSyncedUntilParams struct {
 
 func (q *Queries) SetIdentityRegisteredEventSyncedUntil(ctx context.Context, arg SetIdentityRegisteredEventSyncedUntilParams) error {
 	_, err := q.db.Exec(ctx, setIdentityRegisteredEventSyncedUntil, arg.BlockHash, arg.BlockNumber)
+	return err
+}
+
+const setMultiEventSyncStatus = `-- name: SetMultiEventSyncStatus :exec
+INSERT INTO multi_event_sync_status (block_number, block_hash) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_number = $1, block_hash = $2
+`
+
+type SetMultiEventSyncStatusParams struct {
+	BlockNumber int64
+	BlockHash   []byte
+}
+
+func (q *Queries) SetMultiEventSyncStatus(ctx context.Context, arg SetMultiEventSyncStatusParams) error {
+	_, err := q.db.Exec(ctx, setMultiEventSyncStatus, arg.BlockNumber, arg.BlockHash)
 	return err
 }
 

@@ -25,10 +25,18 @@ type EventTriggerRegisteredEvent struct {
 	Eon            int64
 	IdentityPrefix []byte
 	Sender         string
-	Definition     []byte
-	Decrypted      bool
-	Identity       []byte
+	Definition     [][]byte
 	Ttl            int64
+	Decrypted      bool
+}
+
+type FiredTrigger struct {
+	IdentityPrefix []byte
+	Sender         string
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
 }
 
 type IdentityRegisteredEvent struct {
@@ -48,4 +56,10 @@ type IdentityRegisteredEventsSyncedUntil struct {
 	EnforceOneRow bool
 	BlockHash     []byte
 	BlockNumber   int64
+}
+
+type MultiEventSyncStatus struct {
+	EnforceOneRow bool
+	BlockNumber   int64
+	BlockHash     []byte
 }

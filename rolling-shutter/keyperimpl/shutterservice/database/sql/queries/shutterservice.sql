@@ -44,10 +44,9 @@ INSERT INTO event_trigger_registered_event (
     identity_prefix,
     sender,
     definition,
-    ttl,
-    identity
+    ttl
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
@@ -55,8 +54,7 @@ tx_index = $3,
 log_index = $4,
 sender = $7,
 definition = $8,
-ttl = $9,
-identity = $10;
+ttl = $9;
 
 
 -- name: UpdateDecryptedFlag :exec
@@ -95,3 +93,34 @@ SET block_hash = $1, block_number = $2;
 
 -- name: DeleteIdentityRegisteredEventsFromBlockNumber :exec
 DELETE FROM identity_registered_event WHERE block_number >= $1;
+
+-- name: GetMultiEventSyncStatus :one
+SELECT * FROM multi_event_sync_status LIMIT 1;
+
+-- name: SetMultiEventSyncStatus :exec
+INSERT INTO multi_event_sync_status (block_number, block_hash) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_number = $1, block_hash = $2;
+
+-- name: DeleteEventTriggerRegisteredEventsFromBlockNumber :exec
+DELETE FROM event_trigger_registered_event WHERE block_number >= $1;
+
+-- name: InsertFiredTrigger :exec
+INSERT INTO fired_triggers (identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (identity_prefix, sender) DO NOTHING;
+
+-- name: DeleteFiredTriggersFromBlockNumber :exec
+DELETE FROM fired_triggers WHERE block_number >= $1;
+
+-- name: GetActiveEventTriggerRegisteredEvents :many
+SELECT * FROM event_trigger_registered_event e
+WHERE e.block_number >= @start_block  -- block number not before start block
+AND e.block_number <= @end_block  -- block number not after end block
+AND e.block_number + ttl >= @start_block  -- TTL not expired at start block (might have expired at end block though)
+AND e.decrypted = false  -- not decrypted yet
+AND NOT EXISTS (  -- not fired yet
+    SELECT 1 FROM fired_triggers t
+    WHERE t.identity_prefix = e.identity_prefix
+    AND t.sender = e.sender
+);
