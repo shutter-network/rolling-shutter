@@ -881,6 +881,8 @@ github.com/shurcooL/sanitized_anchor_name v0.0.0-20170918181015-86672fcb3f95/go.
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
 github.com/shurcooL/users v0.0.0-20180125191416-49c67e49c537/go.mod h1:QJTqeLYEDaXHZDBsXlPCDqdhQuJkuw4NOtaxYe3xii4=
 github.com/shurcooL/webdavfs v0.0.0-20170829043945-18c3829fa133/go.mod h1:hKmq5kWdCj2z2KEozexVbfEZIWiTjhE0+UjmZgPqehw=
+github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20250108084129-3b743179373a h1:hWw2nJLGPZU7Rvd6YmEEDfvlTUbwZKZl5UP2ThVVNSU=
+github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20250108084129-3b743179373a/go.mod h1:V8KhVM75wyWVSzZJ6GeC9dWCjRrinIQVb7mYNP+knbg=
 github.com/shutter-network/gnosh-contracts v0.4.0 h1:2GJcHK9w4lJZMsccklmxDhNnrkRLJDRwsL1acBnAeak=
 github.com/shutter-network/gnosh-contracts v0.4.0/go.mod h1:QB0d64ybbVFKMrLjrc1tldri87KNjTmKQjhk9jaso2E=
 github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6 h1:m6Ti1/IH+GBTtGqyAX3xbh+ruUKvC+m+/uzYDUa+JDQ=
