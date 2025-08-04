@@ -18,12 +18,12 @@ import (
 // EventTriggerRegisteredEventProcessor implements the EventProcessor interface for EventTriggerRegistered events
 // in the ShutterRegistry contract.
 type EventTriggerRegisteredEventProcessor struct {
-	Contract help.ShutterRegistry
+	Contract *help.ShutterRegistry
 	DBPool   *pgxpool.Pool
 }
 
 func NewEventTriggerRegisteredEventProcessor(
-	contract help.ShutterRegistry,
+	contract *help.ShutterRegistry,
 	dbPool *pgxpool.Pool,
 ) *EventTriggerRegisteredEventProcessor {
 	return &EventTriggerRegisteredEventProcessor{

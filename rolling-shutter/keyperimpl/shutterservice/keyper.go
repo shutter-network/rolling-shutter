@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -10,13 +11,14 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
-	registryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
+	eventTriggerRegistryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -37,6 +39,7 @@ type Keyper struct {
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredTime *uint64
 	syncMonitor         *SyncMonitor
+	multiEventSyncer    *MultiEventSyncer
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -113,6 +116,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
+	err = kpr.initMultiEventSyncer(ctx)
+	if err != nil {
+		return err
+	}
+
 	kpr.syncMonitor = &SyncMonitor{
 		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
@@ -156,7 +164,7 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 		Str("contract-address", kpr.config.Chain.Contracts.KeyperSetManager.Hex()).
 		Msg("initializing registry syncer")
 
-	contract, err := registryBindings.NewShutterRegistry(kpr.config.Chain.Contracts.ShutterRegistry, client)
+	contract, err := registryBindings.NewShutterregistry(kpr.config.Chain.Contracts.ShutterRegistry, client)
 	if err != nil {
 		return err
 	}
@@ -179,6 +187,62 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// initMultiEventSyncer initializes the multi event syncer and all its event processors.
+func (kpr *Keyper) initMultiEventSyncer(ctx context.Context) error {
+	triggerRegistryClient, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
+	if err != nil {
+		return fmt.Errorf("failed to dial Ethereum execution node: %w", err)
+	}
+	eventTriggerRegistryContract, err := eventTriggerRegistryBindings.NewShutterRegistry(kpr.config.Chain.Contracts.EventTriggerRegistry, triggerRegistryClient)
+	if err != nil {
+		return fmt.Errorf("failed to create ShutterRegistry contract instance: %w", err)
+	}
+	eventTriggerRegisteredProcessor := NewEventTriggerRegisteredEventProcessor(
+		eventTriggerRegistryContract,
+		kpr.dbpool,
+	)
+
+	triggerClient, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
+	if err != nil {
+		return fmt.Errorf("failed to dial Ethereum execution node: %w", err)
+	}
+	triggerProcessor := NewTriggerProcessor(triggerClient, kpr.dbpool)
+
+	processors := []EventProcessor{
+		eventTriggerRegisteredProcessor,
+		triggerProcessor,
+	}
+
+	multiEventSyncerClient, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
+	if err != nil {
+		return fmt.Errorf("failed to dial Ethereum node at %s: %w", kpr.config.Chain.Node.EthereumURL, err)
+	}
+	kpr.multiEventSyncer, err = NewMultiEventSyncer(
+		kpr.dbpool,
+		multiEventSyncerClient,
+		kpr.config.Chain.SyncStartBlockNumber,
+		processors,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize multi event syncer: %w", err)
+	}
+
+	// Perform an initial sync now because it might take some time and doing so during regular
+	// slot processing might hold up things
+	log.Info().Msg("performing initial sync of multi event syncer")
+	latestHeader, err := multiEventSyncerClient.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get latest block header: %w", err)
+	}
+	err = kpr.multiEventSyncer.Sync(ctx, latestHeader)
+	if err != nil {
+		return fmt.Errorf("failed to perform initial sync: %w", err)
+	}
+	log.Info().Msg("multi event syncer initialized")
 
 	return nil
 }

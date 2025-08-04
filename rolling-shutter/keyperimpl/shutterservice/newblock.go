@@ -25,8 +25,7 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
-	// check all our installed filters
-	err := kpr.maybeTriggerEventBased(ctx, ev)
+	err := kpr.multiEventSyncer.Sync(ctx, ev.Header)
 	if err != nil {
 		return err
 	}

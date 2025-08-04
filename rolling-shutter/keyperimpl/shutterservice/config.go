@@ -130,6 +130,7 @@ func (c *ChainConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 type ContractsConfig struct {
 	KeyperSetManager     common.Address `shconfig:",required"`
 	ShutterRegistry      common.Address `shconfig:",required"`
+	EventTriggerRegistry common.Address `shconfig:",required"`
 	KeyBroadcastContract common.Address `shconfig:",required"`
 }
 
