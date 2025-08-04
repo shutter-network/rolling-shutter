@@ -147,6 +147,8 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 
 	currentEon := eons[len(eons)-1]
 
+	MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
+
 	keyperIndex, isKeyper, err := queries.GetKeyperIndex(ctx, currentEon.KeyperConfigIndex, config.GetAddress())
 	if err != nil {
 		log.Error().Err(err).Msg("keypermetrics | Failed to get keyper index")
