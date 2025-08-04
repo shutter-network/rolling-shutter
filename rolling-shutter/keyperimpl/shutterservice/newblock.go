@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
@@ -56,6 +57,13 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		return errors.Wrap(err, "failed to get time based triggers")
 	}
 	kpr.sendTriggers(ctx, timeBasedTriggers)
+
+	eventBasedTriggers, err := kpr.prepareEventBasedTriggers(ctx, block)
+	if err != nil {
+		return errors.Wrap(err, "failed to get event based triggers")
+	}
+	kpr.sendTriggers(ctx, eventBasedTriggers)
+
 	return nil
 }
 
@@ -182,6 +190,71 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 	return triggers, nil
 }
 
+func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context, block *syncevent.LatestBlock) ([]epochkghandler.DecryptionTrigger, error) {
+	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+	serviceDB := servicedatabase.New(kpr.dbpool)
+	obsDB := obskeyper.New(kpr.dbpool)
+
+	firedTriggers, err := serviceDB.GetUndecryptedFiredTriggers(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get undecrypted fired triggers from db")
+	}
+
+	firedTriggersByEon := make(map[int64][]servicedatabase.GetUndecryptedFiredTriggersRow)
+	for _, firedTrigger := range firedTriggers {
+		firedTriggersByEon[firedTrigger.Eon] = append(firedTriggersByEon[firedTrigger.Eon], firedTrigger)
+	}
+
+	var decryptionTriggers []epochkghandler.DecryptionTrigger
+	for eon, firedTriggers := range firedTriggersByEon {
+		if len(firedTriggers) == 0 {
+			continue
+		}
+		eonStruct, err := coreKeyperDB.GetEon(ctx, eon)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				log.Info().
+					Int64("eon", eon).
+					Msg("ignoring fired triggers as eon not found in db")
+				continue
+			}
+			return nil, errors.Wrapf(err, "failed to query eon %d from db", eon)
+		}
+		keyperSet, err := obsDB.GetKeyperSet(ctx, eonStruct.ActivationBlockNumber)
+		if err != nil {
+			log.Err(err).
+				Int64("eon", eon).
+				Int64("activation-block-number", eonStruct.ActivationBlockNumber).
+				Msg("ignoring fired triggers as keyper set not found in db")
+			continue
+		}
+		if !keyperSet.Contains(kpr.config.GetAddress()) {
+			log.Info().
+				Int64("eon", eon).
+				Int64("activation-block-number", eonStruct.ActivationBlockNumber).
+				Str("address", kpr.config.GetAddress().Hex()).
+				Msg("ignoring fired triggers as not part of keyper set")
+			continue
+		}
+
+		identities := []identitypreimage.IdentityPreimage{}
+		for _, firedTrigger := range firedTriggers {
+			identity, err := computeIdentityForFiredTrigger(&firedTrigger)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to compute identity for fired trigger %v", firedTrigger)
+			}
+			identities = append(identities, identity)
+		}
+
+		decryptionTrigger := epochkghandler.DecryptionTrigger{
+			BlockNumber:       uint64(eonStruct.ActivationBlockNumber),
+			IdentityPreimages: identities,
+		}
+		decryptionTriggers = append(decryptionTriggers, decryptionTrigger)
+	}
+	return decryptionTriggers, nil
+}
+
 func (kpr *Keyper) sendTriggers(ctx context.Context, triggers []epochkghandler.DecryptionTrigger) {
 	for _, trigger := range triggers {
 		event := broker.NewEvent(&trigger)
@@ -200,4 +273,15 @@ func sortIdentityPreimages(identityPreimages []identitypreimage.IdentityPreimage
 		return bytes.Compare(sorted[i], sorted[j]) < 0
 	})
 	return sorted
+}
+
+func computeIdentityForFiredTrigger(firedTrigger *servicedatabase.GetUndecryptedFiredTriggersRow) (identitypreimage.IdentityPreimage, error) {
+	var buf bytes.Buffer
+	buf.Write(firedTrigger.IdentityPrefix)
+	senderAddress, err := shdb.DecodeAddress(firedTrigger.Sender)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to decode sender address %x", firedTrigger.Sender)
+	}
+	buf.Write(senderAddress.Bytes())
+	return buf.Bytes(), nil
 }

@@ -124,3 +124,23 @@ AND NOT EXISTS (  -- not fired yet
     WHERE t.identity_prefix = e.identity_prefix
     AND t.sender = e.sender
 );
+
+-- name: GetUndecryptedFiredTriggers :many
+SELECT
+   f.identity_prefix,
+   f.sender,
+   f.block_number,
+   f.block_hash,
+   f.tx_index,
+   f.log_index,
+   e.eon AS eon,
+   e.ttl AS ttl,
+   e.decrypted AS decrypted
+FROM fired_triggers f
+INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
+WHERE NOT EXISTS (  -- not decrypted yet
+    SELECT 1 FROM event_trigger_registered_event e
+    WHERE e.identity_prefix = f.identity_prefix
+    AND e.sender = f.sender
+    AND e.decrypted = true
+);

@@ -201,6 +201,69 @@ func (q *Queries) GetNotDecryptedIdentityRegisteredEvents(ctx context.Context, a
 	return items, nil
 }
 
+const getUndecryptedFiredTriggers = `-- name: GetUndecryptedFiredTriggers :many
+SELECT
+   f.identity_prefix,
+   f.sender,
+   f.block_number,
+   f.block_hash,
+   f.tx_index,
+   f.log_index,
+   e.eon AS eon,
+   e.ttl AS ttl,
+   e.decrypted AS decrypted
+FROM fired_triggers f
+INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
+WHERE NOT EXISTS (  -- not decrypted yet
+    SELECT 1 FROM event_trigger_registered_event e
+    WHERE e.identity_prefix = f.identity_prefix
+    AND e.sender = f.sender
+    AND e.decrypted = true
+)
+`
+
+type GetUndecryptedFiredTriggersRow struct {
+	IdentityPrefix []byte
+	Sender         string
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+	Eon            int64
+	Ttl            int64
+	Decrypted      bool
+}
+
+func (q *Queries) GetUndecryptedFiredTriggers(ctx context.Context) ([]GetUndecryptedFiredTriggersRow, error) {
+	rows, err := q.db.Query(ctx, getUndecryptedFiredTriggers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUndecryptedFiredTriggersRow
+	for rows.Next() {
+		var i GetUndecryptedFiredTriggersRow
+		if err := rows.Scan(
+			&i.IdentityPrefix,
+			&i.Sender,
+			&i.BlockNumber,
+			&i.BlockHash,
+			&i.TxIndex,
+			&i.LogIndex,
+			&i.Eon,
+			&i.Ttl,
+			&i.Decrypted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertDecryptionSignature = `-- name: InsertDecryptionSignature :exec
 INSERT INTO decryption_signatures (eon, keyper_index, identities_hash, signature)
 VALUES ($1, $2, $3, $4)
