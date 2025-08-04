@@ -51,8 +51,17 @@ func (kpr *Keyper) maybeTriggerEventBased(ctx context.Context, block *syncevent.
 // - it hasn't been triggered for those identities before and
 // - the keyper is part of the corresponding keyper set.
 func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.LatestBlock) error {
+	timeBasedTriggers, err := kpr.prepareTimeBasedTriggers(ctx, block)
+	if err != nil {
+		return errors.Wrap(err, "failed to get time based triggers")
+	}
+	kpr.sendTriggers(ctx, timeBasedTriggers)
+	return nil
+}
+
+func (kpr *Keyper) prepareTimeBasedTriggers(ctx context.Context, block *syncevent.LatestBlock) ([]epochkghandler.DecryptionTrigger, error) {
 	if kpr.latestTriggeredTime != nil && block.Header.Time <= *kpr.latestTriggeredTime {
-		return nil
+		return nil, nil
 	}
 
 	lastTriggeredTime := 0
@@ -74,7 +83,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	if err != nil && err != pgx.ErrNoRows {
 		// pgx.ErrNoRows is expected if we're not part of the keyper set (which is checked later).
 		// That's because non-keypers don't sync identity registered events. TODO: this needs to be implemented
-		return errors.Wrap(err, "failed to query non decrypted identity registered events from db")
+		return nil, errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
 
 	obsDB := obskeyper.New(kpr.dbpool)
@@ -85,7 +94,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		}
 	}
 
-	return kpr.triggerDecryption(ctx, eventsToDecrypt, block)
+	return kpr.createTriggersFromIdentityRegisteredEvents(ctx, eventsToDecrypt, block)
 }
 
 func (kpr *Keyper) shouldTriggerDecryption(
@@ -123,10 +132,11 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	return true
 }
 
-func (kpr *Keyper) triggerDecryption(ctx context.Context,
+func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
+	ctx context.Context,
 	triggeredEvents []servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
-) error {
+) ([]epochkghandler.DecryptionTrigger, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
@@ -136,7 +146,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 
 		eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
 		if err != nil {
-			return errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
+			return nil, errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
 		}
 
 		if eonStruct.Eon != event.Eon {
@@ -158,6 +168,7 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 		}
 	}
 
+	triggers := []epochkghandler.DecryptionTrigger{}
 	for eon, preImages := range identityPreimages {
 		sortedIdentityPreimages := sortIdentityPreimages(preImages)
 
@@ -166,16 +177,20 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 			BlockNumber:       uint64(lastEonBlock[eon]),
 			IdentityPreimages: sortedIdentityPreimages,
 		}
+		triggers = append(triggers, trigger)
+	}
+	return triggers, nil
+}
 
+func (kpr *Keyper) sendTriggers(ctx context.Context, triggers []epochkghandler.DecryptionTrigger) {
+	for _, trigger := range triggers {
 		event := broker.NewEvent(&trigger)
 		log.Debug().
-			Uint64("block-number", uint64(lastEonBlock[eon])).
+			Uint64("eon", trigger.BlockNumber).
 			Int("num-identities", len(trigger.IdentityPreimages)).
 			Msg("sending decryption trigger")
 		kpr.decryptionTriggerChannel <- event
 	}
-
-	return nil
 }
 
 func sortIdentityPreimages(identityPreimages []identitypreimage.IdentityPreimage) []identitypreimage.IdentityPreimage {
