@@ -3,6 +3,7 @@ package keypermetrics
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -149,33 +150,68 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 
 	MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
 
-	keyperIndex, isKeyper, err := queries.GetKeyperIndex(ctx, currentEon.KeyperConfigIndex, config.GetAddress())
+	MetricsKeyperCurrentBatchConfigIndex.Set(float64(currentEon.KeyperConfigIndex))
+
+	for _, eon := range eons {
+		eonStr := strconv.FormatInt(eon.Eon, 10)
+		MetricsKeyperEonStartBlock.WithLabelValues(eonStr).Set(float64(eon.ActivationBlockNumber))
+	}
+
+	// Populate MetricsKeyperBatchConfigInfo && MetricsKeyperIsKeyper
+	batchConfigs, err := queries.GetBatchConfigs(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("keypermetrics | Failed to get keyper index")
-		return
+		log.Error().Err(err).Msg("keypermetrics | Failed to fetch batch configs")
+	} else {
+		currentAddress := config.GetAddress().Hex()
+
+		for _, batchConfig := range batchConfigs {
+			batchConfigIndexStr := strconv.Itoa(int(batchConfig.KeyperConfigIndex))
+
+			// Join keyper addresses for the label
+			keyperAddresses := strings.Join(batchConfig.Keypers, ",")
+			MetricsKeyperBatchConfigInfo.WithLabelValues(batchConfigIndexStr, keyperAddresses).Set(1)
+
+			// Check if current node is a keyper in this batch config
+			isKeyper := false
+			for _, keyperAddr := range batchConfig.Keypers {
+				if strings.EqualFold(keyperAddr, currentAddress) {
+					isKeyper = true
+					break
+				}
+			}
+
+			var isKeyperValue float64
+			if isKeyper {
+				isKeyperValue = 1
+			}
+			MetricsKeyperIsKeyper.WithLabelValues(batchConfigIndexStr).Set(isKeyperValue)
+		}
 	}
 
-	eonStr := strconv.FormatInt(currentEon.Eon, 10)
-	keyperIndexStr := strconv.FormatInt(keyperIndex, 10)
-
-	if !isKeyper {
-		MetricsKeyperIsKeyper.WithLabelValues(keyperIndexStr).Set(0)
-		MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
-		return
-	}
-
-	MetricsKeyperIsKeyper.WithLabelValues(keyperIndexStr).Set(1)
-
-	dkgResult, err := queries.GetDKGResultForKeyperConfigIndex(ctx, currentEon.KeyperConfigIndex)
+	// Populate MetricsKeyperDKGStatus
+	dkgResults, err := queries.GetAllDKGResults(ctx)
 	if err != nil {
-		MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
-		log.Error().Err(err).Msg("keypermetrics |  Failed to get DKG result")
-		return
-	}
+		log.Error().Err(err).Msg("keypermetrics | Failed to fetch DKG results")
+	} else {
+		dkgResultMap := make(map[int64]database.DkgResult)
+		for _, result := range dkgResults {
+			dkgResultMap[result.Eon] = result
+		}
 
-	var val float64
-	if dkgResult.Success {
-		val = 1
+		// Set DKG status for all eons
+		for _, eon := range eons {
+			eonStr := strconv.FormatInt(eon.Eon, 10)
+
+			if dkgResult, exists := dkgResultMap[eon.Eon]; exists {
+				var dkgStatusValue float64
+				if dkgResult.Success {
+					dkgStatusValue = 1
+				}
+				MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(dkgStatusValue)
+			} else {
+				// No DKG result found for this eon, set to 0
+				MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
+			}
+		}
 	}
-	MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(val)
 }
