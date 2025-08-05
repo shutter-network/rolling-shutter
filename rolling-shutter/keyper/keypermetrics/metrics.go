@@ -2,11 +2,12 @@ package keypermetrics
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
-	"strconv"
-	"strings"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
