@@ -219,5 +219,4 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	}
 
 	log.Info().Msg("keypermetrics | Metrics population completed")
-
 }
