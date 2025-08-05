@@ -2,12 +2,11 @@ package keypermetrics
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
+	"strconv"
+	"strings"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -141,20 +140,50 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	}
 
 	eons, err := queries.GetAllEons(ctx)
-	if err != nil || len(eons) == 0 {
-		log.Error().Err(err).Msg("keypermetrics | No eons found or failed to fetch eons")
-		return
+	if err != nil {
+		log.Error().Err(err).Msg("keypermetrics | Failed to fetch eons")
+	} else if len(eons) == 0 {
+		log.Warn().Msg("keypermetrics | No eons found")
 	}
 
-	currentEon := eons[len(eons)-1]
+	if len(eons) > 0 {
+		currentEon := eons[len(eons)-1]
 
-	MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
+		MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
 
-	MetricsKeyperCurrentBatchConfigIndex.Set(float64(currentEon.KeyperConfigIndex))
+		MetricsKeyperCurrentBatchConfigIndex.Set(float64(currentEon.KeyperConfigIndex))
 
-	for _, eon := range eons {
-		eonStr := strconv.FormatInt(eon.Eon, 10)
-		MetricsKeyperEonStartBlock.WithLabelValues(eonStr).Set(float64(eon.ActivationBlockNumber))
+		for _, eon := range eons {
+			eonStr := strconv.FormatInt(eon.Eon, 10)
+			MetricsKeyperEonStartBlock.WithLabelValues(eonStr).Set(float64(eon.ActivationBlockNumber))
+		}
+
+		// Populate MetricsKeyperDKGStatus
+		dkgResults, err := queries.GetAllDKGResults(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("keypermetrics | Failed to fetch DKG results")
+		} else {
+			dkgResultMap := make(map[int64]database.DkgResult)
+			for _, result := range dkgResults {
+				dkgResultMap[result.Eon] = result
+			}
+
+			// Set DKG status for all eons
+			for _, eon := range eons {
+				eonStr := strconv.FormatInt(eon.Eon, 10)
+
+				if dkgResult, exists := dkgResultMap[eon.Eon]; exists {
+					var dkgStatusValue float64
+					if dkgResult.Success {
+						dkgStatusValue = 1
+					}
+					MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(dkgStatusValue)
+				} else {
+					// No DKG result found for this eon, set to 0
+					MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
+				}
+			}
+		}
 	}
 
 	// Populate MetricsKeyperBatchConfigInfo && MetricsKeyperIsKeyper
@@ -188,30 +217,6 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 		}
 	}
 
-	// Populate MetricsKeyperDKGStatus
-	dkgResults, err := queries.GetAllDKGResults(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("keypermetrics | Failed to fetch DKG results")
-	} else {
-		dkgResultMap := make(map[int64]database.DkgResult)
-		for _, result := range dkgResults {
-			dkgResultMap[result.Eon] = result
-		}
+	log.Info().Msg("keypermetrics | Metrics population completed")
 
-		// Set DKG status for all eons
-		for _, eon := range eons {
-			eonStr := strconv.FormatInt(eon.Eon, 10)
-
-			if dkgResult, exists := dkgResultMap[eon.Eon]; exists {
-				var dkgStatusValue float64
-				if dkgResult.Success {
-					dkgStatusValue = 1
-				}
-				MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(dkgStatusValue)
-			} else {
-				// No DKG result found for this eon, set to 0
-				MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
-			}
-		}
-	}
 }
