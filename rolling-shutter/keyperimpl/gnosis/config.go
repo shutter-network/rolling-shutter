@@ -100,32 +100,32 @@ func (c *Config) GetAddress() common.Address {
 }
 
 type GnosisConfig struct {
-	Node                      *configuration.EthnodeConfig `shconfig:",required"`
-	Contracts                 *GnosisContractsConfig       `shconfig:",required"`
-	EncryptedGasLimit         uint64                       `shconfig:",required"`
-	MinGasPerTransaction      uint64                       `shconfig:",required"`
-	MaxTxPointerAge           uint64                       `shconfig:",required"`
-	SecondsPerSlot            uint64                       `shconfig:",required"`
-	SlotsPerEpoch             uint64                       `shconfig:",required"`
-	GenesisSlotTimestamp      uint64                       `shconfig:",required"`
-	SyncStartBlockNumber      uint64                       `shconfig:",required"`
-	SyncMonitorCheckInterval  uint64                       `shconfig:",required"`
-	V1ValidatorMessageEnabled bool                         `shconfig:",required"`
+	Node                                   *configuration.EthnodeConfig `shconfig:",required"`
+	Contracts                              *GnosisContractsConfig       `shconfig:",required"`
+	EncryptedGasLimit                      uint64                       `shconfig:",required"`
+	MinGasPerTransaction                   uint64                       `shconfig:",required"`
+	MaxTxPointerAge                        uint64                       `shconfig:",required"`
+	SecondsPerSlot                         uint64                       `shconfig:",required"`
+	SlotsPerEpoch                          uint64                       `shconfig:",required"`
+	GenesisSlotTimestamp                   uint64                       `shconfig:",required"`
+	SyncStartBlockNumber                   uint64                       `shconfig:",required"`
+	SyncMonitorCheckInterval               uint64                       `shconfig:",required"`
+	EnableAggregateValidatorRegistrationV1 bool                         `shconfig:",required"`
 }
 
 func NewGnosisConfig() *GnosisConfig {
 	c := &GnosisConfig{
-		Node:                      configuration.NewEthnodeConfig(),
-		Contracts:                 NewGnosisContractsConfig(),
-		EncryptedGasLimit:         0,
-		MinGasPerTransaction:      0,
-		MaxTxPointerAge:           0,
-		SecondsPerSlot:            0,
-		SlotsPerEpoch:             0,
-		GenesisSlotTimestamp:      0,
-		SyncStartBlockNumber:      0,
-		SyncMonitorCheckInterval:  0,
-		V1ValidatorMessageEnabled: false,
+		Node:                                   configuration.NewEthnodeConfig(),
+		Contracts:                              NewGnosisContractsConfig(),
+		EncryptedGasLimit:                      0,
+		MinGasPerTransaction:                   0,
+		MaxTxPointerAge:                        0,
+		SecondsPerSlot:                         0,
+		SlotsPerEpoch:                          0,
+		GenesisSlotTimestamp:                   0,
+		SyncStartBlockNumber:                   0,
+		SyncMonitorCheckInterval:               0,
+		EnableAggregateValidatorRegistrationV1: false,
 	}
 	c.Init()
 	return c
@@ -163,7 +163,7 @@ func (c *GnosisConfig) SetExampleValues() error {
 	c.GenesisSlotTimestamp = 1665410700
 	c.SyncStartBlockNumber = 0
 	c.SyncMonitorCheckInterval = 30
-	c.V1ValidatorMessageEnabled = false
+	c.EnableAggregateValidatorRegistrationV1 = false
 	return nil
 }
 
