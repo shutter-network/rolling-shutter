@@ -109,7 +109,6 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 	triggeredBlock *syncevent.LatestBlock,
 ) error {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
-	serviceDB := servicedatabase.New(kpr.dbpool)
 
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
 	lastEonBlock := make(map[int64]int64)
@@ -142,15 +141,6 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 
 	for eon, preImages := range identityPreimages {
 		sortedIdentityPreimages := sortIdentityPreimages(preImages)
-
-		err := serviceDB.SetCurrentDecryptionTrigger(ctx, servicedatabase.SetCurrentDecryptionTriggerParams{
-			Eon:                  eon,
-			TriggeredBlockNumber: triggeredBlock.Number.Int64(),
-			IdentitiesHash:       computeIdentitiesHash(sortedIdentityPreimages),
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to insert published decryption trigger into db")
-		}
 
 		trigger := epochkghandler.DecryptionTrigger{
 			// sending last block available for that eon as the key shares will be generated based on the eon associated with this block number
