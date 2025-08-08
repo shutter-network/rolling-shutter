@@ -21,7 +21,7 @@ var files embed.FS
 var Definition db.Definition
 
 func init() {
-	sqlcDB, err := db.NewSQLCDefinition(files, "sql/", "keyper", 1)
+	sqlcDB, err := db.NewSQLCDefinition(files, "sql/", "keyper")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize DB")
 	}

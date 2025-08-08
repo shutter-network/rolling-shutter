@@ -67,3 +67,4 @@ CREATE TABLE validator_registrations_synced_until(
     block_hash bytea NOT NULL,
     block_number bigint NOT NULL CHECK (block_number >= 0)
 );
+
