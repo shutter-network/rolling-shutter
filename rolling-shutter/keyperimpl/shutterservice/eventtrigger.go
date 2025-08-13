@@ -285,7 +285,7 @@ func (e *EventTriggerDefinition) TopicPattern() byte {
 			continue
 		}
 	}
-	result := v[0] + (v[1] << 1) + (v[2] << 2)
+	result := (v[0] << 2) + (v[1] << 1) + v[2]
 	return result
 }
 
