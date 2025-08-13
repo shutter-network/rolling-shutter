@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -409,4 +410,286 @@ func deepEqual(a, b [][]byte) bool {
 		}
 	}
 	return true
+}
+
+func TestEventTriggerMarshalUnmarshal(t *testing.T) {
+	contractAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+
+	tests := []struct {
+		name       string
+		definition EventTriggerDefinition
+	}{
+		{
+			name: "empty conditions",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111"),
+				Conditions:     []Condition{},
+			},
+		},
+		{
+			name: "simple topic condition",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x2222222222222222222222222222222222222222222222222222222222222222"),
+				Conditions: []Condition{
+					{
+						Location: TopicData{number: 1},
+						Constraint: MatchConstraint{
+							target: WordPad(common.HexToAddress("0xdeadbeef").Bytes()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple topic conditions",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x3333333333333333333333333333333333333333333333333333333333333333"),
+				Conditions: []Condition{
+					{
+						Location: TopicData{number: 1},
+						Constraint: MatchConstraint{
+							target: WordPad(common.HexToAddress("0xdeadbeef").Bytes()),
+						},
+					},
+					{
+						Location: TopicData{number: 2},
+						Constraint: MatchConstraint{
+							target: WordPad(common.HexToAddress("0xcafebabe").Bytes()),
+						},
+					},
+					{
+						Location: TopicData{number: 3},
+						Constraint: MatchConstraint{
+							target: WordPad(common.HexToAddress("0x12345678").Bytes()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "data conditions with numeric constraints",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x4444444444444444444444444444444444444444444444444444444444444444"),
+				Conditions: []Condition{
+					{
+						Location: OffsetData{argnumber: 0, complex: false},
+						Constraint: NumConstraint{
+							op:     GTE,
+							target: big.NewInt(1000),
+						},
+					},
+					{
+						Location: OffsetData{argnumber: 1, complex: false},
+						Constraint: NumConstraint{
+							op:     LT,
+							target: big.NewInt(5000),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "mixed topic and data conditions",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x5555555555555555555555555555555555555555555555555555555555555555"),
+				Conditions: []Condition{
+					{
+						Location: TopicData{number: 1},
+						Constraint: MatchConstraint{
+							target: WordPad(common.HexToAddress("0xdeadbeef").Bytes()),
+						},
+					},
+					{
+						Location: OffsetData{argnumber: 0, complex: false},
+						Constraint: NumConstraint{
+							op:     EQ,
+							target: big.NewInt(42),
+						},
+					},
+					{
+						Location: OffsetData{argnumber: 1, complex: true},
+						Constraint: MatchConstraint{
+							target: WordPad([]byte("complex data condition")),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "complex data condition",
+			definition: EventTriggerDefinition{
+				Contract:       contractAddr,
+				EventSignature: common.HexToHash("0x6666666666666666666666666666666666666666666666666666666666666666"),
+				Conditions: []Condition{
+					{
+						Location: OffsetData{argnumber: 0, complex: true},
+						Constraint: MatchConstraint{
+							target: append(WordPad([]byte("complex word 1")), WordPad([]byte("complex word 2"))...),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			marshaled := tt.definition.MarshalBytes()
+			assert.Check(t, len(marshaled) > 0, "marshaled data should not be empty")
+
+			var unmarshaled EventTriggerDefinition
+			err := unmarshaled.UnmarshalBytes(marshaled)
+			assert.NilError(t, err, "unmarshalling should succeed")
+
+			fmt.Printf("Unmarshaled definition: %+v\n", unmarshaled)
+			fmt.Printf("Original definition: %+v\n", tt.definition)
+
+			remarshal := unmarshaled.MarshalBytes()
+			assert.Check(t, deepEqual(marshaled, remarshal), "round trip should produce identical bytes")
+
+			assert.Check(t, unmarshaled.Contract == tt.definition.Contract, "contract address should be preserved")
+			assert.Check(t, unmarshaled.EventSignature == tt.definition.EventSignature, "event signature should be preserved")
+			assert.Check(t, len(unmarshaled.Conditions) == len(tt.definition.Conditions), "number of conditions should be preserved")
+			for i, cond := range unmarshaled.Conditions {
+				assert.Check(t, reflect.DeepEqual(cond.Location, tt.definition.Conditions[i].Location), "condition location should be preserved")
+				assert.Check(t, reflect.DeepEqual(cond.Constraint, tt.definition.Conditions[i].Constraint), "condition constraint should be preserved")
+			}
+		})
+	}
+}
+
+func TestEventTriggerMarshalUnmarshalErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          [][]byte
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:          "empty data",
+			data:          [][]byte{},
+			expectError:   true,
+			errorContains: "failed to read version",
+		},
+		{
+			name: "wrong version",
+			data: [][]byte{
+				{0x99}, // wrong version
+			},
+			expectError:   true,
+			errorContains: "version mismatch",
+		},
+		{
+			name: "incomplete data - missing contract",
+			data: [][]byte{
+				{VERSION}, // correct version but missing contract data
+			},
+			expectError: true,
+		},
+		{
+			name: "incomplete data - truncated contract",
+			data: [][]byte{
+				append([]byte{VERSION}, make([]byte, 10)...), // version + partial contract
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var definition EventTriggerDefinition
+			err := definition.UnmarshalBytes(tt.data)
+
+			if tt.expectError {
+				assert.Check(t, err != nil, "expected an error but got none")
+				if tt.errorContains != "" {
+					assert.Check(t, strings.Contains(err.Error(), tt.errorContains),
+						"error message should contain '%s', got: %v", tt.errorContains, err)
+				}
+			} else {
+				assert.NilError(t, err, "unexpected error")
+			}
+		})
+	}
+}
+
+// TestTopicPatternGeneration tests the TopicPattern method
+func TestTopicPatternGeneration(t *testing.T) {
+	tests := []struct {
+		name            string
+		conditions      []Condition
+		expectedPattern byte
+	}{
+		{
+			name:            "no topic conditions",
+			conditions:      []Condition{},
+			expectedPattern: 0b000,
+		},
+		{
+			name: "topic1 only",
+			conditions: []Condition{
+				{Location: TopicData{number: 1}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b100,
+		},
+		{
+			name: "topic2 only",
+			conditions: []Condition{
+				{Location: TopicData{number: 2}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b010,
+		},
+		{
+			name: "topic3 only",
+			conditions: []Condition{
+				{Location: TopicData{number: 3}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b001,
+		},
+		{
+			name: "topic1 and topic3",
+			conditions: []Condition{
+				{Location: TopicData{number: 1}, Constraint: MatchConstraint{target: []byte("test")}},
+				{Location: TopicData{number: 3}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b101,
+		},
+		{
+			name: "all topics",
+			conditions: []Condition{
+				{Location: TopicData{number: 1}, Constraint: MatchConstraint{target: []byte("test")}},
+				{Location: TopicData{number: 2}, Constraint: MatchConstraint{target: []byte("test")}},
+				{Location: TopicData{number: 3}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b111,
+		},
+		{
+			name: "mixed topic and data conditions",
+			conditions: []Condition{
+				{Location: TopicData{number: 1}, Constraint: MatchConstraint{target: []byte("test")}},
+				{Location: OffsetData{argnumber: 0}, Constraint: NumConstraint{op: EQ, target: big.NewInt(42)}},
+				{Location: TopicData{number: 3}, Constraint: MatchConstraint{target: []byte("test")}},
+			},
+			expectedPattern: 0b101,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := EventTriggerDefinition{
+				Contract:       common.HexToAddress("0x1234"),
+				EventSignature: common.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+				Conditions:     tt.conditions,
+			}
+
+			pattern := definition.TopicPattern()
+			assert.Check(t, pattern == tt.expectedPattern,
+				"expected pattern %b, got %b", tt.expectedPattern, pattern)
+		})
+	}
 }
