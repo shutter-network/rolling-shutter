@@ -70,7 +70,7 @@ type EventTriggerDefinition struct {
 	Conditions     []Condition
 }
 
-func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
+func (e *EventTriggerDefinition) MarshalBytes() []byte {
 	// write version string to buffer 'work'
 	// write common fields to buffer 'work'
 	// loop through conditions
@@ -108,25 +108,11 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 		}
 	}
 	work.Write(data.Bytes())
-	contents := work.Bytes()
-	words := len(contents) / WORD
-	if len(contents)%WORD != 0 {
-		words++
-	}
-	target := make([][]byte, words)
-	for i := range words {
-		target[i] = []byte(contents[i*WORD : (i+1)*WORD])
-	}
-	return target
+	return work.Bytes()
 }
 
-func (e *EventTriggerDefinition) UnmarshalBytes(data [][]byte) error {
-	var cat []byte
-	for i := range data {
-		cat = append(cat, data[i]...)
-	}
-
-	b := bytes.NewBuffer(cat)
+func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
+	b := bytes.NewBuffer(data)
 	version, err := readByte(b)
 	if err != nil {
 		return fmt.Errorf("failed to read version %w", err)

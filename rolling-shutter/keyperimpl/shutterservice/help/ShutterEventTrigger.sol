@@ -45,7 +45,7 @@ contract ShutterRegistry is Ownable {
         uint64 indexed eon,
         bytes32 identityPrefix,
         address sender,
-        bytes[] triggerDefinition,
+        bytes triggerDefinition,
         uint64 ttl
     );
 
@@ -68,7 +68,7 @@ contract ShutterRegistry is Ownable {
     function register(
         uint64 eon,
         bytes32 identityPrefix,
-        bytes[] memory triggerDefinition,
+        bytes memory triggerDefinition,
         uint64 ttl
     ) external {
         // Ensure the timestamp is not in the past.

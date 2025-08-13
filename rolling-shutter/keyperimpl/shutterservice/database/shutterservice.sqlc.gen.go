@@ -318,7 +318,7 @@ type InsertEventTriggerRegisteredEventParams struct {
 	Eon            int64
 	IdentityPrefix []byte
 	Sender         string
-	Definition     [][]byte
+	Definition     []byte
 	Ttl            int64
 }
 

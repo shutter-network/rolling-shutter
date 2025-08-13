@@ -1,6 +1,7 @@
 package shutterservice
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -370,7 +371,7 @@ func TestEvtRegistry(t *testing.T) {
 
 	de.UnmarshalBytes(ser)
 	round := de.MarshalBytes()
-	assert.Check(t, deepEqual(ser, round), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
+	assert.Check(t, bytes.Equal(ser, round), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
 
 	logs, err := setup.triggerContract.FilterEventTriggerRegistered(&bind.FilterOpts{
 		Start:   uint64(0),
@@ -381,7 +382,7 @@ func TestEvtRegistry(t *testing.T) {
 	)
 	for logs.Next() {
 		x := logs.Event.TriggerDefinition
-		assert.Check(t, deepEqual(ser, x), "serialization mismatch")
+		assert.Check(t, bytes.Equal(ser, x), "serialization mismatch")
 	}
 	var newConditions []Condition
 	for _, cond := range def.Conditions {
@@ -392,24 +393,7 @@ func TestEvtRegistry(t *testing.T) {
 	}
 	def.Conditions = newConditions
 	shorter := def.MarshalBytes()
-	assert.Check(t, !deepEqual(shorter, ser), "we lost a constraint")
-}
-
-func deepEqual(a, b [][]byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, ar := range a {
-		if len(b[i]) != len(ar) {
-			return false
-		}
-		for j, v := range ar {
-			if b[i][j] != v {
-				return false
-			}
-		}
-	}
-	return true
+	assert.Check(t, !bytes.Equal(shorter, ser), "we lost a constraint")
 }
 
 func TestEventTriggerMarshalUnmarshal(t *testing.T) {
@@ -548,9 +532,10 @@ func TestEventTriggerMarshalUnmarshal(t *testing.T) {
 
 			fmt.Printf("Unmarshaled definition: %+v\n", unmarshaled)
 			fmt.Printf("Original definition: %+v\n", tt.definition)
+			fmt.Printf("Marshaled bytes: %x\n", marshaled)
 
 			remarshal := unmarshaled.MarshalBytes()
-			assert.Check(t, deepEqual(marshaled, remarshal), "round trip should produce identical bytes")
+			assert.Check(t, bytes.Equal(marshaled, remarshal), "remarshaled data should match original marshaled data")
 
 			assert.Check(t, unmarshaled.Contract == tt.definition.Contract, "contract address should be preserved")
 			assert.Check(t, unmarshaled.EventSignature == tt.definition.EventSignature, "event signature should be preserved")
@@ -566,36 +551,34 @@ func TestEventTriggerMarshalUnmarshal(t *testing.T) {
 func TestEventTriggerMarshalUnmarshalErrors(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          [][]byte
+		data          []byte
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name:          "empty data",
-			data:          [][]byte{},
+			data:          []byte{},
 			expectError:   true,
 			errorContains: "failed to read version",
 		},
 		{
 			name: "wrong version",
-			data: [][]byte{
-				{0x99}, // wrong version
+			data: []byte{
+				0x99, // wrong version
 			},
 			expectError:   true,
 			errorContains: "version mismatch",
 		},
 		{
 			name: "incomplete data - missing contract",
-			data: [][]byte{
-				{VERSION}, // correct version but missing contract data
+			data: []byte{
+				VERSION, // correct version but missing contract data
 			},
 			expectError: true,
 		},
 		{
-			name: "incomplete data - truncated contract",
-			data: [][]byte{
-				append([]byte{VERSION}, make([]byte, 10)...), // version + partial contract
-			},
+			name:        "incomplete data - truncated contract",
+			data:        append([]byte{VERSION}, make([]byte, 10)...), // version + partial contract
 			expectError: true,
 		},
 	}
