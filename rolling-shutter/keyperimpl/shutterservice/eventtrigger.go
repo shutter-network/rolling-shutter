@@ -113,6 +113,7 @@ func (e *EventTriggerDefinition) MarshalBytes() []byte {
 
 func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 	b := bytes.NewBuffer(data)
+
 	version, err := readByte(b)
 	if err != nil {
 		return fmt.Errorf("failed to read version %w", err)
@@ -120,10 +121,19 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 	if version != VERSION {
 		return fmt.Errorf("version mismatch want: %v got %v", VERSION, version)
 	}
+
 	contract := b.Next(common.AddressLength)
-	signature := b.Next(common.HashLength)
+	if len(contract) != common.AddressLength {
+		return fmt.Errorf("failed to read contract address, expected %v bytes, got %v", common.AddressLength, len(contract))
+	}
 	e.Contract = common.BytesToAddress(contract)
+
+	signature := b.Next(common.HashLength)
+	if len(signature) != common.HashLength {
+		return fmt.Errorf("failed to read event signature, expected %v bytes, got %v", common.HashLength, len(signature))
+	}
 	e.EventSignature = common.Hash(signature)
+
 	topicMask, err := readByte(b)
 	if err != nil {
 		return err
