@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -187,8 +188,8 @@ func TestEvtBloomFilterMatch(t *testing.T) {
 
 func CreateDefinition(contract common.Address, topic1 []byte, topic2 []byte, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
 	definition := EventTriggerDefinition{
-		Contract:  contract,
-		Signature: EvtSignature{long: TestEvtSigFull},
+		Contract:       contract,
+		EventSignature: common.HexToHash("0x1234567890123456789012345678901234567890123456789012345678901234"),
 		Conditions: []Condition{
 			{
 				Location: TopicData{

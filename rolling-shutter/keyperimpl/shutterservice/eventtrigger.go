@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"strings"
-	"text/scanner"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // ABI encoding word size
@@ -68,9 +65,9 @@ const (
 // [*:end] DATA matches (see Condition.Bytes())
 
 type EventTriggerDefinition struct {
-	Contract   common.Address
-	Signature  EvtSignature
-	Conditions []Condition
+	Contract       common.Address
+	EventSignature common.Hash
+	Conditions     []Condition
 }
 
 func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
@@ -86,7 +83,7 @@ func (e *EventTriggerDefinition) MarshalBytes() [][]byte {
 	work := bytes.NewBuffer(buf)
 	work.WriteByte(VERSION)
 	work.Write(e.Contract[:])
-	written, err := work.Write(e.Signature.Topic0().Bytes())
+	written, err := work.Write(e.EventSignature.Bytes())
 	if written < 20 {
 		panic("no sig written")
 	}
@@ -140,8 +137,7 @@ func (e *EventTriggerDefinition) UnmarshalBytes(data [][]byte) error {
 	contract := b.Next(common.AddressLength)
 	signature := b.Next(common.HashLength)
 	e.Contract = common.BytesToAddress(contract)
-	signatureHash := common.Hash(signature)
-	e.Signature = EvtSignature{hashed: &signatureHash}
+	e.EventSignature = common.Hash(signature)
 	topicMask, err := readByte(b)
 	if err != nil {
 		return err
@@ -321,7 +317,7 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 	// {{A, B}, {C, D}}   matches topic (A OR B) in first position AND (C OR D) in second position
 	// var Topics [][]common.Hash
 	topics := [][]common.Hash{
-		{e.Signature.Topic0()},
+		{e.EventSignature},
 		{},
 		{},
 		{},
@@ -361,42 +357,6 @@ func (e *EventTriggerDefinition) Match(elog types.Log, testTopics bool) bool {
 		}
 	}
 	return true
-}
-
-type EvtSignature struct {
-	long   string
-	hashed *common.Hash
-}
-
-func (e EvtSignature) toHashableSig() string {
-	var name string
-	var prev string
-	i := 0
-	args := make([]string, 1+strings.Count(string(e.long), ","))
-	var s scanner.Scanner
-	s.Init(strings.NewReader(string(e.long)))
-	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
-		if s.Position.Offset == 0 {
-			name = s.TokenText()
-		} else {
-			if prev == "(" || prev == "," {
-				args[i] = s.TokenText()
-				i++
-			}
-			prev = s.TokenText()
-		}
-	}
-	result := fmt.Sprintf("%v(%v)", name, strings.Join(args, ","))
-	return result
-}
-
-func (e EvtSignature) Topic0() common.Hash {
-	if e.hashed != nil {
-		return *e.hashed
-	}
-	shortSig := e.toHashableSig()
-
-	return common.Hash(crypto.Keccak256([]byte(shortSig)))
 }
 
 type LogField interface {
