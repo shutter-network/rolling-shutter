@@ -370,7 +370,8 @@ func TestEvtRegistry(t *testing.T) {
 
 	de := EventTriggerDefinition{}
 
-	de.UnmarshalBytes(ser)
+	err = de.UnmarshalBytes(ser)
+	assert.NilError(t, err, "unmarshal failed")
 	round := de.MarshalBytes()
 	assert.Check(t, bytes.Equal(ser, round), "roundtrip failed\n%v\n%v", ser, de.MarshalBytes())
 

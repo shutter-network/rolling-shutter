@@ -476,7 +476,8 @@ func (c *Condition) Bytes() []byte {
 				}
 				data.WriteByte(byte(words))
 				data.Write(matchBytes)
-				padBytes := make([]byte, len(matchBytes)%WORD)
+				padSize := words*WORD - len(matchBytes)
+				padBytes := make([]byte, padSize)
 				data.Write(padBytes)
 			} else {
 				data.WriteByte(byte(MATCH))
