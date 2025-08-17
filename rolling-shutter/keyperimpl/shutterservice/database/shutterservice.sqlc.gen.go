@@ -40,9 +40,7 @@ func (q *Queries) DeleteIdentityRegisteredEventsFromBlockNumber(ctx context.Cont
 
 const getActiveEventTriggerRegisteredEvents = `-- name: GetActiveEventTriggerRegisteredEvents :many
 SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, definition, ttl, decrypted FROM event_trigger_registered_event e
-WHERE e.block_number >= $1  -- block number not before start block
-AND e.block_number <= $2  -- block number not after end block
-AND e.block_number + ttl >= $1  -- TTL not expired at start block (might have expired at end block though)
+WHERE e.block_number + ttl >= $1 -- TTL not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
@@ -51,13 +49,8 @@ AND NOT EXISTS (  -- not fired yet
 )
 `
 
-type GetActiveEventTriggerRegisteredEventsParams struct {
-	StartBlock int64
-	EndBlock   int64
-}
-
-func (q *Queries) GetActiveEventTriggerRegisteredEvents(ctx context.Context, arg GetActiveEventTriggerRegisteredEventsParams) ([]EventTriggerRegisteredEvent, error) {
-	rows, err := q.db.Query(ctx, getActiveEventTriggerRegisteredEvents, arg.StartBlock, arg.EndBlock)
+func (q *Queries) GetActiveEventTriggerRegisteredEvents(ctx context.Context, blockNumber int64) ([]EventTriggerRegisteredEvent, error) {
+	rows, err := q.db.Query(ctx, getActiveEventTriggerRegisteredEvents, blockNumber)
 	if err != nil {
 		return nil, err
 	}

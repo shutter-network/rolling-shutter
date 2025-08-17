@@ -42,10 +42,9 @@ func (tp *TriggerProcessor) GetProcessorName() string {
 
 func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) ([]Event, error) {
 	queries := database.New(tp.DBPool)
-	triggerRegisteredEvents, err := queries.GetActiveEventTriggerRegisteredEvents(ctx, database.GetActiveEventTriggerRegisteredEventsParams{
-		StartBlock: int64(start),
-		EndBlock:   int64(end),
-	})
+	// Consider event triggers that have not fired yet and have not expired at the start block.
+	// They might have expired at the end block though which will be checked later.
+	triggerRegisteredEvents, err := queries.GetActiveEventTriggerRegisteredEvents(ctx, int64(start))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get event trigger registered events")
 	}
@@ -73,6 +72,7 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 		}
 
 		for _, eventLog := range logs {
+			// Check that the trigger has not expired at the time of the event.
 			if eventLog.BlockNumber > uint64(triggerRegisteredEvent.BlockNumber+triggerRegisteredEvent.Ttl) {
 				continue
 			}

@@ -115,9 +115,7 @@ DELETE FROM fired_triggers WHERE block_number >= $1;
 
 -- name: GetActiveEventTriggerRegisteredEvents :many
 SELECT * FROM event_trigger_registered_event e
-WHERE e.block_number >= @start_block  -- block number not before start block
-AND e.block_number <= @end_block  -- block number not after end block
-AND e.block_number + ttl >= @start_block  -- TTL not expired at start block (might have expired at end block though)
+WHERE e.block_number + ttl >= @block_number -- TTL not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
