@@ -17,22 +17,28 @@ CustomBootstrapAddresses  = [
     "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
     "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
+DiscoveryNamespace = 'shutter-local'
 
 [Ethereum]
 PrivateKey = '82904d1c48d3a27d218408fc2db3e743f554a69b05b91d28c2897a9026ea47df'
 # The JSON RPC endpoint where the contracts are accessible
 ContractsURL = 'http://127.0.0.1:8555/'
 # Contract source directory
-DeploymentDir       = "./deployments/dockerGeth/"
+DeploymentDir       = "/deployments/dockerGeth/"
 # The layer 1 JSON RPC endpoint
 EthereumURL         = "http://geth:8545/"
 
 [Shuttermint]
-ShuttermintURL		= "http://chain-0-validator:26657"
-ValidatorPublicKey = '720accc33c2bce1319d12b5f23f81b39a33f487e21c4a4d7ca1e1f7954a24172'
+ShuttermintURL		= "http://chain-0-validator-1:26657"
+ValidatorPublicKey = "272adbfdd30113011c4492d0ebbd6ad250b2e6798adfa469783b485028700d54"
 EncryptionKey = 'e5c124eb4d3c13fa46532107b69b5abfa11e8aaf3a7a86d11ef370470834e076'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 200
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
 
 [Metrics]
 Enabled  = true
