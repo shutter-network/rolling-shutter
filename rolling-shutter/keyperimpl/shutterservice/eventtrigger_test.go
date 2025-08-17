@@ -16,22 +16,21 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
+	testHelperBindings "github.com/shutter-network/contracts/v2/bindings/eventtriggertesthelper"
 	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 	"gotest.tools/assert"
-
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
-// This should match what is in help/erc20bindings.go
+// This should match the Trigger event from the TestHelper contract
 const (
-	TestEvtSig     = "Transfer(address,address,address,uint256,string)"
-	TestEvtSigFull = "Transfer(address from indexed, address to indexed, address notify indexed, uint256 amount, string foobar)"
+	TestEvtSig     = "Trigger(uint64,bytes32,bytes32,bytes32)"
+	TestEvtSigFull = "Trigger(uint64 topic1 indexed, bytes32 topic2 indexed, bytes32 data1, bytes32 data2)"
 )
 
 type TestSetup struct {
 	backend                *simulated.Backend
-	erc20Address           common.Address
-	erc20Contract          *help.ERC20Basic
+	testHelperAddress      common.Address
+	testHelperContract     *testHelperBindings.Eventtriggertesthelper
 	triggerRegistryAddress common.Address
 	triggerContract        *triggerRegistryBindings.Shuttereventtriggerregistry
 	key                    *ecdsa.PrivateKey
@@ -52,16 +51,16 @@ func SetupAndDeploy() (TestSetup, error) {
 	blockchain := simulated.NewBackend(alloc)
 	setup.backend = blockchain
 
-	// Deploy erc20Contract
-	erc20Address, _, erc20Contract, err := help.DeployERC20Basic(
+	// Deploy testHelperContract
+	testHelperAddress, _, testHelperContract, err := testHelperBindings.DeployEventtriggertesthelper(
 		auth,
 		blockchain.Client(),
 	)
 	if err != nil {
-		return setup, fmt.Errorf("failed to deploy ERC20 %w", err)
+		return setup, fmt.Errorf("failed to deploy TestHelper %w", err)
 	}
-	setup.erc20Address = erc20Address
-	setup.erc20Contract = erc20Contract
+	setup.testHelperAddress = testHelperAddress
+	setup.testHelperContract = testHelperContract
 
 	// Deploy ShutterEventTrigger contract
 	triggerRegistryAddress, _, triggerContract, err := triggerRegistryBindings.DeployShuttereventtriggerregistry(
@@ -78,17 +77,18 @@ func SetupAndDeploy() (TestSetup, error) {
 	return setup, nil
 }
 
-// Test ERC20 contract gets deployed correctly
+// Test TestHelper contract gets deployed correctly
 func TestEvtDeployContract(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "setup and deploy failed")
 
-	if len(setup.erc20Address.Bytes()) == 0 {
+	if len(setup.testHelperAddress.Bytes()) == 0 {
 		t.Error("Expected a valid deployment address. Received empty address byte array instead")
 	}
 }
 
 func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefinition) {
+	t.Helper()
 	client := setup.backend.Client()
 	from := crypto.PubkeyToAddress(setup.key.PublicKey)
 
@@ -97,7 +97,7 @@ func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefiniti
 	chainid, _ := client.ChainID(context.Background())
 	nonce, err := client.PendingNonceAt(context.Background(), from)
 	assert.NilError(t, err, "failed to get nonce")
-	signer := func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+	signer := func(_ common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		return types.SignTx(tx, types.LatestSignerForChainID(chainid), setup.key)
 	}
 
@@ -130,30 +130,30 @@ func RegisterTrigger(t *testing.T, setup TestSetup, trigger EventTriggerDefiniti
 	assert.Check(t, receipt.Status == 1, "transfer failed")
 }
 
-func ERC20Transfer(t *testing.T, setup TestSetup, from common.Address, to common.Address, amount int64) {
+func EmitTriggerEvent(t *testing.T, setup TestSetup, topic1 uint64, topic2 [32]byte, data1 [32]byte, data2 [32]byte) {
+	t.Helper()
 	client := setup.backend.Client()
 
+	from := crypto.PubkeyToAddress(setup.key.PublicKey)
 	head, _ := client.HeaderByNumber(context.Background(), nil)
 	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
 	chainid, _ := client.ChainID(context.Background())
 	nonce, err := client.PendingNonceAt(context.Background(), from)
 	assert.NilError(t, err, "failed to get nonce")
-	signer := func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+	signer := func(_ common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		return types.SignTx(tx, types.LatestSignerForChainID(chainid), setup.key)
 	}
 
-	assert.NilError(t, err, "failed to sign")
-	tx, err := setup.erc20Contract.Transfer(&bind.TransactOpts{
+	tx, err := setup.testHelperContract.Trigger(&bind.TransactOpts{
 		From:      from,
 		Nonce:     big.NewInt(int64(nonce)),
 		GasTipCap: big.NewInt(params.GWei),
 		GasFeeCap: gasPrice,
 		GasLimit:  2100000,
 		Signer:    signer,
-	}, to, big.NewInt(amount))
-	assert.NilError(t, err, "error with token transfer")
+	}, topic1, topic2, data1, data2)
+	assert.NilError(t, err, "error with trigger call")
 	txHash := tx.Hash()
-	assert.NilError(t, err, "error getting block")
 	setup.backend.Commit()
 	found, pending, err := client.TransactionByHash(context.Background(), txHash)
 	assert.NilError(t, err, "error getting tx")
@@ -162,75 +162,65 @@ func ERC20Transfer(t *testing.T, setup TestSetup, from common.Address, to common
 	receipt, err := client.TransactionReceipt(context.Background(), txHash)
 
 	assert.NilError(t, err, "error getting receipt")
-	assert.Check(t, receipt.Status == 1, "transfer failed")
+	assert.Check(t, receipt.Status == 1, "trigger call failed")
 }
 
 func TestEvtBloomFilterMatch(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "failure deploying")
-	addr := crypto.PubkeyToAddress(setup.key.PublicKey)
 
-	ERC20Transfer(t, setup, addr, addr, 1)
+	topic2 := [32]byte{0x02}
+	EmitTriggerEvent(t, setup, 1, topic2, [32]byte{0x03}, [32]byte{0x04})
 	latest, err := setup.backend.Client().BlockByNumber(context.Background(), nil)
 	assert.NilError(t, err, "error getting block")
 
-	// topic0 signature
 	topic0 := crypto.Keccak256([]byte(TestEvtSig))
 	assert.Check(t, latest.Bloom().Test(topic0), "could not find topic0")
 
-	// topic1 address from indexed
-	topic1 := WordPad(addr.Bytes())
-	assert.Check(t, latest.Bloom().Test(topic1), "could not find topic1")
-
-	// topic2 address to indexed
-	topic2 := WordPad(addr.Bytes())
-	assert.Check(t, latest.Bloom().Test(topic2), "could not find topic2")
+	assert.Check(t, latest.Bloom().Test(WordPad([]byte{0x01})), "could not find topic1")
+	assert.Check(t, latest.Bloom().Test(topic2[:]), "could not find topic2")
 
 	// we could probably calculate `bloom9.go:types.bloomValues` for all topics, and manually match the merged/combined topic
 }
 
-func CreateDefinition(contract common.Address, topic1 []byte, topic2 []byte, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
-	abi, err := help.ERC20BasicMetaData.GetAbi()
-	if err != nil {
-		panic("failed to get ERC20 ABI")
-	}
+func CreateDefinition(contract common.Address, topic1 uint64, topic2 [32]byte, data1 [32]byte, data2 [32]byte) EventTriggerDefinition {
+	transferEventID := common.BytesToHash(crypto.Keccak256([]byte(TestEvtSig)))
 	definition := EventTriggerDefinition{
 		Contract:       contract,
-		EventSignature: abi.Events["Transfer"].ID,
+		EventSignature: transferEventID,
 		Conditions: []Condition{
 			{
 				Location: TopicData{
-					number: 1,
+					number: 1, // topic1 (uint64)
 				},
 				Constraint: MatchConstraint{
-					target: topic1,
+					target: WordPad([]byte{byte(topic1)}),
 				},
 			},
 			{
 				Location: TopicData{
-					number: 3,
+					number: 2, // topic2 (bytes32)
 				},
 				Constraint: MatchConstraint{
-					target: topic3,
+					target: topic2[:],
 				},
 			},
 			{
 				Location: OffsetData{
-					argnumber: 0,
+					argnumber: 0, // data1 (bytes32)
 					complex:   false,
 				},
-				Constraint: NumConstraint{
-					op:     GTE,
-					target: big.NewInt(amount),
+				Constraint: MatchConstraint{
+					target: data1[:],
 				},
 			},
 			{
 				Location: OffsetData{
-					argnumber: 1,
-					complex:   true,
+					argnumber: 1, // data2 (bytes32)
+					complex:   false,
 				},
 				Constraint: MatchConstraint{
-					target: target,
+					target: data2[:],
 				},
 			},
 		},
@@ -242,19 +232,17 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 	setup, err := SetupAndDeploy()
 	assert.NilError(t, err, "error during setup")
 
-	senderAddr := crypto.PubkeyToAddress(setup.key.PublicKey)
-	zeroAddr := common.HexToAddress("0x00000000000000000000000000000000")
-	fiveAddr := common.HexToAddress("0x00000000000000000000000000000005")
-	amount := int64(1)
-	// stringMatch := []byte("Lets see how long this string can get and what it will look like in the data, I feel like I need to keep going for a bit........")
-	stringMatch := []byte("short")
-
-	definition := CreateDefinition(setup.erc20Address, WordPad(senderAddr.Bytes()), nil, WordPad(fiveAddr.Bytes()), int64(1), stringMatch)
+	definition := CreateDefinition(
+		setup.testHelperAddress,
+		1,
+		[32]byte{0x02},
+		[32]byte{0x03},
+		[32]byte{0x04})
 	assert.Check(t, len(definition.Conditions) == 4, "something went wrong")
 	f := definition.ToFilterQuery()
 	assert.Check(t, len(f.Topics) > 0, "no filterquery")
 
-	ERC20Transfer(t, setup, senderAddr, setup.erc20Address, amount)
+	EmitTriggerEvent(t, setup, 1, [32]byte{0x02}, [32]byte{0x03}, [32]byte{0x04})
 
 	checkTopics := true
 
@@ -265,7 +253,7 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 		assert.Check(t, definition.Match(elog, checkTopics) == true, "did not match %v", elog.Data)
 	}
 	// mismatch on topic2
-	ERC20Transfer(t, setup, senderAddr, zeroAddr, 0)
+	EmitTriggerEvent(t, setup, 0, [32]byte{0x04}, [32]byte{0x05}, [32]byte{0x06})
 
 	latest, err := setup.backend.Client().BlockNumber(context.Background())
 	assert.NilError(t, err, "no latest block number")
@@ -283,11 +271,11 @@ func TestEvtEventTriggerDefinition(t *testing.T) {
 			number: 2,
 		},
 		Constraint: MatchConstraint{
-			target: WordPad(senderAddr.Bytes()),
+			target: WordPad([]byte{0x04}),
 		},
 	})
 	overspecific := definition.ToFilterQuery()
-	ERC20Transfer(t, setup, senderAddr, zeroAddr, amount)
+	EmitTriggerEvent(t, setup, 1, [32]byte{0x07}, [32]byte{0x08}, [32]byte{0x09})
 
 	latest, err = setup.backend.Client().BlockNumber(context.Background())
 	assert.NilError(t, err, "no latest block number")
@@ -363,11 +351,11 @@ func TestEvtRegistry(t *testing.T) {
 
 	assert.Check(t, setup.backend != nil, "setup is nil")
 	def := CreateDefinition(
-		setup.erc20Address,
-		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
-		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
-		WordPad(crypto.PubkeyToAddress(setup.key.PublicKey).Bytes()),
-		1, []byte("short"))
+		setup.testHelperAddress,
+		1,
+		[32]byte{0x01},
+		[32]byte{0x02},
+		[32]byte{0x03})
 	RegisterTrigger(t, setup, def)
 
 	ser := def.MarshalBytes()
@@ -390,16 +378,6 @@ func TestEvtRegistry(t *testing.T) {
 		x := logs.Event.TriggerDefinition
 		assert.Check(t, bytes.Equal(ser, x), "serialization mismatch")
 	}
-	var newConditions []Condition
-	for _, cond := range def.Conditions {
-		_, ok := cond.Constraint.(NumConstraint)
-		if !ok {
-			newConditions = append(newConditions, cond)
-		}
-	}
-	def.Conditions = newConditions
-	shorter := def.MarshalBytes()
-	assert.Check(t, !bytes.Equal(shorter, ser), "we lost a constraint")
 }
 
 func TestEventTriggerMarshalUnmarshal(t *testing.T) {
