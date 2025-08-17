@@ -197,7 +197,7 @@ func (kpr *Keyper) initMultiEventSyncer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to dial Ethereum execution node: %w", err)
 	}
-	eventTriggerRegistryContract, err := triggerRegistryBindings.NewShuttereventtriggerregistry(kpr.config.Chain.Contracts.EventTriggerRegistry, triggerRegistryClient)
+	eventTriggerRegistryContract, err := triggerRegistryBindings.NewShuttereventtriggerregistry(kpr.config.Chain.Contracts.ShutterEventTriggerRegistry, triggerRegistryClient)
 	if err != nil {
 		return fmt.Errorf("failed to create ShutterRegistry contract instance: %w", err)
 	}
