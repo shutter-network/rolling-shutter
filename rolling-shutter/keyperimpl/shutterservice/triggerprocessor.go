@@ -80,7 +80,8 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 				continue
 			}
 			events = append(events, &TriggerEvent{
-				Log: eventLog,
+				Log:                         eventLog,
+				EventTriggerRegisteredEvent: triggerRegisteredEvent,
 			})
 		}
 	}
