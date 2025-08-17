@@ -44,9 +44,10 @@ INSERT INTO event_trigger_registered_event (
     identity_prefix,
     sender,
     definition,
-    ttl
+    ttl,
+    identity
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
@@ -54,14 +55,22 @@ tx_index = $3,
 log_index = $4,
 sender = $7,
 definition = $8,
-ttl = $9;
+ttl = $9,
+identity = $10;
 
 
--- name: UpdateDecryptedFlag :exec
+-- name: UpdateTimeBasedDecryptedFlags :exec
 UPDATE identity_registered_event
 SET decrypted = TRUE
 WHERE (eon, identity) IN (
-    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
+    SELECT UNNEST(@eons::bigint[]), UNNEST(@identities::bytea[])
+);
+
+-- name: UpdateEventBasedDecryptedFlags :exec
+UPDATE event_trigger_registered_event
+SET decrypted = TRUE
+WHERE (eon, identity) IN (
+    SELECT UNNEST(@eons::bigint[]), UNNEST(@identities::bytea[])
 );
 
 -- name: InsertIdentityRegisteredEvent :execresult

@@ -28,6 +28,7 @@ type EventTriggerRegisteredEvent struct {
 	Definition     []byte
 	Ttl            int64
 	Decrypted      bool
+	Identity       []byte
 }
 
 type FiredTrigger struct {

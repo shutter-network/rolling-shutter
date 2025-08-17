@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -97,6 +98,7 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 			Sender:         shdb.EncodeAddress(registryEvent.Sender),
 			Definition:     registryEvent.TriggerDefinition,
 			Ttl:            int64(registryEvent.Ttl),
+			Identity:       computeEventTriggerIdentity(registryEvent.IdentityPrefix, registryEvent.Sender),
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to insert event trigger registered event into db")
@@ -112,4 +114,8 @@ func (p *EventTriggerRegisteredEventProcessor) RollbackEvents(ctx context.Contex
 		return errors.Wrap(err, "failed to delete event trigger registered events during rollback")
 	}
 	return nil
+}
+
+func computeEventTriggerIdentity(identityPrefix common.Hash, sender common.Address) []byte {
+	return append(identityPrefix[:], sender[:]...)
 }
