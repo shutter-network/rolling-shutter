@@ -314,9 +314,6 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 	// var Topics [][]common.Hash
 	topics := [][]common.Hash{
 		{e.EventSignature},
-		{},
-		{},
-		{},
 	}
 	for _, cond := range e.Conditions {
 		switch cond.Location.(type) {
@@ -324,6 +321,9 @@ func (e EventTriggerDefinition) ToFilterQuery() ethereum.FilterQuery {
 			d, ok := cond.Constraint.(MatchConstraint)
 			if !ok {
 				continue
+			}
+			for len(topics) <= cond.Location.(TopicData).number {
+				topics = append(topics, []common.Hash{})
 			}
 			topics[cond.Location.(TopicData).number] = []common.Hash{common.Hash(d.target)}
 		default:
