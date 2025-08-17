@@ -190,9 +190,13 @@ func TestEvtBloomFilterMatch(t *testing.T) {
 }
 
 func CreateDefinition(contract common.Address, topic1 []byte, topic2 []byte, topic3 []byte, amount int64, target []byte) EventTriggerDefinition {
+	abi, err := help.ERC20BasicMetaData.GetAbi()
+	if err != nil {
+		panic("failed to get ERC20 ABI")
+	}
 	definition := EventTriggerDefinition{
 		Contract:       contract,
-		EventSignature: common.HexToHash("0x1234567890123456789012345678901234567890123456789012345678901234"),
+		EventSignature: abi.Events["Transfer"].ID,
 		Conditions: []Condition{
 			{
 				Location: TopicData{
