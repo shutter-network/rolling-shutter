@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
@@ -18,7 +19,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
-	eventTriggerRegistryBindings "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -197,7 +197,7 @@ func (kpr *Keyper) initMultiEventSyncer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to dial Ethereum execution node: %w", err)
 	}
-	eventTriggerRegistryContract, err := eventTriggerRegistryBindings.NewShutterRegistry(kpr.config.Chain.Contracts.EventTriggerRegistry, triggerRegistryClient)
+	eventTriggerRegistryContract, err := triggerRegistryBindings.NewShuttereventtriggerregistry(kpr.config.Chain.Contracts.EventTriggerRegistry, triggerRegistryClient)
 	if err != nil {
 		return fmt.Errorf("failed to create ShutterRegistry contract instance: %w", err)
 	}

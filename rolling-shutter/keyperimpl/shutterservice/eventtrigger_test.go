@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
+	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 	"gotest.tools/assert"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
@@ -32,7 +33,7 @@ type TestSetup struct {
 	erc20Address           common.Address
 	erc20Contract          *help.ERC20Basic
 	triggerRegistryAddress common.Address
-	triggerContract        *help.ShutterRegistry
+	triggerContract        *triggerRegistryBindings.Shuttereventtriggerregistry
 	key                    *ecdsa.PrivateKey
 }
 
@@ -63,7 +64,7 @@ func SetupAndDeploy() (TestSetup, error) {
 	setup.erc20Contract = erc20Contract
 
 	// Deploy ShutterEventTrigger contract
-	triggerRegistryAddress, _, triggerContract, err := help.DeployShutterRegistry(
+	triggerRegistryAddress, _, triggerContract, err := triggerRegistryBindings.DeployShuttereventtriggerregistry(
 		auth,
 		blockchain.Client(),
 	)

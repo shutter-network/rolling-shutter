@@ -9,21 +9,22 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
+	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 // EventTriggerRegisteredEventProcessor implements the EventProcessor interface for EventTriggerRegistered events
 // in the ShutterRegistry contract.
 type EventTriggerRegisteredEventProcessor struct {
-	Contract *help.ShutterRegistry
+	Contract *shuttereventtriggerregistry.Shuttereventtriggerregistry
 	DBPool   *pgxpool.Pool
 }
 
 func NewEventTriggerRegisteredEventProcessor(
-	contract *help.ShutterRegistry,
+	contract *shuttereventtriggerregistry.Shuttereventtriggerregistry,
 	dbPool *pgxpool.Pool,
 ) *EventTriggerRegisteredEventProcessor {
 	return &EventTriggerRegisteredEventProcessor{
@@ -60,7 +61,7 @@ func (p *EventTriggerRegisteredEventProcessor) FetchEvents(ctx context.Context, 
 func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context, tx pgx.Tx, events []Event) error {
 	queries := database.New(tx)
 	for _, event := range events {
-		registryEvent := event.(*help.ShutterRegistryEventTriggerRegistered)
+		registryEvent := event.(*triggerRegistryBindings.ShuttereventtriggerregistryEventTriggerRegistered)
 
 		if registryEvent.Eon > math.MaxInt64 {
 			log.Debug().
