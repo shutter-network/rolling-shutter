@@ -314,7 +314,7 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 
 	// Insert eon 1
 	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(eon + 1),
+		Eon:                   int64(eon + 1), //nolint:gosec
 		Height:                1,
 		ActivationBlockNumber: int64(activationBlockNumber + 50),
 		KeyperConfigIndex:     1,
@@ -391,9 +391,14 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
+	eon := config.GetEon()
+	if eon > math.MaxInt64 {
+		t.Fatalf("Eon is too large: %d", eon)
+	}
+
 	// Insert eon 0 that activates at block 200
 	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(config.GetEon()),
+		Eon:                   int64(eon),
 		Height:                0,
 		ActivationBlockNumber: int64(activationBlockNumber),
 		KeyperConfigIndex:     0,
@@ -404,7 +409,7 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	trigger := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
-			Eon:         int64(config.GetEon()), // Event from eon 0
+			Eon:         int64(eon), // Event from eon 0
 			BlockNumber: int64(blockNumber),
 			Timestamp:   eventTimestamp,
 		},
