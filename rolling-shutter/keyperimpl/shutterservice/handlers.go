@@ -22,8 +22,6 @@ type DecryptionKeySharesHandler struct {
 	dbpool *pgxpool.Pool
 }
 
-// TODO: problem in using direct api is it has decryption trigger api and shutdown api??
-
 func (h *DecryptionKeySharesHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.DecryptionKeyShares{}}
 }
