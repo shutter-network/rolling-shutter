@@ -22,3 +22,11 @@ func computeIdentitiesHashFromShares(shares []*p2pmsg.KeyShare) []byte {
 	}
 	return computeIdentitiesHash(identityPreimges)
 }
+
+func computeIdentitiesHashFromKeys(keys []*p2pmsg.Key) []byte {
+	identityPreimges := []identitypreimage.IdentityPreimage{}
+	for _, key := range keys {
+		identityPreimges = append(identityPreimges, identitypreimage.IdentityPreimage(key.IdentityPreimage))
+	}
+	return computeIdentitiesHash(identityPreimges)
+}
