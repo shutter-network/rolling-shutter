@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -58,10 +57,9 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 		return errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
 
-	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
-		if kpr.shouldTriggerDecryption(ctx, obsDB, event, block) {
+		if kpr.shouldTriggerDecryption(ctx, event, block) {
 			eventsToDecrypt = append(eventsToDecrypt, event)
 		}
 	}
@@ -71,20 +69,35 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 
 func (kpr *Keyper) shouldTriggerDecryption(
 	ctx context.Context,
-	obsDB *obskeyper.Queries,
 	event servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
 ) bool {
-	nextBlock := triggeredBlock.Number.Int64()
-	keyperSet, err := obsDB.GetKeyperSet(ctx, nextBlock)
+	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+	isKeyper, err := coreKeyperDB.GetKeyperStateForEon(ctx, corekeyperdatabase.GetKeyperStateForEonParams{
+		Eon:           event.Eon,
+		KeyperAddress: []string{kpr.config.GetAddress().Hex()},
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			log.Info().
-				Int64("block-number", nextBlock).
-				Msg("skipping event as no keyper set has been found for it")
+				Int64("eon", event.Eon).
+				Msg("skipping event as no eon has been found for it")
 		} else {
-			log.Err(err).Msgf("failed to query keyper set for block %d", nextBlock)
+			log.Err(err).Msgf("failed to query keyper state for eon %d", event.Eon)
 		}
+		return false
+	}
+
+	eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
+	if err != nil {
+		log.Err(err).Msgf("failed to get eon %d", event.Eon)
+		return false
+	}
+	if eon.ActivationBlockNumber > triggeredBlock.Header.Number.Int64() {
+		log.Info().
+			Int64("eon", event.Eon).
+			Int64("block-number", triggeredBlock.Header.Number.Int64()).
+			Msg("skipping event as eon activation block number is greater than triggered block number")
 		return false
 	}
 
@@ -93,12 +106,13 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	}
 
 	// don't trigger if we're not part of the keyper set
-	if !keyperSet.Contains(kpr.config.GetAddress()) {
+	if !isKeyper {
 		log.Info().
-			Int64("block-number", nextBlock).
-			Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
+			Int64("eon", event.Eon).
+			Int64("block-number", event.BlockNumber).
+			Str("identity", string(event.Identity)).
 			Str("address", kpr.config.GetAddress().Hex()).
-			Msg("skipping slot as not part of keyper set")
+			Msg("skipping event as not part of keyper set")
 		return false
 	}
 	return true
@@ -109,24 +123,12 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 	triggeredBlock *syncevent.LatestBlock,
 ) error {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
-
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
 	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
-		nextBlock := triggeredBlock.Header.Number.Int64()
-
-		eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
+		eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
 		if err != nil {
-			return errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
-		}
-
-		if eonStruct.Eon != event.Eon {
-			log.Warn().
-				Int64("eon expected", eonStruct.Eon).
-				Int64("eon in event", event.Eon).
-				Msg("skipping event as wrong eon passed")
-
-			continue
+			return errors.Wrap(err, "failed to get eon")
 		}
 
 		if identityPreimages[event.Eon] == nil {
@@ -134,8 +136,8 @@ func (kpr *Keyper) triggerDecryption(ctx context.Context,
 		}
 		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(event.Identity))
 
-		if lastEonBlock[event.Eon] < event.BlockNumber {
-			lastEonBlock[event.Eon] = event.BlockNumber
+		if _, exists := lastEonBlock[event.Eon]; !exists {
+			lastEonBlock[event.Eon] = eon.ActivationBlockNumber
 		}
 	}
 
