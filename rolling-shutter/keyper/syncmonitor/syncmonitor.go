@@ -1,23 +1,28 @@
-package shutterservice
+package syncmonitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	keyperDB "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
+// BlockSyncState is an interface that different keyper implementations
+// can implement to provide their own block sync state logic.
+type BlockSyncState interface {
+	// GetSyncedBlockNumber retrieves the current synced block number.
+	GetSyncedBlockNumber(ctx context.Context) (int64, error)
+}
+
+// SyncMonitor monitors the sync state of the keyper.
 type SyncMonitor struct {
-	DBPool        *pgxpool.Pool
 	CheckInterval time.Duration
+	SyncState     BlockSyncState
 }
 
 func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
@@ -30,15 +35,13 @@ func (s *SyncMonitor) Start(ctx context.Context, runner service.Runner) error {
 
 func (s *SyncMonitor) runMonitor(ctx context.Context) error {
 	var lastBlockNumber int64
-	db := database.New(s.DBPool)
-	keyperdb := keyperDB.New(s.DBPool)
 
 	log.Debug().Msg("starting the sync monitor")
 
 	for {
 		select {
 		case <-time.After(s.CheckInterval):
-			if err := s.runCheck(ctx, db, keyperdb, &lastBlockNumber); err != nil {
+			if err := s.runCheck(ctx, &lastBlockNumber); err != nil {
 				if errors.Is(err, ErrBlockNotIncreasing) {
 					return err
 				}
@@ -55,21 +58,18 @@ var ErrBlockNotIncreasing = errors.New("block number has not increased between c
 
 func (s *SyncMonitor) runCheck(
 	ctx context.Context,
-	db *database.Queries,
-	keyperdb *keyperDB.Queries,
 	lastBlockNumber *int64,
 ) error {
-	record, err := db.GetIdentityRegisteredEventsSyncedUntil(ctx)
+	currentBlockNumber, err := s.SyncState.GetSyncedBlockNumber(ctx)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Warn().Err(err).Msg("no rows found in table identity_registered_events_synced_until")
+			log.Warn().Err(err).Msg("no rows found in sync state table")
 			return nil // This is not an error condition that should stop monitoring
 		}
-		return fmt.Errorf("error getting identity_registered_events_synced_until: %w", err)
+		return fmt.Errorf("error getting synced block number: %w", err)
 	}
 
-	currentBlockNumber := record.BlockNumber
-	log.Debug().Int64("current-block-number", currentBlockNumber).Msg("current block number")
+	log.Debug().Int64("current-block-number", currentBlockNumber).Int64("last-block-number", *lastBlockNumber).Msg("current block number")
 
 	// if the current block number < last block number, this means a reorg is detected, so we do not throw error
 	// if the current block number > last block number, then syncing is working as expected

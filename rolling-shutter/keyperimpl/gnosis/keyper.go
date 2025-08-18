@@ -17,6 +17,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/syncmonitor"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
@@ -49,7 +50,7 @@ type Keyper struct {
 	validatorSyncer     *ValidatorSyncer
 	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
-	syncMonitor         *SyncMonitor
+	syncMonitor         *syncmonitor.SyncMonitor
 
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
@@ -63,8 +64,7 @@ type Keyper struct {
 
 func New(c *Config) *Keyper {
 	return &Keyper{
-		config:      c,
-		syncMonitor: &SyncMonitor{},
+		config: c,
 	}
 }
 
@@ -160,9 +160,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to reset transaction pointer age")
 	}
 
-	kpr.syncMonitor = &SyncMonitor{
-		DBPool:        kpr.dbpool,
+	kpr.syncMonitor = &syncmonitor.SyncMonitor{
 		CheckInterval: time.Duration(kpr.config.Gnosis.SyncMonitorCheckInterval) * time.Second,
+		SyncState: &GnosisSyncState{
+			kpr.dbpool,
+		},
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
