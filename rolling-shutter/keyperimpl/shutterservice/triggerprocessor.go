@@ -54,7 +54,9 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 		trigger := EventTriggerDefinition{}
 		err := trigger.UnmarshalBytes(triggerRegisteredEvent.Definition)
 		if err != nil {
-			log.Info().Err(err).Int64("block-number", triggerRegisteredEvent.BlockNumber).
+			log.Info().
+				Err(err).
+				Int64("block-number", triggerRegisteredEvent.BlockNumber).
 				Hex("block-hash", triggerRegisteredEvent.BlockHash).
 				Int64("tx-index", triggerRegisteredEvent.TxIndex).
 				Int64("log-index", triggerRegisteredEvent.LogIndex).
@@ -62,7 +64,17 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 			continue
 		}
 
-		filterQuery := trigger.ToFilterQuery()
+		filterQuery, err := trigger.ToFilterQuery()
+		if err != nil {
+			log.Info().
+				Err(err).
+				Int64("block-number", triggerRegisteredEvent.BlockNumber).
+				Hex("block-hash", triggerRegisteredEvent.BlockHash).
+				Int64("tx-index", triggerRegisteredEvent.TxIndex).
+				Int64("log-index", triggerRegisteredEvent.LogIndex).
+				Msg("failed to create filter query for trigger, skipping")
+			continue
+		}
 		filterQuery.FromBlock = new(big.Int).SetUint64(start)
 		filterQuery.ToBlock = new(big.Int).SetUint64(end)
 
@@ -76,7 +88,7 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 			if eventLog.BlockNumber > uint64(triggerRegisteredEvent.BlockNumber+triggerRegisteredEvent.Ttl) {
 				continue
 			}
-			if !trigger.Match(eventLog, false) {
+			if !trigger.Match(&eventLog) {
 				continue
 			}
 			events = append(events, &TriggerEvent{
