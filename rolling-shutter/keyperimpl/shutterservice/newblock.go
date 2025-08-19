@@ -248,7 +248,15 @@ func (kpr *Keyper) sendTriggers(ctx context.Context, triggers []epochkghandler.D
 			Uint64("eon", trigger.BlockNumber).
 			Int("num-identities", len(trigger.IdentityPreimages)).
 			Msg("sending decryption trigger")
-		kpr.decryptionTriggerChannel <- event
+
+		select {
+		case kpr.decryptionTriggerChannel <- event:
+		case <-ctx.Done():
+			log.Warn().
+				Err(ctx.Err()).
+				Msg("context canceled while sending decryption trigger")
+			return
+		}
 	}
 }
 
