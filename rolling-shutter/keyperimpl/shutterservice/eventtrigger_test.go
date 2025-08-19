@@ -580,13 +580,13 @@ func TestValuePredicateMatch(t *testing.T) {
 				Op: BytesEq,
 				ByteArgs: [][]byte{func() []byte {
 					val := make([]byte, 32)
-					copy(val, []byte("hello"))
+					copy(val, "hello")
 					return val
 				}()},
 			},
 			value: func() []byte {
 				val := make([]byte, 32)
-				copy(val, []byte("hello"))
+				copy(val, "hello")
 				return val
 			}(),
 			want: true,
@@ -597,13 +597,13 @@ func TestValuePredicateMatch(t *testing.T) {
 				Op: BytesEq,
 				ByteArgs: [][]byte{func() []byte {
 					val := make([]byte, 32)
-					copy(val, []byte("hello"))
+					copy(val, "hello")
 					return val
 				}()},
 			},
 			value: func() []byte {
 				val := make([]byte, 32)
-				copy(val, []byte("world"))
+				copy(val, "world")
 				return val
 			}(),
 			want: false,
@@ -632,15 +632,15 @@ func TestValuePredicateMatch(t *testing.T) {
 				Op: BytesEq,
 				ByteArgs: [][]byte{func() []byte {
 					val := make([]byte, 64)
-					copy(val[:5], []byte("hello"))
-					copy(val[32:37], []byte("world"))
+					copy(val[:5], "hello")
+					copy(val[32:37], "world")
 					return val
 				}()},
 			},
 			value: func() []byte {
 				val := make([]byte, 64)
-				copy(val[:5], []byte("hello"))
-				copy(val[32:37], []byte("world"))
+				copy(val[:5], "hello")
+				copy(val[32:37], "world")
 				return val
 			}(),
 			want: true,
@@ -878,7 +878,8 @@ func TestValuePredicateDecodeErrors(t *testing.T) {
 				// Manually encode an invalid operation
 				var buf bytes.Buffer
 				elements := []interface{}{uint64(999)} // Invalid operation
-				rlp.Encode(&buf, elements)
+				err := rlp.Encode(&buf, elements)
+				assert.NilError(t, err, "Encoding should not fail")
 				return buf.Bytes()
 			}(),
 			expectedErr: "invalid operation",
@@ -889,7 +890,8 @@ func TestValuePredicateDecodeErrors(t *testing.T) {
 				// Encode UintLt operation but without the required integer argument
 				var buf bytes.Buffer
 				elements := []interface{}{uint64(UintLt)} // Missing the integer argument
-				rlp.Encode(&buf, elements)
+				err := rlp.Encode(&buf, elements)
+				assert.NilError(t, err, "Encoding should not fail")
 				return buf.Bytes()
 			}(),
 			expectedErr: "failed to read integer argument",
@@ -900,7 +902,8 @@ func TestValuePredicateDecodeErrors(t *testing.T) {
 				// Encode BytesEq operation but without the required byte argument
 				var buf bytes.Buffer
 				elements := []interface{}{uint64(BytesEq)} // Missing the byte argument
-				rlp.Encode(&buf, elements)
+				err := rlp.Encode(&buf, elements)
+				assert.NilError(t, err, "Encoding should not fail")
 				return buf.Bytes()
 			}(),
 			expectedErr: "failed to read byte argument",
@@ -915,7 +918,8 @@ func TestValuePredicateDecodeErrors(t *testing.T) {
 					big.NewInt(42),  // First integer argument (valid)
 					big.NewInt(100), // Second integer argument (invalid - UintEq only needs one)
 				}
-				rlp.Encode(&buf, elements)
+				err := rlp.Encode(&buf, elements)
+				assert.NilError(t, err, "Encoding should not fail")
 				return buf.Bytes()
 			}(),
 			expectedErr: "failed to decode ValuePredicate",
@@ -930,7 +934,8 @@ func TestValuePredicateDecodeErrors(t *testing.T) {
 					make([]byte, 32), // First byte argument (valid)
 					make([]byte, 32), // Second byte argument (invalid - BytesEq only needs one)
 				}
-				rlp.Encode(&buf, elements)
+				err := rlp.Encode(&buf, elements)
+				assert.NilError(t, err, "Encoding should not fail")
 				return buf.Bytes()
 			}(),
 			expectedErr: "failed to decode ValuePredicate",

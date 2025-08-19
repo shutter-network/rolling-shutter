@@ -261,7 +261,9 @@ func sortIdentityPreimages(identityPreimages []identitypreimage.IdentityPreimage
 	return sorted
 }
 
-func computeIdentityForFiredTrigger(firedTrigger *servicedatabase.GetUndecryptedFiredTriggersRow) (identitypreimage.IdentityPreimage, error) {
+func computeIdentityForFiredTrigger(
+	firedTrigger *servicedatabase.GetUndecryptedFiredTriggersRow,
+) (identitypreimage.IdentityPreimage, error) {
 	var buf bytes.Buffer
 	buf.Write(firedTrigger.IdentityPrefix)
 	senderAddress, err := shdb.DecodeAddress(firedTrigger.Sender)

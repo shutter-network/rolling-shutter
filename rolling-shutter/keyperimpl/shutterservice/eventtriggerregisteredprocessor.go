@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -20,12 +19,12 @@ import (
 // EventTriggerRegisteredEventProcessor implements the EventProcessor interface for EventTriggerRegistered events
 // in the ShutterRegistry contract.
 type EventTriggerRegisteredEventProcessor struct {
-	Contract *shuttereventtriggerregistry.Shuttereventtriggerregistry
+	Contract *triggerRegistryBindings.Shuttereventtriggerregistry
 	DBPool   *pgxpool.Pool
 }
 
 func NewEventTriggerRegisteredEventProcessor(
-	contract *shuttereventtriggerregistry.Shuttereventtriggerregistry,
+	contract *triggerRegistryBindings.Shuttereventtriggerregistry,
 	dbPool *pgxpool.Pool,
 ) *EventTriggerRegisteredEventProcessor {
 	return &EventTriggerRegisteredEventProcessor{
