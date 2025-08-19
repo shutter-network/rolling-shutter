@@ -80,6 +80,10 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 			evLog.Info().Msg("skipping event trigger registered event with Eon > math.MaxInt64")
 			continue
 		}
+		if registryEvent.Ttl > math.MaxInt64 {
+			evLog.Info().Msg("skipping event trigger registered event with TTL > math.MaxInt64")
+			continue
+		}
 
 		triggerDefinition := EventTriggerDefinition{}
 		err := triggerDefinition.UnmarshalBytes(registryEvent.TriggerDefinition)
