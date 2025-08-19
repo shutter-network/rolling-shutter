@@ -35,24 +35,6 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 	return kpr.maybeTriggerDecryption(ctx, ev)
 }
 
-// maybeTriggerEventBased(ctx context.Context, block *syncevent.LatestBlock) error
-// will check installed filters for registered events
-
-func (kpr *Keyper) maybeTriggerEventBased(ctx context.Context, block *syncevent.LatestBlock) error {
-	// we should have a bloom filter for each registered and not resolved trigger
-	// check block headers logs bloom
-	// if match, check exact conditions:
-	// - contract address
-	// - event signature
-	// - specific conditions
-	// if match: trigger decryption
-	// mark in db as resolved
-	return errors.Errorf("not implemented")
-}
-
-// maybeTriggerDecryption triggers decryption for the identities registered if
-// - it hasn't been triggered for those identities before and
-// - the keyper is part of the corresponding keyper set.
 func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.LatestBlock) error {
 	timeBasedTriggers, err := kpr.prepareTimeBasedTriggers(ctx, block)
 	if err != nil {
@@ -61,7 +43,7 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	kpr.sendTriggers(ctx, timeBasedTriggers)
 
 	if kpr.config.EventBasedTriggersEnabled() {
-		eventBasedTriggers, err := kpr.prepareEventBasedTriggers(ctx, block)
+		eventBasedTriggers, err := kpr.prepareEventBasedTriggers(ctx)
 		if err != nil {
 			return errors.Wrap(err, "failed to get event based triggers")
 		}
@@ -194,7 +176,7 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 	return triggers, nil
 }
 
-func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context, block *syncevent.LatestBlock) ([]epochkghandler.DecryptionTrigger, error) {
+func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghandler.DecryptionTrigger, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 	serviceDB := servicedatabase.New(kpr.dbpool)
 	obsDB := obskeyper.New(kpr.dbpool)
