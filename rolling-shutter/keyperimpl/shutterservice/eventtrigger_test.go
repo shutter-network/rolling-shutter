@@ -2213,7 +2213,7 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 	}{
 		{
 			name:    "topic reference - offset 0, length 1",
-			encoded: []byte{0x00}, // RLP encoding of uint64(0)
+			encoded: []byte{0x80}, // RLP encoding of uint64(0)
 			expected: LogValueRef{
 				Offset: 0,
 				Length: 1,
@@ -2267,7 +2267,7 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 		},
 		{
 			name:    "invalid - zero length",
-			encoded: []byte{0xc2, 0x04, 0x00}, // RLP encoding of [4, 0]
+			encoded: []byte{0xc2, 0x04, 0x80}, // RLP encoding of [4, 0]
 			wantErr: true,
 			errMsg:  "log value reference length must be positive",
 		},
