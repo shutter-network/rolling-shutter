@@ -26,9 +26,11 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
-	err := kpr.multiEventSyncer.Sync(ctx, ev.Header)
-	if err != nil {
-		return err
+	if kpr.config.EventBasedTriggersEnabled() {
+		err := kpr.multiEventSyncer.Sync(ctx, ev.Header)
+		if err != nil {
+			return err
+		}
 	}
 	return kpr.maybeTriggerDecryption(ctx, ev)
 }
@@ -58,11 +60,13 @@ func (kpr *Keyper) maybeTriggerDecryption(ctx context.Context, block *syncevent.
 	}
 	kpr.sendTriggers(ctx, timeBasedTriggers)
 
-	eventBasedTriggers, err := kpr.prepareEventBasedTriggers(ctx, block)
-	if err != nil {
-		return errors.Wrap(err, "failed to get event based triggers")
+	if kpr.config.EventBasedTriggersEnabled() {
+		eventBasedTriggers, err := kpr.prepareEventBasedTriggers(ctx, block)
+		if err != nil {
+			return errors.Wrap(err, "failed to get event based triggers")
+		}
+		kpr.sendTriggers(ctx, eventBasedTriggers)
 	}
-	kpr.sendTriggers(ctx, eventBasedTriggers)
 
 	return nil
 }

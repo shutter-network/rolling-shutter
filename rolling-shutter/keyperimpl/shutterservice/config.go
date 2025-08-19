@@ -81,6 +81,10 @@ func (c *Config) GetAddress() common.Address {
 	return c.Chain.Node.PrivateKey.EthereumAddress()
 }
 
+func (c *Config) EventBasedTriggersEnabled() bool {
+	return c.Chain.Contracts.ShutterEventTriggerRegistry != common.Address{}
+}
+
 type ChainConfig struct {
 	Node                     *configuration.EthnodeConfig `shconfig:",required"`
 	Contracts                *ContractsConfig             `shconfig:",required"`
@@ -130,7 +134,7 @@ func (c *ChainConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 type ContractsConfig struct {
 	KeyperSetManager            common.Address `shconfig:",required"`
 	ShutterRegistry             common.Address `shconfig:",required"`
-	ShutterEventTriggerRegistry common.Address `shconfig:",required"`
+	ShutterEventTriggerRegistry common.Address
 	KeyBroadcastContract        common.Address `shconfig:",required"`
 }
 

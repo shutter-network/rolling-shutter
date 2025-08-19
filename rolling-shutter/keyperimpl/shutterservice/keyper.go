@@ -116,9 +116,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	err = kpr.initMultiEventSyncer(ctx)
-	if err != nil {
-		return err
+	if kpr.config.EventBasedTriggersEnabled() {
+		err = kpr.initMultiEventSyncer(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	kpr.syncMonitor = &SyncMonitor{
