@@ -73,37 +73,39 @@ func (s *MultiEventSyncer) Sync(ctx context.Context, header *types.Header) error
 	end := header.Number.Uint64()
 	if start > end {
 		log.Debug().
-			Uint64("start", start).
-			Uint64("end", end).
+			Uint64("start-block", start).
+			Uint64("end-block", end).
 			Msg("already synced up to target block")
 		return nil
 	}
 
 	syncRanges := medley.GetSyncRanges(start, end, s.MaxRequestBlockRange)
-	log.Info().
+	log.Debug().
 		Uint64("start-block", start).
 		Uint64("end-block", end).
 		Int("num-sync-ranges", len(syncRanges)).
 		Msg("starting multi event sync")
+	numEvents := 0
 	for _, r := range syncRanges {
-		err = s.syncRange(ctx, r[0], r[1])
+		numEventsInRange, err := s.syncRange(ctx, r[0], r[1])
 		if err != nil {
 			return errors.Wrapf(err, "failed to sync range [%d, %d]", r[0], r[1])
 		}
+		numEvents += numEventsInRange
 	}
 
 	log.Info().
 		Uint64("start-block", start).
 		Uint64("end-block", end).
-		Int("num-sync-ranges", len(syncRanges)).
+		Int("num-events", numEvents).
 		Msg("completed multi event sync")
 	return nil
 }
 
-func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) error {
+func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) (int, error) {
 	header, err := s.ExecutionClient.HeaderByNumber(ctx, new(big.Int).SetUint64(end))
 	if err != nil {
-		return errors.Wrap(err, "failed to get execution block header")
+		return 0, errors.Wrap(err, "failed to get execution block header")
 	}
 
 	allEvents := make(map[string][]Event)
@@ -111,25 +113,19 @@ func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) err
 	for name, processor := range s.Processors {
 		events, err := processor.FetchEvents(ctx, start, end)
 		if err != nil {
-			return errors.Wrapf(err, "failed to fetch events for processor %s in range [%d, %d]", name, start, end)
+			return 0, errors.Wrapf(err, "failed to fetch events for processor %s in range [%d, %d]", name, start, end)
 		}
 		allEvents[name] = events
 		numEvents += len(events)
 	}
 
-	return s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	err = s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		for name, processor := range s.Processors {
 			events := allEvents[name]
 			err := processor.ProcessEvents(ctx, tx, events)
 			if err != nil {
 				return errors.Wrapf(err, "failed to process events for processor %s", name)
 			}
-			log.Debug().
-				Str("processor", name).
-				Uint64("start-block", start).
-				Uint64("end-block", end).
-				Int("num-events", len(events)).
-				Msg("processed events for processor")
 		}
 
 		err := s.setSyncStatus(ctx, tx, int64(end), header.Hash().Bytes())
@@ -139,6 +135,11 @@ func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) err
 
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
+
+	return numEvents, nil
 }
 
 func (s *MultiEventSyncer) getSyncStatus(ctx context.Context) (*SyncStatus, error) {
@@ -204,8 +205,9 @@ func (s *MultiEventSyncer) handlePotentialReorg(ctx context.Context, header *typ
 	toBlock := status.BlockNumber - int64(numReorgedBlocks)
 	log.Info().
 		Int("reorg-depth", numReorgedBlocks).
-		Int64("rollback-to-block", toBlock).
-		Uint64("current-block", header.Number.Uint64()).
+		Int64("rollback-to-block-number", toBlock).
+		Uint64("current-block-number", header.Number.Uint64()).
+		Hex("current-block-hash", header.Hash().Bytes()).
 		Msg("detected blockchain reorg, rolling back processors")
 	return s.rollback(ctx, toBlock)
 }

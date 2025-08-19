@@ -51,28 +51,30 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 
 	var events []Event
 	for _, triggerRegisteredEvent := range triggerRegisteredEvents {
+		triggerLog := log.With().
+			Int64("block-number", triggerRegisteredEvent.BlockNumber).
+			Hex("block-hash", triggerRegisteredEvent.BlockHash).
+			Int64("tx-index", triggerRegisteredEvent.TxIndex).
+			Int64("log-index", triggerRegisteredEvent.LogIndex).
+			Hex("identity-prefix", triggerRegisteredEvent.IdentityPrefix).
+			Str("sender", triggerRegisteredEvent.Sender).
+			Hex("definition", triggerRegisteredEvent.Definition).
+			Int64("ttl", triggerRegisteredEvent.Ttl).
+			Logger()
+
 		trigger := EventTriggerDefinition{}
 		err := trigger.UnmarshalBytes(triggerRegisteredEvent.Definition)
 		if err != nil {
-			log.Info().
-				Err(err).
-				Int64("block-number", triggerRegisteredEvent.BlockNumber).
-				Hex("block-hash", triggerRegisteredEvent.BlockHash).
-				Int64("tx-index", triggerRegisteredEvent.TxIndex).
-				Int64("log-index", triggerRegisteredEvent.LogIndex).
-				Msg("encountered invalid trigger definition, skipping")
+			// This is not supposed to happen as only valid triggers are inserted into the database.
+			triggerLog.Error().Err(err).Msg("ignoring invalid trigger definition in database")
 			continue
 		}
 
 		filterQuery, err := trigger.ToFilterQuery()
 		if err != nil {
-			log.Info().
-				Err(err).
-				Int64("block-number", triggerRegisteredEvent.BlockNumber).
-				Hex("block-hash", triggerRegisteredEvent.BlockHash).
-				Int64("tx-index", triggerRegisteredEvent.TxIndex).
-				Int64("log-index", triggerRegisteredEvent.LogIndex).
-				Msg("failed to create filter query for trigger, skipping")
+			// This is not supposed to happen as only valid triggers are inserted into the database
+			// and valid triggers should always have a valid filter query.
+			triggerLog.Error().Err(err).Msg("failed to create filter query for trigger")
 			continue
 		}
 		filterQuery.FromBlock = new(big.Int).SetUint64(start)
@@ -89,6 +91,9 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 				continue
 			}
 			if !trigger.Match(&eventLog) {
+				triggerLog.Debug().
+					Str("log", fmt.Sprintf("%+v", eventLog)).
+					Msg("skipping log that matched filter but not additional predicates")
 				continue
 			}
 			events = append(events, &TriggerEvent{
@@ -116,6 +121,16 @@ func (tp *TriggerProcessor) ProcessEvents(ctx context.Context, tx pgx.Tx, events
 		if err != nil {
 			return fmt.Errorf("failed to insert fired trigger: %w", err)
 		}
+		log.Info().
+			Int64("trigger-registered-block-number", event.EventTriggerRegisteredEvent.BlockNumber).
+			Hex("trigger-registered-block-hash", event.EventTriggerRegisteredEvent.BlockHash).
+			Int64("trigger-registered-tx-index", event.EventTriggerRegisteredEvent.TxIndex).
+			Int64("trigger-registered-log-index", event.EventTriggerRegisteredEvent.LogIndex).
+			Uint64("event-block-number", event.Log.BlockNumber).
+			Hex("event-block-hash", event.Log.BlockHash.Bytes()).
+			Uint("event-tx-index", event.Log.TxIndex).
+			Uint("event-log-index", event.Log.Index).
+			Msg("processed fired trigger event")
 	}
 
 	return nil

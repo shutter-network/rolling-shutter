@@ -63,28 +63,28 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 	queries := database.New(tx)
 	for _, event := range events {
 		registryEvent := event.(*triggerRegistryBindings.ShuttereventtriggerregistryEventTriggerRegistered)
+		evLog := log.With().
+			Uint64("block-number", registryEvent.Raw.BlockNumber).
+			Hex("block-hash", registryEvent.Raw.BlockHash.Bytes()).
+			Uint("tx-index", registryEvent.Raw.TxIndex).
+			Uint("log-index", registryEvent.Raw.Index).
+			Uint64("eon", registryEvent.Eon).
+			Hex("identity-prefix", registryEvent.IdentityPrefix[:]).
+			Str("sender", registryEvent.Sender.Hex()).
+			Hex("definition", registryEvent.TriggerDefinition).
+			Uint64("ttl", registryEvent.Ttl).
+			Logger()
+		evLog.Debug().Msg("processing event trigger registered event")
 
 		if registryEvent.Eon > math.MaxInt64 {
-			log.Debug().
-				Uint64("eon", registryEvent.Eon).
-				Uint64("block-number", registryEvent.Raw.BlockNumber).
-				Str("block-hash", registryEvent.Raw.BlockHash.Hex()).
-				Uint("tx-index", registryEvent.Raw.TxIndex).
-				Uint("log-index", registryEvent.Raw.Index).
-				Msg("ignoring identity registered event with high eon")
+			evLog.Info().Msg("skipping event trigger registered event with Eon > math.MaxInt64")
 			continue
 		}
 
 		triggerDefinition := EventTriggerDefinition{}
 		err := triggerDefinition.UnmarshalBytes(registryEvent.TriggerDefinition)
 		if err != nil {
-			log.Info().
-				Err(err).
-				Uint64("block-number", registryEvent.Raw.BlockNumber).
-				Str("block-hash", registryEvent.Raw.BlockHash.Hex()).
-				Uint("tx-index", registryEvent.Raw.TxIndex).
-				Uint("log-index", registryEvent.Raw.Index).
-				Msg("encountered invalid trigger definition, skipping")
+			evLog.Info().Err(err).Msg("skipping invalid trigger definition")
 			continue
 		}
 
@@ -103,6 +103,7 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 		if err != nil {
 			return errors.Wrap(err, "failed to insert event trigger registered event into db")
 		}
+		evLog.Info().Msg("processed event trigger registered event")
 	}
 	return nil
 }
