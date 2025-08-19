@@ -17,7 +17,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
@@ -225,11 +224,7 @@ func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghand
 
 		identities := []identitypreimage.IdentityPreimage{}
 		for _, firedTrigger := range firedTriggers {
-			identity, err := computeIdentityForFiredTrigger(&firedTrigger)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to compute identity for fired trigger %v", firedTrigger)
-			}
-			identities = append(identities, identity)
+			identities = append(identities, firedTrigger.Identity)
 		}
 
 		decryptionTrigger := epochkghandler.DecryptionTrigger{
@@ -267,17 +262,4 @@ func sortIdentityPreimages(identityPreimages []identitypreimage.IdentityPreimage
 		return bytes.Compare(sorted[i], sorted[j]) < 0
 	})
 	return sorted
-}
-
-func computeIdentityForFiredTrigger(
-	firedTrigger *servicedatabase.GetUndecryptedFiredTriggersRow,
-) (identitypreimage.IdentityPreimage, error) {
-	var buf bytes.Buffer
-	buf.Write(firedTrigger.IdentityPrefix)
-	senderAddress, err := shdb.DecodeAddress(firedTrigger.Sender)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode sender address %x", firedTrigger.Sender)
-	}
-	buf.Write(senderAddress.Bytes())
-	return buf.Bytes(), nil
 }

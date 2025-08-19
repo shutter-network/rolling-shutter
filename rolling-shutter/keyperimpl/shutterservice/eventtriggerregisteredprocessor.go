@@ -1,11 +1,12 @@
 package shutterservice
 
 import (
+	"bytes"
 	"context"
 	"math"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
@@ -73,7 +74,6 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 			Hex("definition", registryEvent.TriggerDefinition).
 			Uint64("ttl", registryEvent.Ttl).
 			Logger()
-		evLog.Debug().Msg("processing event trigger registered event")
 
 		if registryEvent.Eon > math.MaxInt64 {
 			evLog.Info().Msg("skipping event trigger registered event with Eon > math.MaxInt64")
@@ -101,7 +101,7 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 			Sender:         shdb.EncodeAddress(registryEvent.Sender),
 			Definition:     registryEvent.TriggerDefinition,
 			Ttl:            int64(registryEvent.Ttl),
-			Identity:       computeEventTriggerIdentity(registryEvent.IdentityPrefix, registryEvent.Sender),
+			Identity:       computeEventTriggerIdentity(registryEvent),
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to insert event trigger registered event into db")
@@ -120,6 +120,9 @@ func (p *EventTriggerRegisteredEventProcessor) RollbackEvents(ctx context.Contex
 	return nil
 }
 
-func computeEventTriggerIdentity(identityPrefix common.Hash, sender common.Address) []byte {
-	return append(identityPrefix[:], sender[:]...)
+func computeEventTriggerIdentity(event *triggerRegistryBindings.ShuttereventtriggerregistryEventTriggerRegistered) []byte {
+	var buf bytes.Buffer
+	buf.Write(event.IdentityPrefix[:])
+	buf.Write(event.Sender.Bytes())
+	return crypto.Keccak256(buf.Bytes())
 }

@@ -205,6 +205,7 @@ SELECT
    f.log_index,
    e.eon AS eon,
    e.ttl AS ttl,
+   e.identity AS identity,
    e.decrypted AS decrypted
 FROM fired_triggers f
 INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
@@ -225,6 +226,7 @@ type GetUndecryptedFiredTriggersRow struct {
 	LogIndex       int64
 	Eon            int64
 	Ttl            int64
+	Identity       []byte
 	Decrypted      bool
 }
 
@@ -246,6 +248,7 @@ func (q *Queries) GetUndecryptedFiredTriggers(ctx context.Context) ([]GetUndecry
 			&i.LogIndex,
 			&i.Eon,
 			&i.Ttl,
+			&i.Identity,
 			&i.Decrypted,
 		); err != nil {
 			return nil, err
