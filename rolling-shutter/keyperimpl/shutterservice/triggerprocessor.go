@@ -138,9 +138,9 @@ func (tp *TriggerProcessor) ProcessEvents(ctx context.Context, tx pgx.Tx, events
 
 func (tp *TriggerProcessor) RollbackEvents(ctx context.Context, tx pgx.Tx, toBlock int64) error {
 	queries := database.New(tx)
-	err := queries.DeleteEventTriggerRegisteredEventsFromBlockNumber(ctx, toBlock+1)
+	err := queries.DeleteFiredTriggersFromBlockNumber(ctx, toBlock+1)
 	if err != nil {
-		return fmt.Errorf("failed to delete event trigger registered events from block number: %w", err)
+		return fmt.Errorf("failed to delete fired triggers from block number: %w", err)
 	}
 	return nil
 }
