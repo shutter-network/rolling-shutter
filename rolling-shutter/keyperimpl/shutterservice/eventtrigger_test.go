@@ -692,7 +692,8 @@ func TestValuePredicateMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.predicate.Match(tt.value)
+			result, err := tt.predicate.Match(tt.value)
+			assert.NilError(t, err, "Match should not return an error")
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -1858,7 +1859,8 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.definition.Match(tt.log)
+			result, err := tt.definition.Match(tt.log)
+			assert.NilError(t, err)
 			assert.Equal(t, tt.want, result)
 		})
 	}

@@ -90,7 +90,12 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 			if eventLog.BlockNumber > uint64(triggerRegisteredEvent.BlockNumber+triggerRegisteredEvent.Ttl) {
 				continue
 			}
-			if !trigger.Match(&eventLog) {
+			match, err := trigger.Match(&eventLog)
+			if err != nil {
+				triggerLog.Error().Err(err).Msg("failed to match trigger with event log")
+				continue
+			}
+			if !match {
 				triggerLog.Debug().
 					Str("log", fmt.Sprintf("%+v", eventLog)).
 					Msg("skipping log that matched filter but not additional predicates")

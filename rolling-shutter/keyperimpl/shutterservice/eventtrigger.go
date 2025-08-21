@@ -156,16 +156,20 @@ func (d *EventTriggerDefinition) ToFilterQuery() (ethereum.FilterQuery, error) {
 // Match checks if the log matches the event trigger definition by checking all log predicates.
 //
 // This may panic if Validate does not pass.
-func (d *EventTriggerDefinition) Match(log *types.Log) bool {
+func (d *EventTriggerDefinition) Match(log *types.Log) (bool, error) {
 	if log.Address != d.Contract {
-		return false
+		return false, nil
 	}
 	for _, logPredicate := range d.LogPredicates {
-		if !logPredicate.Match(log) {
-			return false
+		match, err := logPredicate.Match(log)
+		if err != nil {
+			return false, err
+		}
+		if !match {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 func (p *LogPredicate) Validate() error {
@@ -178,7 +182,7 @@ func (p *LogPredicate) Validate() error {
 	return nil
 }
 
-func (p *LogPredicate) Match(log *types.Log) bool {
+func (p *LogPredicate) Match(log *types.Log) (bool, error) {
 	value := p.LogValueRef.GetValue(log)
 	return p.ValuePredicate.Match(value)
 }
@@ -436,21 +440,21 @@ func (p *ValuePredicate) validateArgValues(numWords uint64) error {
 	return nil
 }
 
-func (p *ValuePredicate) Match(value []byte) bool {
+func (p *ValuePredicate) Match(value []byte) (bool, error) {
 	n := new(big.Int).SetBytes(value)
 	switch p.Op {
 	case UintLt:
-		return n.Cmp(p.IntArgs[0]) < 0
+		return n.Cmp(p.IntArgs[0]) < 0, nil
 	case UintLte:
-		return n.Cmp(p.IntArgs[0]) <= 0
+		return n.Cmp(p.IntArgs[0]) <= 0, nil
 	case UintEq:
-		return n.Cmp(p.IntArgs[0]) == 0
+		return n.Cmp(p.IntArgs[0]) == 0, nil
 	case UintGt:
-		return n.Cmp(p.IntArgs[0]) > 0
+		return n.Cmp(p.IntArgs[0]) > 0, nil
 	case UintGte:
-		return n.Cmp(p.IntArgs[0]) >= 0
+		return n.Cmp(p.IntArgs[0]) >= 0, nil
 	case BytesEq:
-		return bytes.Equal(value, p.ByteArgs[0])
+		return bytes.Equal(value, p.ByteArgs[0]), nil
 	}
-	panic(fmt.Sprintf("unknown operation %d", p.Op))
+	return false, fmt.Errorf("unknown operation %d", p.Op)
 }
