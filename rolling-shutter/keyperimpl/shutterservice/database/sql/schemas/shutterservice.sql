@@ -14,7 +14,7 @@ CREATE TABLE event_trigger_registered_event (
     ttl bigint NOT NULL CHECK (ttl >= 0),
     decrypted boolean NOT NULL DEFAULT false,
     identity bytea NOT NULL,
-    PRIMARY KEY (identity_prefix, sender)
+    PRIMARY KEY (eon, identity_prefix, sender)
 );
 
 CREATE TABLE identity_registered_event (
