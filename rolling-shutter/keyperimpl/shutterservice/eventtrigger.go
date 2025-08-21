@@ -256,7 +256,7 @@ func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
 }
 
 func (r *LogValueRef) IsTopic() bool {
-	return r.Offset >= 0 && r.Offset < 4
+	return r.Offset < 4
 }
 
 // GetValue retrieves the value from the log based on the LogValueRef.
