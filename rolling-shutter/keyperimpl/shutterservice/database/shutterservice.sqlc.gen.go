@@ -481,24 +481,6 @@ func (q *Queries) UpdateEventBasedDecryptedFlags(ctx context.Context, arg Update
 	return err
 }
 
-const updateEventTriggerDecryptedFlag = `-- name: UpdateEventTriggerDecryptedFlag :exec
-UPDATE event_trigger_registered_event
-SET decrypted = TRUE
-WHERE (eon, identity) IN (
-    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
-)
-`
-
-type UpdateEventTriggerDecryptedFlagParams struct {
-	Column1 []int64
-	Column2 [][]byte
-}
-
-func (q *Queries) UpdateEventTriggerDecryptedFlag(ctx context.Context, arg UpdateEventTriggerDecryptedFlagParams) error {
-	_, err := q.db.Exec(ctx, updateEventTriggerDecryptedFlag, arg.Column1, arg.Column2)
-	return err
-}
-
 const updateTimeBasedDecryptedFlags = `-- name: UpdateTimeBasedDecryptedFlags :exec
 UPDATE identity_registered_event
 SET decrypted = TRUE

@@ -27,13 +27,6 @@ WHERE eon = $1 AND identities_hash = $2
 ORDER BY keyper_index ASC
 LIMIT $3;
 
--- name: UpdateEventTriggerDecryptedFlag :exec
-UPDATE event_trigger_registered_event
-SET decrypted = TRUE
-WHERE (eon, identity) IN (
-    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
-);
-
 -- name: InsertEventTriggerRegisteredEvent :execresult
 INSERT INTO event_trigger_registered_event (
     block_number,
