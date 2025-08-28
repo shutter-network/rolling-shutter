@@ -11,7 +11,7 @@ import (
 
 //go:generate sqlc generate --file sql/sqlc.yaml
 
-// TODO: add the sql files here
+//go:embed sql
 var files embed.FS
 
 var Definition db.Definition
