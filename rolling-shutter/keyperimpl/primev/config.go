@@ -106,7 +106,7 @@ func (c *PrimevConfig) Validate() error {
 	return nil
 }
 
-func (c *PrimevConfig) SetDefaultValues() error {
+func (c *PrimevConfig) SetDefaultValues() error { //nolint:unparam
 	c.SyncMonitorCheckInterval = 30
 	c.PrimevRPC = ""
 	c.ProviderRegistryContract = common.Address{}
@@ -114,7 +114,7 @@ func (c *PrimevConfig) SetDefaultValues() error {
 	return nil
 }
 
-func (c *PrimevConfig) SetExampleValues() error {
+func (c *PrimevConfig) SetExampleValues() error { //nolint:unparam
 	c.SyncMonitorCheckInterval = 30
 	c.PrimevRPC = ""
 	c.ProviderRegistryContract = common.Address{}

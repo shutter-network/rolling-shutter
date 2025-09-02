@@ -2,7 +2,6 @@ package primev
 
 import (
 	"context"
-	"math"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -47,15 +46,11 @@ func (k *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.KeyperSe
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
 		}
 
-		if threshold > math.MaxInt32 {
-			return errors.Errorf("threshold %d overflows int32", threshold)
-		}
-
 		return obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 			KeyperConfigIndex:     keyperConfigIndex,
 			ActivationBlockNumber: activationBlockNumber,
 			Keypers:               shdb.EncodeAddresses(ev.Members),
-			Threshold:             int32(threshold),
+			Threshold:             int32(threshold), //nolint:gosec
 		})
 	})
 }

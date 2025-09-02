@@ -216,7 +216,10 @@ func (s *ProviderRegistrySyncer) filterEvents(
 	filteredEvents := []*providerregistry.ProviderregistryProviderRegistered{}
 	blsKeys := [][][]byte{}
 	for _, event := range events {
-		err := s.Contract.IsProviderValid(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider) //nolint:gosec
+		err := s.Contract.IsProviderValid(&bind.CallOpts{
+			Context:     ctx,
+			BlockNumber: big.NewInt(int64(event.Raw.BlockNumber)), //nolint:gosec
+		}, event.Provider)
 		if err != nil {
 			log.Warn().
 				Uint64("block-number", event.Raw.BlockNumber).
@@ -228,7 +231,10 @@ func (s *ProviderRegistrySyncer) filterEvents(
 			continue
 		}
 
-		blsKey, err := s.Contract.GetBLSKeys(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider) //nolint:gosec
+		blsKey, err := s.Contract.GetBLSKeys(&bind.CallOpts{
+			Context:     ctx,
+			BlockNumber: big.NewInt(int64(event.Raw.BlockNumber)), //nolint:gosec
+		}, event.Provider)
 		if err != nil {
 			log.Warn().
 				Uint64("block-number", event.Raw.BlockNumber).
@@ -256,7 +262,7 @@ func (s *ProviderRegistrySyncer) insertProviderRegistryEvents(
 	queries := database.New(tx)
 	for i, event := range events {
 		_, err := queries.InsertProviderRegistryEvent(ctx, database.InsertProviderRegistryEventParams{
-			BlockNumber:     int64(event.Raw.BlockNumber),
+			BlockNumber:     int64(event.Raw.BlockNumber), //nolint:gosec
 			BlockHash:       event.Raw.BlockHash.Bytes(),
 			TxIndex:         int64(event.Raw.TxIndex), //nolint:gosec
 			LogIndex:        int64(event.Raw.Index),   //nolint:gosec
