@@ -41,12 +41,11 @@ INSERT INTO event_trigger_registered_event (
     identity
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (identity_prefix, sender) DO UPDATE SET
+ON CONFLICT (eon, identity_prefix, sender) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
 log_index = $4,
-sender = $7,
 definition = $8,
 ttl = $9,
 identity = $10;
@@ -108,9 +107,9 @@ SET block_number = $1, block_hash = $2;
 DELETE FROM event_trigger_registered_event WHERE block_number >= $1;
 
 -- name: InsertFiredTrigger :exec
-INSERT INTO fired_triggers (identity_prefix, sender, block_number, block_hash, tx_index, log_index)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (identity_prefix, sender) DO NOTHING;
+INSERT INTO fired_triggers (eon, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (eon, identity_prefix, sender) DO NOTHING;
 
 -- name: DeleteFiredTriggersFromBlockNumber :exec
 DELETE FROM fired_triggers WHERE block_number >= $1;

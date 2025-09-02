@@ -32,6 +32,7 @@ type EventTriggerRegisteredEvent struct {
 }
 
 type FiredTrigger struct {
+	Eon            int64
 	IdentityPrefix []byte
 	Sender         string
 	BlockNumber    int64
