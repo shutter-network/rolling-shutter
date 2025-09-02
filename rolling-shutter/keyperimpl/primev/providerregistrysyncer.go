@@ -128,7 +128,7 @@ func (s *ProviderRegistrySyncer) Sync(ctx context.Context, header *types.Header)
 	if err == pgx.ErrNoRows {
 		start = s.SyncStartBlockNumber
 	} else {
-		start = uint64(syncedUntil.BlockNumber + 1)
+		start = uint64(syncedUntil.BlockNumber + 1) //nolint:gosec
 	}
 	endBlock := header.Number.Uint64()
 	log.Debug().
@@ -166,7 +166,7 @@ func (s *ProviderRegistrySyncer) syncRange(
 			return err
 		}
 		return database.New(tx).SetProviderRegistryEventsSyncedUntil(ctx, database.SetProviderRegistryEventsSyncedUntilParams{
-			BlockNumber: int64(end),
+			BlockNumber: int64(end), //nolint:gosec
 			BlockHash:   header.Hash().Bytes(),
 		})
 	})
@@ -216,7 +216,7 @@ func (s *ProviderRegistrySyncer) filterEvents(
 	filteredEvents := []*providerregistry.ProviderregistryProviderRegistered{}
 	blsKeys := [][][]byte{}
 	for _, event := range events {
-		err := s.Contract.IsProviderValid(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider)
+		err := s.Contract.IsProviderValid(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider) //nolint:gosec
 		if err != nil {
 			log.Warn().
 				Uint64("block-number", event.Raw.BlockNumber).
@@ -228,7 +228,7 @@ func (s *ProviderRegistrySyncer) filterEvents(
 			continue
 		}
 
-		blsKey, err := s.Contract.GetBLSKeys(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider)
+		blsKey, err := s.Contract.GetBLSKeys(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(event.Raw.BlockNumber))}, event.Provider) //nolint:gosec
 		if err != nil {
 			log.Warn().
 				Uint64("block-number", event.Raw.BlockNumber).
@@ -258,8 +258,8 @@ func (s *ProviderRegistrySyncer) insertProviderRegistryEvents(
 		_, err := queries.InsertProviderRegistryEvent(ctx, database.InsertProviderRegistryEventParams{
 			BlockNumber:     int64(event.Raw.BlockNumber),
 			BlockHash:       event.Raw.BlockHash.Bytes(),
-			TxIndex:         int64(event.Raw.TxIndex),
-			LogIndex:        int64(event.Raw.Index),
+			TxIndex:         int64(event.Raw.TxIndex), //nolint:gosec
+			LogIndex:        int64(event.Raw.Index),   //nolint:gosec
 			ProviderAddress: event.Provider.Hex(),
 			BlsKeys:         blsKeys[i],
 		})

@@ -10,6 +10,7 @@ import (
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/primev/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
@@ -25,13 +26,15 @@ func (h *PrimevCommitmentHandler) MessagePrototypes() []p2pmsg.Message {
 	return []p2pmsg.Message{&p2pmsg.Commitment{}}
 }
 
-func (h *PrimevCommitmentHandler) ValidateMessage(ctx context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
+func (h *PrimevCommitmentHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
 	commitment := msg.(*p2pmsg.Commitment)
 	if len(commitment.Identities) != len(commitment.TxHashes) {
-		return pubsub.ValidationReject, errors.Errorf("number of identities (%d) does not match number of tx hashes (%d)", len(commitment.Identities), len(commitment.TxHashes))
+		return pubsub.ValidationReject, errors.Errorf("number of identities (%d) does not match number of tx hashes (%d)",
+			len(commitment.Identities), len(commitment.TxHashes))
 	}
 	if commitment.GetInstanceId() != h.config.InstanceID {
-		return pubsub.ValidationReject, errors.Errorf("instance ID mismatch (want=%d, have=%d)", h.config.InstanceID, commitment.GetInstanceId())
+		return pubsub.ValidationReject, errors.Errorf("instance ID mismatch (want=%d, have=%d)",
+			h.config.InstanceID, commitment.GetInstanceId())
 	}
 	return pubsub.ValidationAccept, nil
 	// TODO: more validations need to be done here
@@ -49,8 +52,13 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		identityPreimages = append(identityPreimages, identityPreimage)
 	}
 
+	blockNumberUint64, err := medley.Int64ToUint64Safe(commitment.BlockNumber)
+	if err != nil {
+		return nil, err
+	}
+
 	decryptionTrigger := &epochkghandler.DecryptionTrigger{
-		BlockNumber:       uint64(commitment.BlockNumber),
+		BlockNumber:       blockNumberUint64,
 		IdentityPreimages: identityPreimages,
 	}
 
@@ -58,12 +66,12 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 	eons := make([]int64, 0, len(commitment.Identities))
 
 	obsKeyperDB := corekeyperdatabase.New(h.dbpool)
-	eon, err := obsKeyperDB.GetEonForBlockNumber(ctx, int64(commitment.BlockNumber))
+	eon, err := obsKeyperDB.GetEonForBlockNumber(ctx, commitment.BlockNumber)
 	if err != nil {
 		return nil, err
 	}
 	for range commitment.Identities {
-		blockNumbers = append(blockNumbers, int64(commitment.BlockNumber))
+		blockNumbers = append(blockNumbers, commitment.BlockNumber)
 		eons = append(eons, eon.Eon)
 	}
 
@@ -76,13 +84,13 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		ProviderAddress:     commitment.ProviderAddress,
 		CommitmentSignature: commitment.CommitmentSignature,
 		CommitmentDigest:    commitment.CommitmentDigest,
-		BlockNumber:         int64(commitment.BlockNumber),
+		BlockNumber:         commitment.BlockNumber,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	//TODO: before sending the dec trigger, we need to check if majority of providers have generated commitments
+	// TODO: before sending the dec trigger, we need to check if majority of providers have generated commitments
 
 	h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger)
 

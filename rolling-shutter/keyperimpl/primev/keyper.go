@@ -136,26 +136,26 @@ func NewKeyper(kpr *Keyper) (*keyper.KeyperCore, error) {
 }
 
 // initRegistrySyncer initializes the registry syncer.
-func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
-	client, err := ethclient.DialContext(ctx, kpr.config.Primev.PrimevRPC)
+func (k *Keyper) initRegistrySyncer(ctx context.Context) error {
+	client, err := ethclient.DialContext(ctx, k.config.Primev.PrimevRPC)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial Ethereum execution node")
 	}
 
 	log.Info().
-		Str("contract-address", kpr.config.Chain.Contracts.KeyperSetManager.Hex()).
+		Str("contract-address", k.config.Chain.Contracts.KeyperSetManager.Hex()).
 		Msg("initializing registry syncer")
 
-	contract, err := providerregistry.NewProviderregistry(kpr.config.Primev.ProviderRegistryContract, client)
+	contract, err := providerregistry.NewProviderregistry(k.config.Primev.ProviderRegistryContract, client)
 	if err != nil {
 		return err
 	}
 
-	kpr.providerRegistrySyncer = &ProviderRegistrySyncer{
+	k.providerRegistrySyncer = &ProviderRegistrySyncer{
 		Contract:             contract,
-		DBPool:               kpr.dbpool,
+		DBPool:               k.dbpool,
 		ExecutionClient:      client,
-		SyncStartBlockNumber: kpr.config.Primev.SyncStartBlockNumber,
+		SyncStartBlockNumber: k.config.Primev.SyncStartBlockNumber,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular
@@ -164,7 +164,7 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest block header")
 	}
-	err = kpr.providerRegistrySyncer.Sync(ctx, latestHeader)
+	err = k.providerRegistrySyncer.Sync(ctx, latestHeader)
 	if err != nil {
 		return err
 	}
