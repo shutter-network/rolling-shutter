@@ -114,4 +114,5 @@ message Commitment {
   int64 dispatch_timestamp = 12;
   repeated string reverting_tx_hashes = 13;
   string slash_amount = 14;
+  repeated string identities = 15;
 };
