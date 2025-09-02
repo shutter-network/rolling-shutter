@@ -1,7 +1,7 @@
 FROM alpine/git AS builder
 
-RUN date
-RUN git clone --branch=shutter-api https://github.com/shutter-network/contracts /contracts
+ADD https://api.github.com/repos/shutter-network/contracts/git/refs/heads/event-trigger-registry /tmp/version.json
+RUN git clone --branch=event-trigger-registry https://github.com/shutter-network/contracts /contracts
 RUN cd /contracts && git submodule update --init --recursive
 
 FROM --platform=linux/amd64 ghcr.io/foundry-rs/foundry AS runner
