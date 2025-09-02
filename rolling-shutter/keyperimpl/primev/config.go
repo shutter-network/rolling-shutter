@@ -19,6 +19,8 @@ type Config struct {
 	HTTPReadOnly      bool
 	HTTPListenAddress string
 
+	Primev *PrimevConfig
+
 	Chain       *ChainConfig
 	P2P         *p2p.Config
 	Shuttermint *kprconfig.ShuttermintConfig
@@ -35,6 +37,7 @@ func NewConfig() *Config {
 
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
+	c.Primev = NewPrimevConfig()
 	c.Shuttermint = kprconfig.NewShuttermintConfig()
 	c.Chain = NewChainConfig()
 	c.Metrics = metricsserver.NewConfig()
@@ -75,19 +78,59 @@ func (c *Config) GetAddress() common.Address {
 	return c.Chain.Node.PrivateKey.EthereumAddress()
 }
 
+type PrimevConfig struct {
+	SyncStartBlockNumber     uint64         `shconfig:",required"`
+	SyncMonitorCheckInterval uint64         `shconfig:",required"`
+	PrimevRPC                string         `shconfig:",required"`
+	ProviderRegistryContract common.Address `shconfig:",required"`
+}
+
+func NewPrimevConfig() *PrimevConfig {
+	c := &PrimevConfig{}
+	c.Init()
+	return c
+}
+
+func (c *PrimevConfig) Init() {
+	c.SyncStartBlockNumber = 0
+	c.SyncMonitorCheckInterval = 30
+	c.PrimevRPC = ""
+	c.ProviderRegistryContract = common.Address{}
+}
+
+func (c *PrimevConfig) Name() string {
+	return "primev"
+}
+
+func (c *PrimevConfig) Validate() error {
+	return nil
+}
+
+func (c *PrimevConfig) SetDefaultValues() error {
+	c.SyncMonitorCheckInterval = 30
+	c.PrimevRPC = ""
+	c.ProviderRegistryContract = common.Address{}
+	c.SyncStartBlockNumber = 0
+	return nil
+}
+
+func (c *PrimevConfig) SetExampleValues() error {
+	c.SyncMonitorCheckInterval = 30
+	c.PrimevRPC = ""
+	c.ProviderRegistryContract = common.Address{}
+	c.SyncStartBlockNumber = 0
+	return nil
+}
+
 type ChainConfig struct {
-	Node                     *configuration.EthnodeConfig `shconfig:",required"`
-	Contracts                *ContractsConfig             `shconfig:",required"`
-	SyncStartBlockNumber     uint64                       `shconfig:",required"`
-	SyncMonitorCheckInterval uint64                       `shconfig:",required"`
+	Node      *configuration.EthnodeConfig `shconfig:",required"`
+	Contracts *ContractsConfig             `shconfig:",required"`
 }
 
 func NewChainConfig() *ChainConfig {
 	c := &ChainConfig{
-		Node:                     configuration.NewEthnodeConfig(),
-		Contracts:                NewContractsConfig(),
-		SyncStartBlockNumber:     0,
-		SyncMonitorCheckInterval: 0,
+		Node:      configuration.NewEthnodeConfig(),
+		Contracts: NewContractsConfig(),
 	}
 	c.Init()
 	return c
@@ -107,13 +150,10 @@ func (c *ChainConfig) Validate() error {
 }
 
 func (c *ChainConfig) SetDefaultValues() error {
-	c.SyncStartBlockNumber = 0
-	c.SyncMonitorCheckInterval = 30
 	return c.Contracts.SetDefaultValues()
 }
 
 func (c *ChainConfig) SetExampleValues() error {
-	c.SyncMonitorCheckInterval = 30
 	return nil
 }
 
@@ -122,16 +162,14 @@ func (c *ChainConfig) TOMLWriteHeader(_ io.Writer) (int, error) {
 }
 
 type ContractsConfig struct {
-	KeyperSetManager         common.Address `shconfig:",required"`
-	KeyBroadcastContract     common.Address `shconfig:",required"`
-	ProviderRegistryContract common.Address `shconfig:",required"`
+	KeyperSetManager     common.Address `shconfig:",required"`
+	KeyBroadcastContract common.Address `shconfig:",required"`
 }
 
 func NewContractsConfig() *ContractsConfig {
 	return &ContractsConfig{
-		KeyperSetManager:         common.Address{},
-		KeyBroadcastContract:     common.Address{},
-		ProviderRegistryContract: common.Address{},
+		KeyperSetManager:     common.Address{},
+		KeyBroadcastContract: common.Address{},
 	}
 }
 
