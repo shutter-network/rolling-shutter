@@ -9,9 +9,9 @@ import (
 // TODO: the syncing logic for provider registry to be stripped out of here.
 //
 //	As it uses different chain. Adding it here, just for convenience of development of POC.
-func (k *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
+func (k *Keyper) processNewBlock(ctx context.Context, _ *syncevent.LatestBlock) error {
 	if k.providerRegistrySyncer != nil {
-		if err := k.providerRegistrySyncer.Sync(ctx, ev.Header); err != nil {
+		if err := k.providerRegistrySyncer.Sync(ctx); err != nil {
 			return err
 		}
 	}

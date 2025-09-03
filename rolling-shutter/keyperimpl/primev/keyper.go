@@ -160,11 +160,7 @@ func (k *Keyper) initRegistrySyncer(ctx context.Context) error {
 
 	// Perform an initial sync now because it might take some time and doing so during regular
 	// slot processing might hold up things
-	latestHeader, err := client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get latest block header")
-	}
-	err = k.providerRegistrySyncer.Sync(ctx, latestHeader)
+	err = k.providerRegistrySyncer.Sync(ctx)
 	if err != nil {
 		return err
 	}

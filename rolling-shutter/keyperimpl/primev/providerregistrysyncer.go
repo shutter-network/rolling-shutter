@@ -114,7 +114,12 @@ func (s *ProviderRegistrySyncer) handlePotentialReorg(ctx context.Context, heade
 // Sync fetches IdentityRegistered events from the registry contract and inserts them into the
 // database. It starts at the end point of the previous call to sync (or 0 if it is the first call)
 // and ends at the given block number.
-func (s *ProviderRegistrySyncer) Sync(ctx context.Context, header *types.Header) error {
+func (s *ProviderRegistrySyncer) Sync(ctx context.Context) error {
+	header, err := s.ExecutionClient.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block number")
+	}
+
 	if err := s.handlePotentialReorg(ctx, header); err != nil {
 		return err
 	}
