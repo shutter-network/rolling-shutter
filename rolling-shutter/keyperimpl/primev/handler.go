@@ -1,8 +1,12 @@
 package primev
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -43,13 +47,15 @@ func (h *PrimevCommitmentHandler) ValidateMessage(_ context.Context, msg p2pmsg.
 func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
 	commitment := msg.(*p2pmsg.Commitment)
 
+	bidderNodeAddress, err := getBidderNodeAddress(commitment.ReceivedBidDigest, commitment.ReceivedBidSignature)
+	if err != nil {
+		return nil, err
+	}
+
 	identityPreimages := make([]identitypreimage.IdentityPreimage, 0, len(commitment.Identities))
-	for _, identity := range commitment.Identities {
-		identityPreimage, err := identitypreimage.HexToIdentityPreimage(identity)
-		if err != nil {
-			return nil, err
-		}
-		identityPreimages = append(identityPreimages, identityPreimage)
+	for _, identityPrefix := range commitment.Identities {
+		identityPreimage := computeIdentity([]byte(identityPrefix), bidderNodeAddress.Bytes())
+		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(identityPreimage))
 	}
 
 	blockNumberUint64, err := medley.Int64ToUint64Safe(commitment.BlockNumber)
@@ -95,4 +101,28 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 	h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger)
 
 	return nil, nil
+}
+
+func getBidderNodeAddress(digest, signature string) (*common.Address, error) {
+	digestBytes, err := hex.DecodeString(digest)
+	if err != nil {
+		return nil, err
+	}
+	signatureBytes, err := hex.DecodeString(signature)
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := crypto.SigToPub(digestBytes, signatureBytes)
+	if err != nil {
+		return nil, err
+	}
+	bidderNodeAddress := crypto.PubkeyToAddress(*pubKey)
+	return &bidderNodeAddress, nil
+}
+
+func computeIdentity(identityPrefix, sender []byte) []byte {
+	var buf bytes.Buffer
+	buf.Write(identityPrefix)
+	buf.Write(sender)
+	return crypto.Keccak256(buf.Bytes())
 }
