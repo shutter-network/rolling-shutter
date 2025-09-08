@@ -3,6 +3,7 @@ package primev
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -48,7 +49,11 @@ func (h *PrimevCommitmentHandler) ValidateMessage(_ context.Context, msg p2pmsg.
 }
 
 func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
-	commitment := msg.(*p2pmsg.Commitment)
+	log.Info().Msg("received commitment")
+	commitment, ok := msg.(*p2pmsg.Commitment)
+	if !ok {
+		return nil, errors.Errorf("received message of unexpected type %s", msg.ProtoReflect().Descriptor().FullName())
+	}
 
 	hLog := log.With().
 		Str("provider_address", commitment.ProviderAddress).
@@ -63,7 +68,12 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 
 	identityPreimages := make([]identitypreimage.IdentityPreimage, 0, len(commitment.Identities))
 	for _, identityPrefix := range commitment.Identities {
-		identityPreimage := computeIdentity([]byte(identityPrefix), bidderNodeAddress.Bytes())
+		identityPrefixBytes, err := hex.DecodeString(identityPrefix)
+		if err != nil {
+			hLog.Error().Err(err).Msg("failed to decode identity prefix")
+			return nil, err
+		}
+		identityPreimage := computeIdentity(identityPrefixBytes, bidderNodeAddress.Bytes())
 		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(identityPreimage))
 	}
 
@@ -72,12 +82,10 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		hLog.Error().Err(err).Msg("failed to convert block number to uint64")
 		return nil, err
 	}
-
 	decryptionTrigger := &epochkghandler.DecryptionTrigger{
 		BlockNumber:       blockNumberUint64,
 		IdentityPreimages: identityPreimages,
 	}
-
 	blockNumbers := make([]int64, 0, len(commitment.Identities))
 	eons := make([]int64, 0, len(commitment.Identities))
 
