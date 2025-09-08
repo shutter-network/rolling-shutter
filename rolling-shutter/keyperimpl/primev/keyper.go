@@ -72,7 +72,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		decryptionTriggerChannel: k.decryptionTriggerChannel,
 	})
 
-	k.core, err = NewKeyper(k)
+	k.core, err = NewKeyper(k, messageSender)
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
@@ -114,7 +114,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	return runner.StartService(k.core, k.chainSyncClient, k.eonKeyPublisher)
 }
 
-func NewKeyper(kpr *Keyper) (*keyper.KeyperCore, error) {
+func NewKeyper(kpr *Keyper, messagingMiddleware p2p.Messaging) (*keyper.KeyperCore, error) {
 	return keyper.New(
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
@@ -132,6 +132,7 @@ func NewKeyper(kpr *Keyper) (*keyper.KeyperCore, error) {
 		keyper.WithDBPool(kpr.dbpool),
 		keyper.NoBroadcastEonPublicKey(),
 		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
+		keyper.WithMessaging(messagingMiddleware),
 	)
 }
 
