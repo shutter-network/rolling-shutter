@@ -70,6 +70,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	messageSender.AddMessageHandler(&PrimevCommitmentHandler{
 		config:                   k.config,
 		decryptionTriggerChannel: k.decryptionTriggerChannel,
+		dbpool:                   k.dbpool,
 	})
 
 	k.core, err = NewKeyper(k, messageSender)

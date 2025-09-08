@@ -31,7 +31,10 @@ func (h *PrimevCommitmentHandler) MessagePrototypes() []p2pmsg.Message {
 }
 
 func (h *PrimevCommitmentHandler) ValidateMessage(_ context.Context, msg p2pmsg.Message) (pubsub.ValidationResult, error) {
-	commitment := msg.(*p2pmsg.Commitment)
+	commitment, ok := msg.(*p2pmsg.Commitment)
+	if !ok {
+		return pubsub.ValidationReject, errors.Errorf("received message of unexpected type %s", msg.ProtoReflect().Descriptor().FullName())
+	}
 	if len(commitment.Identities) != len(commitment.TxHashes) {
 		return pubsub.ValidationReject, errors.Errorf("number of identities (%d) does not match number of tx hashes (%d)",
 			len(commitment.Identities), len(commitment.TxHashes))
