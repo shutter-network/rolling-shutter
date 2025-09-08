@@ -3,7 +3,6 @@ package primev
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -116,14 +115,13 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 }
 
 func getBidderNodeAddress(digest, signature string) (*common.Address, error) {
-	digestBytes, err := hex.DecodeString(digest)
-	if err != nil {
-		return nil, err
+	digestBytes := common.FromHex(digest)
+	signatureBytes := common.FromHex(signature)
+
+	if signatureBytes[64] == 27 || signatureBytes[64] == 28 {
+		signatureBytes[64] -= 27 // Transform V from 27/28 to 0/1
 	}
-	signatureBytes, err := hex.DecodeString(signature)
-	if err != nil {
-		return nil, err
-	}
+
 	pubKey, err := crypto.SigToPub(digestBytes, signatureBytes)
 	if err != nil {
 		return nil, err
