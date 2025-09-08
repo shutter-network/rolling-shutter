@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -47,8 +48,14 @@ func (h *PrimevCommitmentHandler) ValidateMessage(_ context.Context, msg p2pmsg.
 func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.Message) ([]p2pmsg.Message, error) {
 	commitment := msg.(*p2pmsg.Commitment)
 
+	hLog := log.With().
+		Str("provider_address", commitment.ProviderAddress).
+		Strs("identities_prefixes", commitment.Identities).
+		Logger()
+
 	bidderNodeAddress, err := getBidderNodeAddress(commitment.ReceivedBidDigest, commitment.ReceivedBidSignature)
 	if err != nil {
+		hLog.Error().Err(err).Msg("failed to get bidder node address")
 		return nil, err
 	}
 
@@ -60,6 +67,7 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 
 	blockNumberUint64, err := medley.Int64ToUint64Safe(commitment.BlockNumber)
 	if err != nil {
+		hLog.Error().Err(err).Msg("failed to convert block number to uint64")
 		return nil, err
 	}
 
@@ -74,6 +82,7 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 	obsKeyperDB := corekeyperdatabase.New(h.dbpool)
 	eon, err := obsKeyperDB.GetEonForBlockNumber(ctx, commitment.BlockNumber)
 	if err != nil {
+		hLog.Error().Err(err).Msg("failed to get eon for block number")
 		return nil, err
 	}
 	for range commitment.Identities {
@@ -93,12 +102,15 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		BlockNumber:         commitment.BlockNumber,
 	})
 	if err != nil {
+		hLog.Error().Err(err).Msg("failed to insert multiple transactions and upsert commitment")
 		return nil, err
 	}
 
 	// TODO: before sending the dec trigger, we need to check if majority of providers have generated commitments
 
 	h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger)
+
+	hLog.Info().Msg("sent decryption trigger")
 
 	return nil, nil
 }
