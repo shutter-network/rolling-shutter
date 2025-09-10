@@ -8,6 +8,9 @@ CREATE TABLE commitment(
     commitment_signature text NOT NULL,
     commitment_digest text NOT NULL,
     block_number bigint NOT NULL CHECK (block_number >= 0),
+    received_bid_digest text NOT NULL,
+    received_bid_signature text NOT NULL,
+    bidder_node_address text NOT NULL,
     PRIMARY KEY (provider_address, commitment_digest, block_number)
 );
 

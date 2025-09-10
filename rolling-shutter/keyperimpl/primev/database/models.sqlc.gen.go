@@ -5,11 +5,14 @@
 package database
 
 type Commitment struct {
-	TxHashes            []string
-	ProviderAddress     string
-	CommitmentSignature string
-	CommitmentDigest    string
-	BlockNumber         int64
+	TxHashes             []string
+	ProviderAddress      string
+	CommitmentSignature  string
+	CommitmentDigest     string
+	BlockNumber          int64
+	ReceivedBidDigest    string
+	ReceivedBidSignature string
+	BidderNodeAddress    string
 }
 
 type CommittedTransaction struct {

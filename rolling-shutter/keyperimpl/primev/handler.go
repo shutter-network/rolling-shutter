@@ -99,17 +99,19 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		blockNumbers = append(blockNumbers, commitment.BlockNumber)
 		eons = append(eons, eon.Eon)
 	}
-
 	db := database.New(h.dbpool)
 	err = db.InsertMultipleTransactionsAndUpsertCommitment(ctx, database.InsertMultipleTransactionsAndUpsertCommitmentParams{
-		Column1:             eons,
-		Column2:             commitment.TxHashes, // right now identityPreimage is txHash
-		Column3:             blockNumbers,
-		Column4:             commitment.TxHashes,
-		ProviderAddress:     commitment.ProviderAddress,
-		CommitmentSignature: commitment.CommitmentSignature,
-		CommitmentDigest:    commitment.CommitmentDigest,
-		BlockNumber:         commitment.BlockNumber,
+		Column1:              eons,
+		Column2:              commitment.TxHashes, // right now identityPreimage is txHash
+		Column3:              blockNumbers,
+		Column4:              commitment.TxHashes,
+		ProviderAddress:      commitment.ProviderAddress,
+		CommitmentSignature:  commitment.CommitmentSignature,
+		CommitmentDigest:     commitment.CommitmentDigest,
+		BlockNumber:          commitment.BlockNumber,
+		ReceivedBidDigest:    commitment.ReceivedBidDigest,
+		ReceivedBidSignature: commitment.ReceivedBidSignature,
+		BidderNodeAddress:    bidderNodeAddress.Hex(),
 	})
 	if err != nil {
 		hLog.Error().Err(err).Msg("failed to insert multiple transactions and upsert commitment")

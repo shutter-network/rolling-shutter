@@ -26,7 +26,10 @@ SELECT
     c.provider_address,
     c.commitment_signature,
     c.commitment_digest,
-    c.block_number
+    c.block_number,
+    c.received_bid_digest,
+    c.received_bid_signature,
+    c.bidder_node_address
 FROM commitment c
 WHERE c.tx_hashes = $1
 `
@@ -46,6 +49,9 @@ func (q *Queries) GetCommitmentByTxHash(ctx context.Context, txHashes []string) 
 			&i.CommitmentSignature,
 			&i.CommitmentDigest,
 			&i.BlockNumber,
+			&i.ReceivedBidDigest,
+			&i.ReceivedBidSignature,
+			&i.BidderNodeAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -80,31 +86,40 @@ WITH inserted_transactions AS (
     RETURNING tx_hash
 ),
 upserted_commitment AS (
-    INSERT INTO commitment (tx_hashes, provider_address, commitment_signature, commitment_digest, block_number)
+    INSERT INTO commitment (tx_hashes, provider_address, commitment_signature, commitment_digest, block_number, received_bid_digest, received_bid_signature, bidder_node_address)
     SELECT
         ARRAY_AGG(tx_hash),
         $5,
         $6,
         $7,
-        $8
+        $8,
+        $9,
+        $10,
+        $11
     FROM inserted_transactions
     ON CONFLICT (provider_address, commitment_digest, block_number)
     DO UPDATE SET
-        tx_hashes = commitment.tx_hashes || EXCLUDED.tx_hashes
+        tx_hashes = commitment.tx_hashes || EXCLUDED.tx_hashes,
+        received_bid_digest = EXCLUDED.received_bid_digest,
+        received_bid_signature = EXCLUDED.received_bid_signature,
+        bidder_node_address = EXCLUDED.bidder_node_address
     RETURNING tx_hashes, provider_address
 )
 SELECT tx_hashes, provider_address FROM upserted_commitment
 `
 
 type InsertMultipleTransactionsAndUpsertCommitmentParams struct {
-	Column1             []int64
-	Column2             []string
-	Column3             []int64
-	Column4             []string
-	ProviderAddress     string
-	CommitmentSignature string
-	CommitmentDigest    string
-	BlockNumber         int64
+	Column1              []int64
+	Column2              []string
+	Column3              []int64
+	Column4              []string
+	ProviderAddress      string
+	CommitmentSignature  string
+	CommitmentDigest     string
+	BlockNumber          int64
+	ReceivedBidDigest    string
+	ReceivedBidSignature string
+	BidderNodeAddress    string
 }
 
 func (q *Queries) InsertMultipleTransactionsAndUpsertCommitment(ctx context.Context, arg InsertMultipleTransactionsAndUpsertCommitmentParams) error {
@@ -117,6 +132,9 @@ func (q *Queries) InsertMultipleTransactionsAndUpsertCommitment(ctx context.Cont
 		arg.CommitmentSignature,
 		arg.CommitmentDigest,
 		arg.BlockNumber,
+		arg.ReceivedBidDigest,
+		arg.ReceivedBidSignature,
+		arg.BidderNodeAddress,
 	)
 	return err
 }
