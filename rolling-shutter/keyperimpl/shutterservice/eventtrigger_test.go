@@ -2062,12 +2062,11 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Marshal the original definition
-			marshaled, err := tt.definition.MarshalBytes()
-			assert.NilError(t, err, "MarshalBytes should not fail")
+			marshaled := tt.definition.MarshalBytes()
 
 			// Unmarshal to get a new definition
 			var unmarshaled EventTriggerDefinition
-			err = unmarshaled.UnmarshalBytes(marshaled)
+			err := unmarshaled.UnmarshalBytes(marshaled)
 			assert.NilError(t, err, "UnmarshalBytes should not fail")
 
 			// Compare the original and unmarshaled definitions
@@ -2100,7 +2099,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 			}
 
 			// Additional validation: marshal the unmarshaled definition and compare bytes
-			remarshaled, err := unmarshaled.MarshalBytes()
+			remarshaled := unmarshaled.MarshalBytes()
 			assert.NilError(t, err)
 			assert.DeepEqual(t, marshaled, remarshaled)
 		})

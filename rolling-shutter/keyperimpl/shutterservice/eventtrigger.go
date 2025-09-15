@@ -73,13 +73,16 @@ func (d *EventTriggerDefinition) UnmarshalBytes(data []byte) error {
 	return nil
 }
 
-func (d *EventTriggerDefinition) MarshalBytes() ([]byte, error) {
+func (d *EventTriggerDefinition) MarshalBytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteByte(Version)
 	if err := rlp.Encode(&buf, d); err != nil {
-		return nil, fmt.Errorf("failed to encode EventTriggerDefinitionRLP: %w", err)
+		// This should never happen as
+		// - we're encoding into a bytes.Buffer which never returns an error
+		// - EventTriggerDefinition is RLP-encodable
+		panic(fmt.Sprintf("failed to encode EventTriggerDefinitionRLP: %v", err))
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
 // Validate checks if the event trigger definition is valid.
