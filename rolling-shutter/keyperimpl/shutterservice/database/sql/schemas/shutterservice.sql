@@ -11,7 +11,7 @@ CREATE TABLE event_trigger_registered_event (
     identity_prefix bytea NOT NULL,
     sender text NOT NULL,
     definition bytea NOT NULL,
-    ttl bigint NOT NULL CHECK (ttl >= 0),
+    expiration_block_number bigint NOT NULL CHECK (expiration_block_number >= 0),
     decrypted boolean NOT NULL DEFAULT false,
     identity bytea NOT NULL,
     PRIMARY KEY (eon, identity_prefix, sender)

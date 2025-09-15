@@ -39,8 +39,8 @@ func (q *Queries) DeleteIdentityRegisteredEventsFromBlockNumber(ctx context.Cont
 }
 
 const getActiveEventTriggerRegisteredEvents = `-- name: GetActiveEventTriggerRegisteredEvents :many
-SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, definition, ttl, decrypted, identity FROM event_trigger_registered_event e
-WHERE e.block_number + ttl >= $1 -- TTL not expired at given block
+SELECT block_number, block_hash, tx_index, log_index, eon, identity_prefix, sender, definition, expiration_block_number, decrypted, identity FROM event_trigger_registered_event e
+WHERE e.expiration_block_number >= $1 -- not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
@@ -67,7 +67,7 @@ func (q *Queries) GetActiveEventTriggerRegisteredEvents(ctx context.Context, blo
 			&i.IdentityPrefix,
 			&i.Sender,
 			&i.Definition,
-			&i.Ttl,
+			&i.ExpirationBlockNumber,
 			&i.Decrypted,
 			&i.Identity,
 		); err != nil {
@@ -204,7 +204,7 @@ SELECT
    f.tx_index,
    f.log_index,
    e.eon AS eon,
-   e.ttl AS ttl,
+   e.expiration_block_number AS expiration_block_number,
    e.identity AS identity,
    e.decrypted AS decrypted
 FROM fired_triggers f
@@ -218,16 +218,16 @@ WHERE NOT EXISTS (  -- not decrypted yet
 `
 
 type GetUndecryptedFiredTriggersRow struct {
-	IdentityPrefix []byte
-	Sender         string
-	BlockNumber    int64
-	BlockHash      []byte
-	TxIndex        int64
-	LogIndex       int64
-	Eon            int64
-	Ttl            int64
-	Identity       []byte
-	Decrypted      bool
+	IdentityPrefix        []byte
+	Sender                string
+	BlockNumber           int64
+	BlockHash             []byte
+	TxIndex               int64
+	LogIndex              int64
+	Eon                   int64
+	ExpirationBlockNumber int64
+	Identity              []byte
+	Decrypted             bool
 }
 
 func (q *Queries) GetUndecryptedFiredTriggers(ctx context.Context) ([]GetUndecryptedFiredTriggersRow, error) {
@@ -247,7 +247,7 @@ func (q *Queries) GetUndecryptedFiredTriggers(ctx context.Context) ([]GetUndecry
 			&i.TxIndex,
 			&i.LogIndex,
 			&i.Eon,
-			&i.Ttl,
+			&i.ExpirationBlockNumber,
 			&i.Identity,
 			&i.Decrypted,
 		); err != nil {
@@ -294,7 +294,7 @@ INSERT INTO event_trigger_registered_event (
     identity_prefix,
     sender,
     definition,
-    ttl,
+    expiration_block_number,
     identity
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -304,21 +304,21 @@ block_hash = $2,
 tx_index = $3,
 log_index = $4,
 definition = $8,
-ttl = $9,
+expiration_block_number = $9,
 identity = $10
 `
 
 type InsertEventTriggerRegisteredEventParams struct {
-	BlockNumber    int64
-	BlockHash      []byte
-	TxIndex        int64
-	LogIndex       int64
-	Eon            int64
-	IdentityPrefix []byte
-	Sender         string
-	Definition     []byte
-	Ttl            int64
-	Identity       []byte
+	BlockNumber           int64
+	BlockHash             []byte
+	TxIndex               int64
+	LogIndex              int64
+	Eon                   int64
+	IdentityPrefix        []byte
+	Sender                string
+	Definition            []byte
+	ExpirationBlockNumber int64
+	Identity              []byte
 }
 
 func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg InsertEventTriggerRegisteredEventParams) (pgconn.CommandTag, error) {
@@ -331,7 +331,7 @@ func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg Ins
 		arg.IdentityPrefix,
 		arg.Sender,
 		arg.Definition,
-		arg.Ttl,
+		arg.ExpirationBlockNumber,
 		arg.Identity,
 	)
 }

@@ -59,7 +59,7 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 			Hex("identity-prefix", triggerRegisteredEvent.IdentityPrefix).
 			Str("sender", triggerRegisteredEvent.Sender).
 			Hex("definition", triggerRegisteredEvent.Definition).
-			Int64("ttl", triggerRegisteredEvent.Ttl).
+			Int64("expiration-block-number", triggerRegisteredEvent.ExpirationBlockNumber).
 			Logger()
 
 		trigger := EventTriggerDefinition{}
@@ -87,7 +87,7 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 
 		for _, eventLog := range logs {
 			// Check that the trigger has not expired at the time of the event.
-			if eventLog.BlockNumber > uint64(triggerRegisteredEvent.BlockNumber+triggerRegisteredEvent.Ttl) {
+			if eventLog.BlockNumber > uint64(triggerRegisteredEvent.ExpirationBlockNumber) {
 				continue
 			}
 			match, err := trigger.Match(&eventLog)

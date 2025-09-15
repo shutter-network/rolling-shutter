@@ -37,7 +37,7 @@ INSERT INTO event_trigger_registered_event (
     identity_prefix,
     sender,
     definition,
-    ttl,
+    expiration_block_number,
     identity
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -47,7 +47,7 @@ block_hash = $2,
 tx_index = $3,
 log_index = $4,
 definition = $8,
-ttl = $9,
+expiration_block_number = $9,
 identity = $10;
 
 
@@ -116,7 +116,7 @@ DELETE FROM fired_triggers WHERE block_number >= $1;
 
 -- name: GetActiveEventTriggerRegisteredEvents :many
 SELECT * FROM event_trigger_registered_event e
-WHERE e.block_number + ttl >= @block_number -- TTL not expired at given block
+WHERE e.expiration_block_number >= @block_number -- not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
@@ -133,7 +133,7 @@ SELECT
    f.tx_index,
    f.log_index,
    e.eon AS eon,
-   e.ttl AS ttl,
+   e.expiration_block_number AS expiration_block_number,
    e.identity AS identity,
    e.decrypted AS decrypted
 FROM fired_triggers f

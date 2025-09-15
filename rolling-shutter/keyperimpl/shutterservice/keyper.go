@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	triggerRegistryBindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistry"
+	triggerRegistryV1Bindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistryv1"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
@@ -199,7 +199,7 @@ func (kpr *Keyper) initMultiEventSyncer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to dial Ethereum execution node: %w", err)
 	}
-	eventTriggerRegistryContract, err := triggerRegistryBindings.NewShuttereventtriggerregistry(
+	eventTriggerRegistryContract, err := triggerRegistryV1Bindings.NewShuttereventtriggerregistryv1(
 		kpr.config.Chain.Contracts.ShutterEventTriggerRegistry,
 		triggerRegistryClient,
 	)
