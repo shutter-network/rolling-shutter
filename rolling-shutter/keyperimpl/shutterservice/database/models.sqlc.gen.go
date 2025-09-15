@@ -17,6 +17,30 @@ type DecryptionSignature struct {
 	Signature      []byte
 }
 
+type EventTriggerRegisteredEvent struct {
+	BlockNumber           int64
+	BlockHash             []byte
+	TxIndex               int64
+	LogIndex              int64
+	Eon                   int64
+	IdentityPrefix        []byte
+	Sender                string
+	Definition            []byte
+	ExpirationBlockNumber int64
+	Decrypted             bool
+	Identity              []byte
+}
+
+type FiredTrigger struct {
+	Eon            int64
+	IdentityPrefix []byte
+	Sender         string
+	BlockNumber    int64
+	BlockHash      []byte
+	TxIndex        int64
+	LogIndex       int64
+}
+
 type IdentityRegisteredEvent struct {
 	BlockNumber    int64
 	BlockHash      []byte
@@ -34,4 +58,10 @@ type IdentityRegisteredEventsSyncedUntil struct {
 	EnforceOneRow bool
 	BlockHash     []byte
 	BlockNumber   int64
+}
+
+type MultiEventSyncStatus struct {
+	EnforceOneRow bool
+	BlockNumber   int64
+	BlockHash     []byte
 }
