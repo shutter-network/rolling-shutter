@@ -81,25 +81,7 @@ services:
       - ./data/deployments:/contracts/broadcast
       - ./config:/config
     depends_on:
-      - deploy-contracts
       - blockchain
-    logging: *logging
-
-  contract-scripts:
-    profiles:
-      - maintenance
-    build:
-      dockerfile: docker-test-setup-api/build-src/deploy_contracts/Dockerfile
-      context: ..
-    command:
-      - "--rpc-url"
-      - "http://blockchain:8545"
-    environment:
-      DEPLOY_KEY: ${DEPLOY_KEY}
-      TX_SENDER_KEY: ${DEPLOY_KEY}
-    volumes:
-      - ./data/deployments:/contracts/broadcast
-      - ./config:/config
     logging: *logging
 
   register-identity:
@@ -198,7 +180,6 @@ services:
     restart: always
     entrypoint:
       - /rolling-shutter
-      - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info,dht:info"
       - shutterservicekeyper
     command: "--config /config/keyper-0.toml"
     volumes:

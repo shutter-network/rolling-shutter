@@ -16,7 +16,6 @@ ${BB} rm -rf data/deployments
 $DC up -d blockchain
 sleep 5
 $DC up deploy-contracts
-$DC run --rm contract-scripts --broadcast --rpc-url http://blockchain:8545 ./script/DeployEventTriggerTestHelper.service.s.sol:DeployEventTriggerTestHelperScript
 
 bash get-contracts.sh
 # setup chain-seed

@@ -15,7 +15,7 @@ for cfg in keyper-{0..2}.toml; do
     config_path=config/${cfg}
     echo $config_path
 
-    for name in KeyperSetManager KeyperSet KeyBroadcastContract ShutterRegistry ShutterEventTriggerRegistry; do
+    for name in KeyperSetManager KeyperSet KeyBroadcastContract ShutterRegistry; do
         key=$name
         value="${!name}"
         ${BB} sed -i "/^$key =/c$key = \"$value\"" "${config_path}"
