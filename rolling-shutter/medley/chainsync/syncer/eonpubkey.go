@@ -52,7 +52,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		}
 	}
 
-	x, cancel := context.WithTimeout(ctx, 10*time.Second)
+	x, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	watchOpts := &bind.WatchOpts{
 		Start:   s.StartBlock.ToUInt64Ptr(),
