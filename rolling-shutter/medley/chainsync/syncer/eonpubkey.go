@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
@@ -157,6 +158,10 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 				return err
 			}
 		case <-ctx.Done():
+			s.Log.Info(fmt.Sprintf("stopping eon key publisher, due to context cancellation, goroutines: %d", runtime.NumGoroutine()))
+			buf := make([]byte, 1024*1024)
+			stackSize := runtime.Stack(buf, true)
+			s.Log.Info(fmt.Sprintf("stack: %s", string(buf[:stackSize])))
 			return ctx.Err()
 		}
 	}
