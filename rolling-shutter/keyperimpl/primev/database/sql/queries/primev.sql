@@ -19,13 +19,15 @@ WITH inserted_transactions AS (
         unnest($2::text[]) as identity_preimage,
         unnest($3::bigint[]) as block_number,
         unnest($4::text[]) as tx_hash
-    ON CONFLICT (eon, identity_preimage, tx_hash) DO NOTHING
-    RETURNING tx_hash
+    ON CONFLICT (eon, identity_preimage, tx_hash)
+    DO UPDATE SET
+        block_number = EXCLUDED.block_number
+    RETURNING tx_hash as hashes
 ),
 upserted_commitment AS (
     INSERT INTO commitment (tx_hashes, provider_address, commitment_signature, commitment_digest, block_number, received_bid_digest, received_bid_signature, bidder_node_address)
     SELECT
-        ARRAY_AGG(tx_hash),
+        ARRAY_AGG(hashes),
         $5,
         $6,
         $7,
