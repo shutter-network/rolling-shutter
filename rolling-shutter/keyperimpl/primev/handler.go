@@ -77,15 +77,6 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(identityPreimage))
 	}
 
-	blockNumberUint64, err := medley.Int64ToUint64Safe(commitment.BlockNumber)
-	if err != nil {
-		hLog.Error().Err(err).Msg("failed to convert block number to uint64")
-		return nil, err
-	}
-	decryptionTrigger := &epochkghandler.DecryptionTrigger{
-		BlockNumber:       blockNumberUint64,
-		IdentityPreimages: identityPreimages,
-	}
 	blockNumbers := make([]int64, 0, len(commitment.Identities))
 	eons := make([]int64, 0, len(commitment.Identities))
 
@@ -118,8 +109,18 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		return nil, err
 	}
 
+	blockNumberUint64, err := medley.Int64ToUint64Safe(commitment.BlockNumber)
+	if err != nil {
+		hLog.Error().Err(err).Msg("failed to convert block number to uint64")
+		return nil, err
+	}
+
 	// TODO: before sending the dec trigger, we need to check if majority of providers have generated commitments
 
+	decryptionTrigger := &epochkghandler.DecryptionTrigger{
+		BlockNumber:       blockNumberUint64,
+		IdentityPreimages: identityPreimages,
+	}
 	h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger)
 
 	hLog.Info().Msg("sent decryption trigger")
