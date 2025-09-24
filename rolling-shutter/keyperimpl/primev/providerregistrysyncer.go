@@ -11,9 +11,9 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
+	providerregistry "github.com/primev/mev-commit/contracts-abi/clients/ProviderRegistry"
 	"github.com/rs/zerolog/log"
 
-	providerregistry "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/primev/abi"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/primev/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
