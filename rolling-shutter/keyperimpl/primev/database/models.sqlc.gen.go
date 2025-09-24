@@ -20,6 +20,8 @@ type CommittedTransaction struct {
 	IdentityPreimage string
 	BlockNumber      int64
 	TxHash           string
+	CommitmentDigest string
+	ProviderAddress  string
 }
 
 type ProviderRegistryEvent struct {
