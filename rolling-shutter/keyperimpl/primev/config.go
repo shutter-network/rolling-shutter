@@ -15,8 +15,6 @@ type Config struct {
 	InstanceID  uint64 `shconfig:",required"`
 	DatabaseURL string `shconfig:",required" comment:"If it's empty, we use the standard PG_ environment variables"`
 
-	HTTPEnabled       bool
-	HTTPReadOnly      bool
 	HTTPListenAddress string
 
 	Primev *PrimevConfig
@@ -54,8 +52,6 @@ func (c *Config) Name() string {
 
 func (c *Config) SetDefaultValues() error {
 	c.MaxNumKeysPerMessage = 500
-	c.HTTPEnabled = false
-	c.HTTPReadOnly = true
 	c.HTTPListenAddress = ":3000"
 	return nil
 }

@@ -66,7 +66,6 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "failed to initialize p2p messaging")
 	}
 
-	// TODO: do we need a middleware also here?
 	messageSender.AddMessageHandler(&PrimevCommitmentHandler{
 		config:                   k.config,
 		decryptionTriggerChannel: k.decryptionTriggerChannel,
@@ -120,8 +119,8 @@ func NewKeyper(kpr *Keyper, messagingMiddleware p2p.Messaging) (*keyper.KeyperCo
 		&kprconfig.Config{
 			InstanceID:           kpr.config.InstanceID,
 			DatabaseURL:          kpr.config.DatabaseURL,
-			HTTPEnabled:          kpr.config.HTTPEnabled,
-			HTTPReadOnly:         kpr.config.HTTPReadOnly,
+			HTTPEnabled:          false,
+			HTTPReadOnly:         true,
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Chain.Node,
