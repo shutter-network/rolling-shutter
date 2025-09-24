@@ -1,10 +1,8 @@
 package shutterservice
 
 import (
-	"bytes"
 	"context"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -105,32 +103,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeyShares(
 ) (p2pmsg.Message, error) {
 	queries := database.New(i.dbpool)
 
-	currentDecryptionTrigger, err := queries.GetCurrentDecryptionTrigger(ctx, int64(originalMsg.Eon))
-	if err == pgx.ErrNoRows {
-		log.Warn().
-			Uint64("eon", originalMsg.Eon).
-			Msg("intercepted decryption key shares message with unknown corresponding decryption trigger")
-		return nil, nil
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to get current decryption trigger for eon %d", originalMsg.Eon)
-	}
-	if originalMsg.Eon != uint64(currentDecryptionTrigger.Eon) {
-		log.Warn().
-			Uint64("eon-got", originalMsg.Eon).
-			Int64("eon-expected", currentDecryptionTrigger.Eon).
-			Msg("intercepted decryption key shares message with unexpected eon")
-		return nil, nil
-	}
-
 	identitiesHash := computeIdentitiesHashFromShares(originalMsg.Shares)
-	if !bytes.Equal(identitiesHash, currentDecryptionTrigger.IdentitiesHash) {
-		log.Warn().
-			Uint64("eon", originalMsg.Eon).
-			Hex("expectedIdentitiesHash", currentDecryptionTrigger.IdentitiesHash).
-			Hex("actualIdentitiesHash", identitiesHash).
-			Msg("intercepted decryption key shares message with unexpected identities hash")
-		return nil, nil
-	}
 
 	identityPreimages := []identitypreimage.IdentityPreimage{}
 	for _, share := range originalMsg.Shares {
@@ -176,32 +149,23 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	ctx context.Context,
 	originalMsg *p2pmsg.DecryptionKeys,
 ) (p2pmsg.Message, error) {
-	// TODO: update flag in event table to notify the decryption is already done
 	if originalMsg.Extra != nil {
 		return originalMsg, nil
 	}
 
 	serviceDB := database.New(i.dbpool)
 	obsKeyperDB := obskeyperdatabase.New(i.dbpool)
-	trigger, err := serviceDB.GetCurrentDecryptionTrigger(ctx, int64(originalMsg.Eon))
-	if err == pgx.ErrNoRows {
-		log.Warn().
-			Uint64("eon", originalMsg.Eon).
-			Msg("unknown decryption trigger for intercepted keys message")
-		return nil, nil
-	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get current decryption trigger for eon %d", originalMsg.Eon)
-	}
 
 	keyperSet, err := obsKeyperDB.GetKeyperSetByKeyperConfigIndex(ctx, int64(originalMsg.Eon))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get keyper set from database for eon %d", originalMsg.Eon)
 	}
 
+	identitiesHash := computeIdentitiesHashFromKeys(originalMsg.GetKeys())
+
 	signatures, err := serviceDB.GetDecryptionSignatures(ctx, database.GetDecryptionSignaturesParams{
 		Eon:            int64(originalMsg.Eon),
-		IdentitiesHash: trigger.IdentitiesHash,
+		IdentitiesHash: identitiesHash,
 		Limit:          keyperSet.Threshold,
 	})
 	if err != nil {
@@ -212,7 +176,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 	if len(signatures) < int(keyperSet.Threshold) {
 		log.Debug().
 			Uint64("eon", originalMsg.Eon).
-			Hex("identities-hash", trigger.IdentitiesHash).
+			Hex("identities-hash", identitiesHash).
 			Int32("threshold", keyperSet.Threshold).
 			Int("num-signatures", len(signatures)).
 			Msg("dropping intercepted keys message as signature count is not high enough yet")
@@ -241,7 +205,7 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 
 	log.Info().
 		Uint64("eon", originalMsg.Eon).
-		Hex("identities-hash", trigger.IdentitiesHash).
+		Hex("identities-hash", identitiesHash).
 		Int("num-signatures", len(signatures)).
 		Int("num-keys", len(msg.Keys)).
 		Msg("sending keys")
@@ -249,19 +213,28 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 }
 
 func updateEventFlag(ctx context.Context, serviceDB *database.Queries, keys *p2pmsg.DecryptionKeys) error {
-	column1 := make([]int64, 0)
-	column2 := make([][]byte, 0)
+	eons := make([]int64, 0)
+	identities := make([][]byte, 0)
 	for _, key := range keys.Keys {
-		column1 = append(column1, int64(keys.Eon))
-		column2 = append(column2, key.IdentityPreimage)
+		eons = append(eons, int64(keys.Eon))
+		identities = append(identities, key.IdentityPreimage)
 	}
 
-	err := serviceDB.UpdateDecryptedFlag(ctx, database.UpdateDecryptedFlagParams{
-		Column1: column1,
-		Column2: column2,
+	// We don't know a priori if the keys where triggered by time-based or event-based triggers,
+	// so we just check both tables and update whatever we find there.
+	err := serviceDB.UpdateTimeBasedDecryptedFlags(ctx, database.UpdateTimeBasedDecryptedFlagsParams{
+		Eons:       eons,
+		Identities: identities,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update decrypted flag")
+		return errors.Wrap(err, "failed to update decrypted flags for time based triggers")
+	}
+	err = serviceDB.UpdateEventBasedDecryptedFlags(ctx, database.UpdateEventBasedDecryptedFlagsParams{
+		Eons:       eons,
+		Identities: identities,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to update decrypted flags for event based triggers")
 	}
 	return nil
 }

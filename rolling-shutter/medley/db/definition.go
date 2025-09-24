@@ -14,7 +14,7 @@ var metaDefinition Definition
 
 func init() {
 	var err error
-	metaDefinition, err = NewSQLCDefinition(files, "sql/", "meta", 1)
+	metaDefinition, err = NewSQLCDefinition(files, "sql/", "meta")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize DB metadata")
 	}

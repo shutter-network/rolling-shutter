@@ -182,6 +182,11 @@ func ValidateDecryptionKeysSignatures(
 	extra *p2pmsg.ShutterServiceDecryptionKeysExtra,
 	keyperSet *obskeyperdatabase.KeyperSet,
 ) (pubsub.ValidationResult, error) {
+	// Allow for empty signatures and signer indices
+	if len(extra.SignerIndices) == 0 || len(extra.Signature) == 0 {
+		return pubsub.ValidationAccept, nil
+	}
+
 	if int32(len(extra.SignerIndices)) != keyperSet.Threshold {
 		return pubsub.ValidationReject, errors.Errorf("expected %d signers, got %d", keyperSet.Threshold, len(extra.SignerIndices))
 	}
@@ -248,12 +253,7 @@ func (h *DecryptionKeysHandler) HandleMessage(ctx context.Context, msg p2pmsg.Me
 	extra := keys.Extra.(*p2pmsg.DecryptionKeys_Service).Service
 	serviceDB := database.New(h.dbpool)
 
-	identityPreimages := []identitypreimage.IdentityPreimage{}
-	for _, key := range keys.Keys {
-		identityPreimage := identitypreimage.IdentityPreimage(key.IdentityPreimage)
-		identityPreimages = append(identityPreimages, identityPreimage)
-	}
-	identitiesHash := computeIdentitiesHash(identityPreimages)
+	identitiesHash := computeIdentitiesHashFromKeys(keys.GetKeys())
 	for i, keyperIndex := range extra.SignerIndices {
 		err := serviceDB.InsertDecryptionSignature(ctx, database.InsertDecryptionSignatureParams{
 			Eon:            int64(keys.Eon),

@@ -248,12 +248,13 @@ func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
 		return errors.Wrap(err, "failed to instantiate validator registry contract")
 	}
 	kpr.validatorSyncer = &ValidatorSyncer{
-		Contract:             validatorRegistryContract,
-		DBPool:               kpr.dbpool,
-		BeaconAPIClient:      kpr.beaconAPIClient,
-		ExecutionClient:      validatorSyncerClient,
-		ChainID:              chainID.Uint64(),
-		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
+		Contract:                               validatorRegistryContract,
+		DBPool:                                 kpr.dbpool,
+		BeaconAPIClient:                        kpr.beaconAPIClient,
+		ExecutionClient:                        validatorSyncerClient,
+		ChainID:                                chainID.Uint64(),
+		SyncStartBlockNumber:                   kpr.config.Gnosis.SyncStartBlockNumber,
+		EnableAggregateValidatorRegistrationV1: kpr.config.Gnosis.EnableAggregateValidatorRegistrationV1,
 	}
 
 	// Perform an initial sync now because it might take some time and doing so during regular

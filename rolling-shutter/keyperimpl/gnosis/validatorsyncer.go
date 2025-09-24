@@ -29,12 +29,13 @@ const (
 )
 
 type ValidatorSyncer struct {
-	Contract             *validatorRegistryBindings.Validatorregistry
-	DBPool               *pgxpool.Pool
-	BeaconAPIClient      *beaconapiclient.Client
-	ExecutionClient      *ethclient.Client
-	ChainID              uint64
-	SyncStartBlockNumber uint64
+	Contract                               *validatorRegistryBindings.Validatorregistry
+	DBPool                                 *pgxpool.Pool
+	BeaconAPIClient                        *beaconapiclient.Client
+	ExecutionClient                        *ethclient.Client
+	ChainID                                uint64
+	SyncStartBlockNumber                   uint64
+	EnableAggregateValidatorRegistrationV1 bool
 }
 
 func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error {
@@ -226,8 +227,12 @@ func (v *ValidatorSyncer) filterEvents(
 				evLog.Warn().Msg("ignoring registration message with invalid signature")
 				continue
 			}
+		} else if v.EnableAggregateValidatorRegistrationV1 && msg.Version == validatorregistry.AggregateValidatorRegistrationMessageVersion {
+			if !validatorregistry.VerifyAggregateSignature(sig, pubKeys, msg) {
+				evLog.Warn().Msg("ignoring validator registration message with invalid signature")
+				continue
+			}
 		} else {
-			// TODO: this disables aggregate message
 			evLog.Warn().Msg("ignoring validator registration message as the version is not compatible")
 			continue
 		}

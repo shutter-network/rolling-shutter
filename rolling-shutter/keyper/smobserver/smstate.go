@@ -489,7 +489,7 @@ func (st *ShuttermintState) finalizeDKG(
 	dkgresultmsg := shmsg.NewDKGResult(eon, err == nil)
 
 	if err != nil {
-		keypermetrics.MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatUint(eon, 10)).Set(0)
+		keypermetrics.MetricsKeyperDKGStatus.WithLabelValues(strconv.FormatUint(eon, 10)).Set(0)
 		log.Error().Err(err).Uint64("eon", eon).Bool("success", false).
 			Msg("DKG process failed")
 		dkgerror = sql.NullString{String: err.Error(), Valid: true}
@@ -498,7 +498,7 @@ func (st *ShuttermintState) finalizeDKG(
 			return err
 		}
 	} else {
-		keypermetrics.MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatUint(eon, 10)).Set(1)
+		keypermetrics.MetricsKeyperDKGStatus.WithLabelValues(strconv.FormatUint(eon, 10)).Set(1)
 		log.Info().Uint64("eon", eon).Bool("success", true).Msg("DKG process succeeded")
 		pureResult, err = shdb.EncodePureDKGResult(&dkgresult)
 		if err != nil {
