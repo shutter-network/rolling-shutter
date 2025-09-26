@@ -172,7 +172,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	trigger := kpr.shouldTriggerDecryption(
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
 			Eon:         int64(eon),
@@ -189,6 +189,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 			},
 		},
 	)
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, true)
 }
 
@@ -209,14 +210,6 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 	blockNumber := 100
 	blockTimestamp := time.Now().Unix()
 
-	if blockTimestamp < 0 {
-		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
-	}
-
-	if eventTimestamp < 0 {
-		t.Fatalf("eventTimestamp is negative: %d", eventTimestamp)
-	}
-
 	kpr := &Keyper{
 		dbpool: dbpool,
 		config: &Config{
@@ -231,7 +224,7 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	trigger := kpr.shouldTriggerDecryption(
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
 			Timestamp: eventTimestamp,
@@ -246,7 +239,7 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 			},
 		},
 	)
-
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, false)
 }
 
@@ -269,10 +262,6 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 100
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
-
-	if blockTimestamp < 0 {
-		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
-	}
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -319,7 +308,7 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Test with event from eon 0, but current block is in eon 1
-	trigger := kpr.shouldTriggerDecryption(
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
 			Eon:         int64(eon), // Event from eon 0
@@ -331,11 +320,12 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 				Int: big.NewInt(int64(blockNumber + 100)), // Block in eon 1
 			},
 			Header: &types.Header{
-				Time:   uint64(blockTimestamp),
+				Time:   uint64(blockTimestamp), //nolint:gosec
 				Number: big.NewInt(int64(blockNumber + 100)),
 			},
 		},
 	)
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, true)
 }
 
@@ -358,14 +348,6 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 150 // Current block is 150, before activation
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
-
-	if blockTimestamp < 0 {
-		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
-	}
-
-	if eventTimestamp < 0 {
-		t.Fatalf("eventTimestamp is negative: %d", eventTimestamp)
-	}
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -403,7 +385,7 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Test with event from eon 0, but current block (150) is before activation (200)
-	trigger := kpr.shouldTriggerDecryption(
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
 			Eon:         int64(eon), // Event from eon 0
@@ -415,10 +397,11 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 				Int: big.NewInt(int64(blockNumber)), // Block 150, before activation at 200
 			},
 			Header: &types.Header{
-				Time:   uint64(blockTimestamp),
+				Time:   uint64(blockTimestamp), //nolint:gosec
 				Number: big.NewInt(int64(blockNumber)),
 			},
 		},
 	)
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, false)
 }

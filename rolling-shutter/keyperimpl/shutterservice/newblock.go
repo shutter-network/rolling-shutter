@@ -81,7 +81,11 @@ func (kpr *Keyper) prepareTimeBasedTriggers(ctx context.Context, block *synceven
 
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
-		if kpr.shouldTriggerDecryption(ctx, event, block) {
+		trigger, err := kpr.shouldTriggerDecryption(ctx, event, block)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to check if should trigger decryption for event %d", event.Eon)
+		}
+		if trigger {
 			eventsToDecrypt = append(eventsToDecrypt, event)
 		}
 	}
@@ -93,7 +97,7 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	ctx context.Context,
 	event servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
-) bool {
+) (bool, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 	isKeyper, err := coreKeyperDB.GetKeyperStateForEon(ctx, corekeyperdatabase.GetKeyperStateForEonParams{
 		Eon:           event.Eon,
@@ -104,27 +108,26 @@ func (kpr *Keyper) shouldTriggerDecryption(
 			log.Info().
 				Int64("eon", event.Eon).
 				Msg("skipping event as no eon has been found for it")
+			return false, nil
 		} else {
-			log.Err(err).Msgf("failed to query keyper state for eon %d", event.Eon)
+			return false, errors.Wrapf(err, "failed to query keyper state for eon %d", event.Eon)
 		}
-		return false
 	}
 
 	eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
 	if err != nil {
-		log.Err(err).Msgf("failed to get eon %d", event.Eon)
-		return false
+		return false, errors.Wrapf(err, "failed to get eon %d", event.Eon)
 	}
 	if eon.ActivationBlockNumber > triggeredBlock.Header.Number.Int64() {
 		log.Info().
 			Int64("eon", event.Eon).
 			Int64("block-number", triggeredBlock.Header.Number.Int64()).
 			Msg("skipping event as eon activation block number is greater than triggered block number")
-		return false
+		return false, nil
 	}
 
 	if event.Timestamp >= int64(triggeredBlock.Header.Time) {
-		return false
+		return false, nil
 	}
 
 	// don't trigger if we're not part of the keyper set
@@ -135,9 +138,9 @@ func (kpr *Keyper) shouldTriggerDecryption(
 			Str("identity", string(event.Identity)).
 			Str("address", kpr.config.GetAddress().Hex()).
 			Msg("skipping event as not part of keyper set")
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
