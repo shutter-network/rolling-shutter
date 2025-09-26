@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -10,8 +11,9 @@ import (
 )
 
 var (
-	ErrValueMismatch = errors.New("database has unexpected value")
-	ErrKeyNotFound   = errors.New("key does not exist")
+	ErrValueMismatch  = errors.New("database has unexpected value")
+	ErrKeyNotFound    = errors.New("key does not exist")
+	ErrNeedsMigration = errors.New("needs migration")
 )
 
 var DatabaseVersionKey string = "database-version"
@@ -29,8 +31,8 @@ func InsertDBVersion(ctx context.Context, tx pgx.Tx, version string) error {
 	return insertMetaInf(ctx, tx, DatabaseVersionKey, version)
 }
 
-func InsertSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) error {
-	return insertMetaInf(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(schema.Version))
+func InsertSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
+	return insertMetaInf(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(version))
 }
 
 func insertMetaInf(ctx context.Context, tx pgx.Tx, key, val string) error {
@@ -42,9 +44,26 @@ func insertMetaInf(ctx context.Context, tx pgx.Tx, key, val string) error {
 	})
 }
 
+func UpdateSchemaVersion(ctx context.Context, tx pgx.Tx, defName string, schema Schema, version int) error {
+	return New(tx).UpdateMeta(ctx, UpdateMetaParams{
+		Key:   MakeSchemaVersionKey(defName, schema.Name),
+		Value: fmt.Sprint(version),
+	})
+}
+
 // ValidateSchemaVersion checks that the database schema is compatible.
-func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) error {
-	return expectMetaKeyVal(ctx, tx, MakeSchemaVersionKey(definitionName, schema.Name), fmt.Sprint(schema.Version))
+func ValidateSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema, version int) error {
+	haveVersion, err := GetSchemaVersion(ctx, tx, definitionName, schema)
+	if err != nil {
+		return err
+	}
+	if haveVersion < version {
+		return errors.Wrapf(ErrNeedsMigration, "expected version %d, have %d", version, haveVersion)
+	}
+	if haveVersion != version {
+		return errors.Wrapf(ErrValueMismatch, "expected version %d, have %d", version, haveVersion)
+	}
+	return nil
 }
 
 func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
@@ -66,4 +85,19 @@ func expectMetaKeyVal(ctx context.Context, tx pgx.Tx, key, val string) error {
 // versions would match exactly.
 func ValidateDatabaseVersion(ctx context.Context, tx pgx.Tx, version string) error {
 	return expectMetaKeyVal(ctx, tx, DatabaseVersionKey, version)
+}
+
+func GetSchemaVersion(ctx context.Context, tx pgx.Tx, definitionName string, schema Schema) (int, error) {
+	key := MakeSchemaVersionKey(definitionName, schema.Name)
+	haveVal, err := New(tx).GetMeta(ctx, key)
+	if err == pgx.ErrNoRows {
+		return 0, errors.Wrapf(ErrKeyNotFound, "key: %s", key)
+	} else if err != nil {
+		return 0, errors.Wrapf(err, "failed to get key '%s' from meta_inf table", key)
+	}
+	version, err := strconv.ParseInt(haveVal, 10, 0)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to convert version '%s' from meta_inf table", key)
+	}
+	return int(version), nil
 }

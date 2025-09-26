@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 	"gotest.tools/assert"
 
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -60,10 +59,8 @@ func TestProcessBlockSuccess(t *testing.T) {
 	activationBlockNumber := 100
 
 	identityPrefix, _ := generateRandom32Bytes()
-	identity := computeIdentity(&shutterregistry.ShutterregistryIdentityRegistered{
-		IdentityPrefix: [32]byte(identityPrefix),
-		Sender:         sender,
-	})
+	identity := identityPrefix
+	identity = append(identity, sender.Bytes()...)
 
 	err := coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
 		Eon:                   int64(config.GetEon()),

@@ -3,6 +3,7 @@ package keypermetrics
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -88,7 +89,7 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 	},
 	[]string{"batch_config_index", "keyper_addresses"})
 
-var MetricsKeyperDKGstatus = prometheus.NewGaugeVec(
+var MetricsKeyperDKGStatus = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
 		Subsystem: "keyper",
@@ -97,6 +98,23 @@ var MetricsKeyperDKGstatus = prometheus.NewGaugeVec(
 	},
 	[]string{"eon"},
 )
+
+var MetricsKeyperEthAddress = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "address",
+		Help:      "Ethereum address of the Keyper",
+	}, []string{"address"})
+
+var MetricsExecutionClientVersion = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "execution_client_version",
+		Help:      "Version of the execution client",
+	},
+	[]string{"version"})
 
 func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
@@ -107,69 +125,98 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
 	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
 	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
-	prometheus.MustRegister(MetricsKeyperDKGstatus)
+	prometheus.MustRegister(MetricsKeyperDKGStatus)
+	prometheus.MustRegister(MetricsKeyperEthAddress)
+	prometheus.MustRegister(MetricsExecutionClientVersion)
 
+	ctx := context.Background()
 	queries := database.New(dbpool)
-	eons, err := queries.GetAllEons(context.Background())
-	if err != nil {
-		log.Error().Err(err).Msg("keypermetrics | Failed to get all eons")
-		return
-	}
-	keyperIndex, isKeyper, err := queries.GetKeyperIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex, config.GetAddress())
-	if err != nil {
-		log.Error().Err(err).Msg("keypermetrics | Failed to get keyper index")
-		return
-	}
-	if isKeyper {
-		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(1)
+
+	MetricsKeyperEthAddress.WithLabelValues(config.GetAddress().Hex()).Set(1)
+
+	if version, err := chainsync.GetClientVersion(ctx, config.Ethereum.EthereumURL); err != nil {
+		log.Error().Err(err).Msg("keypermetrics | Failed to get execution client version")
 	} else {
-		MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatInt(keyperIndex, 10)).Set(0)
+		MetricsExecutionClientVersion.WithLabelValues(version).Set(1)
 	}
 
-	dkgResult, err := queries.GetDKGResultForKeyperConfigIndex(context.Background(), eons[len(eons)-1].KeyperConfigIndex)
+	eons, err := queries.GetAllEons(ctx)
 	if err != nil {
-		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
-		log.Error().Err(err).Msg("keypermetrics | Failed to get dkg result")
-		return
+		log.Error().Err(err).Msg("keypermetrics | Failed to fetch eons")
+	} else if len(eons) == 0 {
+		log.Warn().Msg("keypermetrics | No eons found")
 	}
-	if dkgResult.Success {
-		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(1)
+
+	if len(eons) > 0 {
+		currentEon := eons[len(eons)-1]
+
+		MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
+
+		MetricsKeyperCurrentBatchConfigIndex.Set(float64(currentEon.KeyperConfigIndex))
+
+		for _, eon := range eons {
+			eonStr := strconv.FormatInt(eon.Eon, 10)
+			MetricsKeyperEonStartBlock.WithLabelValues(eonStr).Set(float64(eon.ActivationBlockNumber))
+		}
+
+		// Populate MetricsKeyperDKGStatus
+		dkgResults, err := queries.GetAllDKGResults(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("keypermetrics | Failed to fetch DKG results")
+		} else {
+			dkgResultMap := make(map[int64]database.DkgResult)
+			for _, result := range dkgResults {
+				dkgResultMap[result.Eon] = result
+			}
+
+			// Set DKG status for all eons
+			for _, eon := range eons {
+				eonStr := strconv.FormatInt(eon.Eon, 10)
+
+				if dkgResult, exists := dkgResultMap[eon.Eon]; exists {
+					var dkgStatusValue float64
+					if dkgResult.Success {
+						dkgStatusValue = 1
+					}
+					MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(dkgStatusValue)
+				} else {
+					// No DKG result found for this eon, set to 0
+					MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
+				}
+			}
+		}
+	}
+
+	// Populate MetricsKeyperBatchConfigInfo && MetricsKeyperIsKeyper
+	batchConfigs, err := queries.GetBatchConfigs(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("keypermetrics | Failed to fetch batch configs")
 	} else {
-		MetricsKeyperDKGstatus.WithLabelValues(strconv.FormatInt(eons[len(eons)-1].Eon, 10)).Set(0)
+		currentAddress := config.GetAddress().Hex()
+
+		for _, batchConfig := range batchConfigs {
+			batchConfigIndexStr := strconv.Itoa(int(batchConfig.KeyperConfigIndex))
+
+			// Join keyper addresses for the label
+			keyperAddresses := strings.Join(batchConfig.Keypers, ",")
+			MetricsKeyperBatchConfigInfo.WithLabelValues(batchConfigIndexStr, keyperAddresses).Set(1)
+
+			// Check if current node is a keyper in this batch config
+			isKeyper := false
+			for _, keyperAddr := range batchConfig.Keypers {
+				if strings.EqualFold(keyperAddr, currentAddress) {
+					isKeyper = true
+					break
+				}
+			}
+
+			var isKeyperValue float64
+			if isKeyper {
+				isKeyperValue = 1
+			}
+			MetricsKeyperIsKeyper.WithLabelValues(batchConfigIndexStr).Set(isKeyperValue)
+		}
 	}
 
-	version, err := chainsync.GetClientVersion(context.Background(), config.Ethereum.EthereumURL)
-	if err != nil {
-		log.Error().Err(err).Msg("execution_client_version metrics | Failed to get execution client version")
-		return
-	}
-
-	executionClientVersion := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: "shutter",
-			Subsystem: "keyper",
-			Name:      "execution_client_version",
-			Help:      "Version of the execution client",
-			ConstLabels: prometheus.Labels{
-				"version": version,
-			},
-		},
-	)
-	executionClientVersion.Set(1)
-
-	prometheus.MustRegister(executionClientVersion)
-	metricsKeyperEthAddress := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: "shutter",
-			Subsystem: "keyper",
-			Name:      "address",
-			Help:      "Ethereum address of the Keyper",
-			ConstLabels: prometheus.Labels{
-				"address": config.GetAddress().Hex(),
-			},
-		},
-	)
-	metricsKeyperEthAddress.Set(1)
-
-	prometheus.MustRegister(metricsKeyperEthAddress)
+	log.Info().Msg("keypermetrics | Metrics population completed")
 }

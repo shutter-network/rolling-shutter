@@ -213,19 +213,28 @@ func (i *MessagingMiddleware) interceptDecryptionKeys(
 }
 
 func updateEventFlag(ctx context.Context, serviceDB *database.Queries, keys *p2pmsg.DecryptionKeys) error {
-	column1 := make([]int64, 0)
-	column2 := make([][]byte, 0)
+	eons := make([]int64, 0)
+	identities := make([][]byte, 0)
 	for _, key := range keys.Keys {
-		column1 = append(column1, int64(keys.Eon))
-		column2 = append(column2, key.IdentityPreimage)
+		eons = append(eons, int64(keys.Eon))
+		identities = append(identities, key.IdentityPreimage)
 	}
 
-	err := serviceDB.UpdateDecryptedFlag(ctx, database.UpdateDecryptedFlagParams{
-		Column1: column1,
-		Column2: column2,
+	// We don't know a priori if the keys where triggered by time-based or event-based triggers,
+	// so we just check both tables and update whatever we find there.
+	err := serviceDB.UpdateTimeBasedDecryptedFlags(ctx, database.UpdateTimeBasedDecryptedFlagsParams{
+		Eons:       eons,
+		Identities: identities,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update decrypted flag")
+		return errors.Wrap(err, "failed to update decrypted flags for time based triggers")
+	}
+	err = serviceDB.UpdateEventBasedDecryptedFlags(ctx, database.UpdateEventBasedDecryptedFlagsParams{
+		Eons:       eons,
+		Identities: identities,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to update decrypted flags for event based triggers")
 	}
 	return nil
 }

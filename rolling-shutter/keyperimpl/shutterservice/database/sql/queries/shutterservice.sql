@@ -27,11 +27,42 @@ WHERE eon = $1 AND identities_hash = $2
 ORDER BY keyper_index ASC
 LIMIT $3;
 
--- name: UpdateDecryptedFlag :exec
+-- name: InsertEventTriggerRegisteredEvent :execresult
+INSERT INTO event_trigger_registered_event (
+    block_number,
+    block_hash,
+    tx_index,
+    log_index,
+    eon,
+    identity_prefix,
+    sender,
+    definition,
+    expiration_block_number,
+    identity
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (eon, identity_prefix, sender) DO UPDATE SET
+block_number = $1,
+block_hash = $2,
+tx_index = $3,
+log_index = $4,
+definition = $8,
+expiration_block_number = $9,
+identity = $10;
+
+
+-- name: UpdateTimeBasedDecryptedFlags :exec
 UPDATE identity_registered_event
 SET decrypted = TRUE
 WHERE (eon, identity) IN (
-    SELECT UNNEST($1::bigint[]), UNNEST($2::bytea[])
+    SELECT UNNEST(@eons::bigint[]), UNNEST(@identities::bytea[])
+);
+
+-- name: UpdateEventBasedDecryptedFlags :exec
+UPDATE event_trigger_registered_event
+SET decrypted = TRUE
+WHERE (eon, identity) IN (
+    SELECT UNNEST(@eons::bigint[]), UNNEST(@identities::bytea[])
 );
 
 -- name: InsertIdentityRegisteredEvent :execresult
@@ -63,3 +94,53 @@ SET block_hash = $1, block_number = $2;
 
 -- name: DeleteIdentityRegisteredEventsFromBlockNumber :exec
 DELETE FROM identity_registered_event WHERE block_number >= $1;
+
+-- name: GetMultiEventSyncStatus :one
+SELECT * FROM multi_event_sync_status LIMIT 1;
+
+-- name: SetMultiEventSyncStatus :exec
+INSERT INTO multi_event_sync_status (block_number, block_hash) VALUES ($1, $2)
+ON CONFLICT (enforce_one_row) DO UPDATE
+SET block_number = $1, block_hash = $2;
+
+-- name: DeleteEventTriggerRegisteredEventsFromBlockNumber :exec
+DELETE FROM event_trigger_registered_event WHERE block_number >= $1;
+
+-- name: InsertFiredTrigger :exec
+INSERT INTO fired_triggers (eon, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (eon, identity_prefix, sender) DO NOTHING;
+
+-- name: DeleteFiredTriggersFromBlockNumber :exec
+DELETE FROM fired_triggers WHERE block_number >= $1;
+
+-- name: GetActiveEventTriggerRegisteredEvents :many
+SELECT * FROM event_trigger_registered_event e
+WHERE e.expiration_block_number >= @block_number -- not expired at given block
+AND e.decrypted = false  -- not decrypted yet
+AND NOT EXISTS (  -- not fired yet
+    SELECT 1 FROM fired_triggers t
+    WHERE t.identity_prefix = e.identity_prefix
+    AND t.sender = e.sender
+);
+
+-- name: GetUndecryptedFiredTriggers :many
+SELECT
+   f.identity_prefix,
+   f.sender,
+   f.block_number,
+   f.block_hash,
+   f.tx_index,
+   f.log_index,
+   e.eon AS eon,
+   e.expiration_block_number AS expiration_block_number,
+   e.identity AS identity,
+   e.decrypted AS decrypted
+FROM fired_triggers f
+INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
+WHERE NOT EXISTS (  -- not decrypted yet
+    SELECT 1 FROM event_trigger_registered_event e
+    WHERE e.identity_prefix = f.identity_prefix
+    AND e.sender = f.sender
+    AND e.decrypted = true
+);
