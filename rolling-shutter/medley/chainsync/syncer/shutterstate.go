@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
@@ -44,9 +45,11 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}
+	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	watchOpts := &bind.WatchOpts{
 		Start:   s.StartBlock.ToUInt64Ptr(), // nil means latest
-		Context: ctx,
+		Context: ctxLocal,
 	}
 	s.pausedCh = make(chan *bindings.KeyperSetManagerPaused)
 	subs, err := s.Contract.WatchPaused(watchOpts, s.pausedCh)
@@ -61,7 +64,7 @@ func (s *ShutterStateSyncer) Start(ctx context.Context, runner service.Runner) e
 	}
 
 	runner.Go(func() error {
-		err := s.watchPaused(ctx, subs.Err(), subsUnpaused.Err())
+		err := s.watchPaused(ctxLocal, subs.Err(), subsUnpaused.Err(), cancel)
 		if err != nil {
 			s.Log.Error("error watching paused", err.Error())
 		}
@@ -91,7 +94,7 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 	}
 }
 
-func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error) error {
+func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error, cancel context.CancelFunc) error {
 	isActive, err := s.pollIsActive(ctx)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
@@ -130,11 +133,13 @@ func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan err
 		case err := <-subsErr:
 			if err != nil {
 				s.Log.Error("subscription error for watchPaused", err.Error())
+				cancel()
 				return err
 			}
 		case err := <-subsErrUnpaused:
 			if err != nil {
 				s.Log.Error("subscription error for watchUnpaused", err.Error())
+				cancel()
 				return err
 			}
 		case <-ctx.Done():
