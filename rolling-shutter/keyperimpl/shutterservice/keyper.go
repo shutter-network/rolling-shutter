@@ -171,7 +171,6 @@ func (kpr *Keyper) initRegistrySyncer(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: need to update go module after contract is finalized
 	kpr.registrySyncer = &RegistrySyncer{
 		Contract:             contract,
 		DBPool:               kpr.dbpool,

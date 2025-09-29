@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"gotest.tools/assert"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -21,7 +21,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 func TestProcessBlockSuccess(t *testing.T) {
@@ -34,7 +33,6 @@ func TestProcessBlockSuccess(t *testing.T) {
 	t.Cleanup(dbclose)
 
 	serviceDB := servicedatabase.New(dbpool)
-	obsDB := obskeyper.New(dbpool)
 	coreKeyperDB := corekeyperdatabase.New(dbpool)
 
 	privateKey, sender, _ := generateRandomAccount()
@@ -63,13 +61,12 @@ func TestProcessBlockSuccess(t *testing.T) {
 	identityPrefix, _ := generateRandom32Bytes()
 	identity := identityPrefix
 	identity = append(identity, sender.Bytes()...)
-	keyperConfigIndex := uint64(1)
 
 	err := coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
 		Eon:                   int64(config.GetEon()),
 		Height:                0,
 		ActivationBlockNumber: int64(activationBlockNumber),
-		KeyperConfigIndex:     1,
+		KeyperConfigIndex:     0,
 	})
 	assert.NilError(t, err)
 
@@ -86,12 +83,6 @@ func TestProcessBlockSuccess(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = obsDB.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: int64(activationBlockNumber),
-		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
-		Threshold:             2,
-	})
 	assert.NilError(t, err)
 
 	go func() {
@@ -128,17 +119,24 @@ func TestShouldTriggerDecryption(t *testing.T) {
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
 	t.Cleanup(dbclose)
 
-	obsDB := obskeyper.New(dbpool)
+	coreKeyperDB := corekeyperdatabase.New(dbpool)
 
-	privateKey, sender, _ := generateRandomAccount()
+	privateKey, _, _ := generateRandomAccount()
 
 	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	activationBlockNumber := 100
-	keyperConfigIndex := uint64(1)
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 100
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+
+	if blockTimestamp < 0 {
+		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
+	}
+
+	if eventTimestamp < 0 {
+		t.Fatalf("eventTimestamp is negative: %d", eventTimestamp)
+	}
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -154,18 +152,32 @@ func TestShouldTriggerDecryption(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	err := obsDB.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: int64(activationBlockNumber),
-		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
-		Threshold:             2,
+	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
+		KeyperConfigIndex: 0,
+		Keypers:           []string{kpr.config.GetAddress().Hex()},
+		Threshold:         1,
 	})
+	assert.NilError(t, err)
 
-	trigger := kpr.shouldTriggerDecryption(
+	eon := config.GetEon()
+	if eon > math.MaxInt64 {
+		t.Fatalf("Eon is too large: %d", eon)
+	}
+
+	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
+		Eon:                   int64(eon),
+		Height:                0,
+		ActivationBlockNumber: int64(activationBlockNumber),
+		KeyperConfigIndex:     0,
+	})
+	assert.NilError(t, err)
+
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
-		obsDB,
 		servicedatabase.IdentityRegisteredEvent{
-			Timestamp: eventTimestamp,
+			Eon:         int64(eon),
+			BlockNumber: int64(blockNumber),
+			Timestamp:   eventTimestamp,
 		},
 		&event.LatestBlock{
 			Number: &number.BlockNumber{
@@ -190,14 +202,10 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
 	t.Cleanup(dbclose)
 
-	obsDB := obskeyper.New(dbpool)
-
-	privateKey, sender, _ := generateRandomAccount()
+	privateKey, _, _ := generateRandomAccount()
 
 	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
-	activationBlockNumber := 100
-	keyperConfigIndex := uint64(1)
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 100
 	blockTimestamp := time.Now().Unix()
@@ -216,15 +224,8 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	err := obsDB.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
-		KeyperConfigIndex:     int64(keyperConfigIndex),
-		ActivationBlockNumber: int64(activationBlockNumber),
-		Keypers:               shdb.EncodeAddresses([]common.Address{sender}),
-		Threshold:             2,
-	})
-	trigger := kpr.shouldTriggerDecryption(
+	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
-		obsDB,
 		servicedatabase.IdentityRegisteredEvent{
 			Timestamp: eventTimestamp,
 		},
@@ -239,6 +240,168 @@ func TestShouldNotTriggerDecryption(t *testing.T) {
 		},
 	)
 	assert.NilError(t, err)
+	assert.Equal(t, trigger, false)
+}
 
+func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
+	t.Cleanup(dbclose)
+
+	coreKeyperDB := corekeyperdatabase.New(dbpool)
+
+	privateKey, _, _ := generateRandomAccount()
+
+	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
+
+	activationBlockNumber := 100
+	eventTimestamp := time.Now().Unix()
+	blockNumber := 100
+	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+
+	kpr := &Keyper{
+		dbpool: dbpool,
+		config: &Config{
+			Chain: &ChainConfig{
+				Node: &configuration.EthnodeConfig{
+					PrivateKey: &keys.ECDSAPrivate{
+						Key: privateKey,
+					},
+				},
+			},
+		},
+		decryptionTriggerChannel: decryptionTriggerChannel,
+	}
+
+	eon := config.GetEon()
+	if eon > math.MaxInt64-1 {
+		t.Fatalf("Eon is too large: %d", eon)
+	}
+
+	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
+		KeyperConfigIndex: 0,
+		Keypers:           []string{kpr.config.GetAddress().Hex()},
+		Threshold:         1,
+	})
+	assert.NilError(t, err)
+
+	// Insert eon 0
+	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
+		Eon:                   int64(eon),
+		Height:                0,
+		ActivationBlockNumber: int64(activationBlockNumber),
+		KeyperConfigIndex:     0,
+	})
+	assert.NilError(t, err)
+
+	// Insert eon 1
+	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
+		Eon:                   int64(eon + 1), //nolint:gosec
+		Height:                1,
+		ActivationBlockNumber: int64(activationBlockNumber + 50),
+		KeyperConfigIndex:     1,
+	})
+	assert.NilError(t, err)
+
+	// Test with event from eon 0, but current block is in eon 1
+	trigger, err := kpr.shouldTriggerDecryption(
+		ctx,
+		servicedatabase.IdentityRegisteredEvent{
+			Eon:         int64(eon), // Event from eon 0
+			BlockNumber: int64(blockNumber),
+			Timestamp:   eventTimestamp,
+		},
+		&event.LatestBlock{
+			Number: &number.BlockNumber{
+				Int: big.NewInt(int64(blockNumber + 100)), // Block in eon 1
+			},
+			Header: &types.Header{
+				Time:   uint64(blockTimestamp), //nolint:gosec
+				Number: big.NewInt(int64(blockNumber + 100)),
+			},
+		},
+	)
+	assert.NilError(t, err)
+	assert.Equal(t, trigger, true)
+}
+
+func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
+	t.Cleanup(dbclose)
+
+	coreKeyperDB := corekeyperdatabase.New(dbpool)
+
+	privateKey, _, _ := generateRandomAccount()
+
+	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
+
+	activationBlockNumber := 200 // Eon activates at block 200
+	eventTimestamp := time.Now().Unix()
+	blockNumber := 150 // Current block is 150, before activation
+	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+
+	kpr := &Keyper{
+		dbpool: dbpool,
+		config: &Config{
+			Chain: &ChainConfig{
+				Node: &configuration.EthnodeConfig{
+					PrivateKey: &keys.ECDSAPrivate{
+						Key: privateKey,
+					},
+				},
+			},
+		},
+		decryptionTriggerChannel: decryptionTriggerChannel,
+	}
+
+	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
+		KeyperConfigIndex: 0,
+		Keypers:           []string{kpr.config.GetAddress().Hex()},
+		Threshold:         1,
+	})
+	assert.NilError(t, err)
+
+	eon := config.GetEon()
+	if eon > math.MaxInt64 {
+		t.Fatalf("Eon is too large: %d", eon)
+	}
+
+	// Insert eon 0 that activates at block 200
+	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
+		Eon:                   int64(eon),
+		Height:                0,
+		ActivationBlockNumber: int64(activationBlockNumber),
+		KeyperConfigIndex:     0,
+	})
+	assert.NilError(t, err)
+
+	// Test with event from eon 0, but current block (150) is before activation (200)
+	trigger, err := kpr.shouldTriggerDecryption(
+		ctx,
+		servicedatabase.IdentityRegisteredEvent{
+			Eon:         int64(eon), // Event from eon 0
+			BlockNumber: int64(blockNumber),
+			Timestamp:   eventTimestamp,
+		},
+		&event.LatestBlock{
+			Number: &number.BlockNumber{
+				Int: big.NewInt(int64(blockNumber)), // Block 150, before activation at 200
+			},
+			Header: &types.Header{
+				Time:   uint64(blockTimestamp), //nolint:gosec
+				Number: big.NewInt(int64(blockNumber)),
+			},
+		},
+	)
+	assert.NilError(t, err)
 	assert.Equal(t, trigger, false)
 }

@@ -79,10 +79,13 @@ func (kpr *Keyper) prepareTimeBasedTriggers(ctx context.Context, block *synceven
 		return nil, errors.Wrap(err, "failed to query non decrypted identity registered events from db")
 	}
 
-	obsDB := obskeyper.New(kpr.dbpool)
 	eventsToDecrypt := make([]servicedatabase.IdentityRegisteredEvent, 0)
 	for _, event := range nonTriggeredEvents {
-		if kpr.shouldTriggerDecryption(ctx, obsDB, event, block) {
+		trigger, err := kpr.shouldTriggerDecryption(ctx, event, block)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to check if should trigger decryption for event %d", event.Eon)
+		}
+		if trigger {
 			eventsToDecrypt = append(eventsToDecrypt, event)
 		}
 	}
@@ -92,37 +95,52 @@ func (kpr *Keyper) prepareTimeBasedTriggers(ctx context.Context, block *synceven
 
 func (kpr *Keyper) shouldTriggerDecryption(
 	ctx context.Context,
-	obsDB *obskeyper.Queries,
 	event servicedatabase.IdentityRegisteredEvent,
 	triggeredBlock *syncevent.LatestBlock,
-) bool {
-	nextBlock := triggeredBlock.Number.Int64()
-	keyperSet, err := obsDB.GetKeyperSet(ctx, nextBlock)
+) (bool, error) {
+	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
+	isKeyper, err := coreKeyperDB.GetKeyperStateForEon(ctx, corekeyperdatabase.GetKeyperStateForEonParams{
+		Eon:           event.Eon,
+		KeyperAddress: []string{kpr.config.GetAddress().Hex()},
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			log.Info().
-				Int64("block-number", nextBlock).
-				Msg("skipping event as no keyper set has been found for it")
+				Int64("eon", event.Eon).
+				Msg("skipping event as no eon has been found for it")
+			return false, nil
 		} else {
-			log.Err(err).Msgf("failed to query keyper set for block %d", nextBlock)
+			return false, errors.Wrapf(err, "failed to query keyper state for eon %d", event.Eon)
 		}
-		return false
+	}
+
+	eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get eon %d", event.Eon)
+	}
+	if eon.ActivationBlockNumber > triggeredBlock.Header.Number.Int64() {
+		log.Info().
+			Int64("eon", event.Eon).
+			Int64("block-number", triggeredBlock.Header.Number.Int64()).
+			Msg("skipping event as eon activation block number is greater than triggered block number")
+		return false, nil
 	}
 
 	if event.Timestamp >= int64(triggeredBlock.Header.Time) {
-		return false
+		return false, nil
 	}
 
 	// don't trigger if we're not part of the keyper set
-	if !keyperSet.Contains(kpr.config.GetAddress()) {
+	if !isKeyper {
 		log.Info().
-			Int64("block-number", nextBlock).
-			Int64("keyper-set-index", keyperSet.KeyperConfigIndex).
+			Int64("eon", event.Eon).
+			Int64("block-number", event.BlockNumber).
+			Str("identity", string(event.Identity)).
 			Str("address", kpr.config.GetAddress().Hex()).
-			Msg("skipping slot as not part of keyper set")
-		return false
+			Msg("skipping event as not part of keyper set")
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
@@ -131,24 +149,12 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 	triggeredBlock *syncevent.LatestBlock,
 ) ([]epochkghandler.DecryptionTrigger, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
-
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
 	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
-		nextBlock := triggeredBlock.Header.Number.Int64()
-
-		eonStruct, err := coreKeyperDB.GetEonForBlockNumber(ctx, nextBlock)
+		eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query eon for block number %d from db", nextBlock)
-		}
-
-		if eonStruct.Eon != event.Eon {
-			log.Warn().
-				Int64("eon expected", eonStruct.Eon).
-				Int64("eon in event", event.Eon).
-				Msg("skipping event as wrong eon passed")
-
-			continue
+			return nil, errors.Wrapf(err, "failed to query eon %d from db", event.Eon)
 		}
 
 		if identityPreimages[event.Eon] == nil {
@@ -156,8 +162,8 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 		}
 		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(event.Identity))
 
-		if lastEonBlock[event.Eon] < event.BlockNumber {
-			lastEonBlock[event.Eon] = event.BlockNumber
+		if _, exists := lastEonBlock[event.Eon]; !exists {
+			lastEonBlock[event.Eon] = eon.ActivationBlockNumber
 		}
 	}
 
