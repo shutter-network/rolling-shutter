@@ -94,7 +94,12 @@ func (s *ShutterStateSyncer) handle(ctx context.Context, ev *event.ShutterState)
 	}
 }
 
-func (s *ShutterStateSyncer) watchPaused(ctx context.Context, subsErr <-chan error, subsErrUnpaused <-chan error, cancel context.CancelFunc) error {
+func (s *ShutterStateSyncer) watchPaused(
+	ctx context.Context,
+	subsErr <-chan error,
+	subsErrUnpaused <-chan error,
+	cancel context.CancelFunc,
+) error {
 	isActive, err := s.pollIsActive(ctx)
 	if err != nil {
 		// XXX: this will fail everything, do we want that?
