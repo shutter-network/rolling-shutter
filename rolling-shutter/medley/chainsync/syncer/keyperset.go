@@ -2,7 +2,6 @@ package syncer
 
 import (
 	"context"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -48,18 +47,16 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		s.StartBlock.SetUint64(latest)
 	}
 
-	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 	watchOpts := &bind.WatchOpts{
 		Start:   s.StartBlock.ToUInt64Ptr(),
-		Context: ctxLocal,
+		Context: ctx,
 	}
-	initial, err := s.getInitialKeyperSets(ctxLocal)
+	initial, err := s.getInitialKeyperSets(ctx)
 	if err != nil {
 		return err
 	}
 	for _, ks := range initial {
-		err = s.Handler(ctxLocal, ks)
+		err = s.Handler(ctx, ks)
 		if err != nil {
 			s.Log.Error(
 				"handler for `NewKeyperSet` errored for initial sync",
@@ -74,7 +71,7 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		return err
 	}
 	runner.Go(func() error {
-		err := s.watchNewKeypersService(ctxLocal, subs.Err(), cancel)
+		err := s.watchNewKeypersService(ctx, subs.Err())
 		if err != nil {
 			s.Log.Error("error watching new keypers", err.Error())
 		}
@@ -211,7 +208,7 @@ func (s *KeyperSetSyncer) newEvent(
 	}, nil
 }
 
-func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-chan error, cancel context.CancelFunc) error {
+func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-chan error) error {
 	for {
 		select {
 		case newKeypers, ok := <-s.keyperAddedCh:
@@ -244,7 +241,6 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-
 		case err := <-subsErr:
 			if err != nil {
 				s.Log.Error("subscription error for watchNewKeypersService", err.Error())
-				cancel()
 				return err
 			}
 		case <-ctx.Done():

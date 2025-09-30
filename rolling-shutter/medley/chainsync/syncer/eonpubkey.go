@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
@@ -52,11 +51,9 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		}
 	}
 
-	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 	watchOpts := &bind.WatchOpts{
 		Start:   s.StartBlock.ToUInt64Ptr(),
-		Context: ctxLocal,
+		Context: ctx,
 	}
 	s.keyBroadcastCh = make(chan *bindings.KeyBroadcastContractEonKeyBroadcast, channelSize)
 	subs, err := s.KeyBroadcast.WatchEonKeyBroadcast(watchOpts, s.keyBroadcastCh)
@@ -64,7 +61,7 @@ func (s *EonPubKeySyncer) Start(ctx context.Context, runner service.Runner) erro
 		return err
 	}
 	runner.Go(func() error {
-		err := s.watchNewEonPubkey(ctxLocal, subs.Err(), cancel)
+		err := s.watchNewEonPubkey(ctx, subs.Err())
 		if err != nil {
 			s.Log.Error("error watching new eon pubkey", err.Error())
 		}
@@ -133,7 +130,7 @@ func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.Cal
 	}, nil
 }
 
-func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan error, cancel context.CancelFunc) error {
+func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan error) error {
 	for {
 		select {
 		case newEonKey, ok := <-s.keyBroadcastCh:
@@ -157,7 +154,6 @@ func (s *EonPubKeySyncer) watchNewEonPubkey(ctx context.Context, subsErr <-chan 
 		case err := <-subsErr:
 			if err != nil {
 				s.Log.Error("subscription error for watchNewEonPubkey", err.Error())
-				cancel()
 				return err
 			}
 		case <-ctx.Done():
