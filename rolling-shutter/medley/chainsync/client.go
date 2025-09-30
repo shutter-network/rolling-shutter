@@ -150,6 +150,7 @@ func (s *Client) Start(ctx context.Context, runner service.Runner) error {
 	runner.Go(func() error {
 		<-ctx.Done()
 		s.Client.Close()
+		s.log.Info("client closed")
 		return nil
 	})
 	return runner.StartService(s.getServices()...)

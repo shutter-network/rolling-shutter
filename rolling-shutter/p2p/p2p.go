@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -118,6 +119,10 @@ func (p *P2PNode) Run(
 		}
 		close(p.GossipMessages)
 		log.Info().Msg("host closed")
+		log.Info().Msgf("stopping p2p node, due to context cancellation, goroutines: %d", runtime.NumGoroutine())
+		buf := make([]byte, 1024*1024)
+		stackSize := runtime.Stack(buf, true)
+		log.Info().Msgf("stack: %s", string(buf[:stackSize]))
 		return nil
 	})
 
