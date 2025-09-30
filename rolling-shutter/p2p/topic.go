@@ -43,7 +43,7 @@ func (room *gossipRoom) readLoop(ctx context.Context, messages chan *pubsub.Mess
 		select {
 		case messages <- msg:
 		case <-ctx.Done():
-			log.Debug().Msg("subscription canceled, closing read loop")
+			log.Info().Msg("subscription canceled, closing read loop")
 			room.subscription.Cancel()
 			if err := room.topic.Close(); err != nil {
 				return err

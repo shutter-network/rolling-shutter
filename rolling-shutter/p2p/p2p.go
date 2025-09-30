@@ -103,10 +103,6 @@ func (p *P2PNode) Run(
 	p.mux.Lock()
 	defer p.mux.Unlock()
 
-	runner.Defer(func() {
-		close(p.GossipMessages)
-	})
-
 	if err := p.init(ctx); err != nil {
 		return err
 	}
@@ -120,7 +116,8 @@ func (p *P2PNode) Run(
 		if err := p.dht.Close(); err != nil {
 			log.Error().Err(err).Msg("error closing dht")
 		}
-		log.Debug().Msg("host closed")
+		close(p.GossipMessages)
+		log.Info().Msg("host closed")
 		return nil
 	})
 
