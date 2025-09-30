@@ -98,3 +98,21 @@ message Envelope {
   google.protobuf.Any message = 2;
   optional TraceContext trace = 3;
 }
+
+message Commitment {
+  uint64 instance_id = 1;
+  repeated string tx_hashes = 2;
+  string bid_amount = 3;
+  int64 block_number = 4;
+  string received_bid_digest = 5;
+  string received_bid_signature = 6;
+  string commitment_digest = 7;
+  string commitment_signature = 8;
+  string provider_address = 9;
+  int64 decay_start_timestamp = 10;
+  int64 decay_end_timestamp = 11;
+  int64 dispatch_timestamp = 12;
+  repeated string reverting_tx_hashes = 13;
+  string slash_amount = 14;
+  repeated string identities = 15;
+};
