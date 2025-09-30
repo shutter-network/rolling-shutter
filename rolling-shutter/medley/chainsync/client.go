@@ -146,9 +146,11 @@ func (s *Client) ChainID(ctx context.Context) (*big.Int, error) {
 	return s.chainID, nil
 }
 
-func (s *Client) Start(_ context.Context, runner service.Runner) error {
-	runner.Defer(func() {
+func (s *Client) Start(ctx context.Context, runner service.Runner) error {
+	runner.Go(func() error {
+		<-ctx.Done()
 		s.Client.Close()
+		return nil
 	})
 	return runner.StartService(s.getServices()...)
 }
