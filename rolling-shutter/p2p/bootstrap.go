@@ -100,6 +100,7 @@ func bootstrap(
 		_, err := retry.FunctionCall(
 			ctx,
 			f,
+			retry.NumberOfRetries(10),
 			retry.StopOnErrors(errInsufficientBootstrpConfigured),
 			retry.Interval(2*time.Second))
 		if err != nil {
