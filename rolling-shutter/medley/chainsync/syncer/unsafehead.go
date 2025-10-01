@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -38,6 +39,14 @@ func (s *UnsafeHeadSyncer) Start(ctx context.Context, runner service.Runner) err
 		}
 		subs.Unsubscribe()
 		return err
+	})
+	runner.Go(func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Minute):
+			return errors.New("test error")
+		}
 	})
 	return nil
 }
