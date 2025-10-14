@@ -90,7 +90,6 @@ func NewPrimevConfig() *PrimevConfig {
 func (c *PrimevConfig) Init() {
 	c.SyncStartBlockNumber = 0
 	c.SyncMonitorCheckInterval = 30
-	c.PrimevRPC = ""
 	c.ProviderRegistryContract = common.Address{}
 }
 
@@ -104,7 +103,6 @@ func (c *PrimevConfig) Validate() error {
 
 func (c *PrimevConfig) SetDefaultValues() error { //nolint:unparam
 	c.SyncMonitorCheckInterval = 30
-	c.PrimevRPC = ""
 	c.ProviderRegistryContract = common.Address{}
 	c.SyncStartBlockNumber = 0
 	return nil
@@ -112,7 +110,7 @@ func (c *PrimevConfig) SetDefaultValues() error { //nolint:unparam
 
 func (c *PrimevConfig) SetExampleValues() error { //nolint:unparam
 	c.SyncMonitorCheckInterval = 30
-	c.PrimevRPC = ""
+	c.PrimevRPC = "wss://chainrpc-wss.testnet.mev-commit.xyz"
 	c.ProviderRegistryContract = common.Address{}
 	c.SyncStartBlockNumber = 0
 	return nil
