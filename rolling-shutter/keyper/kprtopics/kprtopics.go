@@ -5,4 +5,5 @@ const (
 	DecryptionKeys      = "decryptionKeys"
 	DecryptionKeyShares = "decryptionKeyShares"
 	EonPublicKey        = "EonPublicKey"
+	PrimevCommitment    = "primevCommitment"
 )

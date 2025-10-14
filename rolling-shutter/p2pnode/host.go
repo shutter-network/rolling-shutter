@@ -34,6 +34,7 @@ func (dummyMessageHandler) MessagePrototypes() []p2pmsg.Message {
 		&p2pmsg.DecryptionKeys{},
 		&p2pmsg.DecryptionTrigger{},
 		&p2pmsg.EonPublicKey{},
+		&p2pmsg.Commitment{},
 	}
 }
 

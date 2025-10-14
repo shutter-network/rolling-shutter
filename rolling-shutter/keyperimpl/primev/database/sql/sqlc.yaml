@@ -1,0 +1,13 @@
+version: "2"
+sql:
+  - schema: "schemas"
+    queries: "queries"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "database"
+        out: "../"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
