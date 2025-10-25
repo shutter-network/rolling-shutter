@@ -218,7 +218,10 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 			currentEon = eval.Eon
 		}
 
-		fmt.Printf("SEND POLY EVALS: eon=%d receiver=%s\n", eval.Eon, eval.ReceiverAddress)
+		log.Info().
+			Int64("eon", eval.Eon).
+			Str("receiverAddress", eval.ReceiverAddress).
+			Msg("sending poly eval")
 		receiver, err := shdb.DecodeAddress(eval.ReceiverAddress)
 		if err != nil {
 			return err

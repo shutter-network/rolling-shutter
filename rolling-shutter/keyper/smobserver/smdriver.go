@@ -165,6 +165,10 @@ func (smdrv *ShuttermintDriver) handleBlock(
 	block *coretypes.ResultBlockResults,
 	lastCommittedHeight int64,
 ) error {
+	err := smdrv.shuttermintState.Load(ctx, queries)
+	if err != nil {
+		return err
+	}
 	oldMeta, err := queries.TMGetSyncMeta(ctx)
 	if err != nil {
 		return err
@@ -217,7 +221,11 @@ func (smdrv *ShuttermintDriver) handleBlock(
 		return err
 	}
 
-	return nil
+	err = smdrv.shuttermintState.BeforeSaveHook(ctx, queries)
+	if err != nil {
+		return err
+	}
+	return smdrv.shuttermintState.Save(ctx, queries)
 }
 
 func (smdrv *ShuttermintDriver) innerHandleTransactions(
