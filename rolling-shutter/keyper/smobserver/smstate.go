@@ -202,11 +202,22 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 			receivers = nil
 			encryptedEvals = nil
 		}()
-		return queries.ScheduleShutterMessage(
+		eonLabel := strconv.FormatInt(currentEon, 10)
+		err := queries.ScheduleShutterMessage(
 			ctx,
 			fmt.Sprintf("poly eval (eon=%d)", currentEon),
 			shmsg.NewPolyEval(uint64(currentEon), receivers, encryptedEvals),
 		)
+		if err != nil {
+			return err
+		}
+		for range receivers {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypePolyEval,
+			).Inc()
+		}
+		return nil
 	}
 
 	for _, eval := range evals {
@@ -389,6 +400,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 		log.Fatal().Err(err).Msg("aborting due to unexpected error")
 	}
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	err = queries.ScheduleShutterMessage(
 		ctx,
 		fmt.Sprintf("poly commitment (eon=%d)", eon),
@@ -397,6 +409,10 @@ func (st *ShuttermintState) startPhase1Dealing(
 	if err != nil {
 		return err
 	}
+	keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+		eonLabel,
+		keypermetrics.DKGMessageTypePolyCommitment,
+	).Inc()
 
 	for _, eval := range polyEvals {
 		err = queries.InsertPolyEval(ctx, database.InsertPolyEvalParams{
@@ -416,9 +432,14 @@ func (st *ShuttermintState) startPhase2Accusing(
 ) error {
 	accusations := dkg.pure.StartPhase2Accusing()
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	if len(accusations) > 0 {
 		var accused []common.Address
 		for _, a := range accusations {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypeAccusation,
+			).Inc()
 			accused = append(accused, dkg.keypers[a.Accused])
 		}
 		err := queries.ScheduleShutterMessage(
@@ -441,11 +462,16 @@ func (st *ShuttermintState) startPhase3Apologizing(
 ) error {
 	apologies := dkg.pure.StartPhase3Apologizing()
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	if len(apologies) > 0 {
 		var accusers []common.Address
 		var polyEvals []*big.Int
 
 		for _, a := range apologies {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypeApology,
+			).Inc()
 			accusers = append(accusers, dkg.keypers[a.Accuser])
 			polyEvals = append(polyEvals, a.Eval)
 		}
@@ -624,6 +650,10 @@ func (st *ShuttermintState) handlePolyCommitment(
 		return nil
 	}
 	dkg.markDirty()
+	keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+		strconv.FormatUint(e.Eon, 10),
+		keypermetrics.DKGMessageTypePolyCommitment,
+	).Inc()
 	return nil
 }
 
@@ -645,6 +675,7 @@ func (st *ShuttermintState) handlePolyEval(
 			Msg("event for non existent eon received")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		return nil
@@ -681,6 +712,10 @@ func (st *ShuttermintState) handlePolyEval(
 	}
 	log.Info().Str("event", e.String()).Int("keyper", sender).
 		Msg("got poly eval message")
+	keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+		eonLabel,
+		keypermetrics.DKGMessageTypePolyEval,
+	).Inc()
 	dkg.markDirty()
 	return nil
 }
@@ -700,6 +735,7 @@ func (st *ShuttermintState) handleAccusation(
 			Msg("received accusation in wrong phase")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		log.Info().Str("event", e.String()).
@@ -724,7 +760,12 @@ func (st *ShuttermintState) handleAccusation(
 		if err != nil {
 			log.Info().Str("event", e.String()).Err(err).
 				Msg("cannot handle accusation")
+			continue
 		}
+		keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+			eonLabel,
+			keypermetrics.DKGMessageTypeAccusation,
+		).Inc()
 	}
 	dkg.markDirty()
 	return nil
@@ -744,6 +785,7 @@ func (st *ShuttermintState) handleApology(
 			Msg("Warning: received apology in wrong phase")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		log.Info().Str("event", e.String()).Msg("failed to handle apology. bad sender")
@@ -766,7 +808,12 @@ func (st *ShuttermintState) handleApology(
 			})
 		if err != nil {
 			log.Info().Str("event", e.String()).Err(err).Msg("failed to handle apology")
+			continue
 		}
+		keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+			eonLabel,
+			keypermetrics.DKGMessageTypeApology,
+		).Inc()
 	}
 	dkg.markDirty()
 	return nil

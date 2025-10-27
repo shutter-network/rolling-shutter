@@ -14,6 +14,13 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 )
 
+const (
+	DKGMessageTypePolyEval       = "poly_eval"
+	DKGMessageTypePolyCommitment = "poly_commitment"
+	DKGMessageTypeAccusation     = "accusation"
+	DKGMessageTypeApology        = "apology"
+)
+
 var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
@@ -69,6 +76,26 @@ var MetricsKeyperCurrentPhase = prometheus.NewGaugeVec(
 		Help:      "Current DKG phase of this Keyper node",
 	},
 	[]string{"eon", "phase"},
+)
+
+var MetricsKeyperDKGMessagesSent = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "dkg_messages_sent",
+		Help:      "Number of DKG messages scheduled for sending for the given eon, partitioned by message type",
+	},
+	[]string{"eon", "message_type"},
+)
+
+var MetricsKeyperDKGMessagesReceived = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "dkg_messages_received",
+		Help:      "Number of DKG messages received for the given eon, partitioned by message type",
+	},
+	[]string{"eon", "message_type"},
 )
 
 var MetricsKeyperCurrentBatchConfigIndex = prometheus.NewGauge(
@@ -128,6 +155,8 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperDKGStatus)
 	prometheus.MustRegister(MetricsKeyperEthAddress)
 	prometheus.MustRegister(MetricsExecutionClientVersion)
+	prometheus.MustRegister(MetricsKeyperDKGMessagesSent)
+	prometheus.MustRegister(MetricsKeyperDKGMessagesReceived)
 
 	ctx := context.Background()
 	queries := database.New(dbpool)
