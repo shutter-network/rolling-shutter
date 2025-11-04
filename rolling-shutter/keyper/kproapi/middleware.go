@@ -3,6 +3,8 @@ package kproapi
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -34,8 +36,23 @@ func shouldEnableEndpoint(operation *openapi3.Operation, enableWriteOperations b
 
 // findOperation looks up the OpenAPI operation for the given path and method.
 func findOperation(spec *openapi3.T, path string, method string) *openapi3.Operation {
-	pathItem := spec.Paths.Find(path)
+	pathItem := spec.Paths.Find(path) // first try to find the path in the spec
 	if pathItem == nil {
+		for specPath, pItem := range spec.Paths { // fallback for path containing parameters
+			rePath := "^" + regexp.QuoteMeta(specPath)
+			rePath = strings.ReplaceAll(rePath, `\{`, "{")
+			rePath = strings.ReplaceAll(rePath, `\}`, "}")
+			rePath = regexp.MustCompile(`\{[^/]+\}`).ReplaceAllString(rePath, `[^/]+`)
+			rePath += "$"
+
+			if matched, _ := regexp.MatchString(rePath, path); matched {
+				pathItem = pItem
+				break
+			}
+		}
+	}
+
+	if pathItem == nil { // if no path is found still, return nil
 		return nil
 	}
 
