@@ -98,13 +98,15 @@ func (q *Queries) GetSlotDecryptionSignatures(ctx context.Context, arg GetSlotDe
 }
 
 const getTransactionSubmittedEventCount = `-- name: GetTransactionSubmittedEventCount :one
-SELECT max(index) + 1 FROM transaction_submitted_event
+SELECT
+    cast(coalesce(max(index) + 1, 0) AS bigint)
+FROM transaction_submitted_event
 WHERE eon = $1
 `
 
-func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int64) (int32, error) {
+func (q *Queries) GetTransactionSubmittedEventCount(ctx context.Context, eon int64) (int64, error) {
 	row := q.db.QueryRow(ctx, getTransactionSubmittedEventCount, eon)
-	var column_1 int32
+	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
 }
