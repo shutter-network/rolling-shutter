@@ -85,7 +85,7 @@ WITH inserted_transactions AS (
         unnest($5::text[]) as tx_hash,
         $6,
         $7
-    ON CONFLICT (eon, identity_preimage, identity_prefix, tx_hash, block_number)
+    ON CONFLICT (eon, identity_preimage, tx_hash, block_number)
     DO NOTHING
     RETURNING tx_hash as hashes
 ),

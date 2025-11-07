@@ -22,7 +22,7 @@ WITH inserted_transactions AS (
         unnest(sqlc.arg('tx_hashes')::text[]) as tx_hash,
         sqlc.arg('commitment_digest'),
         sqlc.arg('provider_address')
-    ON CONFLICT (eon, identity_preimage, identity_prefix, tx_hash, block_number)
+    ON CONFLICT (eon, identity_preimage, tx_hash, block_number)
     DO NOTHING
     RETURNING tx_hash as hashes
 ),

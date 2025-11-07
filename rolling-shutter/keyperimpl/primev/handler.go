@@ -125,7 +125,12 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 		BlockNumber:       blockNumberUint64,
 		IdentityPreimages: identityPreimages,
 	}
-	h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger)
+
+	select {
+	case h.decryptionTriggerChannel <- broker.NewEvent(decryptionTrigger):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 
 	hLog.Info().Msg("sent decryption trigger")
 
