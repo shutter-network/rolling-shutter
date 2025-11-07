@@ -17,6 +17,7 @@ type Commitment struct {
 
 type CommittedTransaction struct {
 	Eon              int64
+	IdentityPrefix   string
 	IdentityPreimage string
 	BlockNumber      int64
 	TxHash           string

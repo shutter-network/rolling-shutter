@@ -13,15 +13,16 @@ WHERE $1 = ANY(c.tx_hashes);
 
 -- name: InsertMultipleTransactionsAndUpsertCommitment :exec
 WITH inserted_transactions AS (
-    INSERT INTO committed_transactions (eon, identity_preimage, block_number, tx_hash, commitment_digest, provider_address)
+    INSERT INTO committed_transactions (eon, identity_preimage, identity_prefix, block_number, tx_hash, commitment_digest, provider_address)
     SELECT
-        unnest($1::bigint[]) as eon,
-        unnest($2::text[]) as identity_preimage,
-        unnest($3::bigint[]) as block_number,
-        unnest($4::text[]) as tx_hash,
-        $7,
-        $5
-    ON CONFLICT (eon, identity_preimage, tx_hash, block_number)
+        unnest(sqlc.arg('eons')::bigint[]) as eon,
+        unnest(sqlc.arg('identity_preimages')::text[]) as identity_preimage,
+        unnest(sqlc.arg('identity_prefixes')::text[]) as identity_prefix,
+        unnest(sqlc.arg('block_numbers')::bigint[]) as block_number,
+        unnest(sqlc.arg('tx_hashes')::text[]) as tx_hash,
+        sqlc.arg('commitment_digest'),
+        sqlc.arg('provider_address')
+    ON CONFLICT (eon, identity_preimage, identity_prefix, tx_hash, block_number)
     DO NOTHING
     RETURNING tx_hash as hashes
 ),
@@ -29,13 +30,13 @@ upserted_commitment AS (
     INSERT INTO commitment (tx_hashes, provider_address, commitment_signature, commitment_digest, block_number, received_bid_digest, received_bid_signature, bidder_node_address)
     SELECT
         ARRAY_AGG(hashes),
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11
+        sqlc.arg('provider_address'),
+        sqlc.arg('commitment_signature'),
+        sqlc.arg('commitment_digest'),
+        sqlc.arg('block_number'),
+        sqlc.arg('received_bid_digest'),
+        sqlc.arg('received_bid_signature'),
+        sqlc.arg('bidder_node_address')
     FROM inserted_transactions
     ON CONFLICT (provider_address, commitment_digest)
     DO UPDATE SET

@@ -16,6 +16,7 @@ CREATE TABLE commitment(
 
 CREATE TABLE committed_transactions(
     eon bigint NOT NULL CHECK (eon >= 0),
+    identity_prefix text NOT NULL,
     identity_preimage text NOT NULL,
     block_number bigint NOT NULL CHECK (block_number >= 0),
     tx_hash text NOT NULL,

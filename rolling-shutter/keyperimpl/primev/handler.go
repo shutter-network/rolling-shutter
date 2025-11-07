@@ -67,6 +67,7 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 	}
 
 	identityPreimages := make([]identitypreimage.IdentityPreimage, 0, len(commitment.Identities))
+	identityPreimagesHex := make([]string, 0, len(commitment.Identities))
 	for _, identityPrefix := range commitment.Identities {
 		identityPrefixBytes, err := hex.DecodeString(identityPrefix)
 		if err != nil {
@@ -74,7 +75,9 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 			return nil, err
 		}
 		identityPreimage := computeIdentity(identityPrefixBytes, bidderNodeAddress.Bytes())
-		identityPreimages = append(identityPreimages, identitypreimage.IdentityPreimage(identityPreimage))
+		identityPreimageTyped := identitypreimage.IdentityPreimage(identityPreimage)
+		identityPreimages = append(identityPreimages, identityPreimageTyped)
+		identityPreimagesHex = append(identityPreimagesHex, identityPreimageTyped.Hex())
 	}
 
 	blockNumbers := make([]int64, 0, len(commitment.Identities))
@@ -92,10 +95,11 @@ func (h *PrimevCommitmentHandler) HandleMessage(ctx context.Context, msg p2pmsg.
 	}
 	db := database.New(h.dbpool)
 	err = db.InsertMultipleTransactionsAndUpsertCommitment(ctx, database.InsertMultipleTransactionsAndUpsertCommitmentParams{
-		Column1:              eons,
-		Column2:              commitment.Identities,
-		Column3:              blockNumbers,
-		Column4:              commitment.TxHashes,
+		Eons:                 eons,
+		IdentityPreimages:    identityPreimagesHex,
+		BlockNumbers:         blockNumbers,
+		TxHashes:             commitment.TxHashes,
+		IdentityPrefixes:     commitment.Identities,
 		ProviderAddress:      commitment.ProviderAddress,
 		CommitmentSignature:  commitment.CommitmentSignature,
 		CommitmentDigest:     commitment.CommitmentDigest,

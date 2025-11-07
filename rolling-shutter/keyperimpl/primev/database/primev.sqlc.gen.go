@@ -76,15 +76,16 @@ func (q *Queries) GetProviderRegistryEventsSyncedUntil(ctx context.Context) (Pro
 
 const insertMultipleTransactionsAndUpsertCommitment = `-- name: InsertMultipleTransactionsAndUpsertCommitment :exec
 WITH inserted_transactions AS (
-    INSERT INTO committed_transactions (eon, identity_preimage, block_number, tx_hash, commitment_digest, provider_address)
+    INSERT INTO committed_transactions (eon, identity_preimage, identity_prefix, block_number, tx_hash, commitment_digest, provider_address)
     SELECT
         unnest($1::bigint[]) as eon,
         unnest($2::text[]) as identity_preimage,
-        unnest($3::bigint[]) as block_number,
-        unnest($4::text[]) as tx_hash,
-        $7,
-        $5
-    ON CONFLICT (eon, identity_preimage, tx_hash, block_number)
+        unnest($3::text[]) as identity_prefix,
+        unnest($4::bigint[]) as block_number,
+        unnest($5::text[]) as tx_hash,
+        $6,
+        $7
+    ON CONFLICT (eon, identity_preimage, identity_prefix, tx_hash, block_number)
     DO NOTHING
     RETURNING tx_hash as hashes
 ),
@@ -92,13 +93,13 @@ upserted_commitment AS (
     INSERT INTO commitment (tx_hashes, provider_address, commitment_signature, commitment_digest, block_number, received_bid_digest, received_bid_signature, bidder_node_address)
     SELECT
         ARRAY_AGG(hashes),
-        $5,
-        $6,
         $7,
         $8,
+        $6,
         $9,
         $10,
-        $11
+        $11,
+        $12
     FROM inserted_transactions
     ON CONFLICT (provider_address, commitment_digest)
     DO UPDATE SET
@@ -112,13 +113,14 @@ SELECT tx_hashes, provider_address FROM upserted_commitment
 `
 
 type InsertMultipleTransactionsAndUpsertCommitmentParams struct {
-	Column1              []int64
-	Column2              []string
-	Column3              []int64
-	Column4              []string
+	Eons                 []int64
+	IdentityPreimages    []string
+	IdentityPrefixes     []string
+	BlockNumbers         []int64
+	TxHashes             []string
+	CommitmentDigest     string
 	ProviderAddress      string
 	CommitmentSignature  string
-	CommitmentDigest     string
 	BlockNumber          int64
 	ReceivedBidDigest    string
 	ReceivedBidSignature string
@@ -127,13 +129,14 @@ type InsertMultipleTransactionsAndUpsertCommitmentParams struct {
 
 func (q *Queries) InsertMultipleTransactionsAndUpsertCommitment(ctx context.Context, arg InsertMultipleTransactionsAndUpsertCommitmentParams) error {
 	_, err := q.db.Exec(ctx, insertMultipleTransactionsAndUpsertCommitment,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
+		arg.Eons,
+		arg.IdentityPreimages,
+		arg.IdentityPrefixes,
+		arg.BlockNumbers,
+		arg.TxHashes,
+		arg.CommitmentDigest,
 		arg.ProviderAddress,
 		arg.CommitmentSignature,
-		arg.CommitmentDigest,
 		arg.BlockNumber,
 		arg.ReceivedBidDigest,
 		arg.ReceivedBidSignature,
