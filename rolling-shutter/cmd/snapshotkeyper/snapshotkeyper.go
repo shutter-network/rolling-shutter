@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/shversion"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	keyper "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/snapshot"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/snapshot/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration/command"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
