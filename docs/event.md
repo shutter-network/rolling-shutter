@@ -40,7 +40,8 @@ It can reference:
   referenced by its index (0-3), where offset 0 is topic[0], etc.
 - **Data (Offsets 4+)**: The non-indexed data section of the log. Offset
   values >= 4 refer to 32-byte words in the log data, where offset 4 is the
-  first word (bytes 0-31), offset 5 is the second word (bytes 32-63), etc.
+  first word (bytes 0-31), offset 5 is the second word (bytes 32-63), etc. Note:
+  data offset always starts at 4, even if there are fewer than 4 topics defined.
 
 Reference:
 [LogValueRef Type and Documentation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L34-L43)
@@ -81,7 +82,8 @@ The current version is **0x01** as defined by the `Version` constant.
 
 ### RLP Encoding Details
 
-The RLP encoding format for the core structures is:
+The RLP encoding format for the core structures are just nested RLP lists. The
+named object definitions below are for clarification purposes only:
 
 ```
 EventTriggerDefinition := {
@@ -102,10 +104,13 @@ ValuePredicate := {
     intArgs: [BigInt, ...],
     byteArgs: [Bytes, ...]
 }
+
+# actual dense format is more akin to this:
+[contract_address, [[offset, [op, [int_args], [byte_args]]], […]]]
 ```
 
 Reference:
-[RLP Encoding Implementation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L211-L267)
+[RLP Encoding Implementation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L211-L392)
 
 ## Operators
 
