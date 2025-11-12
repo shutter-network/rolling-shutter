@@ -92,7 +92,11 @@ func (t *SlotTicker) run(ctx context.Context) error {
 
 		timeToNextSlot := nextTickTime.Sub(now)
 		timer.Reset(timeToNextSlot)
-		<-timer.C
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 
 		if err := t.tick(ctx, nextSlotNumber); err != nil {
 			return err
