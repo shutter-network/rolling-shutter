@@ -28,9 +28,10 @@ Where `{keyper_name}` represents the specific keyper implementation (e.g.,
 
 - **File Format**: All migrations must be written in SQL
 - **Naming Convention**: Files must follow a strict versioning pattern:
-  ```
-  V{version_number}_{migration_description}.sql
-  ```
+
+```
+V{version_number}_{migration_description}.sql
+```
 
 #### Examples:
 
@@ -45,7 +46,35 @@ Where `{keyper_name}` represents the specific keyper implementation (e.g.,
 - **Sequential Ordering**: All subsequent migrations must have version numbers
   greater than any previously defined migration
 
-### 3. Version Tracking
+### 3. Migration schema definition to be added in sqlc.yaml
+
+The `sqlc.yaml` configuration file must be updated to include the migrations
+directory in its schema definition. This ensures that sqlc can generate Go code
+that accounts for all database schema changes defined in the migration files.
+The schema section should explicitly include both the "schemas" and "migrations"
+directories.
+
+#### Example sqlc.yaml configuration:
+
+```yaml
+version: "2"
+sql:
+  - schema:
+      - "schemas"
+      - "migrations"
+    queries: "queries"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "database"
+        out: "../"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db.sqlc.gen.go"
+        output_models_file_name: "models.sqlc.gen.go"
+        output_files_suffix: "c.gen"
+```
+
+### 4. Version Tracking
 
 - Migration version records are maintained in the `meta_inf` table for each
   keyper

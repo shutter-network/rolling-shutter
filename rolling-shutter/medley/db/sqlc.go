@@ -23,7 +23,7 @@ type data struct {
 	SQL []entry `yaml:"sql"`
 }
 type entry struct {
-	Schema string
+	Schema interface{} `yaml:"schema"`
 	Gen    struct {
 		Golang struct{ Out string } `yaml:"go"`
 	}
@@ -48,32 +48,54 @@ func ParseSQLC(filesystem fs.FS, sqlcPath string) ([]Schema, error) {
 
 	schemas := []Schema{}
 	for _, entry := range d.SQL {
-		// TODO: allow for individual sql files and multiple dirs.
-		// For now assume we only get one string
-		// which is the path of the directory containing the schema files.
-		// This won't handle multiple directories, or individual sql file names.
-		schemaDirPath := path.Join(sqlcDir, entry.Schema)
-		dirEntries, err := fs.ReadDir(filesystem, schemaDirPath)
-		if err != nil {
-			return nil, errors.Wrap(err, "error reading schema dir")
+		var schemaPaths []string
+
+		// This allows only for schema directories, not individual sql files.
+		switch schema := entry.Schema.(type) {
+		case string:
+			schemaPaths = []string{schema}
+		case []interface{}:
+			for _, s := range schema {
+				if str, ok := s.(string); ok {
+					// migrations directory is skipped as it would be handled by the migrations loader, managing the database version.
+					if str == "migrations" {
+						continue
+					}
+					schemaPaths = append(schemaPaths, str)
+				}
+			}
+		default:
+			return nil, errors.New("invalid schema type")
 		}
-		for _, de := range dirEntries {
-			i, err := de.Info()
+
+		if len(schemaPaths) == 0 {
+			return nil, errors.New("no schema paths found")
+		}
+
+		for _, schemaPath := range schemaPaths {
+			schemaDirPath := path.Join(sqlcDir, schemaPath)
+			dirEntries, err := fs.ReadDir(filesystem, schemaDirPath)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "error reading schema dir")
 			}
-			if i.IsDir() {
-				continue
+			for _, de := range dirEntries {
+				i, err := de.Info()
+				if err != nil {
+					return nil, err
+				}
+				if i.IsDir() {
+					continue
+				}
+				base, isSQL := strings.CutSuffix(i.Name(), ".sql")
+				if !isSQL {
+					continue
+				}
+				schema := Schema{
+					Name: base,
+					Path: path.Join(schemaDirPath, i.Name()),
+				}
+				schemas = append(schemas, schema)
 			}
-			base, isSQL := strings.CutSuffix(i.Name(), ".sql")
-			if !isSQL {
-				continue
-			}
-			schema := Schema{
-				Name: base,
-				Path: path.Join(schemaDirPath, i.Name()),
-			}
-			schemas = append(schemas, schema)
 		}
 	}
 	return schemas, nil
