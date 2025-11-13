@@ -36,14 +36,24 @@ const (
 )
 
 type Config struct {
-	RootDir       string   `mapstructure:"root"`
-	DevMode       bool     `mapstructure:"dev"`
-	Index         int      `mapstructure:"index"`
-	BlockTime     float64  `mapstructure:"blocktime"`
-	GenesisKeyper []string `mapstructure:"genesis-keyper"`
-	ListenAddress string   `mapstructure:"listen-address"`
-	Role          string   `mapstructure:"role"`
-	InitialEon    uint64   `mapstructure:"initial-eon"`
+	RootDir       string     `mapstructure:"root"`
+	DevMode       bool       `mapstructure:"dev"`
+	Index         int        `mapstructure:"index"`
+	BlockTime     float64    `mapstructure:"blocktime"`
+	GenesisKeyper []string   `mapstructure:"genesis-keyper"`
+	ListenAddress string     `mapstructure:"listen-address"`
+	Role          string     `mapstructure:"role"`
+	InitialEon    uint64     `mapstructure:"initial-eon"`
+	Forks         ForkConfig `mapstructure:"forks"`
+}
+
+type ForkConfig struct {
+	CheckInUpdate Fork `mapstructure:"check-in-update"`
+}
+
+type Fork struct {
+	Height   int64 `mapstructure:"height"`
+	Disabled bool  `mapstructure:"disabled"`
 }
 
 func initCmd() *cobra.Command {
@@ -73,6 +83,8 @@ func initCmd() *cobra.Command {
 	cmd.PersistentFlags().String("listen-address", "tcp://127.0.0.1:26657", "tendermint RPC listen address")
 	cmd.PersistentFlags().String("role", "validator", "tendermint node role (validator, isolated-validator, sentry, seed)")
 	cmd.PersistentFlags().Uint64("initial-eon", 0, "initial eon")
+	cmd.PersistentFlags().Int64("forks.check-in-update.height", 0, "block height at which to activate the check-in update fork")
+	cmd.PersistentFlags().Bool("forks.check-in-update.disabled", false, "whether the check-in update fork is disabled")
 	return cmd
 }
 
@@ -156,7 +168,12 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
 	cfg.WriteConfigFile(config.RootDir+"/config/config.toml", tendermintCfg)
-	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3, config.InitialEon)
+	// Initialize fork heights according to config. Disabled forks have height nil.
+	forkHeights := app.ForkHeights{}
+	if !config.Forks.CheckInUpdate.Disabled {
+		forkHeights.CheckInUpdate = &config.Forks.CheckInUpdate.Height
+	}
+	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3, config.InitialEon, &forkHeights)
 
 	return initFilesWithConfig(tendermintCfg, config, appState)
 }

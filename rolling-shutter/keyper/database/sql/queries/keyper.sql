@@ -103,10 +103,15 @@ SELECT * FROM puredkg;
 DELETE FROM puredkg WHERE eon=$1;
 
 -- name: InsertEncryptionKey :exec
-INSERT INTO tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2);
+INSERT INTO tendermint_encryption_key (address, encryption_public_key, height)
+VALUES ($1, $2, $3)
+ON CONFLICT (address, height) DO UPDATE
+SET encryption_public_key = EXCLUDED.encryption_public_key;
 
 -- name: GetEncryptionKeys :many
-SELECT * FROM tendermint_encryption_key;
+SELECT DISTINCT ON (address) *
+FROM tendermint_encryption_key
+ORDER BY address, height DESC;
 
 -- name: ScheduleSerializedShutterMessage :one
 INSERT INTO tendermint_outgoing_messages (description, msg)
@@ -145,14 +150,19 @@ INSERT INTO poly_evals (eon, receiver_address, eval)
 VALUES ($1, $2, $3);
 
 -- name: PolyEvalsWithEncryptionKeys :many
+WITH latest_keys AS (
+    SELECT DISTINCT ON (address) address, encryption_public_key, height
+    FROM tendermint_encryption_key
+    ORDER BY address, height DESC
+)
 SELECT ev.eon, ev.receiver_address, ev.eval,
        k.encryption_public_key,
-       eons.height
+       eon.height
 FROM poly_evals ev
-INNER JOIN tendermint_encryption_key k
+INNER JOIN latest_keys k
       ON ev.receiver_address = k.address
-INNER JOIN eons eons
-      ON ev.eon = eons.eon
+INNER JOIN eons eon
+      ON ev.eon = eon.eon
 ORDER BY ev.eon;
 
 -- PolyEvalsWithEncryptionKeys could probably already delete the entries from the poly_evals table.

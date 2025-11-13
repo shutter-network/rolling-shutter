@@ -55,20 +55,18 @@ type PhaseLength interface {
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
 // stored in the database, and what we have here is kind of a cache.
 type ShuttermintState struct {
-	config         Config
-	synchronized   bool // are we synchronized
-	isKeyper       bool
-	encryptionKeys map[common.Address]*ecies.PublicKey
-	dkg            map[uint64]*ActiveDKG
-	phaseLength    PhaseLength
+	config       Config
+	synchronized bool // are we synchronized
+	isKeyper     bool
+	dkg          map[uint64]*ActiveDKG
+	phaseLength  PhaseLength
 }
 
 func NewShuttermintState(config Config) *ShuttermintState {
 	return &ShuttermintState{
-		config:         config,
-		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
-		dkg:            make(map[uint64]*ActiveDKG),
-		phaseLength:    config.GetDKGPhaseLength(),
+		config:      config,
+		dkg:         make(map[uint64]*ActiveDKG),
+		phaseLength: config.GetDKGPhaseLength(),
 	}
 }
 
@@ -86,10 +84,6 @@ func (st *ShuttermintState) Load(ctx context.Context, queries *database.Queries)
 		return err
 	}
 	st.isKeyper = numBatchConfigs > 0 // XXX need to look
-	err = st.loadEncryptionKeys(ctx, queries)
-	if err != nil {
-		return err
-	}
 	err = st.loadDKG(ctx, queries)
 	if err != nil {
 		return err
@@ -135,25 +129,6 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *database.Queri
 			dirty:       false,
 			keypers:     keypers,
 		}
-	}
-	return nil
-}
-
-func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *database.Queries) error {
-	keys, err := queries.GetEncryptionKeys(ctx)
-	if err != nil {
-		return err
-	}
-	for _, k := range keys {
-		addr, err := shdb.DecodeAddress(k.Address)
-		if err != nil {
-			return err
-		}
-		p, err := shdb.DecodeEciesPublicKey(k.EncryptionPublicKey)
-		if err != nil {
-			return err
-		}
-		st.encryptionKeys[addr] = p
 	}
 	return nil
 }
@@ -237,9 +212,9 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 		if err != nil {
 			return err
 		}
-		pubkey, ok := st.encryptionKeys[receiver]
-		if !ok {
-			panic("key not loaded into ShuttermintState")
+		pubkey, err := shdb.DecodeEciesPublicKey(eval.EncryptionPublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to decode encryption public key for %s from db: %w", eval.ReceiverAddress, err)
 		}
 		encrypted, err := ecies.Encrypt(rand.Reader, pubkey, eval.Eval, nil, nil)
 		if err != nil {
@@ -266,8 +241,8 @@ func (st *ShuttermintState) handleBatchConfig(
 		keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10)).Set(0)
 	}
 	if e.IsKeyper(st.config.GetAddress()) {
-		// In case we transition to a superset of the current Keyper set or this node was a Keyper before in an older set
-		// the check-in message will be a duplicate, but this isn't a problem, it will be ignored.
+		// Send a check-in message to announce our encryption and validator key. If we have already checked in
+		// for a previous batch config and neither of the keys has changed, this is redundant but harmless.
 		st.isKeyper = true
 		pubKey := st.config.GetValidatorPublicKey()
 		err := queries.ScheduleShutterMessage(
@@ -615,10 +590,13 @@ func (st *ShuttermintState) shiftPhases(
 func (st *ShuttermintState) handleCheckIn(
 	ctx context.Context, queries *database.Queries, e *shutterevents.CheckIn,
 ) error {
-	st.encryptionKeys[e.Sender] = e.EncryptionPublicKey
+	// Store the key in the database, along with the height from which on it is
+	// valid. If there are multiple keys for the same address and height, only
+	// the last inserted one is kept.
 	err := queries.InsertEncryptionKey(ctx, database.InsertEncryptionKeyParams{
 		Address:             shdb.EncodeAddress(e.Sender),
 		EncryptionPublicKey: shdb.EncodeEciesPublicKey(e.EncryptionPublicKey),
+		Height:              e.Height,
 	})
 	return err
 }

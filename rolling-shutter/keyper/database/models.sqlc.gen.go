@@ -78,6 +78,7 @@ type TendermintBatchConfig struct {
 type TendermintEncryptionKey struct {
 	Address             string
 	EncryptionPublicKey []byte
+	Height              int64
 }
 
 type TendermintOutgoingMessage struct {
