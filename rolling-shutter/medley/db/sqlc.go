@@ -57,12 +57,19 @@ func ParseSQLC(filesystem fs.FS, sqlcPath string) ([]Schema, error) {
 		case []interface{}:
 			for _, s := range schema {
 				if str, ok := s.(string); ok {
+					// migrations directory is skipped as it would be handled by the migrations loader, managing the database version.
 					if str == "migrations" {
 						continue
 					}
 					schemaPaths = append(schemaPaths, str)
 				}
 			}
+		default:
+			return nil, errors.New("invalid schema type")
+		}
+
+		if len(schemaPaths) == 0 {
+			return nil, errors.New("no schema paths found")
 		}
 
 		for _, schemaPath := range schemaPaths {
