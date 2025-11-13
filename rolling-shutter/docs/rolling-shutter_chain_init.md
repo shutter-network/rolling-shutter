@@ -9,15 +9,17 @@ rolling-shutter chain init [flags]
 ### Options
 
 ```
-      --blocktime float          block time in seconds (default 1)
-      --dev                      turn on devmode (disables validator set changes)
-      --genesis-keyper strings   genesis keyper address
-  -h, --help                     help for init
-      --index int                keyper index
-      --initial-eon uint         initial eon
-      --listen-address string    tendermint RPC listen address (default "tcp://127.0.0.1:26657")
-      --role string              tendermint node role (validator, isolated-validator, sentry, seed) (default "validator")
-      --root string              root directory
+      --blocktime float                    block time in seconds (default 1)
+      --dev                                turn on devmode (disables validator set changes)
+      --forks.check-in-update.disabled     whether the check-in update fork is disabled
+      --forks.check-in-update.height int   block height at which to activate the check-in update fork
+      --genesis-keyper strings             genesis keyper address
+  -h, --help                               help for init
+      --index int                          keyper index
+      --initial-eon uint                   initial eon
+      --listen-address string              tendermint RPC listen address (default "tcp://127.0.0.1:26657")
+      --role string                        tendermint node role (validator, isolated-validator, sentry, seed) (default "validator")
+      --root string                        root directory
 ```
 
 ### Options inherited from parent commands

@@ -422,7 +422,9 @@ func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKe
 }
 
 const getEncryptionKeys = `-- name: GetEncryptionKeys :many
-SELECT address, encryption_public_key FROM tendermint_encryption_key
+SELECT DISTINCT ON (address) address, encryption_public_key, height
+FROM tendermint_encryption_key
+ORDER BY address, height DESC
 `
 
 func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]TendermintEncryptionKey, error) {
@@ -434,7 +436,7 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]TendermintEncryption
 	var items []TendermintEncryptionKey
 	for rows.Next() {
 		var i TendermintEncryptionKey
-		if err := rows.Scan(&i.Address, &i.EncryptionPublicKey); err != nil {
+		if err := rows.Scan(&i.Address, &i.EncryptionPublicKey, &i.Height); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -670,16 +672,20 @@ func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryp
 }
 
 const insertEncryptionKey = `-- name: InsertEncryptionKey :exec
-INSERT INTO tendermint_encryption_key (address, encryption_public_key) VALUES ($1, $2)
+INSERT INTO tendermint_encryption_key (address, encryption_public_key, height)
+VALUES ($1, $2, $3)
+ON CONFLICT (address, height) DO UPDATE
+SET encryption_public_key = EXCLUDED.encryption_public_key
 `
 
 type InsertEncryptionKeyParams struct {
 	Address             string
 	EncryptionPublicKey []byte
+	Height              int64
 }
 
 func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionKeyParams) error {
-	_, err := q.db.Exec(ctx, insertEncryptionKey, arg.Address, arg.EncryptionPublicKey)
+	_, err := q.db.Exec(ctx, insertEncryptionKey, arg.Address, arg.EncryptionPublicKey, arg.Height)
 	return err
 }
 
@@ -752,14 +758,19 @@ func (q *Queries) InsertPureDKG(ctx context.Context, arg InsertPureDKGParams) er
 }
 
 const polyEvalsWithEncryptionKeys = `-- name: PolyEvalsWithEncryptionKeys :many
+WITH latest_keys AS (
+    SELECT DISTINCT ON (address) address, encryption_public_key, height
+    FROM tendermint_encryption_key
+    ORDER BY address, height DESC
+)
 SELECT ev.eon, ev.receiver_address, ev.eval,
        k.encryption_public_key,
-       eons.height
+       eon.height
 FROM poly_evals ev
-INNER JOIN tendermint_encryption_key k
+INNER JOIN latest_keys k
       ON ev.receiver_address = k.address
-INNER JOIN eons eons
-      ON ev.eon = eons.eon
+INNER JOIN eons eon
+      ON ev.eon = eon.eon
 ORDER BY ev.eon
 `
 
