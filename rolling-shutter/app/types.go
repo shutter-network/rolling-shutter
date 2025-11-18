@@ -25,7 +25,7 @@ type GenesisAppState struct {
 
 func NewGenesisAppState(keypers []common.Address, threshold int, initialEon uint64, forkHeights *ForkHeights) GenesisAppState {
 	appState := GenesisAppState{
-		Threshold:   uint64(threshold),
+		Threshold:   uint64(threshold), //nolint:gosec // G115
 		InitialEon:  initialEon,
 		ForkHeights: forkHeights,
 	}
