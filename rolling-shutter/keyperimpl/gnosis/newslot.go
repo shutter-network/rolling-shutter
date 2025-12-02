@@ -266,7 +266,12 @@ func (kpr *Keyper) triggerDecryption(
 		Int("num-identities", len(trigger.IdentityPreimages)).
 		Int64("tx-pointer", txPointer).
 		Msg("sending decryption trigger")
-	kpr.decryptionTriggerChannel <- event
+
+	select {
+	case kpr.decryptionTriggerChannel <- event:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	return nil
 }

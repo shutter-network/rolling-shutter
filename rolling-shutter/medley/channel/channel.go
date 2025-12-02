@@ -12,7 +12,11 @@ func Forward[T any](ctx context.Context,
 			if !ok {
 				return nil
 			}
-			send <- val
+			select {
+			case send <- val:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}

@@ -274,17 +274,29 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 	}
 }
 
-func (kpr *Keyper) channelNewEonPublicKey(_ context.Context, key keyper.EonPublicKey) error {
-	kpr.newEonPublicKeys <- key
-	return nil
+func (kpr *Keyper) channelNewEonPublicKey(ctx context.Context, key keyper.EonPublicKey) error {
+	select {
+	case kpr.newEonPublicKeys <- key:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
-func (kpr *Keyper) channelNewBlock(_ context.Context, ev *syncevent.LatestBlock) error {
-	kpr.newBlocks <- ev
-	return nil
+func (kpr *Keyper) channelNewBlock(ctx context.Context, ev *syncevent.LatestBlock) error {
+	select {
+	case kpr.newBlocks <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
-func (kpr *Keyper) channelNewKeyperSet(_ context.Context, ev *syncevent.KeyperSet) error {
-	kpr.newKeyperSets <- ev
-	return nil
+func (kpr *Keyper) channelNewKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) error {
+	select {
+	case kpr.newKeyperSets <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
