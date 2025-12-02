@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
+	"strconv"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -71,15 +71,26 @@ func mockBeaconClientWithJSONData(t *testing.T) string {
 	assert.NilError(t, err)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		parts := strings.Split(r.URL.Path, "/")
+		// Get the id parameters from the query string
+		ids := r.URL.Query()["id"]
+
+		validatorData := make([]beaconapiclient.ValidatorData, 0, len(ids))
+		for _, id := range ids {
+			index, err := strconv.ParseUint(id, 10, 64)
+			assert.NilError(t, err)
+			if pubkey, exists := result[id]; exists {
+				validatorData = append(validatorData, beaconapiclient.ValidatorData{
+					Index: index,
+					Validator: beaconapiclient.Validator{
+						PubkeyHex: pubkey,
+					},
+				})
+			}
+		}
 
 		x := beaconapiclient.GetValidatorByIndexResponse{
 			Finalized: true,
-			Data: beaconapiclient.ValidatorData{
-				Validator: beaconapiclient.Validator{
-					PubkeyHex: result[parts[len(parts)-1]],
-				},
-			},
+			Data:      validatorData,
 		}
 		res, err := json.Marshal(x)
 		assert.NilError(t, err)

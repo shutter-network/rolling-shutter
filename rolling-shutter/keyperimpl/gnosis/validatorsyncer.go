@@ -165,7 +165,37 @@ func (v *ValidatorSyncer) filterEvents(
 		}
 
 		pubKeys := make([]*blst.P1Affine, 0)
-		for _, validatorIndex := range msg.ValidatorIndices() {
+		validatorIndices := msg.ValidatorIndices()
+
+		// Split indices into chunks of 64 to respect GetValidatorByIndices limit
+		const maxIndicesPerRequest = 64
+		validatorMap := make(map[int64]*beaconapiclient.ValidatorData)
+
+		for i := 0; i < len(validatorIndices); i += maxIndicesPerRequest {
+			end := i + maxIndicesPerRequest
+			if end > len(validatorIndices) {
+				end = len(validatorIndices)
+			}
+
+			chunk := validatorIndices[i:end]
+			validators, err := v.BeaconAPIClient.GetValidatorByIndices(ctx, "head", chunk)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get validators for chunk starting at index %d", i)
+			}
+
+			// Add validators from this chunk to our map
+			for _, validator := range validators.Data {
+				if validator.Index > math.MaxInt64 {
+					evLog.Warn().
+						Uint64("validator-index", validator.Index).
+						Msg("ignoring validator with index larger than MaxInt64")
+					continue
+				}
+				validatorMap[int64(validator.Index)] = &validator
+			}
+		}
+
+		for _, validatorIndex := range validatorIndices {
 			evLog = evLog.With().Int64("validator-index", validatorIndex).Logger()
 			latestNonce, err := db.GetValidatorRegistrationNonceBefore(ctx, database.GetValidatorRegistrationNonceBeforeParams{
 				ValidatorIndex: validatorIndex,
@@ -188,17 +218,15 @@ func (v *ValidatorSyncer) filterEvents(
 				continue
 			}
 
-			validator, err := v.BeaconAPIClient.GetValidatorByIndex(ctx, "head", uint64(validatorIndex))
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get validator %d", msg.ValidatorIndex)
-			}
-			if validator == nil {
+			validatorData, exists := validatorMap[validatorIndex]
+			if !exists {
 				evLog.Warn().Msg("ignoring registration message for unknown validator")
 				continue
 			}
-			pubkey, err := validator.Data.Validator.GetPubkey()
+
+			pubkey, err := validatorData.Validator.GetPubkey()
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get pubkey of validator %d", msg.ValidatorIndex)
+				return nil, errors.Wrapf(err, "failed to get pubkey of validator %d", validatorIndex)
 			}
 			pubKeys = append(pubKeys, pubkey)
 		}
