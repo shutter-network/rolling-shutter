@@ -164,3 +164,15 @@ func (*EonPublicKey) Topic() string {
 func (*EonPublicKey) Validate() error {
 	return nil
 }
+
+func (c *Commitment) LogInfo() string {
+	return fmt.Sprintf("Commitment{commitment_digest=%s}", c.CommitmentDigest)
+}
+
+func (c *Commitment) Topic() string {
+	return kprtopics.PrimevCommitment
+}
+
+func (c *Commitment) Validate() error {
+	return nil
+}
