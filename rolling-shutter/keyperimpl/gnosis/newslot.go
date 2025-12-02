@@ -209,11 +209,8 @@ func getTxPointer(ctx context.Context, db *pgxpool.Pool, eon int64, maxTxPointer
 			Int64("tx-pointer", txPointer).
 			Int64("tx-pointer-age", txPointerAge).
 			Msg("outdated tx pointer")
-		txPointerInt32, err := gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, eon)
-		txPointer = int64(txPointerInt32)
-		if err == pgx.ErrNoRows {
-			txPointer = 0
-		} else if err != nil {
+		txPointer, err = gnosisKeyperDB.GetTransactionSubmittedEventCount(ctx, eon)
+		if err != nil {
 			return 0, errors.Wrap(err, "failed to query transaction submitted event count from db")
 		}
 	}

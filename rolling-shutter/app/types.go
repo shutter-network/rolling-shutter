@@ -17,15 +17,17 @@ import (
 // providing the first real BatchConfig to be used. We use common.MixedcaseAddress to hold the list
 // of keypers as that one serializes as checksum address.
 type GenesisAppState struct {
-	Keypers    []common.MixedcaseAddress `json:"keypers"`
-	Threshold  uint64                    `json:"threshold"`
-	InitialEon uint64                    `json:"initialEon"`
+	Keypers     []common.MixedcaseAddress `json:"keypers"`
+	Threshold   uint64                    `json:"threshold"`
+	InitialEon  uint64                    `json:"initialEon"`
+	ForkHeights *ForkHeights              `json:"forkHeights"`
 }
 
-func NewGenesisAppState(keypers []common.Address, threshold int, initialEon uint64) GenesisAppState {
+func NewGenesisAppState(keypers []common.Address, threshold int, initialEon uint64, forkHeights *ForkHeights) GenesisAppState {
 	appState := GenesisAppState{
-		Threshold:  uint64(threshold),
-		InitialEon: initialEon,
+		Threshold:   uint64(threshold), //nolint:gosec // G115
+		InitialEon:  initialEon,
+		ForkHeights: forkHeights,
 	}
 	for _, k := range keypers {
 		appState.Keypers = append(appState.Keypers, common.NewMixedcaseAddress(k))
@@ -109,6 +111,7 @@ type ShutterApp struct {
 	CheckTxState    *CheckTxState
 	NonceTracker    *NonceTracker
 	ChainID         string
+	ForkHeights     *ForkHeights
 }
 
 // CheckTxState is a part of the state used by CheckTx calls that is reset at every commit.
@@ -136,6 +139,22 @@ type DKGInstance struct {
 	PolyCommitmentsSeen map[common.Address]struct{}
 	AccusationsSeen     map[common.Address]struct{}
 	ApologiesSeen       map[common.Address]struct{}
+}
+
+// ForkHeights stores the block heights at which the rules of the protocol
+// change. If a field is nil, the corresponding fork is never activated,
+// unless overridden in code for specific chain IDs.
+type ForkHeights struct {
+	CheckInUpdate *int64 `json:"checkInUpdate"`
+}
+
+type ForkHeightOverrides struct {
+	CheckInUpdate *ForkHeightOverride
+}
+
+type ForkHeightOverride struct {
+	Height *int64
+	Eon    *uint64
 }
 
 type (

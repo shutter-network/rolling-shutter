@@ -55,20 +55,18 @@ type PhaseLength interface {
 // ShuttermintState contains our view of the remote shutter state. Strictly speaking everything is
 // stored in the database, and what we have here is kind of a cache.
 type ShuttermintState struct {
-	config         Config
-	synchronized   bool // are we synchronized
-	isKeyper       bool
-	encryptionKeys map[common.Address]*ecies.PublicKey
-	dkg            map[uint64]*ActiveDKG
-	phaseLength    PhaseLength
+	config       Config
+	synchronized bool // are we synchronized
+	isKeyper     bool
+	dkg          map[uint64]*ActiveDKG
+	phaseLength  PhaseLength
 }
 
 func NewShuttermintState(config Config) *ShuttermintState {
 	return &ShuttermintState{
-		config:         config,
-		encryptionKeys: make(map[common.Address]*ecies.PublicKey),
-		dkg:            make(map[uint64]*ActiveDKG),
-		phaseLength:    config.GetDKGPhaseLength(),
+		config:      config,
+		dkg:         make(map[uint64]*ActiveDKG),
+		phaseLength: config.GetDKGPhaseLength(),
 	}
 }
 
@@ -86,10 +84,6 @@ func (st *ShuttermintState) Load(ctx context.Context, queries *database.Queries)
 		return err
 	}
 	st.isKeyper = numBatchConfigs > 0 // XXX need to look
-	err = st.loadEncryptionKeys(ctx, queries)
-	if err != nil {
-		return err
-	}
 	err = st.loadDKG(ctx, queries)
 	if err != nil {
 		return err
@@ -139,25 +133,6 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *database.Queri
 	return nil
 }
 
-func (st *ShuttermintState) loadEncryptionKeys(ctx context.Context, queries *database.Queries) error {
-	keys, err := queries.GetEncryptionKeys(ctx)
-	if err != nil {
-		return err
-	}
-	for _, k := range keys {
-		addr, err := shdb.DecodeAddress(k.Address)
-		if err != nil {
-			return err
-		}
-		p, err := shdb.DecodeEciesPublicKey(k.EncryptionPublicKey)
-		if err != nil {
-			return err
-		}
-		st.encryptionKeys[addr] = p
-	}
-	return nil
-}
-
 func (st *ShuttermintState) BeforeSaveHook(ctx context.Context, queries *database.Queries) error {
 	return st.sendPolyEvals(ctx, queries)
 }
@@ -202,11 +177,22 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 			receivers = nil
 			encryptedEvals = nil
 		}()
-		return queries.ScheduleShutterMessage(
+		eonLabel := strconv.FormatInt(currentEon, 10)
+		err := queries.ScheduleShutterMessage(
 			ctx,
 			fmt.Sprintf("poly eval (eon=%d)", currentEon),
 			shmsg.NewPolyEval(uint64(currentEon), receivers, encryptedEvals),
 		)
+		if err != nil {
+			return err
+		}
+		for range receivers {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypePolyEval,
+			).Inc()
+		}
+		return nil
 	}
 
 	for _, eval := range evals {
@@ -218,14 +204,17 @@ func (st *ShuttermintState) sendPolyEvals(ctx context.Context, queries *database
 			currentEon = eval.Eon
 		}
 
-		fmt.Printf("SEND POLY EVALS: eon=%d receiver=%s\n", eval.Eon, eval.ReceiverAddress)
+		log.Info().
+			Int64("eon", eval.Eon).
+			Str("receiverAddress", eval.ReceiverAddress).
+			Msg("sending poly eval")
 		receiver, err := shdb.DecodeAddress(eval.ReceiverAddress)
 		if err != nil {
 			return err
 		}
-		pubkey, ok := st.encryptionKeys[receiver]
-		if !ok {
-			panic("key not loaded into ShuttermintState")
+		pubkey, err := shdb.DecodeEciesPublicKey(eval.EncryptionPublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to decode encryption public key for %s from db: %w", eval.ReceiverAddress, err)
 		}
 		encrypted, err := ecies.Encrypt(rand.Reader, pubkey, eval.Eval, nil, nil)
 		if err != nil {
@@ -252,8 +241,8 @@ func (st *ShuttermintState) handleBatchConfig(
 		keypermetrics.MetricsKeyperIsKeyper.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10)).Set(0)
 	}
 	if e.IsKeyper(st.config.GetAddress()) {
-		// In case we transition to a superset of the current Keyper set or this node was a Keyper before in an older set
-		// the check-in message will be a duplicate, but this isn't a problem, it will be ignored.
+		// Send a check-in message to announce our encryption and validator key. If we have already checked in
+		// for a previous batch config and neither of the keys has changed, this is redundant but harmless.
 		st.isKeyper = true
 		pubKey := st.config.GetValidatorPublicKey()
 		err := queries.ScheduleShutterMessage(
@@ -386,6 +375,7 @@ func (st *ShuttermintState) startPhase1Dealing(
 		log.Fatal().Err(err).Msg("aborting due to unexpected error")
 	}
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	err = queries.ScheduleShutterMessage(
 		ctx,
 		fmt.Sprintf("poly commitment (eon=%d)", eon),
@@ -394,6 +384,10 @@ func (st *ShuttermintState) startPhase1Dealing(
 	if err != nil {
 		return err
 	}
+	keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+		eonLabel,
+		keypermetrics.DKGMessageTypePolyCommitment,
+	).Inc()
 
 	for _, eval := range polyEvals {
 		err = queries.InsertPolyEval(ctx, database.InsertPolyEvalParams{
@@ -413,9 +407,14 @@ func (st *ShuttermintState) startPhase2Accusing(
 ) error {
 	accusations := dkg.pure.StartPhase2Accusing()
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	if len(accusations) > 0 {
 		var accused []common.Address
 		for _, a := range accusations {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypeAccusation,
+			).Inc()
 			accused = append(accused, dkg.keypers[a.Accused])
 		}
 		err := queries.ScheduleShutterMessage(
@@ -438,11 +437,16 @@ func (st *ShuttermintState) startPhase3Apologizing(
 ) error {
 	apologies := dkg.pure.StartPhase3Apologizing()
 	dkg.markDirty()
+	eonLabel := strconv.FormatUint(eon, 10)
 	if len(apologies) > 0 {
 		var accusers []common.Address
 		var polyEvals []*big.Int
 
 		for _, a := range apologies {
+			keypermetrics.MetricsKeyperDKGMessagesSent.WithLabelValues(
+				eonLabel,
+				keypermetrics.DKGMessageTypeApology,
+			).Inc()
 			accusers = append(accusers, dkg.keypers[a.Accuser])
 			polyEvals = append(polyEvals, a.Eval)
 		}
@@ -586,10 +590,13 @@ func (st *ShuttermintState) shiftPhases(
 func (st *ShuttermintState) handleCheckIn(
 	ctx context.Context, queries *database.Queries, e *shutterevents.CheckIn,
 ) error {
-	st.encryptionKeys[e.Sender] = e.EncryptionPublicKey
+	// Store the key in the database, along with the height from which on it is
+	// valid. If there are multiple keys for the same address and height, only
+	// the last inserted one is kept.
 	err := queries.InsertEncryptionKey(ctx, database.InsertEncryptionKeyParams{
 		Address:             shdb.EncodeAddress(e.Sender),
 		EncryptionPublicKey: shdb.EncodeEciesPublicKey(e.EncryptionPublicKey),
+		Height:              e.Height,
 	})
 	return err
 }
@@ -621,6 +628,10 @@ func (st *ShuttermintState) handlePolyCommitment(
 		return nil
 	}
 	dkg.markDirty()
+	keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+		strconv.FormatUint(e.Eon, 10),
+		keypermetrics.DKGMessageTypePolyCommitment,
+	).Inc()
 	return nil
 }
 
@@ -642,6 +653,7 @@ func (st *ShuttermintState) handlePolyEval(
 			Msg("event for non existent eon received")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		return nil
@@ -678,6 +690,10 @@ func (st *ShuttermintState) handlePolyEval(
 	}
 	log.Info().Str("event", e.String()).Int("keyper", sender).
 		Msg("got poly eval message")
+	keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+		eonLabel,
+		keypermetrics.DKGMessageTypePolyEval,
+	).Inc()
 	dkg.markDirty()
 	return nil
 }
@@ -697,6 +713,7 @@ func (st *ShuttermintState) handleAccusation(
 			Msg("received accusation in wrong phase")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		log.Info().Str("event", e.String()).
@@ -721,7 +738,12 @@ func (st *ShuttermintState) handleAccusation(
 		if err != nil {
 			log.Info().Str("event", e.String()).Err(err).
 				Msg("cannot handle accusation")
+			continue
 		}
+		keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+			eonLabel,
+			keypermetrics.DKGMessageTypeAccusation,
+		).Inc()
 	}
 	dkg.markDirty()
 	return nil
@@ -741,6 +763,7 @@ func (st *ShuttermintState) handleApology(
 			Msg("Warning: received apology in wrong phase")
 		return nil
 	}
+	eonLabel := strconv.FormatUint(e.Eon, 10)
 	sender, err := medley.FindAddressIndex(dkg.keypers, e.Sender)
 	if err != nil {
 		log.Info().Str("event", e.String()).Msg("failed to handle apology. bad sender")
@@ -763,7 +786,12 @@ func (st *ShuttermintState) handleApology(
 			})
 		if err != nil {
 			log.Info().Str("event", e.String()).Err(err).Msg("failed to handle apology")
+			continue
 		}
+		keypermetrics.MetricsKeyperDKGMessagesReceived.WithLabelValues(
+			eonLabel,
+			keypermetrics.DKGMessageTypeApology,
+		).Inc()
 	}
 	dkg.markDirty()
 	return nil

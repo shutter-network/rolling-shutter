@@ -86,7 +86,8 @@ func NewShutterApp() *ShutterApp {
 		BlocksSeen:   make(map[common.Address]uint64),
 		CheckTxState: NewCheckTxState(),
 		NonceTracker: NewNonceTracker(),
-		ChainID:      "", // will be set in InitChain
+		ChainID:      "",  // will be set in InitChain
+		ForkHeights:  nil, // will be set in InitChain
 	}
 }
 
@@ -104,6 +105,14 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 		err = dec.Decode(&shapp)
 		if err != nil {
 			return shapp, err
+		}
+		// Old versions of ShutterApp were initialized with a genesis file
+		// that did not contain ForkHeights and thus do not have them set
+		// either. For backwards compatibility, we set them to all disabled
+		// here (but they will likely be overridden by chain id specific
+		// overrides).
+		if shapp.ForkHeights == nil {
+			shapp.ForkHeights = NewForkHeightsAllDisabled()
 		}
 		log.Info().
 			Str("file", gobpath).
@@ -216,6 +225,15 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	err := amino.NewCodec().UnmarshalJSON(req.AppStateBytes, &genesisState)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot unmarshal genesis app state")
+	}
+
+	// ForkHeights are taken from the genesis state. For backwards compatibility
+	// with older genesis files that do not specify ForkHeights, we initialize
+	// them with all forks disabled (note however that they will likely be
+	// superseded by chain id based overrides).
+	app.ForkHeights = genesisState.ForkHeights
+	if app.ForkHeights == nil {
+		app.ForkHeights = NewForkHeightsAllDisabled()
 	}
 
 	bc := BatchConfig{
@@ -424,10 +442,16 @@ func (app *ShutterApp) isKeyper(a common.Address) bool {
 }
 
 func (app *ShutterApp) deliverCheckIn(msg *shmsg.CheckIn, sender common.Address) abcitypes.ResponseDeliverTx {
-	_, ok := app.Identities[sender]
-	if ok {
-		return makeAlreadySeenResponse(fmt.Sprintf(
-			"sender %s already checked in", sender.Hex()))
+	// Before the check in update fork, only the first check-in of a keyper
+	// is accepted, any subsequent check-in is ignored. After the fork, check-ins
+	// of already checked-in keypers are accepted and update their validator
+	// identity and encryption key.
+	if !app.IsCheckInUpdateForkActive() {
+		_, ok := app.Identities[sender]
+		if ok {
+			return makeAlreadySeenResponse(fmt.Sprintf(
+				"sender %s already checked in", sender.Hex()))
+		}
 	}
 	if !app.isKeyper(sender) {
 		return notAKeyper(sender)
@@ -850,4 +874,10 @@ func (app *ShutterApp) Commit() abcitypes.ResponseCommit { //nolint:unparam
 	}
 
 	return abcitypes.ResponseCommit{}
+}
+
+// CurrentBlockHeight returns the height of the block being processed between
+// BeginBlock and EndBlock.
+func (app *ShutterApp) CurrentBlockHeight() int64 {
+	return app.LastBlockHeight + 1
 }

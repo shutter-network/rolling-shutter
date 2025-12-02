@@ -35,7 +35,9 @@ SET block_hash = $1, block_number = $2, slot = $3;
 SELECT * FROM transaction_submitted_events_synced_until LIMIT 1;
 
 -- name: GetTransactionSubmittedEventCount :one
-SELECT max(index) + 1 FROM transaction_submitted_event
+SELECT
+    cast(coalesce(max(index) + 1, 0) AS bigint)
+FROM transaction_submitted_event
 WHERE eon = $1;
 
 -- name: DeleteTransactionSubmittedEventsFromBlockNumber :exec
