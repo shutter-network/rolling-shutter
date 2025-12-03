@@ -182,6 +182,58 @@ func TestFindOperation(t *testing.T) {
 	}
 }
 
+func TestFindOperation_ParameterizedPaths(t *testing.T) {
+	spec := &openapi3.T{
+		Paths: openapi3.Paths{
+			"/test/{id}": &openapi3.PathItem{
+				Get: &openapi3.Operation{},
+			},
+			"/tests/{id}/items/{name}": &openapi3.PathItem{
+				Post: &openapi3.Operation{},
+			},
+		},
+	}
+
+	tests := []struct {
+		name   string
+		path   string
+		method string
+		want   *openapi3.Operation
+	}{
+		{
+			name:   "match single parameterized path",
+			path:   "/test/123",
+			method: http.MethodGet,
+			want:   spec.Paths.Find("/test/{id}").Get,
+		},
+		{
+			name:   "match nested parameterized path",
+			path:   "/tests/123/items/xyz456",
+			method: http.MethodPost,
+			want:   spec.Paths.Find("/tests/{id}/items/{name}").Post,
+		},
+		{
+			name:   "no match for wrong structure",
+			path:   "/tests/123/items", // missing /{name}
+			method: http.MethodPost,
+			want:   nil,
+		},
+		{
+			name:   "non-existent parameterized path",
+			path:   "/unknown/123",
+			method: http.MethodGet,
+			want:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findOperation(spec, tt.path, tt.method)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestConfigMiddleware(t *testing.T) {
 	// Create a test spec with both read-only and write operations
 	spec := &openapi3.T{
