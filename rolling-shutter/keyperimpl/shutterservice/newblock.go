@@ -3,6 +3,7 @@ package shutterservice
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -135,7 +136,7 @@ func (kpr *Keyper) shouldTriggerDecryption(
 		log.Info().
 			Int64("eon", event.Eon).
 			Int64("block-number", event.BlockNumber).
-			Str("identity", string(event.Identity)).
+			Str("identity", hex.EncodeToString(event.Identity)).
 			Str("address", kpr.config.GetAddress().Hex()).
 			Msg("skipping event as not part of keyper set")
 		return false, nil
