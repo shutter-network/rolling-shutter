@@ -124,5 +124,6 @@ func computeEventTriggerIdentity(event *triggerRegistryV1Bindings.Shuttereventtr
 	var buf bytes.Buffer
 	buf.Write(event.IdentityPrefix[:])
 	buf.Write(event.Sender.Bytes())
+	buf.Write(event.TriggerDefinition)
 	return crypto.Keccak256(buf.Bytes())
 }

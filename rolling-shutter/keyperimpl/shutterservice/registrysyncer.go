@@ -266,7 +266,6 @@ func (s *RegistrySyncer) insertIdentityRegisteredEvents(
 }
 
 func computeIdentity(event *registryBindings.ShutterregistryIdentityRegistered) []byte {
-	// TODO: may need to change this if we want to create identity other way
 	var buf bytes.Buffer
 	buf.Write(event.IdentityPrefix[:])
 	buf.Write(event.Sender.Bytes())
