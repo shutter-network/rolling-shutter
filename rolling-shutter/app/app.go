@@ -824,7 +824,7 @@ func numRequiredTransitionValidators(config *BatchConfig) uint64 {
 	return defenders
 }
 
-// persistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and
+// PersistToDisk stores the ShutterApp on disk. This method first writes to a temporary file and
 // renames the file later. Most probably this will not work on windows!
 func (app *ShutterApp) PersistToDisk() error {
 	log.Info().Int64("height", app.LastBlockHeight).Msg("persisting state to disk")
