@@ -34,11 +34,13 @@ services:
     command: >
       --datadir /data
       --dev
-      --dev.period 1
       --ipcdisable
+      --dev.period 1
       --http
       --http.addr 0.0.0.0
       --http.vhosts geth
+      --ws
+      --ws.addr 0.0.0.0
     # No idea why this is suddenly needed - the HEALTHCHECK is defined in the dockerfile but doesn't get picked up anymore...
     healthcheck:
       test: >
@@ -48,13 +50,21 @@ services:
     logging: *logging
 
   deploy-contracts:
+    image: footest
     build:
       dockerfile: docker/build-src/deploy_contracts/Dockerfile
       context: ..
+    command:
+      - "script/Deploy.gnosh.s.sol"
+      - "--rpc-url" 
+      - "http://geth:8545"
+      - "--broadcast"
     volumes:
-      - ./data/deployments:/contracts/deployments
+      - ./data/deployments:/contracts/broadcast
       - ./config:/config
     environment:
+      DEPLOY_KEY: ${DEPLOY_KEY}
+      PRIVATE_KEY: ${DEPLOY_KEY}
       DEPLOY_CONF: /config/node-deploy.json
       KEYPER_SET_INDEX: 0
     depends_on:
@@ -75,23 +85,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-0-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-0-sentry:
-    image: rolling-shutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-0-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-1-validator:
@@ -107,23 +100,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-1-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-1-sentry:
-    image: rolling-shutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-1-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-2-validator:
@@ -139,23 +115,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-2-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-2-sentry:
-    image: rolling-shutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-2-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-3-validator:
@@ -171,23 +130,6 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-      chain-3-sentry:
-        condition: service_started
-    logging: *logging
-
-  chain-3-sentry:
-    image: rolling-shutter
-    restart: always
-    entrypoint:
-      - /rolling-shutter
-      - chain
-    volumes:
-      - ./data/chain-3-sentry:/chain
-      - ./data/deployments:/deployments
-    command: "--config /chain/config/config.toml"
-    depends_on:
-      chain-seed:
-        condition: service_started
     logging: *logging
 
   chain-seed:
@@ -242,13 +184,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       geth:
         condition: service_healthy
@@ -267,13 +209,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       geth:
         condition: service_healthy
@@ -285,7 +227,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-0.toml"
     volumes:
       - ./config:/config
@@ -295,7 +237,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-0-sentry:
+      chain-0-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -311,7 +253,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-1.toml"
     volumes:
       - ./config:/config
@@ -321,7 +263,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-1-sentry:
+      chain-1-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -337,7 +279,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-2.toml"
     volumes:
       - ./config:/config
@@ -347,7 +289,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-2-sentry:
+      chain-2-validator:
         condition: service_started
       bootnode-0:
         condition: service_started
@@ -363,7 +305,7 @@ services:
     entrypoint:
       - /rolling-shutter
       - "--loglevel=:debug,basichost:info,swarm:info,swarm2:info,net/identify:info,pubsub:info,p2p-config:info,upgrader:info"
-      - snapshotkeyper
+      - gnosiskeyper
     command: "--config /config/keyper-3.toml"
     volumes:
       - ./config:/config
@@ -371,7 +313,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      chain-3-sentry:
+      chain-3-validator:
         condition: service_started
       bootnode-0:
         condition: service_started

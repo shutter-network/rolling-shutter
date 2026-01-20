@@ -6,6 +6,7 @@
 InstanceID = 0
 # If it's empty, we use the standard PG_ environment variables
 DatabaseURL		= "postgres://postgres@db:5432/keyper-1"
+BeaconAPIURL = 'http://localhost:5052'
 HTTPEnabled = false
 HTTPListenAddress = ':3000'
 
@@ -17,22 +18,51 @@ CustomBootstrapAddresses  = [
     "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
     "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
 ]
+DiscoveryNamespace = 'shutter-local'
 
 [Ethereum]
 PrivateKey = '939babbad75cbcc42eef92496ce86ede989ba96918bbc6cc0efcc498f9cc0887'
 # The JSON RPC endpoint where the contracts are accessible
 ContractsURL = 'http://127.0.0.1:8555/'
 # Contract source directory
-DeploymentDir       = "./deployments/dockerGeth/"
+DeploymentDir       = "/deployments/dockerGeth/"
 # The layer 1 JSON RPC endpoint
-EthereumURL         = "http://geth:8545/"
+EthereumURL         = "ws://geth:8546/"
+
+[Gnosis]
+EncryptedGasLimit = 1000000
+MinGasPerTransaction = 21000
+MaxTxPointerAge = 5
+SecondsPerSlot = 5
+SlotsPerEpoch = 16
+GenesisSlotTimestamp = 1665410700
+SyncStartBlockNumber = 0
+SyncMonitorCheckInterval = 30
+
+[Gnosis.Node]
+PrivateKey = '939babbad75cbcc42eef92496ce86ede989ba96918bbc6cc0efcc498f9cc0887'
+# Contract source directory
+DeploymentDir = '/deployments/localhost/'
+# The layer 1 JSON RPC endpoint
+EthereumURL = "ws://geth:8546/"
+
+[Gnosis.Contracts]
+KeyperSetManager = "0xd9013c930ca8a417138e5103002a3444208c920c"
+KeyBroadcastContract = "0x11389b254727b0cdd3ec6b874b688b4a664090fb"
+Sequencer = "0x813d13b8b75528e301afc1f0ff5c4d34fde37f36"
+ValidatorRegistry = "0xd96291f87495f81421bba525a205a652768e1828"
 
 [Shuttermint]
 ShuttermintURL		= "http://chain-1-validator:26657"
-ValidatorPublicKey = '720accc33c2bce1319d12b5f23f81b39a33f487e21c4a4d7ca1e1f7954a24172'
+ValidatorPublicKey = "7ab992829d9826ed71602ec9088ae6f101f8a1621385f0803af24e2cefdb7568"
 EncryptionKey = '8972bbbcf5b4a9eaef0030b1eff64332e7188ff4dd523314176956b5c624ca8b'
 DKGPhaseLength = 8
 DKGStartBlockDelta = 200
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
 
 [Metrics]
 Enabled  = true

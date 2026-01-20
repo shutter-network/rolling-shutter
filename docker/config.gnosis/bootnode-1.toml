@@ -1,0 +1,26 @@
+# Peer identity: /p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo
+# Peer role: bootstrap
+
+# whether to register handlers on the messages and log them
+InstanceID = 0
+ListenMessages = true
+
+[P2P]
+P2PKey          = "CAESQCywBzANmzk2gFd63qkQ8+PlZzy/IqK9Wuv5d6FB1cYh+SggYvQ9pBD5FPLqTbc7garDqgQUJz/6Gpi6Ssbcx44="
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+DiscoveryNamespace = 'shutter-local'
+
+[P2P.FloodSubDiscovery]
+Enabled = true
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled = false
+Host = '[::]'
+Port = 9100

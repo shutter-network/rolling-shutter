@@ -1,0 +1,32 @@
+# Note: for snapshot shutter, we don't need to run a collator!
+
+# Peer identity: /p2p/12D3KooWFsVXBunDMNQZ8LLvS7BpY85Bop8isZaFAq6NVL7nLzUj
+# Ethereum address: 0x2E135FE171fB6351026B75aF688a7F9689B66B87
+
+
+InstanceID = 0
+DatabaseURL     = "postgres://postgres@db:5432/collator"
+HTTPListenAddress = ':3000'
+SequencerURL    = "http://geth:8545/"
+EpochDuration = '1s'
+ExecutionBlockDelay = 5
+BatchIndexAcceptenceInterval = 5
+
+[P2P]
+P2PKey          = "CAESQDTb6IrZcY37WUI2Ld42H4ixyA7S/7ttXBUt0J9EwuPGWfMtbuNarlScRbqIz6Dm8jZqZWkpECDx8r8PwXB97ZQ="
+ListenAddresses   = ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+
+[Ethereum]
+
+PrivateKey     = "215ddd19b91c54252bb956c7f88e42122a61bd45a562d5bae38bc2328a9b52d0"
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL    = "http://geth:8545/"
+# Contract source directory
+DeploymentDir   = "/deployments/dockerGeth/"
+# The layer 1 JSON RPC endpoint
+EthereumURL     = "http://geth:8545/"

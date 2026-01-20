@@ -7,7 +7,7 @@ import (
 )
 
 var Definition = db.NewAggregateDefinition(
-	"snapshot",
+	"snapshotkeyper",
 	database.Definition,
 	chainobsdb.CollatorDefinition,
 )
