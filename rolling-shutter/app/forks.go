@@ -15,6 +15,9 @@ var forkHeightOverrides = map[string]ForkHeightOverrides{
 	"shutter-service-chiado-1000": {CheckInUpdate: &ForkHeightOverride{
 		Eon: uint64Ptr(9),
 	}},
+	"shutter-api-gnosis-1002": {CheckInUpdate: &ForkHeightOverride{
+		Eon: uint64Ptr(6),
+	}},
 }
 
 func int64Ptr(value int64) *int64 {
