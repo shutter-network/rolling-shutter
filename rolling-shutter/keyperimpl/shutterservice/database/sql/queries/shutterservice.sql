@@ -143,4 +143,7 @@ WHERE NOT EXISTS (  -- not decrypted yet
     WHERE e.identity_prefix = f.identity_prefix
     AND e.sender = f.sender
     AND e.decrypted = true
-);
+)
+ORDER BY
+    e.eon ASC,
+    e.identity ASC;
