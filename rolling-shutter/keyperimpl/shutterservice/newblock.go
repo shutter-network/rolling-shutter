@@ -234,10 +234,13 @@ func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghand
 			identities = append(identities, firedTrigger.Identity)
 		}
 
+		sortedIdentityPreimages := sortIdentityPreimages(identities)
+
 		decryptionTrigger := epochkghandler.DecryptionTrigger{
 			BlockNumber:       uint64(eonStruct.ActivationBlockNumber),
-			IdentityPreimages: identities,
+			IdentityPreimages: sortedIdentityPreimages,
 		}
+
 		decryptionTriggers = append(decryptionTriggers, decryptionTrigger)
 	}
 	return decryptionTriggers, nil

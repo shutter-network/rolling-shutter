@@ -215,9 +215,6 @@ WHERE NOT EXISTS (  -- not decrypted yet
     AND e.sender = f.sender
     AND e.decrypted = true
 )
-ORDER BY
-    e.eon ASC,
-    e.identity ASC
 `
 
 type GetUndecryptedFiredTriggersRow struct {
