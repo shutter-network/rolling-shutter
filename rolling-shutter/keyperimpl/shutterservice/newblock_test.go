@@ -1,6 +1,7 @@
 package shutterservice
 
 import (
+	"bytes"
 	"context"
 	"math"
 	"math/big"
@@ -9,8 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/jackc/pgx/v4/pgxpool"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"gotest.tools/assert"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -404,4 +408,138 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	)
 	assert.NilError(t, err)
 	assert.Equal(t, trigger, false)
+}
+
+func setupEventBasedOrderingTest(
+	ctx context.Context,
+	t *testing.T,
+	dbpool *pgxpool.Pool,
+) (*Keyper, *servicedatabase.Queries, int64) {
+	t.Helper()
+
+	const keyperIndex = uint64(1)
+	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
+
+	eon := config.GetEon()
+	if eon > math.MaxInt64 {
+		t.Fatalf("Eon is too large: %d", eon)
+	}
+	eonInt64 := int64(eon)
+
+	privateKey, sender, err := generateRandomAccount()
+	assert.NilError(t, err)
+
+	kpr := &Keyper{
+		dbpool: dbpool,
+		config: &Config{
+			Chain: &ChainConfig{
+				Node: &configuration.EthnodeConfig{
+					PrivateKey: &keys.ECDSAPrivate{Key: privateKey},
+				},
+			},
+		},
+	}
+
+	err = obskeyper.New(dbpool).InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
+		KeyperConfigIndex:     1,
+		ActivationBlockNumber: 0,
+		Keypers:               []string{sender.Hex()},
+		Threshold:             1,
+	})
+	assert.NilError(t, err)
+
+	return kpr, servicedatabase.New(dbpool), eonInt64
+}
+
+func TestFiredTriggersProducesOrderedShares(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
+	t.Cleanup(dbclose)
+
+	kpr, serviceDB, eon := setupEventBasedOrderingTest(ctx, t, dbpool)
+
+	type row struct {
+		identity byte
+		prefix   byte
+		sender   string
+	}
+
+	inserted := []row{
+		{identity: 0x04, prefix: 0x14, sender: "0x0000000000000000000000000000000000000011"},
+		{identity: 0x03, prefix: 0x13, sender: "0x0000000000000000000000000000000000000011"},
+		{identity: 0x02, prefix: 0x12, sender: "0x0000000000000000000000000000000000000011"},
+		{identity: 0x01, prefix: 0x11, sender: "0x0000000000000000000000000000000000000011"},
+		{identity: 0x05, prefix: 0x15, sender: "0x0000000000000000000000000000000000000011"},
+	}
+
+	for i, r := range inserted {
+		_, err := serviceDB.InsertEventTriggerRegisteredEvent(ctx, servicedatabase.InsertEventTriggerRegisteredEventParams{
+			BlockNumber:           int64(100 + i),
+			BlockHash:             []byte{byte(100 + i)},
+			TxIndex:               0,
+			LogIndex:              0,
+			Eon:                   eon,
+			IdentityPrefix:        b32(r.prefix),
+			Sender:                r.sender,
+			Definition:            []byte{0x01},
+			ExpirationBlockNumber: 10_000,
+			Identity:              b32(r.identity),
+		})
+		assert.NilError(t, err)
+
+		err = serviceDB.InsertFiredTrigger(ctx, servicedatabase.InsertFiredTriggerParams{
+			Eon:            eon,
+			IdentityPrefix: b32(r.prefix),
+			Sender:         r.sender,
+			BlockNumber:    int64(200 + i),
+			BlockHash:      []byte{byte(200 + i)},
+			TxIndex:        0,
+			LogIndex:       0,
+		})
+		assert.NilError(t, err)
+	}
+
+	triggers, err := kpr.prepareEventBasedTriggers(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(triggers), 1)
+	assert.Equal(t, len(triggers[0].IdentityPreimages), len(inserted))
+	for i := 1; i < len(triggers[0].IdentityPreimages); i++ {
+		assert.Assert(t, bytes.Compare(
+			triggers[0].IdentityPreimages[i-1],
+			triggers[0].IdentityPreimages[i],
+		) < 0)
+	}
+
+	coreDB := corekeyperdatabase.New(dbpool)
+	triggerBlockNumber := triggers[0].BlockNumber
+	if triggerBlockNumber > math.MaxInt64 {
+		t.Fatalf("BlockNumber is too large: %d", triggerBlockNumber)
+	}
+
+	triggerEon, err := coreDB.GetEonForBlockNumber(ctx, int64(triggerBlockNumber))
+	assert.NilError(t, err)
+
+	keyShareHandler := &epochkghandler.KeyShareHandler{
+		InstanceID:           config.GetInstanceID(),
+		KeyperAddress:        config.GetAddress(),
+		MaxNumKeysPerMessage: config.GetMaxNumKeysPerMessage(),
+		DBPool:               dbpool,
+	}
+	msg, err := keyShareHandler.ConstructDecryptionKeyShares(ctx, triggerEon, triggers[0].IdentityPreimages)
+	assert.NilError(t, err)
+
+	validator := epochkghandler.NewDecryptionKeyShareHandler(config, dbpool)
+	res, err := validator.ValidateMessage(ctx, msg)
+	assert.Equal(t, res, pubsub.ValidationAccept)
+	assert.NilError(t, err)
+}
+
+func b32(last byte) []byte {
+	b := make([]byte, 32)
+	b[31] = last
+	return b
 }
