@@ -117,6 +117,7 @@ func (tp *TriggerProcessor) ProcessEvents(ctx context.Context, tx pgx.Tx, events
 		event := untypedEvent.(*TriggerEvent)
 		err := queries.InsertFiredTrigger(ctx, database.InsertFiredTriggerParams{
 			Eon:            event.EventTriggerRegisteredEvent.Eon,
+			Identity:       event.EventTriggerRegisteredEvent.Identity,
 			IdentityPrefix: event.EventTriggerRegisteredEvent.IdentityPrefix,
 			Sender:         event.EventTriggerRegisteredEvent.Sender,
 			BlockNumber:    int64(event.Log.BlockNumber),

@@ -82,7 +82,10 @@ func (c *Config) GetAddress() common.Address {
 }
 
 func (c *Config) EventBasedTriggersEnabled() bool {
-	return c.Chain.Contracts.ShutterEventTriggerRegistry != common.Address{}
+	return c != nil &&
+		c.Chain != nil &&
+		c.Chain.Contracts != nil &&
+		c.Chain.Contracts.ShutterEventTriggerRegistry != (common.Address{})
 }
 
 type ChainConfig struct {
