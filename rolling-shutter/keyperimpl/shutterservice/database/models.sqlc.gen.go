@@ -39,6 +39,7 @@ type FiredTrigger struct {
 	BlockHash      []byte
 	TxIndex        int64
 	LogIndex       int64
+	Identity       []byte
 }
 
 type IdentityRegisteredEvent struct {

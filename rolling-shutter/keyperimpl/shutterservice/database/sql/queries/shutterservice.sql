@@ -41,7 +41,7 @@ INSERT INTO event_trigger_registered_event (
     identity
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (eon, identity_prefix, sender) DO UPDATE SET
+ON CONFLICT (eon, identity) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
@@ -107,9 +107,9 @@ SET block_number = $1, block_hash = $2;
 DELETE FROM event_trigger_registered_event WHERE block_number >= $1;
 
 -- name: InsertFiredTrigger :exec
-INSERT INTO fired_triggers (eon, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (eon, identity_prefix, sender) DO NOTHING;
+INSERT INTO fired_triggers (eon, identity, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (eon, identity) DO NOTHING;
 
 -- name: DeleteFiredTriggersFromBlockNumber :exec
 DELETE FROM fired_triggers WHERE block_number >= $1;
@@ -120,8 +120,8 @@ WHERE e.expiration_block_number >= @block_number -- not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
-    WHERE t.identity_prefix = e.identity_prefix
-    AND t.sender = e.sender
+    WHERE t.eon = e.eon
+    AND t.identity = e.identity
 );
 
 -- name: GetUndecryptedFiredTriggers :many
@@ -137,10 +137,10 @@ SELECT
    e.identity AS identity,
    e.decrypted AS decrypted
 FROM fired_triggers f
-INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
+INNER JOIN event_trigger_registered_event e ON f.eon = e.eon AND f.identity = e.identity
 WHERE NOT EXISTS (  -- not decrypted yet
     SELECT 1 FROM event_trigger_registered_event e
-    WHERE e.identity_prefix = f.identity_prefix
-    AND e.sender = f.sender
+    WHERE e.eon = f.eon
+    AND e.identity = f.identity
     AND e.decrypted = true
 );
