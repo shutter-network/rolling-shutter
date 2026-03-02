@@ -493,6 +493,7 @@ func TestFiredTriggersProducesOrderedShares(t *testing.T) {
 
 		err = serviceDB.InsertFiredTrigger(ctx, servicedatabase.InsertFiredTriggerParams{
 			Eon:            eon,
+			Identity:       b32(r.identity),
 			IdentityPrefix: b32(r.prefix),
 			Sender:         r.sender,
 			BlockNumber:    int64(200 + i),

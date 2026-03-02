@@ -44,8 +44,8 @@ WHERE e.expiration_block_number >= $1 -- not expired at given block
 AND e.decrypted = false  -- not decrypted yet
 AND NOT EXISTS (  -- not fired yet
     SELECT 1 FROM fired_triggers t
-    WHERE t.identity_prefix = e.identity_prefix
-    AND t.sender = e.sender
+    WHERE t.eon = e.eon
+    AND t.identity = e.identity
 )
 `
 
@@ -208,11 +208,11 @@ SELECT
    e.identity AS identity,
    e.decrypted AS decrypted
 FROM fired_triggers f
-INNER JOIN event_trigger_registered_event e ON f.identity_prefix = e.identity_prefix AND f.sender = e.sender
+INNER JOIN event_trigger_registered_event e ON f.eon = e.eon AND f.identity = e.identity
 WHERE NOT EXISTS (  -- not decrypted yet
     SELECT 1 FROM event_trigger_registered_event e
-    WHERE e.identity_prefix = f.identity_prefix
-    AND e.sender = f.sender
+    WHERE e.eon = f.eon
+    AND e.identity = f.identity
     AND e.decrypted = true
 )
 `
@@ -298,7 +298,7 @@ INSERT INTO event_trigger_registered_event (
     identity
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (eon, identity_prefix, sender) DO UPDATE SET
+ON CONFLICT (eon, identity) DO UPDATE SET
 block_number = $1,
 block_hash = $2,
 tx_index = $3,
@@ -337,13 +337,14 @@ func (q *Queries) InsertEventTriggerRegisteredEvent(ctx context.Context, arg Ins
 }
 
 const insertFiredTrigger = `-- name: InsertFiredTrigger :exec
-INSERT INTO fired_triggers (eon, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (eon, identity_prefix, sender) DO NOTHING
+INSERT INTO fired_triggers (eon, identity, identity_prefix, sender, block_number, block_hash, tx_index, log_index)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (eon, identity) DO NOTHING
 `
 
 type InsertFiredTriggerParams struct {
 	Eon            int64
+	Identity       []byte
 	IdentityPrefix []byte
 	Sender         string
 	BlockNumber    int64
@@ -355,6 +356,7 @@ type InsertFiredTriggerParams struct {
 func (q *Queries) InsertFiredTrigger(ctx context.Context, arg InsertFiredTriggerParams) error {
 	_, err := q.db.Exec(ctx, insertFiredTrigger,
 		arg.Eon,
+		arg.Identity,
 		arg.IdentityPrefix,
 		arg.Sender,
 		arg.BlockNumber,
