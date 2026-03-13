@@ -58,10 +58,12 @@ type FinalizedEventData struct {
 
 // For now this code only supports RawEthereum events, as that's all we need in Shutter.
 type Event struct {
-	ContractId uint   `json:"contract_id"`
-	Raw        RawEth `json:"raweth"`
+	ContractId uint `json:"contract_id"`
+	EventEnum  `json:"data"`
 }
-
+type EventEnum struct {
+	Raw RawEth `json:"raweth"`
+}
 type RawEth struct {
 	Topics []string `json:"topics"` // hex
 	Data   string   `json:"data"`   // hex
