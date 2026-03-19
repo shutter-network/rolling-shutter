@@ -25,6 +25,16 @@ contract Emitter {
         bytes six
     );
 
+    event SingleIdx(uint256 indexed one, bytes two, uint256 three);
+
+    function emitSingleIdx(
+        uint256 one,
+        bytes memory two,
+        uint256 three
+    ) public {
+        emit SingleIdx(one, two, three);
+    }
+
     function emitTwo(uint256 value) public {
         emit Two(value, 5);
     }

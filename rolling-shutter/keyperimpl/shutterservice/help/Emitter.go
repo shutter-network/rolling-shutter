@@ -31,8 +31,8 @@ var (
 
 // EmitterMetaData contains all meta data concerning the Emitter contract.
 var EmitterMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"five\",\"type\":\"bytes\"}],\"name\":\"Five\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"}],\"name\":\"Four\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"string\",\"name\":\"two\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"three\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"five\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"six\",\"type\":\"bytes\"}],\"name\":\"Six\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"newValue\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Two\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"five\",\"type\":\"bytes\"}],\"name\":\"emitFive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"}],\"name\":\"emitFour\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"two\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"three\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"five\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"six\",\"type\":\"bytes\"}],\"name\":\"emitSix\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"emitTwo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506108ed806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80636995a2d9146100515780637155880d1461006d5780638cc5e89214610089578063f70770e0146100a5575b600080fd5b61006b60048036038101906100669190610381565b6100c1565b005b61008760048036038101906100829190610434565b610104565b005b6100a3600480360381019061009e9190610461565b610140565b005b6100bf60048036038101906100ba91906105e3565b610180565b005b8284867f2778059b9d45e2cd0df03a27bbe3e688dfc48aa15a729c42f39dcd986ebd446185856040516100f592919061074c565b60405180910390a45050505050565b807fce34f015a0e20f2b0daf980b28ed50729e87b993e4d30cca4c3f4da05acbd0ac600560405161013591906107c8565b60405180910390a250565b8183857fd82c9bd67140e94b50e0a62e800c51428267b0cd733573daaafad26b62c05afb8460405161017291906107e3565b60405180910390a450505050565b8373ffffffffffffffffffffffffffffffffffffffff16856040516101a5919061084c565b6040518091039020877f1c49d7caedaa8e8be0f2ef7b3c285ccaef7eac5a7fe6b427cbe7e7d8ad3070548686866040516101e193929190610872565b60405180910390a4505050505050565b6000604051905090565b600080fd5b600080fd5b6000819050919050565b61021881610205565b811461022357600080fd5b50565b6000813590506102358161020f565b92915050565b600080fd5b600080fd5b6000601f19601f8301169050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b61028e82610245565b810181811067ffffffffffffffff821117156102ad576102ac610256565b5b80604052505050565b60006102c06101f1565b90506102cc8282610285565b919050565b600067ffffffffffffffff8211156102ec576102eb610256565b5b6102f582610245565b9050602081019050919050565b82818337600083830152505050565b600061032461031f846102d1565b6102b6565b9050828152602081018484840111156103405761033f610240565b5b61034b848285610302565b509392505050565b600082601f8301126103685761036761023b565b5b8135610378848260208601610311565b91505092915050565b600080600080600060a0868803121561039d5761039c6101fb565b5b60006103ab88828901610226565b95505060206103bc88828901610226565b94505060406103cd88828901610226565b935050606086013567ffffffffffffffff8111156103ee576103ed610200565b5b6103fa88828901610353565b925050608086013567ffffffffffffffff81111561041b5761041a610200565b5b61042788828901610353565b9150509295509295909350565b60006020828403121561044a576104496101fb565b5b600061045884828501610226565b91505092915050565b6000806000806080858703121561047b5761047a6101fb565b5b600061048987828801610226565b945050602061049a87828801610226565b93505060406104ab87828801610226565b925050606085013567ffffffffffffffff8111156104cc576104cb610200565b5b6104d887828801610353565b91505092959194509250565b600067ffffffffffffffff8211156104ff576104fe610256565b5b61050882610245565b9050602081019050919050565b6000610528610523846104e4565b6102b6565b90508281526020810184848401111561054457610543610240565b5b61054f848285610302565b509392505050565b600082601f83011261056c5761056b61023b565b5b813561057c848260208601610515565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006105b082610585565b9050919050565b6105c0816105a5565b81146105cb57600080fd5b50565b6000813590506105dd816105b7565b92915050565b60008060008060008060c08789031215610600576105ff6101fb565b5b600061060e89828a01610226565b965050602087013567ffffffffffffffff81111561062f5761062e610200565b5b61063b89828a01610557565b955050604061064c89828a016105ce565b945050606087013567ffffffffffffffff81111561066d5761066c610200565b5b61067989828a01610353565b935050608061068a89828a01610226565b92505060a087013567ffffffffffffffff8111156106ab576106aa610200565b5b6106b789828a01610353565b9150509295509295509295565b600081519050919050565b600082825260208201905092915050565b60005b838110156106fe5780820151818401526020810190506106e3565b8381111561070d576000848401525b50505050565b600061071e826106c4565b61072881856106cf565b93506107388185602086016106e0565b61074181610245565b840191505092915050565b600060408201905081810360008301526107668185610713565b9050818103602083015261077a8184610713565b90509392505050565b6000819050919050565b6000819050919050565b60006107b26107ad6107a884610783565b61078d565b610205565b9050919050565b6107c281610797565b82525050565b60006020820190506107dd60008301846107b9565b92915050565b600060208201905081810360008301526107fd8184610713565b905092915050565b600081519050919050565b600081905092915050565b600061082682610805565b6108308185610810565b93506108408185602086016106e0565b80840191505092915050565b6000610858828461081b565b915081905092915050565b61086c81610205565b82525050565b6000606082019050818103600083015261088c8186610713565b905061089b6020830185610863565b81810360408301526108ad8184610713565b905094935050505056fea2646970667358221220848f06dbefbfd7023244910f585f43334b07207284d4f6541eb16b4b0073fa8964736f6c63430008090033",
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"five\",\"type\":\"bytes\"}],\"name\":\"Five\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"}],\"name\":\"Four\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"two\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"}],\"name\":\"SingleIdx\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"string\",\"name\":\"two\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"three\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"five\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"six\",\"type\":\"bytes\"}],\"name\":\"Six\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"newValue\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Two\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"five\",\"type\":\"bytes\"}],\"name\":\"emitFive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"two\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"}],\"name\":\"emitFour\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"two\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"three\",\"type\":\"uint256\"}],\"name\":\"emitSingleIdx\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"one\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"two\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"three\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"four\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"five\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"six\",\"type\":\"bytes\"}],\"name\":\"emitSix\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"emitTwo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b506109f2806100206000396000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80636995a2d91461005c5780637155880d146100785780638cc5e89214610094578063bb1c31ec146100b0578063f70770e0146100cc575b600080fd5b610076600480360381019061007191906103e7565b6100e8565b005b610092600480360381019061008d919061049a565b61012b565b005b6100ae60048036038101906100a991906104c7565b610167565b005b6100ca60048036038101906100c5919061054a565b6101a7565b005b6100e660048036038101906100e191906106b8565b6101e6565b005b8284867f2778059b9d45e2cd0df03a27bbe3e688dfc48aa15a729c42f39dcd986ebd4461858560405161011c929190610821565b60405180910390a45050505050565b807fce34f015a0e20f2b0daf980b28ed50729e87b993e4d30cca4c3f4da05acbd0ac600560405161015c919061089d565b60405180910390a250565b8183857fd82c9bd67140e94b50e0a62e800c51428267b0cd733573daaafad26b62c05afb8460405161019991906108b8565b60405180910390a450505050565b827f118f15bfd27a002429cfe56dc0757c904b3e8c0535f4f54771d8b184ecdf381483836040516101d99291906108e9565b60405180910390a2505050565b8373ffffffffffffffffffffffffffffffffffffffff168560405161020b9190610960565b6040518091039020877f1c49d7caedaa8e8be0f2ef7b3c285ccaef7eac5a7fe6b427cbe7e7d8ad30705486868660405161024793929190610977565b60405180910390a4505050505050565b6000604051905090565b600080fd5b600080fd5b6000819050919050565b61027e8161026b565b811461028957600080fd5b50565b60008135905061029b81610275565b92915050565b600080fd5b600080fd5b6000601f19601f8301169050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6102f4826102ab565b810181811067ffffffffffffffff82111715610313576103126102bc565b5b80604052505050565b6000610326610257565b905061033282826102eb565b919050565b600067ffffffffffffffff821115610352576103516102bc565b5b61035b826102ab565b9050602081019050919050565b82818337600083830152505050565b600061038a61038584610337565b61031c565b9050828152602081018484840111156103a6576103a56102a6565b5b6103b1848285610368565b509392505050565b600082601f8301126103ce576103cd6102a1565b5b81356103de848260208601610377565b91505092915050565b600080600080600060a0868803121561040357610402610261565b5b60006104118882890161028c565b95505060206104228882890161028c565b94505060406104338882890161028c565b935050606086013567ffffffffffffffff81111561045457610453610266565b5b610460888289016103b9565b925050608086013567ffffffffffffffff81111561048157610480610266565b5b61048d888289016103b9565b9150509295509295909350565b6000602082840312156104b0576104af610261565b5b60006104be8482850161028c565b91505092915050565b600080600080608085870312156104e1576104e0610261565b5b60006104ef8782880161028c565b94505060206105008782880161028c565b93505060406105118782880161028c565b925050606085013567ffffffffffffffff81111561053257610531610266565b5b61053e878288016103b9565b91505092959194509250565b60008060006060848603121561056357610562610261565b5b60006105718682870161028c565b935050602084013567ffffffffffffffff81111561059257610591610266565b5b61059e868287016103b9565b92505060406105af8682870161028c565b9150509250925092565b600067ffffffffffffffff8211156105d4576105d36102bc565b5b6105dd826102ab565b9050602081019050919050565b60006105fd6105f8846105b9565b61031c565b905082815260208101848484011115610619576106186102a6565b5b610624848285610368565b509392505050565b600082601f830112610641576106406102a1565b5b81356106518482602086016105ea565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006106858261065a565b9050919050565b6106958161067a565b81146106a057600080fd5b50565b6000813590506106b28161068c565b92915050565b60008060008060008060c087890312156106d5576106d4610261565b5b60006106e389828a0161028c565b965050602087013567ffffffffffffffff81111561070457610703610266565b5b61071089828a0161062c565b955050604061072189828a016106a3565b945050606087013567ffffffffffffffff81111561074257610741610266565b5b61074e89828a016103b9565b935050608061075f89828a0161028c565b92505060a087013567ffffffffffffffff8111156107805761077f610266565b5b61078c89828a016103b9565b9150509295509295509295565b600081519050919050565b600082825260208201905092915050565b60005b838110156107d35780820151818401526020810190506107b8565b838111156107e2576000848401525b50505050565b60006107f382610799565b6107fd81856107a4565b935061080d8185602086016107b5565b610816816102ab565b840191505092915050565b6000604082019050818103600083015261083b81856107e8565b9050818103602083015261084f81846107e8565b90509392505050565b6000819050919050565b6000819050919050565b600061088761088261087d84610858565b610862565b61026b565b9050919050565b6108978161086c565b82525050565b60006020820190506108b2600083018461088e565b92915050565b600060208201905081810360008301526108d281846107e8565b905092915050565b6108e38161026b565b82525050565b6000604082019050818103600083015261090381856107e8565b905061091260208301846108da565b9392505050565b600081519050919050565b600081905092915050565b600061093a82610919565b6109448185610924565b93506109548185602086016107b5565b80840191505092915050565b600061096c828461092f565b915081905092915050565b6000606082019050818103600083015261099181866107e8565b90506109a060208301856108da565b81810360408301526109b281846107e8565b905094935050505056fea2646970667358221220095412f10dd044a1de6fe1692f95175a761ae75806a97261993a8ab82c278d7d64736f6c63430008090033",
 }
 
 // EmitterABI is the input ABI used to generate the binding from.
@@ -242,6 +242,27 @@ func (_Emitter *EmitterSession) EmitFour(one *big.Int, two *big.Int, three *big.
 // Solidity: function emitFour(uint256 one, uint256 two, uint256 three, bytes four) returns()
 func (_Emitter *EmitterTransactorSession) EmitFour(one *big.Int, two *big.Int, three *big.Int, four []byte) (*types.Transaction, error) {
 	return _Emitter.Contract.EmitFour(&_Emitter.TransactOpts, one, two, three, four)
+}
+
+// EmitSingleIdx is a paid mutator transaction binding the contract method 0xbb1c31ec.
+//
+// Solidity: function emitSingleIdx(uint256 one, bytes two, uint256 three) returns()
+func (_Emitter *EmitterTransactor) EmitSingleIdx(opts *bind.TransactOpts, one *big.Int, two []byte, three *big.Int) (*types.Transaction, error) {
+	return _Emitter.contract.Transact(opts, "emitSingleIdx", one, two, three)
+}
+
+// EmitSingleIdx is a paid mutator transaction binding the contract method 0xbb1c31ec.
+//
+// Solidity: function emitSingleIdx(uint256 one, bytes two, uint256 three) returns()
+func (_Emitter *EmitterSession) EmitSingleIdx(one *big.Int, two []byte, three *big.Int) (*types.Transaction, error) {
+	return _Emitter.Contract.EmitSingleIdx(&_Emitter.TransactOpts, one, two, three)
+}
+
+// EmitSingleIdx is a paid mutator transaction binding the contract method 0xbb1c31ec.
+//
+// Solidity: function emitSingleIdx(uint256 one, bytes two, uint256 three) returns()
+func (_Emitter *EmitterTransactorSession) EmitSingleIdx(one *big.Int, two []byte, three *big.Int) (*types.Transaction, error) {
+	return _Emitter.Contract.EmitSingleIdx(&_Emitter.TransactOpts, one, two, three)
 }
 
 // EmitSix is a paid mutator transaction binding the contract method 0xf70770e0.
@@ -603,6 +624,150 @@ func (_Emitter *EmitterFilterer) WatchFour(opts *bind.WatchOpts, sink chan<- *Em
 func (_Emitter *EmitterFilterer) ParseFour(log types.Log) (*EmitterFour, error) {
 	event := new(EmitterFour)
 	if err := _Emitter.contract.UnpackLog(event, "Four", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// EmitterSingleIdxIterator is returned from FilterSingleIdx and is used to iterate over the raw logs and unpacked data for SingleIdx events raised by the Emitter contract.
+type EmitterSingleIdxIterator struct {
+	Event *EmitterSingleIdx // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *EmitterSingleIdxIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(EmitterSingleIdx)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(EmitterSingleIdx)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *EmitterSingleIdxIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *EmitterSingleIdxIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// EmitterSingleIdx represents a SingleIdx event raised by the Emitter contract.
+type EmitterSingleIdx struct {
+	One   *big.Int
+	Two   []byte
+	Three *big.Int
+	Raw   types.Log // Blockchain specific contextual infos
+}
+
+// FilterSingleIdx is a free log retrieval operation binding the contract event 0x118f15bfd27a002429cfe56dc0757c904b3e8c0535f4f54771d8b184ecdf3814.
+//
+// Solidity: event SingleIdx(uint256 indexed one, bytes two, uint256 three)
+func (_Emitter *EmitterFilterer) FilterSingleIdx(opts *bind.FilterOpts, one []*big.Int) (*EmitterSingleIdxIterator, error) {
+	var oneRule []interface{}
+	for _, oneItem := range one {
+		oneRule = append(oneRule, oneItem)
+	}
+
+	logs, sub, err := _Emitter.contract.FilterLogs(opts, "SingleIdx", oneRule)
+	if err != nil {
+		return nil, err
+	}
+	return &EmitterSingleIdxIterator{contract: _Emitter.contract, event: "SingleIdx", logs: logs, sub: sub}, nil
+}
+
+// WatchSingleIdx is a free log subscription operation binding the contract event 0x118f15bfd27a002429cfe56dc0757c904b3e8c0535f4f54771d8b184ecdf3814.
+//
+// Solidity: event SingleIdx(uint256 indexed one, bytes two, uint256 three)
+func (_Emitter *EmitterFilterer) WatchSingleIdx(opts *bind.WatchOpts, sink chan<- *EmitterSingleIdx, one []*big.Int) (event.Subscription, error) {
+	var oneRule []interface{}
+	for _, oneItem := range one {
+		oneRule = append(oneRule, oneItem)
+	}
+
+	logs, sub, err := _Emitter.contract.WatchLogs(opts, "SingleIdx", oneRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(EmitterSingleIdx)
+				if err := _Emitter.contract.UnpackLog(event, "SingleIdx", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseSingleIdx is a log parse operation binding the contract event 0x118f15bfd27a002429cfe56dc0757c904b3e8c0535f4f54771d8b184ecdf3814.
+//
+// Solidity: event SingleIdx(uint256 indexed one, bytes two, uint256 three)
+func (_Emitter *EmitterFilterer) ParseSingleIdx(log types.Log) (*EmitterSingleIdx, error) {
+	event := new(EmitterSingleIdx)
+	if err := _Emitter.contract.UnpackLog(event, "SingleIdx", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
