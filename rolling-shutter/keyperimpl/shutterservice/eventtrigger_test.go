@@ -1813,20 +1813,23 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				unmarshaledPredicate := unmarshaled.LogPredicates[i]
 
 				// Compare LogValueRef
-				assert.Equal(t, originalPredicate.LogValueRef.Offset, unmarshaledPredicate.LogValueRef.Offset)
+				assert.Equal(t, originalPredicate.LogValueRef.Offset,
+					unmarshaledPredicate.LogValueRef.Offset)
 
 				// Compare ValuePredicate
 				assert.Equal(t, originalPredicate.ValuePredicate.Op, unmarshaledPredicate.ValuePredicate.Op)
 
 				// Compare IntArgs
-				assert.Equal(t, len(originalPredicate.ValuePredicate.IntArgs), len(unmarshaledPredicate.ValuePredicate.IntArgs))
+				assert.Equal(t, len(originalPredicate.ValuePredicate.IntArgs),
+					len(unmarshaledPredicate.ValuePredicate.IntArgs))
 				for j, originalIntArg := range originalPredicate.ValuePredicate.IntArgs {
 					unmarshaledIntArg := unmarshaledPredicate.ValuePredicate.IntArgs[j]
 					assert.Equal(t, originalIntArg.Cmp(unmarshaledIntArg), 0)
 				}
 
 				// Compare ByteArgs
-				assert.Equal(t, len(originalPredicate.ValuePredicate.ByteArgs), len(unmarshaledPredicate.ValuePredicate.ByteArgs))
+				assert.Equal(t, len(originalPredicate.ValuePredicate.ByteArgs),
+					len(unmarshaledPredicate.ValuePredicate.ByteArgs))
 				for j, originalByteArg := range originalPredicate.ValuePredicate.ByteArgs {
 					unmarshaledByteArg := unmarshaledPredicate.ValuePredicate.ByteArgs[j]
 					assert.DeepEqual(t, originalByteArg, unmarshaledByteArg)
@@ -2071,8 +2074,10 @@ func TestWithEVM(t *testing.T) {
 
 	two := "two"
 	matchTwo := LogPredicate{
-		LogValueRef:    LogValueRef{Offset: 2},
-		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{Align(crypto.Keccak256([]byte("two")))}},
+		LogValueRef: LogValueRef{Offset: 2},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{
+			Align(crypto.Keccak256([]byte("two"))),
+		}},
 	}
 
 	three := common.BytesToAddress(big.NewInt(84).Bytes())
@@ -2082,14 +2087,25 @@ func TestWithEVM(t *testing.T) {
 	}
 	four := []byte("first and slightly longer arg that should use more space and if i am right, then this will span multiple words")
 	notQuiteFour := []byte("first and slightly longer arg that should use more space and if ")
-	matchFour := LogPredicate{LogValueRef: LogValueRef{Offset: 4}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}}}
-	dontMatchFour := LogPredicate{LogValueRef: LogValueRef{Offset: 4}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{[]byte("no match")}}}
-	notQuiteMatchFour := LogPredicate{LogValueRef: LogValueRef{Offset: 4}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{notQuiteFour}}}
+	matchFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
+	}
+	dontMatchFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{[]byte("no match")}},
+	}
+	notQuiteMatchFour := LogPredicate{
+		LogValueRef: LogValueRef{Offset: 4}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{notQuiteFour}},
+	}
 
 	five := big.NewInt(42)
 
 	six := []byte("second arg")
-	matchSix := LogPredicate{LogValueRef: LogValueRef{Offset: 6}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}}}
+	matchSix := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 6},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}},
+	}
 	tx, err := setup.Contract.EmitSix(setup.Auth, one, two, three, four, five, six)
 	assert.NilError(t, err, "error creating tx")
 	vLog, err := help.CollectLog(t, setup, tx)
@@ -2199,7 +2215,8 @@ func TestWithEVM(t *testing.T) {
 
 			encoded := etd.MarshalBytes()
 			decoded := EventTriggerDefinition{}
-			decoded.UnmarshalBytes(encoded)
+			err = decoded.UnmarshalBytes(encoded)
+			assert.NilError(t, err, "error when roundtrip decoding")
 			doubleEncoded := decoded.MarshalBytes()
 
 			equal := cmp.DeepEqual(encoded, doubleEncoded)

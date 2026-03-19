@@ -2,7 +2,7 @@ package help
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -69,7 +69,7 @@ func CollectLog(t *testing.T, setup Setup, tx *types.Transaction) (*types.Log, e
 	// get Receipt for Logs
 	receipt, err := setup.Backend.TransactionReceipt(context.Background(), tx.Hash())
 	if err != nil {
-		log.Fatalf("Failed to get receipt: %v", err)
+		return nil, fmt.Errorf("failed to get receipt: %v", err)
 	}
 	return receipt.Logs[0], nil
 }
