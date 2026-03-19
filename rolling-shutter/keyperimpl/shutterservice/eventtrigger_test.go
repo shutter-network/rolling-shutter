@@ -1858,6 +1858,10 @@ func TestEventTriggerDefinitionUnmarshalErrors(t *testing.T) {
 			data: []byte{0x99}, // Wrong version
 		},
 		{
+			name: "old version",
+			data: []byte{0x1}, // Old version
+		},
+		{
 			name: "version only, no RLP data",
 			data: []byte{Version},
 		},

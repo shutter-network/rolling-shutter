@@ -15,7 +15,7 @@ import (
 
 const (
 	Word    = 32
-	Version = 0x1
+	Version = 0x2
 )
 
 // EventTriggerDefinition specifies an event-based trigger.
