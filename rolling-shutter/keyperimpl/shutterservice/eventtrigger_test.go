@@ -2065,44 +2065,40 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 
 func TestWithEVM(t *testing.T) {
 	setup := help.SetupBackend(t)
-
 	one := big.NewInt(1)
-	matchOne := LogPredicate{
+	mOne := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 1},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{Align(one.Bytes())}},
 	}
-
 	two := "two"
-	matchTwo := LogPredicate{
+	mTwo := LogPredicate{
 		LogValueRef: LogValueRef{Offset: 2},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{
 			Align(crypto.Keccak256([]byte("two"))),
 		}},
 	}
-
 	three := common.BytesToAddress(big.NewInt(84).Bytes())
-	matchThree := LogPredicate{
+	mThree := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 3},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{Align(three[:])}},
 	}
 	four := []byte("first and slightly longer arg that should use more space and if i am right, then this will span multiple words")
-	notQuiteFour := []byte("first and slightly longer arg that should use more space and if ")
-	matchFour := LogPredicate{
+	preFour := []byte("first and slightly longer arg that should use more space and if ")
+	mFoure := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 4},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
 	}
-	dontMatchFour := LogPredicate{
+	noMFour := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 4},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{[]byte("no match")}},
 	}
-	notQuiteMatchFour := LogPredicate{
-		LogValueRef: LogValueRef{Offset: 4}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{notQuiteFour}},
+	preNotFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{preFour}},
 	}
-
 	five := big.NewInt(42)
-
 	six := []byte("second arg")
-	matchSix := LogPredicate{
+	mSix := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 6},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}},
 	}
@@ -2112,104 +2108,41 @@ func TestWithEVM(t *testing.T) {
 	assert.NilError(t, err, "error getting log")
 
 	tests := []struct {
-		def    EventTriggerDefinition
-		match  bool
-		errMsg string
-		name   string
+		predicates []LogPredicate
+		match      bool
+		name       string
 	}{
+		{predicates: []LogPredicate{mOne, mTwo, mThree, mSix}, match: true, name: "match one, two, three and six"},
+		{predicates: []LogPredicate{mFoure}, match: true, name: "match four"},
+		{predicates: []LogPredicate{mFoure, mSix}, match: true, name: "match four and six"},
 		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{matchOne, matchTwo, matchThree, matchSix},
-			},
-			match:  true,
-			errMsg: "",
-			name:   "match one, two, three and six",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{matchFour},
-			},
-			match:  true,
-			errMsg: "",
-			name:   "match four",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{matchFour, matchSix},
-			},
-			match:  true,
-			errMsg: "",
-			name:   "match four and six",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{matchSix, matchSix, matchSix},
-			},
-			match:  true,
-			errMsg: "",
+			predicates: []LogPredicate{mSix, mSix},
+			match:      true,
 			// Note: this is legal, although not practical
-			name: "match tripplicated six",
+			name: "match duplicate six",
 		},
+		{predicates: []LogPredicate{preNotFour}, match: false, name: "prefix should not match whole"},
+		{predicates: []LogPredicate{noMFour, mFoure}, match: false, name: "mismatch same offset"},
 		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{notQuiteMatchFour},
-			},
-			match:  false,
-			errMsg: "",
-			name:   "string prefix should not match whole string",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract:      setup.ContractAddress,
-				LogPredicates: []LogPredicate{dontMatchFour, matchFour},
-			},
-			match:  false,
-			errMsg: "",
-			name:   "match four and dont match four",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract: setup.ContractAddress,
-				LogPredicates: []LogPredicate{
-					{
-						LogValueRef: LogValueRef{Offset: 5},
-						ValuePredicate: ValuePredicate{
-							Op:      UintEq,
-							IntArgs: []*big.Int{five},
-						},
+			predicates: []LogPredicate{
+				{
+					LogValueRef: LogValueRef{Offset: 5},
+					ValuePredicate: ValuePredicate{
+						Op:      UintEq,
+						IntArgs: []*big.Int{five},
 					},
 				},
 			},
-			match:  true,
-			errMsg: "",
-			name:   "match five EQ",
-		},
-		{
-			def: EventTriggerDefinition{
-				Contract: setup.ContractAddress,
-				LogPredicates: []LogPredicate{
-					{
-						LogValueRef: LogValueRef{Offset: 5},
-						ValuePredicate: ValuePredicate{
-							Op:      UintGte,
-							IntArgs: []*big.Int{five},
-						},
-					},
-				},
-			},
-			match:  true,
-			errMsg: "",
-			name:   "match five GTE",
+			match: true,
+			name:  "match five GTE",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			etd := tt.def
+			etd := EventTriggerDefinition{
+				Contract:      setup.ContractAddress,
+				LogPredicates: tt.predicates,
+			}
 			err := etd.Validate()
 			assert.NilError(t, err, "did not validate: %v", tt.name)
 
