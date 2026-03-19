@@ -20,12 +20,9 @@ $(CONTRACT).go: $(CONTRACT).json
 	@echo "Generating Go bindings..."
 	$(ABIGEN) \
 		--combined-json $(CONTRACT).json \
-		--pkg shutterservice \
-		--out ../$(CONTRACT).go
+		--pkg help \
+		--out $(CONTRACT).go
 
 # Clean generated files
 clean:
-	rm -f $(CONTRACT).json ../$(CONTRACT).go
-
-test:
-	go test -run TestMyEVM
+	rm -f $(CONTRACT).json $(CONTRACT).go

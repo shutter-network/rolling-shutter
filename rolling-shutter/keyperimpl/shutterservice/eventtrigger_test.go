@@ -2,22 +2,19 @@ package shutterservice
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/rlp"
 	"gotest.tools/assert"
 	"gotest.tools/assert/cmp"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
 func TestOpValidate(t *testing.T) {
@@ -2063,67 +2060,8 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 	}
 }
 
-type Setup struct {
-	backend         backends.SimulatedBackend
-	auth            *bind.TransactOpts
-	contract        *Emitter
-	contractAddress common.Address
-}
-
-func setupBackend(t *testing.T) Setup {
-	t.Helper()
-
-	// create funded genesis account
-	privateKey, err := crypto.GenerateKey()
-	assert.NilError(t, err, "failed to generate private key %v", err)
-
-	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(1337))
-	assert.NilError(t, err, "failed to create transactor %v", err)
-
-	balance := new(big.Int)
-	balance.SetString("1000000000000000000000", 10) // 1000 ETH
-	alloc := make(types.GenesisAlloc)
-	alloc[auth.From] = types.Account{Balance: balance}
-
-	// create SimulatedBackend
-	b := simulated.NewBackend(alloc, simulated.WithBlockGasLimit(8000000))
-	backend := backends.SimulatedBackend{
-		Backend: b,
-		Client:  b.Client(),
-	}
-	// deploy Emitter contract
-	// Emitter.go is generated through `make all`
-	contractAddress, _, _, err := DeployEmitter(auth, backend)
-	assert.NilError(t, err, "failed to deploy contract: %v", err)
-	backend.Commit()
-
-	// bind contract
-	contract, err := NewEmitter(contractAddress, backend)
-	assert.NilError(t, err, "failed to bind contract instance to address %v: %v", contractAddress, err)
-
-	return Setup{
-		backend:         backend,
-		auth:            auth,
-		contract:        contract,
-		contractAddress: contractAddress,
-	}
-}
-
-func collectLog(t *testing.T, setup Setup, tx *types.Transaction) (*types.Log, error) {
-	t.Helper()
-	// Commit the block to process the transaction
-	setup.backend.Commit()
-
-	// get Receipt for Logs
-	receipt, err := setup.backend.TransactionReceipt(context.Background(), tx.Hash())
-	if err != nil {
-		log.Fatalf("Failed to get receipt: %v", err)
-	}
-	return receipt.Logs[0], nil
-}
-
 func TestWithEVM(t *testing.T) {
-	setup := setupBackend(t)
+	setup := help.SetupBackend(t)
 
 	one := big.NewInt(1)
 	matchOne := LogPredicate{
@@ -2152,9 +2090,9 @@ func TestWithEVM(t *testing.T) {
 
 	six := []byte("second arg")
 	matchSix := LogPredicate{LogValueRef: LogValueRef{Offset: 6}, ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}}}
-	tx, err := setup.contract.EmitSix(setup.auth, one, two, three, four, five, six)
+	tx, err := setup.Contract.EmitSix(setup.Auth, one, two, three, four, five, six)
 	assert.NilError(t, err, "error creating tx")
-	vLog, err := collectLog(t, setup, tx)
+	vLog, err := help.CollectLog(t, setup, tx)
 	assert.NilError(t, err, "error getting log")
 
 	tests := []struct {
@@ -2165,7 +2103,7 @@ func TestWithEVM(t *testing.T) {
 	}{
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{matchOne, matchTwo, matchThree, matchSix},
 			},
 			match:  true,
@@ -2174,7 +2112,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{matchFour},
 			},
 			match:  true,
@@ -2183,7 +2121,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{matchFour, matchSix},
 			},
 			match:  true,
@@ -2192,7 +2130,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{matchSix, matchSix, matchSix},
 			},
 			match:  true,
@@ -2202,7 +2140,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{notQuiteMatchFour},
 			},
 			match:  false,
@@ -2211,7 +2149,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract:      setup.contractAddress,
+				Contract:      setup.ContractAddress,
 				LogPredicates: []LogPredicate{dontMatchFour, matchFour},
 			},
 			match:  false,
@@ -2220,7 +2158,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract: setup.contractAddress,
+				Contract: setup.ContractAddress,
 				LogPredicates: []LogPredicate{
 					{
 						LogValueRef: LogValueRef{Offset: 5},
@@ -2237,7 +2175,7 @@ func TestWithEVM(t *testing.T) {
 		},
 		{
 			def: EventTriggerDefinition{
-				Contract: setup.contractAddress,
+				Contract: setup.ContractAddress,
 				LogPredicates: []LogPredicate{
 					{
 						LogValueRef: LogValueRef{Offset: 5},
