@@ -448,11 +448,6 @@ func (p *ValuePredicate) validateArgValues() error {
 			return fmt.Errorf("integer argument %d cannot be negative for operation %d", i, p.Op)
 		}
 	}
-	// for i, arg := range p.ByteArgs {
-	// 	if len(arg) > Word {
-	// 		return fmt.Errorf("size of byte argument %d larger than 32 bytes for operation %d, got %d bytes", i, p.Op, len(arg))
-	// 	}
-	// }
 	return nil
 }
 
