@@ -32,11 +32,11 @@ type LogPredicate struct {
 }
 
 // LogValueRef references a value contained in an event log.
-//   - If 0 <= Offset < 4, it refers to the topic of the log at index Offset. In this case, Length
-//     must be 1.
-//   - If Offset >= 4, it refers to a slice of 32-byte words from the log's data. Its start index is
-//     Offset - 4 and the length is Length. E.g., for offset 5 and length 2, the slice starts at
-//     byte 32, ends at byte 96 (exclusive), and is 64 bytes long.
+//   - If 0 <= Offset < 4, it refers to the topic of the log at index Offset. In this case, there is always
+//     one whole 32 byte word.
+//   - If Offset >= 4, it refers to a slice from the log's data. Its start index is at
+//     (Offset - 4) * 32 and the length is encoded according to the ABI event encoding spec
+//     (https://docs.soliditylang.org/en/latest/abi-spec.html).
 type LogValueRef struct {
 	Offset uint64
 }
@@ -138,11 +138,13 @@ func (d *EventTriggerDefinition) ToFilterQuery() (ethereum.FilterQuery, error) {
 			topics = append(topics, []common.Hash{})
 		}
 		if len(topics[topicIndex]) != 0 {
-			return ethereum.FilterQuery{}, fmt.Errorf("multiple log predicates for topic %d", topicIndex)
+			return ethereum.FilterQuery{}, fmt.Errorf(
+				"multiple log predicates for topic %d", topicIndex)
 		}
 		topic := logPredicate.ValuePredicate.ByteArgs[0]
 		if len(topic) != Word {
-			return ethereum.FilterQuery{}, fmt.Errorf("log predicate for topic %d must have a 32-byte value, got %d bytes", topicIndex, len(topic))
+			return ethereum.FilterQuery{}, fmt.Errorf(
+				"log predicate for topic %d must have a 32-byte value, got %d bytes", topicIndex, len(topic))
 		}
 		topics[logPredicate.LogValueRef.Offset] = []common.Hash{common.BytesToHash(topic)}
 	}
@@ -434,7 +436,8 @@ func (p *ValuePredicate) validateArgNums() error {
 		return fmt.Errorf("operation %d requires exactly %d integer argument(s), got %d", p.Op, requiredIntArgs, len(p.IntArgs))
 	}
 	if len(p.ByteArgs) != requiredByteArgs {
-		return fmt.Errorf("operation %d requires exactly %d bytes argument(s), got %d", p.Op, requiredByteArgs, len(p.ByteArgs))
+		return fmt.Errorf("operation %d requires exactly %d bytes argument(s), got %d",
+			p.Op, requiredByteArgs, len(p.ByteArgs))
 	}
 	return nil
 }
