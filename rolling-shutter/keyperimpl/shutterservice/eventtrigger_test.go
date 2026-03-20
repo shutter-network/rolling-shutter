@@ -2163,3 +2163,11 @@ func TestWithEVM(t *testing.T) {
 		})
 	}
 }
+
+// aligns []byte to 32 byte.
+func Align(val []byte) []byte {
+	words := (31 + len(val)) / Word
+	x := make([]byte, Word*words)
+	copy(x[len(x)-len(val):], val)
+	return x
+}

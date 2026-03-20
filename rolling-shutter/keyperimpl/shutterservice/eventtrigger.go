@@ -311,14 +311,6 @@ func (r *LogValueRef) GetOffsetDataValue(log *types.Log) []byte {
 	return value
 }
 
-// aligns []byte to 32 byte.
-func Align(val []byte) []byte {
-	words := (31 + len(val)) / Word
-	x := make([]byte, Word*words)
-	copy(x[len(x)-len(val):], val)
-	return x
-}
-
 const (
 	UintLt Op = iota
 	UintLte
