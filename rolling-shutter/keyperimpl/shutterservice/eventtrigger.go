@@ -38,7 +38,8 @@ type LogPredicate struct {
 //     (Offset - 4) * 32 and the length is encoded according to the ABI event encoding spec
 //     (https://docs.soliditylang.org/en/latest/abi-spec.html).
 type LogValueRef struct {
-	Offset uint64
+	Dynamic bool
+	Offset  uint64
 }
 
 // ValuePredicate defines a condition on a value contained in an event log that must be satisfied
@@ -188,12 +189,7 @@ func (p *LogPredicate) Validate() error {
 }
 
 func (p *LogPredicate) Match(log *types.Log) (bool, error) {
-	var value []byte
-	if p.ValuePredicate.Op != BytesEq || p.LogValueRef.IsTopic() {
-		value = p.LogValueRef.GetValue(log)
-	} else {
-		value = p.LogValueRef.GetOffsetDataValue(log)
-	}
+	value := p.LogValueRef.GetValue(log)
 	return p.ValuePredicate.Match(value)
 }
 
@@ -203,16 +199,21 @@ func (r *LogValueRef) Validate() error {
 	if r.Offset > math.MaxUint32 {
 		return fmt.Errorf("log value reference offset must be less than 2^32, got %d", r.Offset)
 	}
+	if r.Dynamic && r.Offset < 4 {
+		return fmt.Errorf("topic values (offset < 4) are always fixed size of one word, got offset %d", r.Offset)
+	}
 	return nil
 }
 
 func (r *LogValueRef) EncodeRLP(w io.Writer) error {
 	buf := rlp.NewEncoderBuffer(w)
+	buf.WriteBool(r.Dynamic)
 	buf.WriteUint64(r.Offset)
 	return buf.Flush()
 }
 
 func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
+	var dynamic bool
 	var offset uint64
 	kind, _, err := s.Kind()
 	if err != nil {
@@ -220,6 +221,10 @@ func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
 	}
 	switch kind {
 	case rlp.Byte, rlp.String:
+		dynamic, err = s.Bool()
+		if err != nil {
+			return fmt.Errorf("failed to read dynamic from LogValueRef: %w", err)
+		}
 		offset, err = s.Uint64()
 		if err != nil {
 			return fmt.Errorf("failed to read offset from LogValueRef: %w", err)
@@ -229,6 +234,7 @@ func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
 	default:
 		panic(fmt.Sprintf("unexpected kind %d for LogValueRef", kind))
 	}
+	r.Dynamic = dynamic
 	r.Offset = offset
 	if err := r.Validate(); err != nil {
 		return fmt.Errorf("invalid LogValueRef: %w", err)
@@ -240,9 +246,9 @@ func (r *LogValueRef) IsTopic() bool {
 	return r.Offset < 4
 }
 
-// GetValue retrieves a one-word value from the log based on the LogValueRef.
+// GetValue retrieves a slice from the log based on the LogValueRef.
 //
-// In case a slice of log data is referenced and the slice exceeds the log's data length, the
+// In case the referenced slice exceeds the log's data length, the
 // result will be zero-padded on the right to the expected length.
 func (r *LogValueRef) GetValue(log *types.Log) []byte {
 	if r.IsTopic() {
@@ -252,6 +258,9 @@ func (r *LogValueRef) GetValue(log *types.Log) []byte {
 		return log.Topics[r.Offset].Bytes()
 	}
 
+	if r.Dynamic {
+		return r.getOffsetDataValue(log)
+	}
 	dataOffset := r.Offset - 4
 	value := make([]byte, Word)
 
@@ -269,11 +278,11 @@ func (r *LogValueRef) GetValue(log *types.Log) []byte {
 	return value
 }
 
-// GetOffsetDataValue retrieves a "complex" data value from the log based on the LogValueRef.
+// getOffsetDataValue retrieves a "complex" data value from the log based on the LogValueRef.
 //
 // In case a slice of log data is referenced and the slice exceeds the log's data length, the
 // result will be zero-padded on the right to the expected length.
-func (r *LogValueRef) GetOffsetDataValue(log *types.Log) []byte {
+func (r *LogValueRef) getOffsetDataValue(log *types.Log) []byte {
 	// abi encoded log data:
 	// W1: first argument value (simple) or offset_0 (complex)
 	// W2: second argument value (simple) or offset_1 (complex)

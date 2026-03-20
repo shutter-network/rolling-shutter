@@ -92,6 +92,15 @@ func TestLogValueRefValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "invalid topic reference - offset 3, cannot be dynamic",
+			ref: LogValueRef{
+				Offset:  3,
+				Dynamic: true,
+			},
+			wantErr: true,
+			errMsg:  "topic values (offset < 4) are always fixed size of one word, got offset 3",
+		},
+		{
 			name: "valid topic reference - offset 3",
 			ref: LogValueRef{
 				Offset: 3,
@@ -99,16 +108,18 @@ func TestLogValueRefValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid data reference - offset 4",
+			name: "valid data reference - offset 4, dynamic size",
 			ref: LogValueRef{
-				Offset: 4,
+				Offset:  4,
+				Dynamic: true,
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid data reference - offset 5",
+			name: "valid data reference - offset 5, fixed size",
 			ref: LogValueRef{
-				Offset: 5,
+				Offset:  5,
+				Dynamic: false,
 			},
 			wantErr: false,
 		},
@@ -983,11 +994,48 @@ func TestLogValueRefGetValue(t *testing.T) {
 				return result
 			}(),
 		},
-
+		{
+			name: "get two data words (offset 4, dynamic)",
+			ref: LogValueRef{
+				Offset:  4,
+				Dynamic: true,
+			},
+			log: &types.Log{
+				Topics: []common.Hash{
+					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+				},
+				Data: func() []byte {
+					data := make([]byte, 128)
+					// Encode offset
+					data[31] = 32
+					// Encode length
+					data[63] = 64
+					// First word: 0x1111...1111
+					for i := 0; i < 32; i++ {
+						data[64+i] = 0x11
+					}
+					// Second word: 0x2222...2222
+					for i := 0; i < 32; i++ {
+						data[96+i] = 0x22
+					}
+					return data
+				}(),
+			},
+			want: func() []byte {
+				result := make([]byte, 64)
+				for i := 0; i < 32; i++ {
+					result[i] = 0x11
+				}
+				for i := 32; i < 64; i++ {
+					result[i] = 0x22
+				}
+				return result
+			}(),
+		},
 		{
 			name: "get data beyond log length - zero padded",
 			// Third word, but log only has 2 words
-			ref: LogValueRef{Offset: 6},
+			ref: LogValueRef{Offset: 6, Dynamic: false},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -1738,7 +1786,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 			},
 		},
 		{
-			name: "definition with all operation types",
+			name: "definition with all operation types and one dynamic LogValueRef",
 			definition: EventTriggerDefinition{
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
@@ -1783,7 +1831,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 5},
+						LogValueRef: LogValueRef{Offset: 5, Dynamic: true},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1889,32 +1937,42 @@ func TestLogValueRefEncodeRLP(t *testing.T) {
 		{
 			name:     "topic reference - offset 0",
 			ref:      LogValueRef{Offset: 0},
-			expected: []byte{0x80}, // RLP encoding of uint64(0)
+			expected: []byte{0x80, 0x80}, // RLP encoding of uint64(0)
 		},
 		{
 			name:     "topic reference - offset 3",
 			ref:      LogValueRef{Offset: 3},
-			expected: []byte{0x03}, // RLP encoding of uint64(3)
+			expected: []byte{0x80, 0x03}, // RLP encoding of uint64(3)
 		},
 		{
 			name:     "data reference - offset 4",
 			ref:      LogValueRef{Offset: 4},
-			expected: []byte{0x04}, // RLP encoding of uint64(4)
+			expected: []byte{0x80, 0x04}, // RLP encoding of uint64(4)
 		},
 		{
 			name:     "data reference - offset 5",
 			ref:      LogValueRef{Offset: 5},
-			expected: []byte{0x05}, // RLP encoding of uint64(5)
+			expected: []byte{0x80, 0x05}, // RLP encoding of uint64(5)
 		},
 		{
 			name:     "data reference - offset 10",
 			ref:      LogValueRef{Offset: 10},
-			expected: []byte{0x0a}, // RLP encoding of uint64(10)
+			expected: []byte{0x80, 0x0a}, // RLP encoding of uint64(10)
+		},
+		{
+			name:     "data reference - offset 10, dynamic",
+			ref:      LogValueRef{Offset: 10, Dynamic: true},
+			expected: []byte{0x01, 0x0a}, // RLP encoding of uint64(10)
 		},
 		{
 			name:     "large offset",
-			ref:      LogValueRef{Offset: 1000},
-			expected: []byte{0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			ref:      LogValueRef{Offset: 1000, Dynamic: false},
+			expected: []byte{0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+		},
+		{
+			name:     "large offset, dynamic",
+			ref:      LogValueRef{Offset: 1000, Dynamic: true},
+			expected: []byte{0x01, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 		},
 	}
 
@@ -1938,37 +1996,37 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 	}{
 		{
 			name:     "topic reference - offset 0",
-			encoded:  []byte{0x80}, // RLP encoding of uint64(0)
+			encoded:  []byte{0x80, 0x80}, // RLP encoding of uint64(0)
 			expected: LogValueRef{Offset: 0},
 			wantErr:  false,
 		},
 		{
 			name:     "topic reference - offset 3",
-			encoded:  []byte{0x03}, // RLP encoding of uint64(3)
+			encoded:  []byte{0x80, 0x03}, // RLP encoding of uint64(3)
 			expected: LogValueRef{Offset: 3},
 			wantErr:  false,
 		},
 		{
 			name:     "data reference - offset 4",
-			encoded:  []byte{0x04}, // RLP encoding of uint64(4)
+			encoded:  []byte{0x80, 0x04}, // RLP encoding of uint64(4)
 			expected: LogValueRef{Offset: 4},
 			wantErr:  false,
 		},
 		{
-			name:     "data reference - offset 5",
-			encoded:  []byte{0x05}, // RLP encoding of uint64(5)
-			expected: LogValueRef{Offset: 5},
+			name:     "data reference - offset 5, dynamic true",
+			encoded:  []byte{0x01, 0x05}, // RLP encoding of uint64(5)
+			expected: LogValueRef{Offset: 5, Dynamic: true},
 			wantErr:  false,
 		},
 		{
 			name:     "data reference - offset 10",
-			encoded:  []byte{0x0a}, // RLP encoding of uint64(10)
+			encoded:  []byte{0x80, 0x0a}, // RLP encoding of uint64(10)
 			expected: LogValueRef{Offset: 10},
 			wantErr:  false,
 		},
 		{
 			name:     "large offset",
-			encoded:  []byte{0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			encoded:  []byte{0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 			expected: LogValueRef{Offset: 1000},
 			wantErr:  false,
 		},
@@ -2028,7 +2086,7 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 		},
 		{
 			name: "data reference - multiple words",
-			ref:  LogValueRef{Offset: 5},
+			ref:  LogValueRef{Offset: 5, Dynamic: true},
 		},
 		{
 			name: "large values",
@@ -2085,21 +2143,25 @@ func TestWithEVM(t *testing.T) {
 	four := []byte("first and slightly longer arg that should use more space and if i am right, then this will span multiple words")
 	preFour := []byte("first and slightly longer arg that should use more space and if ")
 	mFour := LogPredicate{
-		LogValueRef:    LogValueRef{Offset: 4},
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
 	}
 	noMFour := LogPredicate{
-		LogValueRef:    LogValueRef{Offset: 4},
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{[]byte("no match")}},
 	}
+	inValidFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: false},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
+	}
 	preNotFour := LogPredicate{
-		LogValueRef:    LogValueRef{Offset: 4},
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{preFour}},
 	}
 	five := big.NewInt(42)
 	six := []byte("second arg")
 	mSix := LogPredicate{
-		LogValueRef:    LogValueRef{Offset: 6},
+		LogValueRef:    LogValueRef{Offset: 6, Dynamic: true},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}},
 	}
 	tx, err := setup.Contract.EmitSix(setup.Auth, one, two, three, four, five, six)
@@ -2118,11 +2180,11 @@ func TestWithEVM(t *testing.T) {
 		{
 			predicates: []LogPredicate{mSix, mSix},
 			match:      true,
-			// Note: this is legal, although not practical
-			name: "match duplicate six",
+			name:       "match duplicate six", // Note: this is legal, although not practical
 		},
 		{predicates: []LogPredicate{preNotFour}, match: false, name: "prefix should not match whole"},
 		{predicates: []LogPredicate{noMFour, mFour}, match: false, name: "mismatch same offset"},
+		{predicates: []LogPredicate{inValidFour}, match: false, name: "invalid fourth arg matcher"},
 		{
 			predicates: []LogPredicate{
 				{
@@ -2145,7 +2207,6 @@ func TestWithEVM(t *testing.T) {
 			}
 			err := etd.Validate()
 			assert.NilError(t, err, "did not validate: %v", tt.name)
-
 			encoded := etd.MarshalBytes()
 			decoded := EventTriggerDefinition{}
 			err = decoded.UnmarshalBytes(encoded)
