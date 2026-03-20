@@ -281,6 +281,7 @@ func (r *LogValueRef) GetOffsetDataValue(log *types.Log) []byte {
 	// W..@offset_0+W: start of data for first complex argument
 	//
 	// we need to discriminate between literal/simple and complex arguments
+	// - topic data (i.e. offset < 4) is always read as a whole word by `GetValue`
 	// - simple are found in `data[(offset-4)*WORD:(offset-4+1)*WORD]`
 	// - complex are found by
 	// 		- reading the `internal_offset` from `data[(offset-4)*WORD:(offset-4+1)*WORD]`
