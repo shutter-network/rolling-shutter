@@ -2084,7 +2084,7 @@ func TestWithEVM(t *testing.T) {
 	}
 	four := []byte("first and slightly longer arg that should use more space and if i am right, then this will span multiple words")
 	preFour := []byte("first and slightly longer arg that should use more space and if ")
-	mFoure := LogPredicate{
+	mFour := LogPredicate{
 		LogValueRef:    LogValueRef{Offset: 4},
 		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
 	}
@@ -2113,8 +2113,8 @@ func TestWithEVM(t *testing.T) {
 		name       string
 	}{
 		{predicates: []LogPredicate{mOne, mTwo, mThree, mSix}, match: true, name: "match one, two, three and six"},
-		{predicates: []LogPredicate{mFoure}, match: true, name: "match four"},
-		{predicates: []LogPredicate{mFoure, mSix}, match: true, name: "match four and six"},
+		{predicates: []LogPredicate{mFour}, match: true, name: "match four"},
+		{predicates: []LogPredicate{mFour, mSix}, match: true, name: "match four and six"},
 		{
 			predicates: []LogPredicate{mSix, mSix},
 			match:      true,
@@ -2122,7 +2122,7 @@ func TestWithEVM(t *testing.T) {
 			name: "match duplicate six",
 		},
 		{predicates: []LogPredicate{preNotFour}, match: false, name: "prefix should not match whole"},
-		{predicates: []LogPredicate{noMFour, mFoure}, match: false, name: "mismatch same offset"},
+		{predicates: []LogPredicate{noMFour, mFour}, match: false, name: "mismatch same offset"},
 		{
 			predicates: []LogPredicate{
 				{
