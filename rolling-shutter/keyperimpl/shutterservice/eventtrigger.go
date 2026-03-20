@@ -163,7 +163,6 @@ func (d *EventTriggerDefinition) ToFilterQuery() (ethereum.FilterQuery, error) {
 // We need to match ABI encoding: https://docs.soliditylang.org/en/latest/abi-spec.html
 func (d *EventTriggerDefinition) Match(log *types.Log) (bool, error) {
 	if log.Address != d.Contract {
-		fmt.Println("Contract mismatch")
 		return false, nil
 	}
 	for _, logPredicate := range d.LogPredicates {
