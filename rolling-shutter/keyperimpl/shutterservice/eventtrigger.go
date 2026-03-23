@@ -205,43 +205,6 @@ func (r *LogValueRef) Validate() error {
 	return nil
 }
 
-func (r *LogValueRef) EncodeRLP(w io.Writer) error {
-	buf := rlp.NewEncoderBuffer(w)
-	buf.WriteBool(r.Dynamic)
-	buf.WriteUint64(r.Offset)
-	return buf.Flush()
-}
-
-func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
-	var dynamic bool
-	var offset uint64
-	kind, _, err := s.Kind()
-	if err != nil {
-		return fmt.Errorf("failed to decode LogValueRef: %w", err)
-	}
-	switch kind {
-	case rlp.Byte, rlp.String:
-		dynamic, err = s.Bool()
-		if err != nil {
-			return fmt.Errorf("failed to read dynamic from LogValueRef: %w", err)
-		}
-		offset, err = s.Uint64()
-		if err != nil {
-			return fmt.Errorf("failed to read offset from LogValueRef: %w", err)
-		}
-	case rlp.List:
-		return fmt.Errorf("LogValueRef can't be a list")
-	default:
-		panic(fmt.Sprintf("unexpected kind %d for LogValueRef", kind))
-	}
-	r.Dynamic = dynamic
-	r.Offset = offset
-	if err := r.Validate(); err != nil {
-		return fmt.Errorf("invalid LogValueRef: %w", err)
-	}
-	return nil
-}
-
 func (r *LogValueRef) IsTopic() bool {
 	return r.Offset < 4
 }

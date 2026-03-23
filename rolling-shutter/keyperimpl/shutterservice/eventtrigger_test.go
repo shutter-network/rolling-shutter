@@ -1937,51 +1937,50 @@ func TestLogValueRefEncodeRLP(t *testing.T) {
 		{
 			name:     "topic reference - offset 0",
 			ref:      LogValueRef{Offset: 0},
-			expected: []byte{0x80, 0x80}, // RLP encoding of uint64(0)
+			expected: []byte{0xc2, 0x80, 0x80}, // RLP encoding of uint64(0)
 		},
 		{
 			name:     "topic reference - offset 3",
 			ref:      LogValueRef{Offset: 3},
-			expected: []byte{0x80, 0x03}, // RLP encoding of uint64(3)
+			expected: []byte{0xc2, 0x80, 0x03}, // RLP encoding of uint64(3)
 		},
 		{
 			name:     "data reference - offset 4",
 			ref:      LogValueRef{Offset: 4},
-			expected: []byte{0x80, 0x04}, // RLP encoding of uint64(4)
+			expected: []byte{0xc2, 0x80, 0x04}, // RLP encoding of uint64(4)
 		},
 		{
 			name:     "data reference - offset 5",
 			ref:      LogValueRef{Offset: 5},
-			expected: []byte{0x80, 0x05}, // RLP encoding of uint64(5)
+			expected: []byte{0xc2, 0x80, 0x05}, // RLP encoding of uint64(5)
 		},
 		{
 			name:     "data reference - offset 10",
 			ref:      LogValueRef{Offset: 10},
-			expected: []byte{0x80, 0x0a}, // RLP encoding of uint64(10)
+			expected: []byte{0xc2, 0x80, 0x0a}, // RLP encoding of uint64(10)
 		},
 		{
 			name:     "data reference - offset 10, dynamic",
 			ref:      LogValueRef{Offset: 10, Dynamic: true},
-			expected: []byte{0x01, 0x0a}, // RLP encoding of uint64(10)
+			expected: []byte{0xc2, 0x01, 0x0a}, // RLP encoding of uint64(10)
 		},
 		{
 			name:     "large offset",
 			ref:      LogValueRef{Offset: 1000, Dynamic: false},
-			expected: []byte{0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			expected: []byte{0xc4, 0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 		},
 		{
 			name:     "large offset, dynamic",
 			ref:      LogValueRef{Offset: 1000, Dynamic: true},
-			expected: []byte{0x01, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			expected: []byte{0xc4, 0x01, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := tt.ref.EncodeRLP(&buf)
+			encoded, err := rlp.EncodeToBytes(tt.ref)
 			assert.NilError(t, err, "EncodeRLP should not fail")
-			assert.DeepEqual(t, tt.expected, buf.Bytes())
+			assert.DeepEqual(t, tt.expected, encoded)
 		})
 	}
 }
@@ -1996,37 +1995,37 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 	}{
 		{
 			name:     "topic reference - offset 0",
-			encoded:  []byte{0x80, 0x80}, // RLP encoding of uint64(0)
+			encoded:  []byte{0xc2, 0x80, 0x80}, // RLP encoding of uint64(0)
 			expected: LogValueRef{Offset: 0},
 			wantErr:  false,
 		},
 		{
 			name:     "topic reference - offset 3",
-			encoded:  []byte{0x80, 0x03}, // RLP encoding of uint64(3)
+			encoded:  []byte{0xc2, 0x80, 0x03}, // RLP encoding of uint64(3)
 			expected: LogValueRef{Offset: 3},
 			wantErr:  false,
 		},
 		{
 			name:     "data reference - offset 4",
-			encoded:  []byte{0x80, 0x04}, // RLP encoding of uint64(4)
+			encoded:  []byte{0xc2, 0x80, 0x04}, // RLP encoding of uint64(4)
 			expected: LogValueRef{Offset: 4},
 			wantErr:  false,
 		},
 		{
 			name:     "data reference - offset 5, dynamic true",
-			encoded:  []byte{0x01, 0x05}, // RLP encoding of uint64(5)
+			encoded:  []byte{0xc2, 0x01, 0x05}, // RLP encoding of uint64(5)
 			expected: LogValueRef{Offset: 5, Dynamic: true},
 			wantErr:  false,
 		},
 		{
 			name:     "data reference - offset 10",
-			encoded:  []byte{0x80, 0x0a}, // RLP encoding of uint64(10)
+			encoded:  []byte{0xc2, 0x80, 0x0a}, // RLP encoding of uint64(10)
 			expected: LogValueRef{Offset: 10},
 			wantErr:  false,
 		},
 		{
 			name:     "large offset",
-			encoded:  []byte{0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			encoded:  []byte{0xc4, 0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 			expected: LogValueRef{Offset: 1000},
 			wantErr:  false,
 		},
@@ -2034,19 +2033,19 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 			name:    "invalid - empty RLP data",
 			encoded: []byte{},
 			wantErr: true,
-			errMsg:  "failed to decode LogValueRef",
+			errMsg:  "EOF",
 		},
 		{
 			name:    "invalid - malformed RLP",
 			encoded: []byte{0xFF, 0xFF},
 			wantErr: true,
-			errMsg:  "failed to decode LogValueRef",
+			errMsg:  "rlp: value size exceeds available input length",
 		},
 		{
 			name:    "invalid - incomplete list",
-			encoded: []byte{0xc1, 0x04}, // List with only one element
+			encoded: []byte{0xc2, 0x04}, // List with only one element
 			wantErr: true,
-			errMsg:  "LogValueRef can't be a list",
+			errMsg:  "rlp: value size exceeds available input length",
 		},
 	}
 
@@ -2092,16 +2091,18 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 			name: "large values",
 			ref:  LogValueRef{Offset: 65535},
 		},
+		{
+			name: "large values - dynamic",
+			ref:  LogValueRef{Offset: 65535, Dynamic: true},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Encode
-			var buf bytes.Buffer
-			err := tt.ref.EncodeRLP(&buf)
+			encoded, err := rlp.EncodeToBytes(tt.ref)
 			assert.NilError(t, err, "EncodeRLP should not fail")
 
-			encoded := buf.Bytes()
 			assert.Assert(t, len(encoded) > 0, "Encoded data should not be empty")
 
 			// Decode
@@ -2113,10 +2114,9 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 			assert.Equal(t, tt.ref.Offset, decoded.Offset)
 
 			// Encode again and verify consistency
-			var buf2 bytes.Buffer
-			err = decoded.EncodeRLP(&buf2)
+			encoded2, err := rlp.EncodeToBytes(decoded)
 			assert.NilError(t, err, "Second EncodeRLP should not fail")
-			assert.DeepEqual(t, encoded, buf2.Bytes())
+			assert.DeepEqual(t, encoded, encoded2)
 		})
 	}
 }
