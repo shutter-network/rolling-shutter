@@ -1,0 +1,45 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Initialize the shuttermint seed node"
+#MISE depends=["gen-compose"]
+#MISE outputs=["{{env.DATA_DIR}}/chain-seed/config/config.toml"]
+# /// script
+# dependencies = ["tomlkit"]
+# ///
+
+import os
+from pathlib import Path
+
+import tomlkit
+import utils
+
+
+data_dir = Path(os.environ["DATA_DIR"])
+config_path = data_dir / "chain-seed" / "config" / "config.toml"
+
+if not config_path.exists():
+    utils.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--no-deps",
+            "chain-seed",
+            "chain",
+            "init",
+            "--root",
+            "/chain",
+            "--genesis-keyper",
+            "0x0000000000000000000000000000000000000000",
+            "--blocktime",
+            os.environ["SHUTTERMINT_BLOCK_TIME"],
+            "--listen-address",
+            f"tcp://0.0.0.0:{os.environ['SHUTTERMINT_RPC_PORT']}",
+            "--role",
+            "seed",
+        ]
+    )
+
+document = tomlkit.parse(config_path.read_text())
+document["moniker"] = "chain-seed"
+config_path.write_text(tomlkit.dumps(document))

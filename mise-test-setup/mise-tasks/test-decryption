@@ -1,0 +1,25 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Submit a decryption trigger and wait for the key"
+
+import json
+
+import utils
+
+
+result = utils.run(
+    ["mise", "run", "submit-identity-registration"],
+    capture_output=True,
+)
+context = json.loads(result.stdout.strip().splitlines()[-1])
+
+utils.run(
+    [
+        "mise",
+        "run",
+        "wait-for-decryption-key",
+        "--eon",
+        context["eon"],
+        "--identity-prefix",
+        context["identity_prefix"],
+    ]
+)

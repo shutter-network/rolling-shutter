@@ -1,0 +1,45 @@
+x-chain-base: &chain_base
+  image: rolling-shutter
+  entrypoint:
+    - /rolling-shutter
+  command:
+    - chain
+    - --config
+    - /chain/config/config.toml
+  healthcheck:
+    test: curl -sf http://127.0.0.1:26657/status >/dev/null
+    interval: 1s
+    timeout: 1s
+    retries: 10
+  depends_on:
+    chain-seed:
+      condition: service_healthy
+
+x-keyper-base: &keyper_base
+  image: rolling-shutter
+  entrypoint:
+    - /rolling-shutter
+  command:
+    - {{ keyper_command }}
+    - --config
+    - /config.toml
+
+services:
+    {%- for i in range(num_keypers|int) %}
+    chain-{{ i }}:
+        <<: *chain_base
+        volumes:
+        - ../${DATA_DIR}/chain-{{ i }}/:/chain
+
+    keyper-{{ i }}:
+        <<: *keyper_base
+        depends_on:
+          bootnode:
+            condition: service_started
+          chain-{{ i }}:
+            condition: service_healthy
+        volumes:
+        - ../${DATA_DIR}/keyper-{{ i }}.toml:/config.toml
+    {%- if not loop.last %}
+    {% endif %}
+    {%- endfor %}

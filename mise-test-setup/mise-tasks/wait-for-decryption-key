@@ -1,0 +1,40 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Wait for a decryption key"
+#USAGE flag "--eon <eon>" help="Target eon"
+#USAGE flag "--identity-prefix <identity_prefix>" help="Identity prefix hex string"
+
+import os
+import time
+
+import utils
+
+
+eon = os.environ.get("usage_eon", "").strip()
+identity_prefix = os.environ.get("usage_identity_prefix", "").strip()
+poll_interval = float(os.environ["DECRYPTION_KEY_POLL_INTERVAL"])
+if not eon or not identity_prefix:
+    raise SystemExit("Provide both --eon and --identity-prefix")
+
+while True:
+    identity = utils.query_keyper_db(
+        0,
+        "SELECT encode(identity, 'hex') "
+        "FROM identity_registered_event "
+        f"WHERE eon = {int(eon)} AND encode(identity_prefix, 'hex') = '{identity_prefix.removeprefix('0x')}' "
+        "ORDER BY block_number DESC, tx_index DESC, log_index DESC LIMIT 1",
+    )
+    if not identity:
+        time.sleep(poll_interval)
+        continue
+
+    exists = utils.query_keyper_db(
+        0,
+        "SELECT EXISTS ("
+        "SELECT 1 FROM decryption_key "
+        f"WHERE eon = {int(eon)} AND encode(epoch_id, 'hex') = '{identity}'"
+        ")",
+    )
+    if exists == "t":
+        print(f"Decryption key available for eon {eon}")
+        raise SystemExit(0)
+    time.sleep(poll_interval)

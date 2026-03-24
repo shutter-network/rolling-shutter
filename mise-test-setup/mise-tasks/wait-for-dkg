@@ -1,0 +1,53 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Wait for DKG completion"
+#USAGE flag "--keyper-set-index <keyper_set_index>" help="Wait for a successful DKG for this keyper set index"
+#USAGE flag "--eon <eon>" help="Wait for completion of this eon"
+
+import os
+import time
+
+import utils
+
+
+keyper_set_index = os.environ.get("usage_keyper_set_index", "").strip()
+eon = os.environ.get("usage_eon", "").strip()
+poll_interval = float(os.environ["DKG_RESULT_POLL_INTERVAL"])
+
+if bool(keyper_set_index) == bool(eon):
+    raise SystemExit("Provide exactly one of --keyper-set-index or --eon")
+
+last_reported_failed_eon: str | None = None
+
+while True:
+    if keyper_set_index:
+        target_eon = utils.query_keyper_db(
+            0,
+            f"SELECT max(eon) FROM eons WHERE keyper_config_index = {int(keyper_set_index)}",
+        )
+        if not target_eon:
+            time.sleep(poll_interval)
+            continue
+    else:
+        target_eon = str(int(eon))
+
+    success = utils.query_keyper_db(
+        0,
+        f"SELECT success FROM dkg_result WHERE eon = {target_eon}",
+    )
+    if not success:
+        time.sleep(poll_interval)
+        continue
+
+    if success == "t":
+        print(f"DKG finished successfully for eon {target_eon}")
+        raise SystemExit(0)
+
+    if keyper_set_index:
+        if target_eon != last_reported_failed_eon:
+            print(f"DKG failed for eon {target_eon}")
+            last_reported_failed_eon = target_eon
+        time.sleep(poll_interval)
+        continue
+
+    print(f"DKG failed for eon {target_eon}")
+    raise SystemExit(1)

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Build the rolling-shutter image"
+
+docker build \
+    -f ../docker/build-src/rolling-shutter/Dockerfile \
+    -t rolling-shutter:latest \
+    ..

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Delete all generated files"
+#MISE depends=["down"]
+
+rm -rf "${DATA_DIR}"
+rm -rf "${GENERATED_DIR}"

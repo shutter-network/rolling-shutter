@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Stop the docker3 stack"
+
+if [ -f "${GENERATED_DIR}/compose.yml" ]; then
+    docker compose down || true
+fi

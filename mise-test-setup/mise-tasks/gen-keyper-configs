@@ -1,0 +1,73 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Ensure config files for all keypers"
+#MISE depends=["deploy"]
+# /// script
+# dependencies = ["tomlkit"]
+# ///
+
+import os
+import json
+from pathlib import Path
+
+import tomlkit
+import utils
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+data_dir = Path(os.environ["DATA_DIR"])
+static_dir = Path(os.environ["STATIC_DIR"])
+run_path = (
+    data_dir
+    / "contracts"
+    / "broadcast"
+    / utils.DEPLOYMENT_SCRIPTS[deployment_type]
+    / os.environ["ETHEREUM_CHAIN_ID"]
+    / "run-latest.json"
+)
+deployment_run = json.loads(run_path.read_text())
+bootstrap_config = tomlkit.parse((static_dir / "bootstrap.toml").read_text())
+bootstrap_addresses = bootstrap_config.get("P2P", {}).get("CustomBootstrapAddresses")
+
+if not isinstance(bootstrap_addresses, list) or not bootstrap_addresses:
+    raise SystemExit(
+        "static/bootstrap.toml must define a non-empty P2P.CustomBootstrapAddresses list"
+    )
+
+for index in range(int(os.environ["NUM_KEYPERS"])):
+    config_path = data_dir / f"keyper-{index}.toml"
+    config_container_path = f"/data/keyper-{index}.toml"
+
+    if not config_path.exists():
+        utils.run(
+            [
+                "docker",
+                "compose",
+                "run",
+                "--rm",
+                "rolling-shutter",
+                utils.KEYPER_SUBCOMMANDS[deployment_type],
+                "generate-config",
+                "--output",
+                config_container_path,
+            ]
+        )
+
+    document = tomlkit.parse(config_path.read_text())
+    utils.set_toml_path(document, ["DatabaseURL"], f"postgresql://postgres@db:5432/keyper-{index}")
+    utils.set_toml_path(document, ["Shuttermint", "ShuttermintURL"], f"http://chain-{index}:{os.environ['SHUTTERMINT_RPC_PORT']}")
+    utils.set_toml_path(document, ["Shuttermint", "DKGPhaseLength"], int(os.environ["SHUTTERMINT_DKG_PHASE_LENGTH"]))
+    utils.set_toml_path(document, ["Shuttermint", "StartBlockDelta"], int(os.environ["SHUTTERMINT_START_BLOCK_DELTA"]))
+    utils.set_toml_path(document, ["P2P", "CustomBootstrapAddresses"], bootstrap_addresses)
+    utils.set_toml_path(document, ["Chain", "Contracts", "KeyBroadcastContract"], utils.get_created_contract_address(deployment_run, "KeyBroadcastContract"))
+    utils.set_toml_path(document, ["Chain", "Contracts", "KeyperSetManager"], utils.get_created_contract_address(deployment_run, "KeyperSetManager"))
+
+    if deployment_type == "gnosis":
+        utils.set_toml_path(document, ["Gnosis", "Node", "EthereumURL"], "ws://ethereum:8545")
+        utils.set_toml_path(document, ["Chain", "Contracts", "Sequencer"], utils.get_created_contract_address(deployment_run, "Sequencer"))
+        utils.set_toml_path(document, ["Chain", "Contracts", "ValidatorRegistry"], utils.get_created_contract_address(deployment_run, "ValidatorRegistry"))
+    elif deployment_type == "service":
+        utils.set_toml_path(document, ["Chain", "Node", "EthereumURL"], "ws://ethereum:8545")
+        utils.set_toml_path(document, ["Chain", "Contracts", "ShutterRegistry"], utils.get_created_contract_address(deployment_run, "ShutterRegistry"))
+    else:
+        raise SystemExit(f"Unsupported DEPLOYMENT_TYPE for config generation: {deployment_type}")
+
+    config_path.write_text(tomlkit.dumps(document))
