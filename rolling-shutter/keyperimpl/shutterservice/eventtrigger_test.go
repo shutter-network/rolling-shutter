@@ -2,14 +2,19 @@ package shutterservice
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
+
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/help"
 )
 
 func TestOpValidate(t *testing.T) {
@@ -83,77 +88,47 @@ func TestLogValueRefValidate(t *testing.T) {
 			name: "valid topic reference - offset 0",
 			ref: LogValueRef{
 				Offset: 0,
-				Length: 1,
 			},
 			wantErr: false,
+		},
+		{
+			name: "invalid topic reference - offset 3, cannot be dynamic",
+			ref: LogValueRef{
+				Offset:  3,
+				Dynamic: true,
+			},
+			wantErr: true,
+			errMsg:  "topic values (offset < 4) are always fixed size of one word, got offset 3",
 		},
 		{
 			name: "valid topic reference - offset 3",
 			ref: LogValueRef{
 				Offset: 3,
-				Length: 1,
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid data reference - offset 4, length 1",
+			name: "valid data reference - offset 4, dynamic size",
 			ref: LogValueRef{
-				Offset: 4,
-				Length: 1,
+				Offset:  4,
+				Dynamic: true,
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid data reference - offset 5, length 2",
+			name: "valid data reference - offset 5, fixed size",
 			ref: LogValueRef{
-				Offset: 5,
-				Length: 2,
+				Offset:  5,
+				Dynamic: false,
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid data reference - large offset and length",
+			name: "valid data reference - large offset",
 			ref: LogValueRef{
 				Offset: 100,
-				Length: 10,
 			},
 			wantErr: false,
-		},
-		{
-			name: "invalid zero length",
-			ref: LogValueRef{
-				Offset: 0,
-				Length: 0,
-			},
-			wantErr: true,
-			errMsg:  "log value reference length must be positive, got 0",
-		},
-		{
-			name: "invalid topic reference with length > 1 - offset 0",
-			ref: LogValueRef{
-				Offset: 0,
-				Length: 2,
-			},
-			wantErr: true,
-			errMsg:  "log value reference offset < 4 requires length to be 1, got 2",
-		},
-		{
-			name: "invalid topic reference with length > 1 - offset 1",
-			ref: LogValueRef{
-				Offset: 1,
-				Length: 3,
-			},
-			wantErr: true,
-			errMsg:  "log value reference offset < 4 requires length to be 1, got 3",
-		},
-		{
-			name: "invalid topic reference with length > 1 - offset 3",
-			ref: LogValueRef{
-				Offset: 3,
-				Length: 5,
-			},
-			wantErr: true,
-			errMsg:  "log value reference offset < 4 requires length to be 1, got 5",
 		},
 	}
 
@@ -184,8 +159,7 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{big.NewInt(100)},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  false,
+			wantErr: false,
 		},
 		{
 			name: "valid UintEq predicate",
@@ -194,8 +168,7 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{big.NewInt(42)},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  false,
+			wantErr: false,
 		},
 		{
 			name: "valid BytesEq predicate",
@@ -204,8 +177,7 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{make([]byte, 32)}, // 32 bytes for 1 word
 			},
-			numWords: 1,
-			wantErr:  false,
+			wantErr: false,
 		},
 		{
 			name: "valid BytesEq predicate with 2 words",
@@ -214,8 +186,7 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{make([]byte, 64)}, // 64 bytes for 2 words
 			},
-			numWords: 2,
-			wantErr:  false,
+			wantErr: false,
 		},
 		{
 			name: "invalid operation",
@@ -224,9 +195,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "invalid operation: 999",
+			wantErr: true,
+			errMsg:  "invalid operation: 999",
 		},
 		{
 			name: "UintLt with wrong number of int args - too few",
@@ -235,9 +205,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "operation 0 requires exactly 1 integer argument(s), got 0",
+			wantErr: true,
+			errMsg:  "operation 0 requires exactly 1 integer argument(s), got 0",
 		},
 		{
 			name: "UintLt with wrong number of int args - too many",
@@ -246,9 +215,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{big.NewInt(1), big.NewInt(2)},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "operation 0 requires exactly 1 integer argument(s), got 2",
+			wantErr: true,
+			errMsg:  "operation 0 requires exactly 1 integer argument(s), got 2",
 		},
 		{
 			name: "BytesEq with wrong number of byte args - too few",
@@ -257,9 +225,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "operation 5 requires exactly 1 bytes argument(s), got 0",
+			wantErr: true,
+			errMsg:  "operation 5 requires exactly 1 bytes argument(s), got 0",
 		},
 		{
 			name: "BytesEq with wrong number of byte args - too many",
@@ -268,9 +235,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{},
 				ByteArgs: [][]byte{make([]byte, 32), make([]byte, 32)},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "operation 5 requires exactly 1 bytes argument(s), got 2",
+			wantErr: true,
+			errMsg:  "operation 5 requires exactly 1 bytes argument(s), got 2",
 		},
 		{
 			name: "UintLt with nil integer argument",
@@ -279,9 +245,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{nil},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "integer argument 0 cannot be nil for operation 0",
+			wantErr: true,
+			errMsg:  "integer argument 0 cannot be nil for operation 0",
 		},
 		{
 			name: "UintLt with negative integer argument",
@@ -290,25 +255,8 @@ func TestValuePredicateValidate(t *testing.T) {
 				IntArgs:  []*big.Int{big.NewInt(-1)},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "integer argument 0 cannot be negative for operation 0",
-		},
-		{
-			name: "UintLt with integer argument too large for 1 word",
-			predicate: ValuePredicate{
-				Op: UintLt,
-				IntArgs: []*big.Int{func() *big.Int {
-					// Create a number that requires more than 256 bits (1 word = 32 bytes = 256 bits)
-					val := big.NewInt(1)
-					val.Lsh(val, 257) // 2^257
-					return val
-				}()},
-				ByteArgs: [][]byte{},
-			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "bit length of integer argument 0 cannot exceed value bit length 256 for operation 0, got 258 bits",
+			wantErr: true,
+			errMsg:  "integer argument 0 cannot be negative for operation 0",
 		},
 		{
 			name: "UintLt with integer argument fitting exactly in 2 words",
@@ -322,36 +270,13 @@ func TestValuePredicateValidate(t *testing.T) {
 				}()},
 				ByteArgs: [][]byte{},
 			},
-			numWords: 2,
-			wantErr:  false,
-		},
-		{
-			name: "BytesEq with wrong byte argument size - too small",
-			predicate: ValuePredicate{
-				Op:       BytesEq,
-				IntArgs:  []*big.Int{},
-				ByteArgs: [][]byte{make([]byte, 16)}, // 16 bytes instead of 32
-			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "size of byte argument 0 must match size of value (32 bytes) for operation 5, got 16 bytes",
-		},
-		{
-			name: "BytesEq with wrong byte argument size - too large",
-			predicate: ValuePredicate{
-				Op:       BytesEq,
-				IntArgs:  []*big.Int{},
-				ByteArgs: [][]byte{make([]byte, 48)}, // 48 bytes instead of 32
-			},
-			numWords: 1,
-			wantErr:  true,
-			errMsg:   "size of byte argument 0 must match size of value (32 bytes) for operation 5, got 48 bytes",
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.predicate.Validate(tt.numWords)
+			err := tt.predicate.Validate()
 			if tt.wantErr {
 				assert.ErrorContains(t, err, tt.errMsg)
 			} else {
@@ -963,10 +888,7 @@ func TestLogValueRefGetValue(t *testing.T) {
 		// Topic tests
 		{
 			name: "get topic 0",
-			ref: LogValueRef{
-				Offset: 0,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 0},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -978,10 +900,7 @@ func TestLogValueRefGetValue(t *testing.T) {
 		},
 		{
 			name: "get topic 1",
-			ref: LogValueRef{
-				Offset: 1,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 1},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -993,10 +912,7 @@ func TestLogValueRefGetValue(t *testing.T) {
 		},
 		{
 			name: "get topic 3 (last valid topic)",
-			ref: LogValueRef{
-				Offset: 3,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 3},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111"),
@@ -1010,10 +926,7 @@ func TestLogValueRefGetValue(t *testing.T) {
 		},
 		{
 			name: "get topic that doesn't exist - returns nil",
-			ref: LogValueRef{
-				Offset: 2,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 2},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -1027,7 +940,6 @@ func TestLogValueRefGetValue(t *testing.T) {
 			name: "get first data word (offset 4, length 1)",
 			ref: LogValueRef{
 				Offset: 4,
-				Length: 1,
 			},
 			log: &types.Log{
 				Topics: []common.Hash{
@@ -1056,10 +968,7 @@ func TestLogValueRefGetValue(t *testing.T) {
 		},
 		{
 			name: "get second data word (offset 5, length 1)",
-			ref: LogValueRef{
-				Offset: 5,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 5},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -1086,24 +995,28 @@ func TestLogValueRefGetValue(t *testing.T) {
 			}(),
 		},
 		{
-			name: "get two data words (offset 4, length 2)",
+			name: "get two data words (offset 4, dynamic)",
 			ref: LogValueRef{
-				Offset: 4,
-				Length: 2,
+				Offset:  4,
+				Dynamic: true,
 			},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
 				},
 				Data: func() []byte {
-					data := make([]byte, 64)
+					data := make([]byte, 128)
+					// Encode offset
+					data[31] = 32
+					// Encode length
+					data[63] = 64
 					// First word: 0x1111...1111
 					for i := 0; i < 32; i++ {
-						data[i] = 0x11
+						data[64+i] = 0x11
 					}
 					// Second word: 0x2222...2222
-					for i := 32; i < 64; i++ {
-						data[i] = 0x22
+					for i := 0; i < 32; i++ {
+						data[96+i] = 0x22
 					}
 					return data
 				}(),
@@ -1121,10 +1034,8 @@ func TestLogValueRefGetValue(t *testing.T) {
 		},
 		{
 			name: "get data beyond log length - zero padded",
-			ref: LogValueRef{
-				Offset: 6, // Third word, but log only has 2 words
-				Length: 1,
-			},
+			// Third word, but log only has 2 words
+			ref: LogValueRef{Offset: 6, Dynamic: false},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -1140,44 +1051,8 @@ func TestLogValueRefGetValue(t *testing.T) {
 			want: make([]byte, 32), // Should return 32 zero bytes
 		},
 		{
-			name: "get partial data beyond log length - partial zero padding",
-			ref: LogValueRef{
-				Offset: 5, // Second word, but we want 2 words and log only has 2 words total
-				Length: 2,
-			},
-			log: &types.Log{
-				Topics: []common.Hash{
-					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
-				},
-				Data: func() []byte {
-					data := make([]byte, 64) // Only 2 words
-					// First word: 0x1111...1111
-					for i := 0; i < 32; i++ {
-						data[i] = 0x11
-					}
-					// Second word: 0x2222...2222
-					for i := 32; i < 64; i++ {
-						data[i] = 0x22
-					}
-					return data
-				}(),
-			},
-			want: func() []byte {
-				result := make([]byte, 64)
-				// Second word from log data
-				for i := 0; i < 32; i++ {
-					result[i] = 0x22
-				}
-				// Third word is zero-padded (bytes 32-63 remain zero)
-				return result
-			}(),
-		},
-		{
 			name: "get data from empty log data",
-			ref: LogValueRef{
-				Offset: 4,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 4},
 			log: &types.Log{
 				Topics: []common.Hash{
 					common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
@@ -1216,10 +1091,7 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 				Contract: common.HexToAddress("0x1234567890123456789012345678901234567890"),
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1236,14 +1108,11 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 				Contract: common.HexToAddress("0x1234567890123456789012345678901234567890"),
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 0, // Invalid zero length
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
-							ByteArgs: [][]byte{make([]byte, 32)},
+							ByteArgs: [][]byte{},
 						},
 					},
 				},
@@ -1256,10 +1125,7 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 				Contract: common.HexToAddress("0x1234567890123456789012345678901234567890"),
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1267,10 +1133,8 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0, // Same topic as previous predicate
-							Length: 1,
-						},
+						// Same topic as previous predicate
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1287,10 +1151,7 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 				Contract: common.HexToAddress("0x1234567890123456789012345678901234567890"),
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt, // Not BytesEq, so multiple predicates allowed
 							IntArgs:  []*big.Int{big.NewInt(100)},
@@ -1298,10 +1159,8 @@ func TestEventTriggerDefinitionValidate(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0, // Same topic, but different operation
-							Length: 1,
-						},
+						// Same topic, but different operation
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt, // Not BytesEq, so allowed
 							IntArgs:  []*big.Int{big.NewInt(50)},
@@ -1353,10 +1212,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1377,10 +1233,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1388,10 +1241,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 2,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 2},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1416,10 +1266,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt,
 							IntArgs:  []*big.Int{big.NewInt(100)},
@@ -1440,10 +1287,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 1,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 1},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt,
 							IntArgs:  []*big.Int{big.NewInt(50)},
@@ -1464,10 +1308,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1475,10 +1316,8 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0, // Same topic
-							Length: 1,
-						},
+						// Same topic
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1495,10 +1334,7 @@ func TestEventTriggerDefinitionToFilterQuery(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1574,10 +1410,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1601,10 +1434,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1628,10 +1458,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1639,10 +1466,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 1,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 1},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt,
 							IntArgs:  []*big.Int{big.NewInt(50)},
@@ -1671,10 +1495,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1682,10 +1503,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 1,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 1},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt,
 							IntArgs:  []*big.Int{big.NewInt(200)},
@@ -1716,7 +1534,6 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 					{
 						LogValueRef: LogValueRef{
 							Offset: 4,
-							Length: 1,
 						},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt,
@@ -1748,7 +1565,6 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 					{
 						LogValueRef: LogValueRef{
 							Offset: 4,
-							Length: 1,
 						},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt,
@@ -1778,10 +1594,8 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 2, // Topic index 2, but log only has 1 topic
-							Length: 1,
-						},
+						// Topic index 2, but log only has 1 topic
+						LogValueRef: LogValueRef{Offset: 2},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1805,10 +1619,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1816,10 +1627,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       UintEq,
 							IntArgs:  []*big.Int{big.NewInt(42)},
@@ -1827,10 +1635,7 @@ func TestEventTriggerDefinitionMatch(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 5,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 5},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGte,
 							IntArgs:  []*big.Int{big.NewInt(100)},
@@ -1886,10 +1691,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1905,10 +1707,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt,
 							IntArgs:  []*big.Int{big.NewInt(1000)},
@@ -1924,10 +1723,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 0,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -1935,10 +1731,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 1,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 1},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt,
 							IntArgs:  []*big.Int{big.NewInt(50)},
@@ -1946,10 +1739,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 1,
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       UintEq,
 							IntArgs:  []*big.Int{big.NewInt(42)},
@@ -1965,10 +1755,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 2, // 2 words for large numbers
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op: UintLte,
 							IntArgs: []*big.Int{func() *big.Int {
@@ -1988,10 +1775,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{
-							Offset: 4,
-							Length: 2, // 2 words = 64 bytes
-						},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -2002,12 +1786,12 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 			},
 		},
 		{
-			name: "definition with all operation types",
+			name: "definition with all operation types and one dynamic LogValueRef",
 			definition: EventTriggerDefinition{
 				Contract: contractAddr,
 				LogPredicates: []LogPredicate{
 					{
-						LogValueRef: LogValueRef{Offset: 0, Length: 1},
+						LogValueRef: LogValueRef{Offset: 0},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLt,
 							IntArgs:  []*big.Int{big.NewInt(100)},
@@ -2015,7 +1799,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 1, Length: 1},
+						LogValueRef: LogValueRef{Offset: 1},
 						ValuePredicate: ValuePredicate{
 							Op:       UintLte,
 							IntArgs:  []*big.Int{big.NewInt(200)},
@@ -2023,7 +1807,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 2, Length: 1},
+						LogValueRef: LogValueRef{Offset: 2},
 						ValuePredicate: ValuePredicate{
 							Op:       UintEq,
 							IntArgs:  []*big.Int{big.NewInt(42)},
@@ -2031,7 +1815,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 3, Length: 1},
+						LogValueRef: LogValueRef{Offset: 3},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGt,
 							IntArgs:  []*big.Int{big.NewInt(300)},
@@ -2039,7 +1823,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 4, Length: 1},
+						LogValueRef: LogValueRef{Offset: 4},
 						ValuePredicate: ValuePredicate{
 							Op:       UintGte,
 							IntArgs:  []*big.Int{big.NewInt(400)},
@@ -2047,7 +1831,7 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 						},
 					},
 					{
-						LogValueRef: LogValueRef{Offset: 5, Length: 1},
+						LogValueRef: LogValueRef{Offset: 5, Dynamic: true},
 						ValuePredicate: ValuePredicate{
 							Op:       BytesEq,
 							IntArgs:  []*big.Int{},
@@ -2077,21 +1861,23 @@ func TestEventTriggerDefinitionMarshalUnmarshal(t *testing.T) {
 				unmarshaledPredicate := unmarshaled.LogPredicates[i]
 
 				// Compare LogValueRef
-				assert.Equal(t, originalPredicate.LogValueRef.Offset, unmarshaledPredicate.LogValueRef.Offset)
-				assert.Equal(t, originalPredicate.LogValueRef.Length, unmarshaledPredicate.LogValueRef.Length)
+				assert.Equal(t, originalPredicate.LogValueRef.Offset,
+					unmarshaledPredicate.LogValueRef.Offset)
 
 				// Compare ValuePredicate
 				assert.Equal(t, originalPredicate.ValuePredicate.Op, unmarshaledPredicate.ValuePredicate.Op)
 
 				// Compare IntArgs
-				assert.Equal(t, len(originalPredicate.ValuePredicate.IntArgs), len(unmarshaledPredicate.ValuePredicate.IntArgs))
+				assert.Equal(t, len(originalPredicate.ValuePredicate.IntArgs),
+					len(unmarshaledPredicate.ValuePredicate.IntArgs))
 				for j, originalIntArg := range originalPredicate.ValuePredicate.IntArgs {
 					unmarshaledIntArg := unmarshaledPredicate.ValuePredicate.IntArgs[j]
 					assert.Equal(t, originalIntArg.Cmp(unmarshaledIntArg), 0)
 				}
 
 				// Compare ByteArgs
-				assert.Equal(t, len(originalPredicate.ValuePredicate.ByteArgs), len(unmarshaledPredicate.ValuePredicate.ByteArgs))
+				assert.Equal(t, len(originalPredicate.ValuePredicate.ByteArgs),
+					len(unmarshaledPredicate.ValuePredicate.ByteArgs))
 				for j, originalByteArg := range originalPredicate.ValuePredicate.ByteArgs {
 					unmarshaledByteArg := unmarshaledPredicate.ValuePredicate.ByteArgs[j]
 					assert.DeepEqual(t, originalByteArg, unmarshaledByteArg)
@@ -2120,6 +1906,10 @@ func TestEventTriggerDefinitionUnmarshalErrors(t *testing.T) {
 			data: []byte{0x99}, // Wrong version
 		},
 		{
+			name: "old version",
+			data: []byte{0x1}, // Old version
+		},
+		{
 			name: "version only, no RLP data",
 			data: []byte{Version},
 		},
@@ -2145,61 +1935,52 @@ func TestLogValueRefEncodeRLP(t *testing.T) {
 		expected []byte
 	}{
 		{
-			name: "topic reference - offset 0, length 1",
-			ref: LogValueRef{
-				Offset: 0,
-				Length: 1,
-			},
-			expected: []byte{0x80}, // RLP encoding of uint64(0)
+			name:     "topic reference - offset 0",
+			ref:      LogValueRef{Offset: 0},
+			expected: []byte{0xc2, 0x80, 0x80}, // RLP encoding of uint64(0)
 		},
 		{
-			name: "topic reference - offset 3, length 1",
-			ref: LogValueRef{
-				Offset: 3,
-				Length: 1,
-			},
-			expected: []byte{0x03}, // RLP encoding of uint64(3)
+			name:     "topic reference - offset 3",
+			ref:      LogValueRef{Offset: 3},
+			expected: []byte{0xc2, 0x80, 0x03}, // RLP encoding of uint64(3)
 		},
 		{
-			name: "data reference - offset 4, length 1",
-			ref: LogValueRef{
-				Offset: 4,
-				Length: 1,
-			},
-			expected: []byte{0x04}, // RLP encoding of uint64(4)
+			name:     "data reference - offset 4",
+			ref:      LogValueRef{Offset: 4},
+			expected: []byte{0xc2, 0x80, 0x04}, // RLP encoding of uint64(4)
 		},
 		{
-			name: "data reference - offset 5, length 2",
-			ref: LogValueRef{
-				Offset: 5,
-				Length: 2,
-			},
-			expected: []byte{0xc2, 0x05, 0x02}, // RLP encoding of [5, 2]
+			name:     "data reference - offset 5",
+			ref:      LogValueRef{Offset: 5},
+			expected: []byte{0xc2, 0x80, 0x05}, // RLP encoding of uint64(5)
 		},
 		{
-			name: "data reference - offset 10, length 5",
-			ref: LogValueRef{
-				Offset: 10,
-				Length: 5,
-			},
-			expected: []byte{0xc2, 0x0a, 0x05}, // RLP encoding of [10, 5]
+			name:     "data reference - offset 10",
+			ref:      LogValueRef{Offset: 10},
+			expected: []byte{0xc2, 0x80, 0x0a}, // RLP encoding of uint64(10)
 		},
 		{
-			name: "large offset",
-			ref: LogValueRef{
-				Offset: 1000,
-				Length: 3,
-			},
-			expected: []byte{0xc4, 0x82, 0x03, 0xe8, 0x03}, // RLP encoding of [1000, 3]
+			name:     "data reference - offset 10, dynamic",
+			ref:      LogValueRef{Offset: 10, Dynamic: true},
+			expected: []byte{0xc2, 0x01, 0x0a}, // RLP encoding of uint64(10)
+		},
+		{
+			name:     "large offset",
+			ref:      LogValueRef{Offset: 1000, Dynamic: false},
+			expected: []byte{0xc4, 0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+		},
+		{
+			name:     "large offset, dynamic",
+			ref:      LogValueRef{Offset: 1000, Dynamic: true},
+			expected: []byte{0xc4, 0x01, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := tt.ref.EncodeRLP(&buf)
+			encoded, err := rlp.EncodeToBytes(tt.ref)
 			assert.NilError(t, err, "EncodeRLP should not fail")
-			assert.DeepEqual(t, tt.expected, buf.Bytes())
+			assert.DeepEqual(t, tt.expected, encoded)
 		})
 	}
 }
@@ -2213,88 +1994,58 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 		errMsg   string
 	}{
 		{
-			name:    "topic reference - offset 0, length 1",
-			encoded: []byte{0x80}, // RLP encoding of uint64(0)
-			expected: LogValueRef{
-				Offset: 0,
-				Length: 1,
-			},
-			wantErr: false,
+			name:     "topic reference - offset 0",
+			encoded:  []byte{0xc2, 0x80, 0x80}, // RLP encoding of uint64(0)
+			expected: LogValueRef{Offset: 0},
+			wantErr:  false,
 		},
 		{
-			name:    "topic reference - offset 3, length 1",
-			encoded: []byte{0x03}, // RLP encoding of uint64(3)
-			expected: LogValueRef{
-				Offset: 3,
-				Length: 1,
-			},
-			wantErr: false,
+			name:     "topic reference - offset 3",
+			encoded:  []byte{0xc2, 0x80, 0x03}, // RLP encoding of uint64(3)
+			expected: LogValueRef{Offset: 3},
+			wantErr:  false,
 		},
 		{
-			name:    "data reference - offset 4, length 1",
-			encoded: []byte{0xc2, 0x04, 0x01}, // RLP encoding of [4, 1]
-			expected: LogValueRef{
-				Offset: 4,
-				Length: 1,
-			},
-			wantErr: false,
+			name:     "data reference - offset 4",
+			encoded:  []byte{0xc2, 0x80, 0x04}, // RLP encoding of uint64(4)
+			expected: LogValueRef{Offset: 4},
+			wantErr:  false,
 		},
 		{
-			name:    "data reference - offset 5, length 2",
-			encoded: []byte{0xc2, 0x05, 0x02}, // RLP encoding of [5, 2]
-			expected: LogValueRef{
-				Offset: 5,
-				Length: 2,
-			},
-			wantErr: false,
+			name:     "data reference - offset 5, dynamic true",
+			encoded:  []byte{0xc2, 0x01, 0x05}, // RLP encoding of uint64(5)
+			expected: LogValueRef{Offset: 5, Dynamic: true},
+			wantErr:  false,
 		},
 		{
-			name:    "data reference - offset 10, length 5",
-			encoded: []byte{0xc2, 0x0a, 0x05}, // RLP encoding of [10, 5]
-			expected: LogValueRef{
-				Offset: 10,
-				Length: 5,
-			},
-			wantErr: false,
+			name:     "data reference - offset 10",
+			encoded:  []byte{0xc2, 0x80, 0x0a}, // RLP encoding of uint64(10)
+			expected: LogValueRef{Offset: 10},
+			wantErr:  false,
 		},
 		{
-			name:    "large offset",
-			encoded: []byte{0xc4, 0x82, 0x03, 0xe8, 0x03}, // RLP encoding of [1000, 3]
-			expected: LogValueRef{
-				Offset: 1000,
-				Length: 3,
-			},
-			wantErr: false,
-		},
-		{
-			name:    "invalid - zero length",
-			encoded: []byte{0xc2, 0x04, 0x80}, // RLP encoding of [4, 0]
-			wantErr: true,
-			errMsg:  "log value reference length must be positive",
-		},
-		{
-			name:    "invalid - topic with length > 1",
-			encoded: []byte{0xc2, 0x02, 0x03}, // RLP encoding of [2, 3] - topic offset with length > 1
-			wantErr: true,
-			errMsg:  "log value reference offset < 4 requires length to be 1",
+			name:     "large offset",
+			encoded:  []byte{0xc4, 0x80, 0x82, 0x03, 0xe8}, // RLP encoding of uint64(1000)
+			expected: LogValueRef{Offset: 1000},
+			wantErr:  false,
 		},
 		{
 			name:    "invalid - empty RLP data",
 			encoded: []byte{},
 			wantErr: true,
-			errMsg:  "failed to decode LogValueRef",
+			errMsg:  "EOF",
 		},
 		{
 			name:    "invalid - malformed RLP",
 			encoded: []byte{0xFF, 0xFF},
 			wantErr: true,
-			errMsg:  "failed to decode LogValueRef",
+			errMsg:  "rlp: value size exceeds available input length",
 		},
 		{
 			name:    "invalid - incomplete list",
-			encoded: []byte{0xc1, 0x04}, // List with only one element
+			encoded: []byte{0xc2, 0x04}, // List with only one element
 			wantErr: true,
-			errMsg:  "failed to read length from LogValueRef",
+			errMsg:  "rlp: value size exceeds available input length",
 		},
 	}
 
@@ -2302,6 +2053,7 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var ref LogValueRef
 			err := rlp.DecodeBytes(tt.encoded, &ref)
+			fmt.Println(ref)
 
 			if tt.wantErr {
 				assert.Assert(t, err != nil, "DecodeRLP should fail")
@@ -2309,7 +2061,6 @@ func TestLogValueRefDecodeRLP(t *testing.T) {
 			} else {
 				assert.NilError(t, err, "DecodeRLP should not fail")
 				assert.Equal(t, tt.expected.Offset, ref.Offset)
-				assert.Equal(t, tt.expected.Length, ref.Length)
 			}
 		})
 	}
@@ -2322,49 +2073,36 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 	}{
 		{
 			name: "topic reference - offset 0",
-			ref: LogValueRef{
-				Offset: 0,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 0},
 		},
 		{
 			name: "topic reference - offset 3",
-			ref: LogValueRef{
-				Offset: 3,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 3},
 		},
 		{
 			name: "data reference - single word",
-			ref: LogValueRef{
-				Offset: 4,
-				Length: 1,
-			},
+			ref:  LogValueRef{Offset: 4},
 		},
 		{
 			name: "data reference - multiple words",
-			ref: LogValueRef{
-				Offset: 5,
-				Length: 10,
-			},
+			ref:  LogValueRef{Offset: 5, Dynamic: true},
 		},
 		{
 			name: "large values",
-			ref: LogValueRef{
-				Offset: 65535,
-				Length: 1000,
-			},
+			ref:  LogValueRef{Offset: 65535},
+		},
+		{
+			name: "large values - dynamic",
+			ref:  LogValueRef{Offset: 65535, Dynamic: true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Encode
-			var buf bytes.Buffer
-			err := tt.ref.EncodeRLP(&buf)
+			encoded, err := rlp.EncodeToBytes(tt.ref)
 			assert.NilError(t, err, "EncodeRLP should not fail")
 
-			encoded := buf.Bytes()
 			assert.Assert(t, len(encoded) > 0, "Encoded data should not be empty")
 
 			// Decode
@@ -2374,13 +2112,123 @@ func TestLogValueRefRLPRoundTrip(t *testing.T) {
 
 			// Verify round trip
 			assert.Equal(t, tt.ref.Offset, decoded.Offset)
-			assert.Equal(t, tt.ref.Length, decoded.Length)
 
 			// Encode again and verify consistency
-			var buf2 bytes.Buffer
-			err = decoded.EncodeRLP(&buf2)
+			encoded2, err := rlp.EncodeToBytes(decoded)
 			assert.NilError(t, err, "Second EncodeRLP should not fail")
-			assert.DeepEqual(t, encoded, buf2.Bytes())
+			assert.DeepEqual(t, encoded, encoded2)
 		})
 	}
+}
+
+func TestWithEVM(t *testing.T) {
+	setup := help.SetupBackend(t)
+	one := big.NewInt(1)
+	mOne := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 1},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{Align(one.Bytes())}},
+	}
+	two := "two"
+	mTwo := LogPredicate{
+		LogValueRef: LogValueRef{Offset: 2},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{
+			Align(crypto.Keccak256([]byte("two"))),
+		}},
+	}
+	three := common.BytesToAddress(big.NewInt(84).Bytes())
+	mThree := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 3},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{Align(three[:])}},
+	}
+	four := []byte("first and slightly longer arg that should use more space and if i am right, then this will span multiple words")
+	preFour := []byte("first and slightly longer arg that should use more space and if ")
+	mFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
+	}
+	noMFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{[]byte("no match")}},
+	}
+	inValidFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: false},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{four}},
+	}
+	preNotFour := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 4, Dynamic: true},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{preFour}},
+	}
+	five := big.NewInt(42)
+	six := []byte("second arg")
+	mSix := LogPredicate{
+		LogValueRef:    LogValueRef{Offset: 6, Dynamic: true},
+		ValuePredicate: ValuePredicate{Op: BytesEq, ByteArgs: [][]byte{six}},
+	}
+	tx, err := setup.Contract.EmitSix(setup.Auth, one, two, three, four, five, six)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+
+	tests := []struct {
+		predicates []LogPredicate
+		match      bool
+		name       string
+	}{
+		{predicates: []LogPredicate{mOne, mTwo, mThree, mSix}, match: true, name: "match one, two, three and six"},
+		{predicates: []LogPredicate{mFour}, match: true, name: "match four"},
+		{predicates: []LogPredicate{mFour, mSix}, match: true, name: "match four and six"},
+		{
+			predicates: []LogPredicate{mSix, mSix},
+			match:      true,
+			name:       "match duplicate six", // Note: this is legal, although not practical
+		},
+		{predicates: []LogPredicate{preNotFour}, match: false, name: "prefix should not match whole"},
+		{predicates: []LogPredicate{noMFour, mFour}, match: false, name: "mismatch same offset"},
+		{predicates: []LogPredicate{inValidFour}, match: false, name: "invalid fourth arg matcher"},
+		{
+			predicates: []LogPredicate{
+				{
+					LogValueRef: LogValueRef{Offset: 5},
+					ValuePredicate: ValuePredicate{
+						Op:      UintEq,
+						IntArgs: []*big.Int{five},
+					},
+				},
+			},
+			match: true,
+			name:  "match five GTE",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			etd := EventTriggerDefinition{
+				Contract:      setup.ContractAddress,
+				LogPredicates: tt.predicates,
+			}
+			err := etd.Validate()
+			assert.NilError(t, err, "did not validate: %v", tt.name)
+			encoded := etd.MarshalBytes()
+			decoded := EventTriggerDefinition{}
+			err = decoded.UnmarshalBytes(encoded)
+			assert.NilError(t, err, "error when roundtrip decoding")
+			doubleEncoded := decoded.MarshalBytes()
+
+			equal := cmp.DeepEqual(encoded, doubleEncoded)
+			assert.Check(t, equal, "did not survive roundtrip: %v", tt.name)
+			match, err := etd.Match(vLog)
+			assert.NilError(t, err, "error when matching: %v. err: %v", tt.name, err)
+			assert.Equal(t, match, tt.match, "did not match expectation: %v\nlog data:\t%v\nmatch data:\t%v", tt.name, vLog, etd)
+			match, err = decoded.Match(vLog)
+			assert.NilError(t, err, "error when matching from decoded: %v. err: %v", tt.name, err)
+			assert.Equal(t, match, tt.match, "did not match expectation after roundtrip: %v", tt.name)
+		})
+	}
+}
+
+// aligns []byte to 32 byte.
+func Align(val []byte) []byte {
+	words := (31 + len(val)) / Word
+	x := make([]byte, Word*words)
+	copy(x[len(x)-len(val):], val)
+	return x
 }

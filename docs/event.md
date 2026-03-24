@@ -21,7 +21,7 @@ An `EventTriggerDefinition` is a structured data object that combines:
   trigger the release of the decryption key.
 
 Reference:
-[EventTriggerDefinition Type](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L21-L25)
+[EventTriggerDefinition Type](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L21-L25)
 
 ### LogPredicate
 
@@ -29,7 +29,7 @@ A `LogPredicate` pairs a reference to a specific value within an event log with
 a predicate that must be satisfied for the trigger to fire.
 
 Reference:
-[LogPredicate Type](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L27-L32)
+[LogPredicate Type](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L27-L32)
 
 ### LogValueRef
 
@@ -39,12 +39,21 @@ It can reference:
 - **Topics (Offsets 0-3)**: The indexed parameters of the event log. A topic is
   referenced by its index (0-3), where offset 0 is topic[0], etc.
 - **Data (Offsets 4+)**: The non-indexed data section of the log. Offset
-  values >= 4 refer to 32-byte words in the log data, where offset 4 is the
-  first word (bytes 0-31), offset 5 is the second word (bytes 32-63), etc. Note:
-  data offset always starts at 4, even if there are fewer than 4 topics defined.
+  values >= 4 refer to slices in the log data, where offset 4 is the first ABI
+  encoded slice, offset 5 is the second such slice, etc.
+
+- The `Dynamic` attribute defines whether data at the offset position should be
+  read as a single 32 byte word, or, if the offset should be interpreted as an
+  [ABI encoding of a data slice](https://docs.soliditylang.org/en/latest/abi-spec.html),
+  where
+  - `internal_offset_in_bytes = uint64(WORD@Offset)` => `IOIB`
+  - `length = uint64(WORD@IOIB)`
+  - `dataslice = data[IOIB + 32 : IOIB + 32 + length]`
+- Note: data offset always starts at 4, even if there are fewer than 4 topics
+  defined.
 
 Reference:
-[LogValueRef Type and Documentation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L34-L43)
+[LogValueRef Type and Documentation](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L34-L43)
 
 ### ValuePredicate
 
@@ -53,7 +62,7 @@ log value. It consists of an operation (`Op`) and a set of arguments. The type
 and number of arguments required depend on the operation.
 
 Reference:
-[ValuePredicate Type](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L45-L53)
+[ValuePredicate Type](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L45-L53)
 
 ## Encoding Format
 
@@ -64,21 +73,21 @@ encoding with a version byte prefix:
 
 ```
 EventTriggerDefinitionBytes := {
-    version: uint8                    // Current version is 0x01
+    version: uint8                    // Current version is 0x02
     rlp_encoded_content: []byte       // RLP-encoded EventTriggerDefinition
 }
 ```
 
-The version byte (`0x01`) allows for future format changes. After the version
+The version byte (`0x02`) allows for future format changes. After the version
 byte, the remaining bytes are RLP-encoded content representing the
 `EventTriggerDefinition` structure.
 
 Reference:
-[MarshalBytes and UnmarshalBytes Implementation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L58-L86)
+[MarshalBytes and UnmarshalBytes Implementation](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L58-L86)
 
 ### Versioning
 
-The current version is **0x01** as defined by the `Version` constant.
+The current version is **0x02** as defined by the `Version` constant.
 
 ### RLP Encoding Details
 
@@ -96,8 +105,7 @@ LogPredicate := {
     valuePredicate: ValuePredicate
 }
 
-LogValueRef := Offset                    // if Length == 1
-LogValueRef := [Offset, Length]          // if Length > 1
+LogValueRef := {Dynamic, Offset}
 
 ValuePredicate := {
     op: uint64,
@@ -106,11 +114,11 @@ ValuePredicate := {
 }
 
 # actual dense format is more akin to this:
-[contract_address, [[offset, [op, [int_args], [byte_args]]], […]]]
+[contract_address, [[dynamic, offset, [op, [int_args], [byte_args]]], […]]]
 ```
 
 Reference:
-[RLP Encoding Implementation](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L211-L392)
+[RLP Encoding Implementation](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L208-L414)
 
 ## Operators
 
@@ -137,7 +145,7 @@ value predicate.
   - Returns true if value == argument (byte-by-byte comparison)
 
 Reference:
-[Operator Constants](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L298-L305)
+[Operator Constants](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L320-L327)
 
 Note, that different operators require different numbers and types of arguments:
 
@@ -153,7 +161,7 @@ Ethereum log satisfies the `EventTriggerDefinition`:
 2. The log must satisfy **all** log predicates (logical `AND` of all conditions)
 
 Reference:
-[Match Method](https://github.com/shutter-network/rolling-shutter/blob/42f562532acfc4f89f630d3de809fc4451636ab2/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L159-L176)
+[Match Method](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L161-L179)
 
 ### LogValueRef.GetValue
 
@@ -161,12 +169,13 @@ To retrieve a value from a log:
 
 - **Topics (Offset < 4)**: Returns the log's topic at index Offset as a 32-byte
   value
-- **Data (Offset >= 4)**: Extracts a slice of 32-byte words from the log's data,
-  starting at word index (Offset - 4). If the slice extends beyond the log's
-  data, it is zero-padded on the right to the expected length.
+- **Data (Offset >= 4)**: Extracts a slice from the log's data, starting at word
+  index (Offset - 4). The length of the slice is defined in the log data
+  according to the
+  [ABI event encoding spec](https://docs.soliditylang.org/en/latest/abi-spec.html).
 
 Reference:
-[GetValue Method](https://github.com/shutter-network/rolling-shutter/blob/main/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L210-L228)
+[GetValue Methods](https://github.com/shutter-network/rolling-shutter/blob/7b3013978b997dc7507656851c792012f6836241/rolling-shutter/keyperimpl/shutterservice/eventtrigger.go#L246-L318)
 
 ## Generating EventTriggerDefinition from EVM Contract ABI
 
@@ -214,16 +223,16 @@ function generateEventTriggerDefinition(
         if (param.indexed) {
             // Topics are at offsets 0-3
             offset = calculateTopicIndex(event, param)
-            length = 1
         } else {
             // Data starts at offset 4
             offset = 4 + calculateDataWordOffset(event, param)
-            length = calculateDataWordLength(param.type)
         }
 
+        dynamic = decide_if_dynamic_type(param.type)
+
         logValueRef = LogValueRef{
+            Dynamic: dynamic,
             Offset: offset,
-            Length: length
         }
 
         // Create the ValuePredicate
@@ -270,6 +279,10 @@ Non-indexed parameters are stored in the log's data field. They are packed as
 For types smaller than 32 bytes, they are right-padded (for fixed-size types) or
 stored in a single word.
 
+However, for `Dynamic` types, the words only specify an internal offset to
+another word that encodes the data slices length. The actual data will be at
+`internal_offset + 32` and be `length` bytes long.
+
 ## Examples
 
 ### Example 1: ERC20 Transfer Trigger
@@ -302,8 +315,7 @@ Trigger when a specific address transfers tokens:
   "logPredicates": [
     {
       "logValueRef": {
-        "offset": 1,
-        "length": 1
+        "offset": 1
       },
       "valuePredicate": {
         "op": 5,
@@ -349,8 +361,7 @@ Trigger when a swap occurs with minimum token amount:
   "logPredicates": [
     {
       "logValueRef": {
-        "offset": 1,
-        "length": 1
+        "offset": 1
       },
       "valuePredicate": {
         "op": 5,
@@ -362,8 +373,7 @@ Trigger when a swap occurs with minimum token amount:
     },
     {
       "logValueRef": {
-        "offset": 5,
-        "length": 1
+        "offset": 5
       },
       "valuePredicate": {
         "op": 4,
@@ -374,3 +384,7 @@ Trigger when a swap occurs with minimum token amount:
   ]
 }
 ```
+
+Note: an example for an event trigger definition compiler can be found in
+[shutter-api](https://github.com/shutter-network/shutter-api) (the
+`/event/compile_event_trigger_definition` endpoint.)

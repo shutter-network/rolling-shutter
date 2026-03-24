@@ -15,7 +15,7 @@ import (
 
 const (
 	Word    = 32
-	Version = 0x1
+	Version = 0x2
 )
 
 // EventTriggerDefinition specifies an event-based trigger.
@@ -32,14 +32,14 @@ type LogPredicate struct {
 }
 
 // LogValueRef references a value contained in an event log.
-//   - If 0 <= Offset < 4, it refers to the topic of the log at index Offset. In this case, Length
-//     must be 1.
-//   - If Offset >= 4, it refers to a slice of 32-byte words from the log's data. Its start index is
-//     Offset - 4 and the length is Length. E.g., for offset 5 and length 2, the slice starts at
-//     byte 32, ends at byte 96 (exclusive), and is 64 bytes long.
+//   - If 0 <= Offset < 4, it refers to the topic of the log at index Offset. In this case, there is always
+//     one whole 32 byte word.
+//   - If Offset >= 4, it refers to a slice from the log's data. Its start index is at
+//     (Offset - 4) * 32 and the length is encoded according to the ABI event encoding spec
+//     (https://docs.soliditylang.org/en/latest/abi-spec.html).
 type LogValueRef struct {
-	Offset uint64
-	Length uint64
+	Dynamic bool
+	Offset  uint64
 }
 
 // ValuePredicate defines a condition on a value contained in an event log that must be satisfied
@@ -139,11 +139,13 @@ func (d *EventTriggerDefinition) ToFilterQuery() (ethereum.FilterQuery, error) {
 			topics = append(topics, []common.Hash{})
 		}
 		if len(topics[topicIndex]) != 0 {
-			return ethereum.FilterQuery{}, fmt.Errorf("multiple log predicates for topic %d", topicIndex)
+			return ethereum.FilterQuery{}, fmt.Errorf(
+				"multiple log predicates for topic %d", topicIndex)
 		}
 		topic := logPredicate.ValuePredicate.ByteArgs[0]
 		if len(topic) != Word {
-			return ethereum.FilterQuery{}, fmt.Errorf("log predicate for topic %d must have a 32-byte value, got %d bytes", topicIndex, len(topic))
+			return ethereum.FilterQuery{}, fmt.Errorf(
+				"log predicate for topic %d must have a 32-byte value, got %d bytes", topicIndex, len(topic))
 		}
 		topics[logPredicate.LogValueRef.Offset] = []common.Hash{common.BytesToHash(topic)}
 	}
@@ -159,6 +161,7 @@ func (d *EventTriggerDefinition) ToFilterQuery() (ethereum.FilterQuery, error) {
 // Match checks if the log matches the event trigger definition by checking all log predicates.
 //
 // This may panic if Validate does not pass.
+// We need to match ABI encoding: https://docs.soliditylang.org/en/latest/abi-spec.html
 func (d *EventTriggerDefinition) Match(log *types.Log) (bool, error) {
 	if log.Address != d.Contract {
 		return false, nil
@@ -179,7 +182,7 @@ func (p *LogPredicate) Validate() error {
 	if err := p.LogValueRef.Validate(); err != nil {
 		return err
 	}
-	if err := p.ValuePredicate.Validate(p.LogValueRef.Length); err != nil {
+	if err := p.ValuePredicate.Validate(); err != nil {
 		return err
 	}
 	return nil
@@ -191,73 +194,13 @@ func (p *LogPredicate) Match(log *types.Log) (bool, error) {
 }
 
 func (r *LogValueRef) Validate() error {
-	if r.Length == 0 {
-		return fmt.Errorf("log value reference length must be positive, got %d", r.Length)
-	}
-	if r.Offset < 4 && r.Length != 1 {
-		return fmt.Errorf("log value reference offset < 4 requires length to be 1, got %d", r.Length)
-	}
-	// Check that the offset and length are within reasonable bounds so that we can convert them
+	// Check that the offset is within reasonable bounds so that we can convert them
 	// to bytes and bits without worrying.
 	if r.Offset > math.MaxUint32 {
 		return fmt.Errorf("log value reference offset must be less than 2^32, got %d", r.Offset)
 	}
-	if r.Length > math.MaxUint32 {
-		return fmt.Errorf("log value reference length must be less than 2^32, got %d", r.Length)
-	}
-	return nil
-}
-
-func (r *LogValueRef) EncodeRLP(w io.Writer) error {
-	buf := rlp.NewEncoderBuffer(w)
-	if r.Length == 1 {
-		buf.WriteUint64(r.Offset)
-	} else {
-		listIndex := buf.List()
-		buf.WriteUint64(r.Offset)
-		buf.WriteUint64(r.Length)
-		buf.ListEnd(listIndex)
-	}
-	return buf.Flush()
-}
-
-func (r *LogValueRef) DecodeRLP(s *rlp.Stream) error {
-	var offset, length uint64
-	kind, _, err := s.Kind()
-	if err != nil {
-		return fmt.Errorf("failed to decode LogValueRef: %w", err)
-	}
-	switch kind {
-	case rlp.Byte, rlp.String:
-		offset, err = s.Uint64()
-		if err != nil {
-			return fmt.Errorf("failed to read offset from LogValueRef: %w", err)
-		}
-		length = 1
-	case rlp.List:
-		_, err = s.List()
-		if err != nil {
-			return fmt.Errorf("failed to read LogValueRef list: %w", err)
-		}
-		offset, err = s.Uint64()
-		if err != nil {
-			return fmt.Errorf("failed to read offset from LogValueRef: %w", err)
-		}
-		length, err = s.Uint64()
-		if err != nil {
-			return fmt.Errorf("failed to read length from LogValueRef: %w", err)
-		}
-		err = s.ListEnd()
-		if err != nil {
-			return fmt.Errorf("failed to decode LogValueRef: %w", err)
-		}
-	default:
-		panic(fmt.Sprintf("unexpected kind %d for LogValueRef", kind))
-	}
-	r.Offset = offset
-	r.Length = length
-	if err := r.Validate(); err != nil {
-		return fmt.Errorf("invalid LogValueRef: %w", err)
+	if r.Dynamic && r.Offset < 4 {
+		return fmt.Errorf("topic values (offset < 4) are always fixed size of one word, got offset %d", r.Offset)
 	}
 	return nil
 }
@@ -266,9 +209,9 @@ func (r *LogValueRef) IsTopic() bool {
 	return r.Offset < 4
 }
 
-// GetValue retrieves the value from the log based on the LogValueRef.
+// GetValue retrieves a slice from the log based on the LogValueRef.
 //
-// In case a slice of log data is referenced and the slice exceeds the log's data length, the
+// In case the referenced slice exceeds the log's data length, the
 // result will be zero-padded on the right to the expected length.
 func (r *LogValueRef) GetValue(log *types.Log) []byte {
 	if r.IsTopic() {
@@ -278,11 +221,14 @@ func (r *LogValueRef) GetValue(log *types.Log) []byte {
 		return log.Topics[r.Offset].Bytes()
 	}
 
+	if r.Dynamic {
+		return r.getOffsetDataValue(log)
+	}
 	dataOffset := r.Offset - 4
-	value := make([]byte, r.Length*Word)
+	value := make([]byte, Word)
 
 	startByte := dataOffset * Word
-	endByte := (dataOffset + r.Length) * Word
+	endByte := (dataOffset + 1) * Word
 
 	if startByte < uint64(len(log.Data)) {
 		availableEnd := uint64(len(log.Data))
@@ -292,6 +238,48 @@ func (r *LogValueRef) GetValue(log *types.Log) []byte {
 		copy(value, log.Data[startByte:availableEnd])
 	}
 
+	return value
+}
+
+// getOffsetDataValue retrieves a "complex" data value from the log based on the LogValueRef.
+//
+// In case a slice of log data is referenced and the slice exceeds the log's data length, the
+// result will be zero-padded on the right to the expected length.
+func (r *LogValueRef) getOffsetDataValue(log *types.Log) []byte {
+	// abi encoded log data:
+	// W1: first argument value (simple) or offset_0 (complex)
+	// W2: second argument value (simple) or offset_1 (complex)
+	// W..@offset_0: size_0 for first complex argument
+	// W..@offset_0+W: start of data for first complex argument
+	//
+	// we need to discriminate between literal/simple and complex arguments
+	// - topic data (i.e. offset < 4) is always read as a whole word by `GetValue`
+	// - simple are found in `data[(offset-4)*WORD:(offset-4+1)*WORD]`
+	// - complex are found by
+	// 		- reading the `internal_offset` from `data[(offset-4)*WORD:(offset-4+1)*WORD]`
+	//		- reading the `value_length` from `data[internal_offset:internal_offset+WORD]`
+	//		- reading the `value` from `data[internal_offset+WORD:internal_offset+WORD+value_length]`
+	//
+	dataOffset := r.Offset - 4
+
+	offsetStartByte := dataOffset * Word
+
+	x := log.Data[offsetStartByte : offsetStartByte+Word]
+
+	lengthByteOffset := new(big.Int).SetBytes(x).Uint64()
+	y := log.Data[lengthByteOffset : lengthByteOffset+Word]
+	length := new(big.Int).SetBytes(y).Uint64()
+	value := make([]byte, length)
+	startByte := lengthByteOffset + Word
+	endByte := startByte + length
+
+	if startByte < uint64(len(log.Data)) {
+		availableEnd := uint64(len(log.Data))
+		if endByte < availableEnd {
+			availableEnd = endByte
+		}
+		copy(value, log.Data[startByte:availableEnd])
+	}
 	return value
 }
 
@@ -391,14 +379,14 @@ func (p *ValuePredicate) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-func (p *ValuePredicate) Validate(numWords uint64) error {
+func (p *ValuePredicate) Validate() error {
 	if err := p.Op.Validate(); err != nil {
 		return err
 	}
 	if err := p.validateArgNums(); err != nil {
 		return err
 	}
-	if err := p.validateArgValues(numWords); err != nil {
+	if err := p.validateArgValues(); err != nil {
 		return err
 	}
 	return nil
@@ -412,32 +400,19 @@ func (p *ValuePredicate) validateArgNums() error {
 		return fmt.Errorf("operation %d requires exactly %d integer argument(s), got %d", p.Op, requiredIntArgs, len(p.IntArgs))
 	}
 	if len(p.ByteArgs) != requiredByteArgs {
-		return fmt.Errorf("operation %d requires exactly %d bytes argument(s), got %d", p.Op, requiredByteArgs, len(p.ByteArgs))
+		return fmt.Errorf("operation %d requires exactly %d bytes argument(s), got %d",
+			p.Op, requiredByteArgs, len(p.ByteArgs))
 	}
 	return nil
 }
 
-func (p *ValuePredicate) validateArgValues(numWords uint64) error {
+func (p *ValuePredicate) validateArgValues() error {
 	for i, arg := range p.IntArgs {
 		if arg == nil {
 			return fmt.Errorf("integer argument %d cannot be nil for operation %d", i, p.Op)
 		}
 		if arg.Sign() < 0 {
 			return fmt.Errorf("integer argument %d cannot be negative for operation %d", i, p.Op)
-		}
-		if uint64(arg.BitLen()) > numWords*Word*8 {
-			return fmt.Errorf(
-				"bit length of integer argument %d cannot exceed value bit length %d for operation %d, got %d bits",
-				i, numWords*Word*8, p.Op, arg.BitLen(),
-			)
-		}
-	}
-	for i, arg := range p.ByteArgs {
-		if uint64(len(arg)) != numWords*Word {
-			return fmt.Errorf(
-				"size of byte argument %d must match size of value (%d bytes) for operation %d, got %d bytes",
-				i, numWords*Word, p.Op, len(arg),
-			)
 		}
 	}
 	return nil
