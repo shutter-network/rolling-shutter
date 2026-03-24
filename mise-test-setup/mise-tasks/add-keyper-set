@@ -1,0 +1,58 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Add a keyper set on-chain"
+#MISE depends=["gen-keyper-configs"]
+#USAGE flag "--indices <indices>" help="Comma-separated keyper indices"
+#USAGE flag "--threshold <threshold>" help="Keyper set threshold"
+
+import json
+import os
+from pathlib import Path
+
+import utils
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+data_dir = Path(os.environ["DATA_DIR"])
+indices = utils.parse_indices(os.environ["usage_indices"])
+threshold = os.environ["usage_threshold"]
+run_path = (
+    data_dir
+    / "contracts"
+    / "broadcast"
+    / utils.DEPLOYMENT_SCRIPTS[deployment_type]
+    / os.environ["ETHEREUM_CHAIN_ID"]
+    / "run-latest.json"
+)
+deployment_run = json.loads(run_path.read_text())
+keyper_set_manager = utils.get_created_contract_address(deployment_run, "KeyperSetManager")
+key_broadcast_contract = utils.get_created_contract_address(deployment_run, "KeyBroadcastContract")
+keyper_addresses = ",".join(
+    utils.keyper_address(data_dir / f"keyper-{index}.toml") for index in indices
+)
+
+utils.run(
+    [
+        "docker",
+        "compose",
+        "run",
+        "--rm",
+        "--env",
+        f"DEPLOY_KEY={os.environ['DEPLOY_KEY']}",
+        "--env",
+        f"PRIVATE_KEY={os.environ['DEPLOY_KEY']}",
+        "--env",
+        f"ACTIVATION_DELTA={os.environ['ACTIVATION_DELTA']}",
+        "--env",
+        f"KEYPERSETMANAGER_ADDRESS={keyper_set_manager}",
+        "--env",
+        f"KEYBROADCAST_ADDRESS={key_broadcast_contract}",
+        "--env",
+        f"KEYPER_ADDRESSES={keyper_addresses}",
+        "--env",
+        f"THRESHOLD={threshold}",
+        "contracts",
+        "script",
+        "/app/script/AddKeyperSet.s.sol:AddKeyperSet",
+        "--broadcast",
+    ]
+)

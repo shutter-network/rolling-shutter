@@ -1,0 +1,4 @@
+/data/
+/generated/
+__pycache__/
+mise.local.toml

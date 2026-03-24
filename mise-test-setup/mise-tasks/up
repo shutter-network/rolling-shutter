@@ -1,0 +1,16 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Start the implemented docker3 stack"
+#MISE depends=["patch-genesis", "init-keyper-dbs"]
+
+import os
+import utils
+
+
+utils.run(["docker", "compose", "up", "-d"])
+
+utils.wait_for_service_health("ethereum")
+utils.wait_for_service_health("db")
+utils.wait_for_service_health("chain-seed")
+num_keypers = int(os.environ["NUM_KEYPERS"])
+for index in range(num_keypers):
+    utils.wait_for_service_health(f"chain-{index}")

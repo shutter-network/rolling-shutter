@@ -1,0 +1,29 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Render docker compose files based on DEPLOYMENT_TYPE"
+# /// script
+# dependencies = ["jinja2"]
+# ///
+
+import os
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
+import utils
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+generated_dir = Path(os.environ["GENERATED_DIR"])
+generated_dir.mkdir(parents=True, exist_ok=True)
+
+environment = Environment(loader=FileSystemLoader("."))
+
+compose_keypers = environment.get_template("compose.keypers.yml.j2").render(
+    num_keypers=int(os.environ["NUM_KEYPERS"]),
+    keyper_command=utils.KEYPER_SUBCOMMANDS[deployment_type],
+)
+(generated_dir / "compose.keypers.yml").write_text(compose_keypers)
+
+compose = environment.get_template("compose.yml.j2").render(
+    deployment_type=deployment_type,
+)
+(generated_dir / "compose.yml").write_text(compose)

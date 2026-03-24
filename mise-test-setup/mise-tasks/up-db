@@ -1,0 +1,9 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Run db and wait for healthcheck"
+#MISE depends=["gen-compose"]
+
+import utils
+
+
+utils.run(["docker", "compose", "up", "-d", "db"])
+utils.wait_for_service_health("db")

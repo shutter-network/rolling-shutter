@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - ${DATA_DIR}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 1s
+      timeout: 1s
+      retries: 10
+
+  ethereum:
+    image: ghcr.io/foundry-rs/foundry:v1.5.0
+    volumes:
+      - ${DATA_DIR}/ethereum:/state
+    working_dir: /anvil
+    entrypoint: anvil
+    command:
+      - --host
+      - 0.0.0.0
+      - --chain-id
+      - ${ETHEREUM_CHAIN_ID}
+      - --block-time
+      - ${ETHEREUM_BLOCK_TIME}
+      - --state
+      - /state
+    healthcheck:
+      test: cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  chain-seed:
+    image: rolling-shutter
+    entrypoint: /rolling-shutter
+    command:
+      - chain
+      - --config
+      - /chain/config/config.toml
+    volumes:
+      - ${DATA_DIR}/chain-seed:/chain
+    healthcheck:
+      test: curl -sf http://127.0.0.1:26657/status >/dev/null
+      interval: 1s
+      timeout: 1s
+      retries: 10
+
+  bootnode:
+    image: rolling-shutter
+    entrypoint: /rolling-shutter
+    command:
+      - p2pnode
+      - --config
+      - /config.toml
+    volumes:
+      - ${STATIC_DIR}/bootstrap.toml:/config.toml
+
+  contracts:
+    build:
+      context: https://github.com/shutter-network/contracts.git#docker
+    profiles:
+      - tools
+    environment:
+      - FOUNDRY_ETH_RPC_URL=http://ethereum:8545
+    volumes:
+      - ${DATA_DIR}/contracts/out:/app/out
+      - ${DATA_DIR}/contracts/broadcast:/app/broadcast
+
+  rolling-shutter:
+    image: rolling-shutter
+    profiles:
+      - tools
+    entrypoint:
+      - /rolling-shutter
+    volumes:
+      - ${DATA_DIR}:/data

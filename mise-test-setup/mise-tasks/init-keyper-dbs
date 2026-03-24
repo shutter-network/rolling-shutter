@@ -1,0 +1,85 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Initialize dbs for all keypers"
+#MISE depends=["up-db", "gen-keyper-configs"]
+
+import os
+
+import utils
+
+
+def db_exists(database_name: str) -> bool:
+    result = utils.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-U",
+            "postgres",
+            "-tAc",
+            f"SELECT 1 FROM pg_database WHERE datname = '{database_name}'",
+        ],
+        capture_output=True,
+    )
+    return result.stdout.strip() == "1"
+
+
+def public_table_count(database_name: str) -> int:
+    result = utils.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            database_name,
+            "-tAc",
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'",
+        ],
+        capture_output=True,
+    )
+    return int(result.stdout.strip() or "0")
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+
+for index in range(int(os.environ["NUM_KEYPERS"])):
+    database_name = f"keyper-{index}"
+
+    if not db_exists(database_name):
+        utils.run(
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "db",
+                "createdb",
+                "-U",
+                "postgres",
+                database_name,
+            ]
+        )
+
+    if public_table_count(database_name) == 0:
+        utils.run(
+            [
+                "docker",
+                "compose",
+                "run",
+                "-T",
+                "--no-deps",
+                "--rm",
+                f"keyper-{index}",
+                utils.KEYPER_SUBCOMMANDS[deployment_type],
+                "initdb",
+                "--config",
+                "/config.toml",
+            ]
+        )

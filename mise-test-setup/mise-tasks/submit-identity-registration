@@ -1,0 +1,83 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Submit an identity registration transaction"
+#MISE depends=["deploy"]
+#USAGE flag "--eon <eon>" help="Target eon"
+#USAGE flag "--identity-prefix <identity_prefix>" help="Identity prefix hex string"
+#USAGE flag "--timestamp <timestamp>" help="Trigger timestamp"
+
+import json
+import os
+import secrets
+import time
+from pathlib import Path
+
+import utils
+
+
+def deployment_run_path(data_dir: Path, deployment_type: str) -> Path:
+    return (
+        data_dir
+        / "contracts"
+        / "broadcast"
+        / utils.DEPLOYMENT_SCRIPTS[deployment_type]
+        / os.environ["ETHEREUM_CHAIN_ID"]
+        / "run-latest.json"
+    )
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+if deployment_type != "service":
+    raise SystemExit("submit-identity-registration only supports DEPLOYMENT_TYPE=service")
+
+data_dir = Path(os.environ["DATA_DIR"])
+deployment_run = json.loads(deployment_run_path(data_dir, deployment_type).read_text())
+registry_address = utils.get_created_contract_address(deployment_run, "ShutterRegistry")
+
+eon = os.environ.get("usage_eon", "").strip()
+if not eon:
+    eon = utils.query_keyper_db(0, "SELECT max(eon) FROM eons")
+    if not eon:
+        raise SystemExit("No eon found")
+
+identity_prefix = os.environ.get("usage_identity_prefix", "").strip()
+if not identity_prefix:
+    identity_prefix = f"0x{secrets.token_hex(32)}"
+
+timestamp = os.environ.get("usage_timestamp", "").strip()
+if not timestamp:
+    timestamp = str(
+        int(time.time()) + int(os.environ["DECRYPTION_TRIGGER_TIMESTAMP_DELTA"])
+    )
+
+utils.run(
+    [
+        "docker",
+        "compose",
+        "run",
+        "--rm",
+        "--env",
+        f"TX_SENDER_KEY={os.environ['DEPLOY_KEY']}",
+        "--env",
+        f"REGISTRY_ADDRESS={registry_address}",
+        "--env",
+        f"EON={eon}",
+        "--env",
+        f"IDENTITY_PREFIX={identity_prefix}",
+        "--env",
+        f"TIMESTAMP={timestamp}",
+        "contracts",
+        "script",
+        "/app/script/SubmitTransaction.service.s.sol:SubmitTransaction",
+        "--broadcast",
+    ]
+)
+
+print(
+    json.dumps(
+        {
+            "eon": eon,
+            "identity_prefix": identity_prefix,
+            "timestamp": timestamp,
+        }
+    )
+)

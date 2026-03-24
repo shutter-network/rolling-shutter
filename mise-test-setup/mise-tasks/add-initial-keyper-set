@@ -1,0 +1,58 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Add the initial keyper set on-chain"
+#MISE depends=["gen-keyper-configs"]
+
+import json
+import os
+from pathlib import Path
+
+import utils
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+data_dir = Path(os.environ["DATA_DIR"])
+run_path = (
+    data_dir
+    / "contracts"
+    / "broadcast"
+    / utils.DEPLOYMENT_SCRIPTS[deployment_type]
+    / os.environ["ETHEREUM_CHAIN_ID"]
+    / "run-latest.json"
+)
+deployment_run = json.loads(run_path.read_text())
+keyper_set_manager = utils.get_created_contract_address(
+    deployment_run, "KeyperSetManager"
+)
+
+count_result = utils.run(
+    [
+        "docker",
+        "compose",
+        "run",
+        "--rm",
+        "--entrypoint",
+        "cast",
+        "contracts",
+        "call",
+        "--rpc-url",
+        "http://ethereum:8545",
+        keyper_set_manager,
+        "getNumKeyperSets()(uint64)",
+    ],
+    capture_output=True,
+)
+if int(count_result.stdout.strip()) > 1:  # 0 is the guard keyper set
+    print("Initial keyper set already added; skipping")
+    raise SystemExit(0)
+
+utils.run(
+    [
+        "mise",
+        "run",
+        "add-keyper-set",
+        "--indices",
+        os.environ["INITIAL_KEYPER_SET_INDICES"],
+        "--threshold",
+        os.environ["INITIAL_THRESHOLD"],
+    ]
+)

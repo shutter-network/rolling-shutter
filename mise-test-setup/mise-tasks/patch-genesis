@@ -1,0 +1,46 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Patch and distribute the shuttermint genesis"
+#MISE depends=["init-chain-nodes"]
+
+import json
+import os
+from pathlib import Path
+
+import utils
+
+data_dir = Path(os.environ["DATA_DIR"])
+num_keypers = int(os.environ["NUM_KEYPERS"])
+initial_keyper_set_indices = utils.parse_indices(os.environ["INITIAL_KEYPER_SET_INDICES"])
+source_path = data_dir / "chain-seed" / "config" / "genesis.json"
+genesis = json.loads(source_path.read_text())
+
+validators: list[dict[str, object]] = []
+keypers: list[str] = []
+for index in initial_keyper_set_indices:
+    validator_key_path = (
+        data_dir / f"chain-{index}" / "config" / "priv_validator_key.json"
+    )
+    validator_key = json.loads(validator_key_path.read_text())
+    validators.append(
+        {
+            "address": validator_key["address"],
+            "pub_key": validator_key["pub_key"],
+            "power": "10",
+            "name": f"chain-{index}",
+        }
+    )
+
+    keyper_config_path = data_dir / f"keyper-{index}.toml"
+    keypers.append(utils.keyper_address(keyper_config_path))
+
+genesis["validators"] = validators
+genesis["app_state"]["keypers"] = keypers
+genesis["app_state"]["threshold"] = os.environ["INITIAL_THRESHOLD"]
+
+rendered_genesis = json.dumps(genesis, indent=2) + "\n"
+targets: list[Path] = [source_path]
+for index in range(num_keypers):
+    targets.append(data_dir / f"chain-{index}" / "config" / "genesis.json")
+
+for target in targets:
+    target.write_text(rendered_genesis)

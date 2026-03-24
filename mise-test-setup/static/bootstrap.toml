@@ -1,0 +1,28 @@
+# Peer identity: /p2p/12D3KooWBamWEFbZjgRah297g4AZP6zMs85akjZD4McszhLwBzLr
+# Peer role: bootstrap
+
+ListenMessages = true
+
+[P2P]
+P2PKey = 'CAESQJDNTqY2xZN9dl/erOChzLkSXkT0u54UMrMh08rtWGYjGjug6Yiy7zL7/bVG3xhdWxTfPsTn2x3kiAMoidLMS9M='
+ListenAddresses = ['/ip4/0.0.0.0/tcp/23000']
+# Optional, addresses to be advertised to other peers instead of auto-detected ones.
+AdvertiseAddresses = []
+# Overwrite p2p bootstrap nodes
+CustomBootstrapAddresses = [
+    '/dns4/bootnode/tcp/23000/p2p/12D3KooWBamWEFbZjgRah297g4AZP6zMs85akjZD4McszhLwBzLr',
+]
+Environment = 'production'
+# Must be unique for each instance id.
+DiscoveryNamespace = 'shutter-42'
+IsAccessNode = false
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Metrics]
+Enabled = false
+Host = '[::]'
+Port = 9100

@@ -1,0 +1,57 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Deploy contracts if not already deployed"
+#MISE depends=["up-ethereum"]
+
+import os
+import json
+from pathlib import Path
+import utils
+
+REQUIRED_CONTRACTS: dict[str, list[str]] = {
+    "gnosis": [
+        "KeyBroadcastContract",
+        "KeyperSetManager",
+        "Sequencer",
+        "ValidatorRegistry",
+    ],
+    "service": ["KeyBroadcastContract", "KeyperSetManager", "ShutterRegistry"],
+}
+
+
+def deployment_is_complete(path: Path, deployment_type: str) -> bool:
+    try:
+        deployment_run = json.loads(path.read_text())
+    except FileNotFoundError:
+        return False
+
+    for contract_name in REQUIRED_CONTRACTS[deployment_type]:
+        if not utils.get_created_contract_address(deployment_run, contract_name):
+            return False
+    return True
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+
+deploy_script = utils.DEPLOYMENT_SCRIPTS[deployment_type]
+data_dir = Path(os.environ["DATA_DIR"])
+chain_id = os.environ["ETHEREUM_CHAIN_ID"]
+run_path = data_dir / "contracts" / "broadcast" / deploy_script / chain_id / "run-latest.json"
+
+if deployment_is_complete(run_path, deployment_type):
+    print(f"Deployment already present at {run_path}; skipping")
+    raise SystemExit(0)
+
+utils.run(
+    [
+        "docker",
+        "compose",
+        "run",
+        "--rm",
+        "--env",
+        f"DEPLOY_KEY={os.environ['DEPLOY_KEY']}",
+        "contracts",
+        "script",
+        f"/app/script/{deploy_script}:Deploy",
+        "--broadcast",
+    ]
+)
