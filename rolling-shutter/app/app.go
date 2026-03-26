@@ -106,14 +106,7 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 		if err != nil {
 			return shapp, err
 		}
-		// Old versions of ShutterApp were initialized with a genesis file
-		// that did not contain ForkHeights and thus do not have them set
-		// either. For backwards compatibility, we set them to all disabled
-		// here (but they will likely be overridden by chain id specific
-		// overrides).
-		if shapp.ForkHeights == nil {
-			shapp.ForkHeights = NewForkHeightsAllDisabled()
-		}
+		shapp.ForkHeights = migrateForkHeights(shapp.ForkHeights)
 		log.Info().
 			Str("file", gobpath).
 			Time("last-saved", shapp.LastSaved).
@@ -125,6 +118,28 @@ func LoadShutterAppFromFile(gobpath string) (ShutterApp, error) {
 	shapp.Gobpath = gobpath
 	shapp.LastSaved = time.Now() // Do not persist immediately after starting
 	return shapp, nil
+}
+
+// migrateForkHeights applies backwards-compatibility migrations for fork
+// height state loaded from persisted app state or genesis.
+func migrateForkHeights(forkHeights *ForkHeights) *ForkHeights {
+	if forkHeights == nil {
+		return NewForkHeightsAllDisabled()
+	}
+	if forkHeights.CheckInUpdateNew == (ForkHeight{}) && forkHeights.CheckInUpdate != nil {
+		log.Info().
+			Int64("check-in-update-height", *forkHeights.CheckInUpdate).
+			Msg("migrating legacy fork height checkInUpdate to checkInUpdateNew")
+		forkHeights.CheckInUpdateNew = ForkHeight{
+			Enabled: true,
+			Height:  *forkHeights.CheckInUpdate,
+		}
+	}
+	if forkHeights.CheckInUpdate != nil {
+		log.Info().Msg("clearing legacy fork height checkInUpdate after migration")
+		forkHeights.CheckInUpdate = nil
+	}
+	return forkHeights
 }
 
 // checkConfig checks if the given BatchConfig could be added.
@@ -227,14 +242,7 @@ func (app *ShutterApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		log.Fatal().Err(err).Msg("cannot unmarshal genesis app state")
 	}
 
-	// ForkHeights are taken from the genesis state. For backwards compatibility
-	// with older genesis files that do not specify ForkHeights, we initialize
-	// them with all forks disabled (note however that they will likely be
-	// superseded by chain id based overrides).
-	app.ForkHeights = genesisState.ForkHeights
-	if app.ForkHeights == nil {
-		app.ForkHeights = NewForkHeightsAllDisabled()
-	}
+	app.ForkHeights = migrateForkHeights(genesisState.ForkHeights)
 
 	bc := BatchConfig{
 		ActivationBlockNumber: 0,
