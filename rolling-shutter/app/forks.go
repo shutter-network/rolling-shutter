@@ -33,7 +33,10 @@ func uint64Ptr(value uint64) *uint64 {
 func NewForkHeightsAllEnabled() *ForkHeights {
 	zero := int64(0)
 	return &ForkHeights{
-		CheckInUpdate: &zero,
+		CheckInUpdateNew: ForkHeight{
+			Enabled: true,
+			Height:  zero,
+		},
 	}
 }
 
@@ -41,7 +44,10 @@ func NewForkHeightsAllEnabled() *ForkHeights {
 // are set to disabled.
 func NewForkHeightsAllDisabled() *ForkHeights {
 	return &ForkHeights{
-		CheckInUpdate: nil,
+		CheckInUpdateNew: ForkHeight{
+			Enabled: false,
+			Height:  0,
+		},
 	}
 }
 
@@ -54,22 +60,21 @@ func (app *ShutterApp) IsCheckInUpdateForkActive() bool {
 		log.Warn().Msg("ForkHeights is nil, assuming all forks disabled")
 		return false
 	}
-	forkHeight := app.ForkHeights.CheckInUpdate
-	return isForkActive(forkHeight, override, app.CurrentBlockHeight(), app.EONCounter)
+	return app.ForkHeights.CheckInUpdateNew.IsForkActive(override, app.CurrentBlockHeight(), app.EONCounter)
 }
 
-// isForkActive checks whether a fork is active.
+// IsForkActive checks whether a fork is active.
 //
 // A fork is active in either of the following cases:
 //   - an override is set and the override condition is met
-//   - no override is set, a fork height is set, and current block height
-//     is greater than or equal to the fork height
+//   - no override is set, the fork height enabled flag is set, and the current
+//     block height is greater than or equal to the fork height
 //
 // Otherwise, the fork is not active, i.e., in any of the following cases:
 //   - an override is set but the override condition is not met
-//   - no override is set, a fork height is set, but the current block height is
-//     less than the fork height
-//   - no override is set and no fork height is set
+//   - no override is set, the fork height flag is enabled, but the current
+//     block height is less than the fork height
+//   - no override is set and the fork height enabled flag is not set
 //
 // An override condition is met if
 //   - an override height is set and the current block height is greater than or
@@ -80,7 +85,7 @@ func (app *ShutterApp) IsCheckInUpdateForkActive() bool {
 // If both override height and override eon are set, the height takes
 // precedence. If neither is set, the fork is not active, regardless of the
 // fork height.
-func isForkActive(forkHeightGenesis *int64, override *ForkHeightOverride, currentBlockHeight int64, currentEon uint64) bool {
+func (fh ForkHeight) IsForkActive(override *ForkHeightOverride, currentBlockHeight int64, currentEon uint64) bool {
 	if override != nil {
 		if override.Height != nil {
 			return currentBlockHeight >= *override.Height
@@ -90,8 +95,8 @@ func isForkActive(forkHeightGenesis *int64, override *ForkHeightOverride, curren
 		}
 		return false
 	}
-	if forkHeightGenesis == nil {
+	if !fh.Enabled {
 		return false
 	}
-	return currentBlockHeight >= *forkHeightGenesis
+	return currentBlockHeight >= fh.Height
 }

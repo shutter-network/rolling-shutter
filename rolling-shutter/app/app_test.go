@@ -99,3 +99,47 @@ func TestGobDKG(t *testing.T) {
 
 	shtest.EnsureGobable(t, &dkg, new(DKGInstance))
 }
+
+func TestMigrateForkHeights(t *testing.T) {
+	t.Run("fork heights nil defaults to all disabled", func(t *testing.T) {
+		got := migrateForkHeights(nil)
+		assert.Assert(t, is.DeepEqual(got, NewForkHeightsAllDisabled()))
+	})
+
+	t.Run("legacy CheckInUpdate migrates to CheckInUpdateNew", func(t *testing.T) {
+		legacyHeight := int64(123)
+		got := migrateForkHeights(&ForkHeights{CheckInUpdate: &legacyHeight})
+
+		assert.Assert(t, got.CheckInUpdate == nil)
+		assert.Assert(t, is.DeepEqual(got.CheckInUpdateNew, ForkHeight{Enabled: true, Height: 123}))
+	})
+
+	t.Run("legacy CheckInUpdate zero migrates to enabled genesis fork", func(t *testing.T) {
+		legacyHeight := int64(0)
+		got := migrateForkHeights(&ForkHeights{CheckInUpdate: &legacyHeight})
+
+		assert.Assert(t, got.CheckInUpdate == nil)
+		assert.Assert(t, is.DeepEqual(got.CheckInUpdateNew, ForkHeight{Enabled: true, Height: 0}))
+	})
+
+	t.Run("CheckInUpdateNew is preserved and CheckInUpdate is unset", func(t *testing.T) {
+		legacyHeight := int64(999)
+		expected := ForkHeight{Enabled: true, Height: 42}
+		got := migrateForkHeights(&ForkHeights{
+			CheckInUpdate:    &legacyHeight,
+			CheckInUpdateNew: expected,
+		})
+
+		assert.Assert(t, got.CheckInUpdate == nil)
+		assert.Assert(t, is.DeepEqual(got.CheckInUpdateNew, expected))
+	})
+
+	t.Run("idempotent when CheckInUpdate is unset", func(t *testing.T) {
+		initial := &ForkHeights{CheckInUpdateNew: ForkHeight{Enabled: true, Height: 42}}
+
+		first := migrateForkHeights(initial)
+		second := migrateForkHeights(first)
+
+		assert.Assert(t, is.DeepEqual(second, first))
+	})
+}
