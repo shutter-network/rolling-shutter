@@ -2343,6 +2343,35 @@ func TestDynamicEventFromSmokeTests(t *testing.T) {
 		vLog.Data, vLog.Data[2*32+31], etd.LogPredicates[2].LogValueRef.GetValue(vLog))
 }
 
+// This test demonstrates how we can match an address in event data:
+// pad the address bytes to word size and byte match 1 word (dynamic: false)
+func TestStaticUserEq(t *testing.T) {
+	setup := help.SetupBackend(t)
+	tx, err := setup.Contract.EmitStaticSample(setup.Auth)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+	userbytes := Align(common.HexToAddress("0x1111111111111111111111111111111111111111").Bytes())
+	etd := EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: false,
+					Offset:  4,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{userbytes},
+				},
+			},
+		},
+	}
+	match, err := etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+}
+
 // aligns []byte to 32 byte.
 func Align(val []byte) []byte {
 	words := (31 + len(val)) / Word
