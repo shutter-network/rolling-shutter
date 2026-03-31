@@ -2441,6 +2441,128 @@ func TestStatic(t *testing.T) {
 	assert.Check(t, match, "did not match", vLog)
 }
 
+func TestStaticCustomFromSmoke(t *testing.T) {
+	// Full event is
+	//   event StaticArgs(
+	// 		address user,
+	// 		bool ok,
+	// 		bytes4 sig,
+	// 		bytes32 tag,
+	// 		uint256 amount
+	//	)
+	//
+	// emitArgs from smoke test:
+	// [
+	// "0x2222222222222222222222222222222222222222",
+	// "false",
+	// "0x12345678",
+	// "0x746573742d746167000000000000000000000000000000000000000000000000",
+	// "777"
+	// ]
+	//
+	// trigger definition from smoke test:
+	// "args": [
+	// { "name": "user", "op": "eq", "bytes": "0x2222222222222222222222222222222222222222" },
+	// { "name": "ok", "op": "eq", "bytes": "0x00" },
+	// { "name": "sig", "op": "eq", "bytes": "0x12345678" },
+	// { "name": "tag", "op": "eq", "bytes": "0x746573742d746167000000000000000000000000000000000000000000000000" },
+	// { "name": "amount", "op": "eq", "number": "777" }
+	// ]
+	setup := help.SetupBackend(t)
+
+	userAddr := common.HexToAddress("0x2222222222222222222222222222222222222222")
+
+	sigFromHex, err := hex.DecodeString("12345678")
+	assert.NilError(t, err, "error decoding 12345678")
+	sigArg := [4]byte(sigFromHex)
+
+	tagFromHex, err := hex.DecodeString("746573742d746167000000000000000000000000000000000000000000000000")
+	assert.NilError(t, err, "error decoding tag")
+	tagArg := [32]byte(tagFromHex)
+
+	amount := big.NewInt(777)
+
+	tx, err := setup.Contract.EmitStaticCustom(
+		setup.Auth,
+		userAddr,
+		false,
+		sigArg,
+		tagArg,
+		amount,
+	)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+
+	userbytes := Align(userAddr.Bytes())
+
+	lpUser := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  4,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{userbytes},
+		},
+	}
+
+	lpOk := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  5,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{Align([]byte{0})},
+		},
+	}
+
+	sigbytes := RAlign(sigFromHex)
+	sigref := LogValueRef{
+		Dynamic: false,
+		Offset:  6,
+	}
+
+	lpSig := LogPredicate{
+		LogValueRef: sigref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{sigbytes},
+		},
+	}
+
+	lpTag := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  7,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{tagFromHex},
+		},
+	}
+	lpAmount := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  8,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:      UintEq,
+			IntArgs: []*big.Int{amount},
+		},
+	}
+	etd := EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			lpUser, lpOk, lpSig, lpTag, lpAmount,
+		},
+	}
+	match, err := etd.Match(vLog)
+
+	assert.NilError(t, err, "error when matching")
+	assert.Check(t, match, "%v did not match %v", etd, vLog.Data)
+}
+
 // aligns []byte to 32 byte.
 func Align(val []byte) []byte {
 	words := (31 + len(val)) / Word
