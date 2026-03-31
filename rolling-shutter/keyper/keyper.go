@@ -316,23 +316,28 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return err
 	}
 	cq := obskeyper.New(tx)
-	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
-		ctx,
-		int64(latestBatchConfig.KeyperConfigIndex)+1,
-	)
-	if err == pgx.ErrNoRows {
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
 
 	lastSent, err := q.GetLastBatchConfigSent(ctx)
 	if err != nil {
 		return err
 	}
-	if lastSent == keyperSet.KeyperConfigIndex {
+
+	// Advance from whichever progress marker is further ahead: the latest config known to
+	// Tendermint or the last config we already handled locally.
+	nextKeyperConfigIndex := int64(latestBatchConfig.KeyperConfigIndex)
+	if lastSent > nextKeyperConfigIndex {
+		nextKeyperConfigIndex = lastSent
+	}
+
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, nextKeyperConfigIndex+1)
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if nextKeyperConfigIndex == keyperSet.KeyperConfigIndex {
 		log.Debug().
 			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
 			Msg("batch config already sent (scheduled).")
