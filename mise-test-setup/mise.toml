@@ -27,3 +27,6 @@ SHUTTERMINT_START_BLOCK_DELTA = "200"
 SHUTTERMINT_RPC_PORT = "26657"
 SHUTTERMINT_P2P_PORT = "26656"
 DEPLOYMENT_TYPE = "service"  # "gnosis" or "service"
+
+# Load optional overrides after defaults so .env wins when present.
+mise.file = ".env"

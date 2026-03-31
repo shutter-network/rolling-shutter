@@ -9,18 +9,27 @@ import time
 import utils
 
 
-eon = os.environ.get("usage_eon", "").strip()
+requested_eon = os.environ.get("usage_eon", "").strip()
 identity_prefix = os.environ.get("usage_identity_prefix", "").strip()
 poll_interval = float(os.environ["DECRYPTION_KEY_POLL_INTERVAL"])
-if not eon or not identity_prefix:
+if not requested_eon or not identity_prefix:
     raise SystemExit("Provide both --eon and --identity-prefix")
 
 while True:
+    keyper_set_index = utils.query_keyper_db(
+        0,
+        f"SELECT keyper_config_index FROM eons WHERE eon = {int(requested_eon)} LIMIT 1",
+    )
+    if not keyper_set_index:
+        time.sleep(poll_interval)
+        continue
+
     identity = utils.query_keyper_db(
         0,
         "SELECT encode(identity, 'hex') "
         "FROM identity_registered_event "
-        f"WHERE eon = {int(eon)} AND encode(identity_prefix, 'hex') = '{identity_prefix.removeprefix('0x')}' "
+        f"WHERE eon = {int(requested_eon)} "
+        f"AND encode(identity_prefix, 'hex') = '{identity_prefix.removeprefix('0x')}' "
         "ORDER BY block_number DESC, tx_index DESC, log_index DESC LIMIT 1",
     )
     if not identity:
@@ -31,10 +40,13 @@ while True:
         0,
         "SELECT EXISTS ("
         "SELECT 1 FROM decryption_key "
-        f"WHERE eon = {int(eon)} AND encode(epoch_id, 'hex') = '{identity}'"
+        f"WHERE eon = {int(keyper_set_index)} AND encode(epoch_id, 'hex') = '{identity}'"
         ")",
     )
     if exists == "t":
-        print(f"Decryption key available for eon {eon}")
+        print(
+            f"Decryption key available for eon {requested_eon} "
+            f"(keyper set index {keyper_set_index})"
+        )
         raise SystemExit(0)
     time.sleep(poll_interval)
