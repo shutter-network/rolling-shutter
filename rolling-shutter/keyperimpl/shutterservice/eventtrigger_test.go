@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -2223,6 +2225,122 @@ func TestWithEVM(t *testing.T) {
 			assert.Equal(t, match, tt.match, "did not match expectation after roundtrip: %v", tt.name)
 		})
 	}
+}
+
+// This test demonstrates a shortcoming in EventTriggerDefinition:
+// we currently have no way of matching array types in event data.
+// The event we test here has the format
+//
+//	event DynamicArgs(string note, bytes blob, uint256[] nums);
+//
+// and we can not create an ETD that matches on `nums`.
+//
+// We are lacking the deserialization knowledge, that an event
+// argument is an array of some other type
+// (i.e. word-wise encoded as `[array length][val@idx 0][val@idx 1],...`)
+// instead of an array of bytes (encoded as `[slice length][value bytes, word aligned]`).
+//
+// In this test we demonstrate how we also fail to interpret the array
+// data as a fixed size []byte argument.
+func TestDynamicEventFromSmokeTests(t *testing.T) {
+	setup := help.SetupBackend(t)
+	tx, err := setup.Contract.EmitDynamicSample(setup.Auth)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+	hexarg, err := hexutil.Decode("0xbeef")
+	assert.NilError(t, err, "error on hex decode", err)
+
+	etd := EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  4,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{[]byte("hello")},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  5,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{hexarg},
+				},
+			},
+		},
+	}
+	match, err := etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+
+	// matching dynamic array as []byte:
+	uintarray := make([]*big.Int, 2)
+	uintarray[0] = big.NewInt(1)
+	uintarray[1] = big.NewInt(2)
+	typ, err := abi.NewType("uint256[]", "", nil)
+	assert.NilError(t, err, "error creating type")
+	a := abi.Argument{
+		Name: "nums",
+		Type: typ,
+	}
+	args := abi.Arguments{a}
+	packed, err := args.Pack(uintarray)
+	assert.NilError(t, err, "error packing")
+
+	// first packed Word is offset
+	uintarraybytes := packed[32:]
+
+	etd = EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  4,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{[]byte("hello")},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  5,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{hexarg},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  6,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{uintarraybytes},
+				},
+			},
+		},
+	}
+
+	// we manage to create the same []byte:
+	backwardsoffset := len(vLog.Data) - len(uintarraybytes)
+	assert.Check(t, cmp.DeepEqual(vLog.Data[backwardsoffset:], uintarraybytes), "packed encoding did not match")
+	// but we fail to create a Match like this:
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "we could not match uint256[] as []byte.\nevent data is %v\nextracted value `GetValue(…)` at offset %v is %v",
+		vLog.Data, vLog.Data[2*32+31], etd.LogPredicates[2].LogValueRef.GetValue(vLog))
 }
 
 // aligns []byte to 32 byte.
