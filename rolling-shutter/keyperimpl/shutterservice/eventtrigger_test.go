@@ -2,6 +2,7 @@ package shutterservice
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
@@ -2343,31 +2344,99 @@ func TestDynamicEventFromSmokeTests(t *testing.T) {
 		vLog.Data, vLog.Data[2*32+31], etd.LogPredicates[2].LogValueRef.GetValue(vLog))
 }
 
-// This test demonstrates how we can match an address in event data:
-// pad the address bytes to word size and byte match 1 word (dynamic: false)
-func TestStaticUserEq(t *testing.T) {
+func TestStatic(t *testing.T) {
 	setup := help.SetupBackend(t)
 	tx, err := setup.Contract.EmitStaticSample(setup.Auth)
 	assert.NilError(t, err, "error creating tx")
 	vLog, err := help.CollectLog(t, setup, tx)
 	assert.NilError(t, err, "error getting log")
-	userbytes := Align(common.HexToAddress("0x1111111111111111111111111111111111111111").Bytes())
-	etd := EventTriggerDefinition{
-		Contract: setup.ContractAddress,
-		LogPredicates: []LogPredicate{
-			{
-				LogValueRef: LogValueRef{
-					Dynamic: false,
-					Offset:  4,
-				},
-				ValuePredicate: ValuePredicate{
-					Op:       BytesEq,
-					ByteArgs: [][]byte{userbytes},
-				},
-			},
+
+	// Full event is
+	//   event StaticArgs(
+	// 		address user,
+	// 		bool ok,
+	// 		bytes4 sig,
+	// 		bytes32 tag,
+	// 		uint256 amount
+	//	)
+
+	// Testing `bytes32 tag`
+	tag := []byte("tag")
+	var tagbytes [32]byte
+	copy(tagbytes[:], tag)
+	ref := LogValueRef{
+		Dynamic: false,
+		Offset:  7,
+	}
+
+	lpTag := LogPredicate{
+		LogValueRef: ref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{tagbytes[:]},
 		},
 	}
+	etd := EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpTag},
+	}
 	match, err := etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "%v did not match data %v, extracted value is %v", tagbytes, vLog.Data, ref.GetValue(vLog))
+
+	// Testing `bytes4 sig`:
+	// we can match `bytes4` value as a static log value, if we right pad with 0s
+	sig, err := hex.DecodeString("deadbeef")
+	assert.NilError(t, err, "error decoding deadbeef")
+	sigbytes := RAlign(sig)
+	sigref := LogValueRef{
+		Dynamic: false,
+		Offset:  6,
+	}
+
+	lpSig := LogPredicate{
+		LogValueRef: sigref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{sigbytes},
+		},
+	}
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpSig},
+	}
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "%v did not match data %v, extracted value is %v", sigbytes, vLog.Data, ref.GetValue(vLog))
+
+	// Testing `address user`
+
+	// This test demonstrates how we can match an address in event data:
+	// pad the address bytes to word size and byte match 1 word (dynamic: false)
+	userbytes := Align(common.HexToAddress("0x1111111111111111111111111111111111111111").Bytes())
+
+	lpUser := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  4,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{userbytes},
+		},
+	}
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpUser},
+	}
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+
+	// Match all three
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpSig, lpUser, lpTag},
+	}
+	match, err = etd.Match(vLog)
 	assert.NilError(t, err, "error on match: %v", err)
 	assert.Check(t, match, "did not match", vLog)
 }
@@ -2377,5 +2446,13 @@ func Align(val []byte) []byte {
 	words := (31 + len(val)) / Word
 	x := make([]byte, Word*words)
 	copy(x[len(x)-len(val):], val)
+	return x
+}
+
+// right aligns []byte to 32 byte.
+func RAlign(val []byte) []byte {
+	words := (31 + len(val)) / Word
+	x := make([]byte, Word*words)
+	copy(x[0:len(val)], val)
 	return x
 }
