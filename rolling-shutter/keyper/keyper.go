@@ -337,13 +337,6 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return err
 	}
 
-	if nextKeyperConfigIndex == keyperSet.KeyperConfigIndex {
-		log.Debug().
-			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
-			Msg("batch config already sent (scheduled).")
-		return nil
-	}
-
 	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
 	if err != nil {
 		return err
