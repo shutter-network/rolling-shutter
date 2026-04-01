@@ -5,7 +5,7 @@ import "testing"
 func TestIsForkActive(t *testing.T) {
 	testcases := []struct {
 		name               string
-		forkHeightGenesis  *int64
+		forkHeight         ForkHeight
 		override           *ForkHeightOverride
 		currentBlockHeight int64
 		currentEon         uint64
@@ -51,18 +51,37 @@ func TestIsForkActive(t *testing.T) {
 		},
 		{
 			name:               "genesis height met without override",
-			forkHeightGenesis:  int64Ptr(7),
+			forkHeight:         ForkHeight{Enabled: true, Height: 7},
 			currentBlockHeight: 7,
 			want:               true,
 		},
 		{
 			name:               "genesis height not met without override",
-			forkHeightGenesis:  int64Ptr(7),
+			forkHeight:         ForkHeight{Enabled: true, Height: 7},
 			currentBlockHeight: 6,
 			want:               false,
 		},
 		{
-			name:               "no override and no fork height",
+			name:               "enabled zero height activates at genesis",
+			forkHeight:         ForkHeight{Enabled: true, Height: 0},
+			currentBlockHeight: 0,
+			want:               true,
+		},
+		{
+			name:               "disabled fork with non-zero height stays inactive",
+			forkHeight:         ForkHeight{Enabled: false, Height: 7},
+			currentBlockHeight: 100,
+			want:               false,
+		},
+		{
+			name:               "zero-value fork height is disabled",
+			forkHeight:         ForkHeight{},
+			currentBlockHeight: 100,
+			want:               false,
+		},
+		{
+			name:               "nil override uses fork height",
+			forkHeight:         ForkHeight{Enabled: false, Height: 0},
 			currentBlockHeight: 100,
 			want:               false,
 		},
@@ -71,9 +90,9 @@ func TestIsForkActive(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := isForkActive(tc.forkHeightGenesis, tc.override, tc.currentBlockHeight, tc.currentEon)
+			got := tc.forkHeight.IsForkActive(tc.override, tc.currentBlockHeight, tc.currentEon)
 			if got != tc.want {
-				t.Fatalf("isForkActive() = %t, want %t (test case: %+v)", got, tc.want, tc)
+				t.Fatalf("%s: IsForkActive() = %t, want %t (test case: %+v)", tc.name, got, tc.want, tc)
 			}
 		})
 	}
