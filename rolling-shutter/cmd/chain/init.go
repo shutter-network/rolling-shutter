@@ -168,12 +168,15 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	// EnsureRoot also write the config file but with the default config. We want our own, so
 	// let's overwrite it.
 	cfg.WriteConfigFile(config.RootDir+"/config/config.toml", tendermintCfg)
-	// Initialize fork heights according to config. Disabled forks have height nil.
-	forkHeights := app.ForkHeights{}
+	// Initialize fork heights according to config.
+	forkHeights := app.NewForkHeightsAllDisabled()
 	if !config.Forks.CheckInUpdate.Disabled {
-		forkHeights.CheckInUpdate = &config.Forks.CheckInUpdate.Height
+		forkHeights.CheckInUpdateNew = app.ForkHeight{
+			Enabled: true,
+			Height:  config.Forks.CheckInUpdate.Height,
+		}
 	}
-	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3, config.InitialEon, &forkHeights)
+	appState := app.NewGenesisAppState(keypers, (2*len(keypers)+2)/3, config.InitialEon, forkHeights)
 
 	return initFilesWithConfig(tendermintCfg, config, appState)
 }

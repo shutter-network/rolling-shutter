@@ -141,11 +141,20 @@ type DKGInstance struct {
 	ApologiesSeen       map[common.Address]struct{}
 }
 
-// ForkHeights stores the block heights at which the rules of the protocol
-// change. If a field is nil, the corresponding fork is never activated,
-// unless overridden in code for specific chain IDs.
+// ForkHeights stores the configuration that controls when protocol forks
+// become active. A fork activates if the `Enabled` flag is true and the
+// current block height reaches `Height`, unless overridden in code for
+// specific chain IDs.
 type ForkHeights struct {
+	// legacy and unused, only present for backwards compatible deserialization
 	CheckInUpdate *int64 `json:"checkInUpdate"`
+
+	CheckInUpdateNew ForkHeight `json:"checkInUpdateNew"`
+}
+
+type ForkHeight struct {
+	Enabled bool
+	Height  int64
 }
 
 type ForkHeightOverrides struct {
