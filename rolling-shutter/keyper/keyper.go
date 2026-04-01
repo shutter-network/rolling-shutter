@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -257,6 +258,49 @@ func (kpr *KeyperCore) sendNewBlockSeen(ctx context.Context, tx pgx.Tx, l1BlockN
 	return nil
 }
 
+// validateBatchConfig mirrors shuttermint's BatchConfig validations (EnsureValid, checkConfig,
+// BatchConfigFromMessage, and allowedToVoteOnConfigChanges) to avoid sending batch configs that
+// would be rejected.
+func validateBatchConfig(
+	latestBatchConfig database.TendermintBatchConfig,
+	keyperSet obskeyper.KeyperSet,
+	keypers []common.Address,
+) error {
+	// mirrors EnsureValid (shutterevents/batchconfig.go)
+	if len(keypers) == 0 {
+		return errors.New("no keypers in batch config")
+	}
+	if keyperSet.Threshold <= 0 {
+		return errors.New("threshold must not be zero")
+	}
+	if int(keyperSet.Threshold) > len(keypers) {
+		return errors.Errorf("threshold %d exceeds number of keypers %d", keyperSet.Threshold, len(keypers))
+	}
+
+	// mirrors EnsureUniqueAddresses check in BatchConfigFromMessage (shutterevents/batchconfig.go)
+	if err := medley.EnsureUniqueAddresses(keypers); err != nil {
+		return errors.Wrap(err, "duplicate keyper addresses in batch config")
+	}
+
+	// mirrors checkConfig (app/app.go)
+	if keyperSet.ActivationBlockNumber < latestBatchConfig.ActivationBlockNumber {
+		return errors.Errorf(
+			"activation block number of next config (%d) lower than current one (%d)",
+			keyperSet.ActivationBlockNumber,
+			latestBatchConfig.ActivationBlockNumber,
+		)
+	}
+	if keyperSet.KeyperConfigIndex <= int64(latestBatchConfig.KeyperConfigIndex) {
+		return errors.Errorf(
+			"config index of next config (%d) not greater than current one (%d)",
+			keyperSet.KeyperConfigIndex,
+			latestBatchConfig.KeyperConfigIndex,
+		)
+	}
+
+	return nil
+}
+
 // handleOnChainKeyperSetChanges looks for changes in the keyper_set table.
 func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 	ctx context.Context,
@@ -272,26 +316,40 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return err
 	}
 	cq := obskeyper.New(tx)
-	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(
-		ctx,
-		int64(latestBatchConfig.KeyperConfigIndex)+1,
-	)
+
+	lastProcessedConfig, err := q.GetLastBatchConfigProcessed(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Advance from whichever progress marker is further ahead: the latest config known to
+	// Tendermint or the last config we already handled locally.
+	nextKeyperConfigIndex := int64(latestBatchConfig.KeyperConfigIndex)
+	if lastProcessedConfig > nextKeyperConfigIndex {
+		nextKeyperConfigIndex = lastProcessedConfig
+	}
+
+	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, nextKeyperConfigIndex+1)
 	if err == pgx.ErrNoRows {
 		return nil
 	}
-
 	if err != nil {
 		return err
 	}
 
-	lastSent, err := q.GetLastBatchConfigSent(ctx)
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
 	if err != nil {
 		return err
 	}
-	if lastSent == keyperSet.KeyperConfigIndex {
-		log.Debug().
+
+	if err := validateBatchConfig(latestBatchConfig, keyperSet, keypers); err != nil {
+		log.Warn().Err(err).
 			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
-			Msg("batch config already sent (scheduled).")
+			Msg("batch config validation failed, not sending to shuttermint")
+		// Mark as sent so we don't retry the same invalid config every cycle.
+		if err := q.SetLastBatchConfigProcessed(ctx, keyperSet.KeyperConfigIndex); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -310,7 +368,7 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return nil
 	}
 
-	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
+	err = q.SetLastBatchConfigProcessed(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
 		log.Warn().Err(err).
 			Interface("keyper-set", keyperSet).
@@ -319,10 +377,6 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return nil
 	}
 
-	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
-	if err != nil {
-		return err
-	}
 	log.Info().Interface("keyper-set", keyperSet).
 		Uint64("sync-block-number", blockNumber).
 		Uint64("dkg-start-delta", kpr.config.Shuttermint.DKGStartBlockDelta).
