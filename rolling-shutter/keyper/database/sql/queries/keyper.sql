@@ -209,12 +209,12 @@ INNER JOIN eons
 INNER JOIN tendermint_batch_config tbc
       ON eons.keyper_config_index = tbc.keyper_config_index;
 
--- name: SetLastBatchConfigSent :exec
+-- name: SetLastBatchConfigProcessed :exec
 INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
 SET keyper_config_index = $1;
 
--- name: GetLastBatchConfigSent :one
+-- name: GetLastBatchConfigProcessed :one
 SELECT keyper_config_index FROM last_batch_config_sent LIMIT 1;
 
 

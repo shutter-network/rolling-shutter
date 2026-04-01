@@ -317,7 +317,7 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 	}
 	cq := obskeyper.New(tx)
 
-	lastSent, err := q.GetLastBatchConfigSent(ctx)
+	lastProcessedConfig, err := q.GetLastBatchConfigProcessed(ctx)
 	if err != nil {
 		return err
 	}
@@ -325,8 +325,8 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 	// Advance from whichever progress marker is further ahead: the latest config known to
 	// Tendermint or the last config we already handled locally.
 	nextKeyperConfigIndex := int64(latestBatchConfig.KeyperConfigIndex)
-	if lastSent > nextKeyperConfigIndex {
-		nextKeyperConfigIndex = lastSent
+	if lastProcessedConfig > nextKeyperConfigIndex {
+		nextKeyperConfigIndex = lastProcessedConfig
 	}
 
 	keyperSet, err := cq.GetKeyperSetByKeyperConfigIndex(ctx, nextKeyperConfigIndex+1)
@@ -347,7 +347,7 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 			Int64("keyper-config-index", keyperSet.KeyperConfigIndex).
 			Msg("batch config validation failed, not sending to shuttermint")
 		// Mark as sent so we don't retry the same invalid config every cycle.
-		if err := q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex); err != nil {
+		if err := q.SetLastBatchConfigProcessed(ctx, keyperSet.KeyperConfigIndex); err != nil {
 			return err
 		}
 		return nil
@@ -368,7 +368,7 @@ func (kpr *KeyperCore) handleOnChainKeyperSetChanges(
 		return nil
 	}
 
-	err = q.SetLastBatchConfigSent(ctx, keyperSet.KeyperConfigIndex)
+	err = q.SetLastBatchConfigProcessed(ctx, keyperSet.KeyperConfigIndex)
 	if err != nil {
 		log.Warn().Err(err).
 			Interface("keyper-set", keyperSet).

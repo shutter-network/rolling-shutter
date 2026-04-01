@@ -77,7 +77,7 @@ func TestHandleOnChainKeyperSetChangesSkipsPastInvalidConfig(t *testing.T) {
 	assert.NilError(t, err)
 
 	queries := keyperdb.New(dbpool)
-	lastSent, err := queries.GetLastBatchConfigSent(ctx)
+	lastSent, err := queries.GetLastBatchConfigProcessed(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, lastSent, int64(2))
 
@@ -86,7 +86,7 @@ func TestHandleOnChainKeyperSetChangesSkipsPastInvalidConfig(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	lastSent, err = queries.GetLastBatchConfigSent(ctx)
+	lastSent, err = queries.GetLastBatchConfigProcessed(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, lastSent, int64(3))
 

@@ -501,12 +501,12 @@ func (q *Queries) GetKeyperStateForEon(ctx context.Context, arg GetKeyperStateFo
 	return is_keyper, err
 }
 
-const getLastBatchConfigSent = `-- name: GetLastBatchConfigSent :one
+const getLastBatchConfigProcessed = `-- name: GetLastBatchConfigProcessed :one
 SELECT keyper_config_index FROM last_batch_config_sent LIMIT 1
 `
 
-func (q *Queries) GetLastBatchConfigSent(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, getLastBatchConfigSent)
+func (q *Queries) GetLastBatchConfigProcessed(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getLastBatchConfigProcessed)
 	var keyper_config_index int64
 	err := row.Scan(&keyper_config_index)
 	return keyper_config_index, err
@@ -895,14 +895,14 @@ func (q *Queries) SetBatchConfigStarted(ctx context.Context, keyperConfigIndex i
 	return err
 }
 
-const setLastBatchConfigSent = `-- name: SetLastBatchConfigSent :exec
+const setLastBatchConfigProcessed = `-- name: SetLastBatchConfigProcessed :exec
 INSERT INTO last_batch_config_sent (keyper_config_index) VALUES ($1)
 ON CONFLICT (enforce_one_row) DO UPDATE
 SET keyper_config_index = $1
 `
 
-func (q *Queries) SetLastBatchConfigSent(ctx context.Context, keyperConfigIndex int64) error {
-	_, err := q.db.Exec(ctx, setLastBatchConfigSent, keyperConfigIndex)
+func (q *Queries) SetLastBatchConfigProcessed(ctx context.Context, keyperConfigIndex int64) error {
+	_, err := q.db.Exec(ctx, setLastBatchConfigProcessed, keyperConfigIndex)
 	return err
 }
 
