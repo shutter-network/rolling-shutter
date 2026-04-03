@@ -571,6 +571,26 @@ func (q *Queries) GetLatestEonForKeyperConfig(ctx context.Context, keyperConfigI
 	return column_1, err
 }
 
+const getLatestStartedEonByKeyperConfigIndex = `-- name: GetLatestStartedEonByKeyperConfigIndex :one
+SELECT eon, height, activation_block_number, keyper_config_index
+FROM eons
+WHERE keyper_config_index = $1
+ORDER BY eon DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (Eon, error) {
+	row := q.db.QueryRow(ctx, getLatestStartedEonByKeyperConfigIndex, keyperConfigIndex)
+	var i Eon
+	err := row.Scan(
+		&i.Eon,
+		&i.Height,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+	)
+	return i, err
+}
+
 const getNextShutterMessage = `-- name: GetNextShutterMessage :one
 SELECT id, description, msg from tendermint_outgoing_messages
 ORDER BY id

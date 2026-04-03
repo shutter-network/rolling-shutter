@@ -3,6 +3,7 @@ package shutterservice
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"math"
 	"math/big"
 	"testing"
@@ -14,7 +15,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"gotest.tools/assert"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -41,7 +41,7 @@ func TestProcessBlockSuccess(t *testing.T) {
 
 	privateKey, sender, _ := generateRandomAccount()
 
-	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
+	decryptionTriggerChannel := make(chan *broker.Event[*epochkghandler.DecryptionTrigger], 1)
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -61,45 +61,29 @@ func TestProcessBlockSuccess(t *testing.T) {
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
 	blockNumber := 102
 	activationBlockNumber := 100
+	keyperConfigIndex := int64(7)
+	eon := int64(config.GetEon())
 
 	identityPrefix, _ := generateRandom32Bytes()
 	identity := identityPrefix
 	identity = append(identity, sender.Bytes()...)
 
-	err := coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(config.GetEon()),
-		Height:                0,
-		ActivationBlockNumber: int64(activationBlockNumber),
-		KeyperConfigIndex:     0,
-	})
-	assert.NilError(t, err)
+	insertBatchConfig(ctx, t, coreKeyperDB, keyperConfigIndex, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertEon(ctx, t, coreKeyperDB, eon, keyperConfigIndex, int64(activationBlockNumber))
+	insertDKGResult(ctx, t, coreKeyperDB, eon, true)
 
-	_, err = serviceDB.InsertIdentityRegisteredEvent(ctx, servicedatabase.InsertIdentityRegisteredEventParams{
+	_, err := serviceDB.InsertIdentityRegisteredEvent(ctx, servicedatabase.InsertIdentityRegisteredEventParams{
 		BlockNumber:    int64(activationBlockNumber + 1),
 		BlockHash:      blockHash,
 		TxIndex:        1,
 		LogIndex:       1,
-		Eon:            int64(config.GetEon()),
+		Eon:            keyperConfigIndex,
 		IdentityPrefix: identityPrefix,
 		Sender:         sender.Hex(),
 		Timestamp:      time.Now().Unix(),
 		Identity:       identity,
 	})
 	assert.NilError(t, err)
-
-	assert.NilError(t, err)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case ev := <-decryptionTriggerChannel:
-				assert.Equal(t, ev.Value.BlockNumber, uint64(activationBlockNumber+1))
-				assert.DeepEqual(t, ev.Value.IdentityPreimages, []identitypreimage.IdentityPreimage{identity})
-			}
-		}
-	}()
 
 	err = kpr.processNewBlock(ctx, &event.LatestBlock{
 		Number: &number.BlockNumber{
@@ -112,6 +96,14 @@ func TestProcessBlockSuccess(t *testing.T) {
 		},
 	})
 	assert.NilError(t, err)
+
+	select {
+	case ev := <-decryptionTriggerChannel:
+		assert.Equal(t, ev.Value.BlockNumber, uint64(activationBlockNumber))
+		assert.DeepEqual(t, ev.Value.IdentityPreimages, []identitypreimage.IdentityPreimage{identity})
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected decryption trigger")
+	}
 }
 
 func TestShouldTriggerDecryption(t *testing.T) {
@@ -133,6 +125,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 100
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+	keyperConfigIndex := int64(7)
 
 	if blockTimestamp < 0 {
 		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
@@ -156,30 +149,19 @@ func TestShouldTriggerDecryption(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
-		KeyperConfigIndex: 0,
-		Keypers:           []string{kpr.config.GetAddress().Hex()},
-		Threshold:         1,
-	})
-	assert.NilError(t, err)
-
 	eon := config.GetEon()
 	if eon > math.MaxInt64 {
 		t.Fatalf("Eon is too large: %d", eon)
 	}
 
-	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(eon),
-		Height:                0,
-		ActivationBlockNumber: int64(activationBlockNumber),
-		KeyperConfigIndex:     0,
-	})
-	assert.NilError(t, err)
+	insertBatchConfig(ctx, t, coreKeyperDB, keyperConfigIndex, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertEon(ctx, t, coreKeyperDB, int64(eon), keyperConfigIndex, int64(activationBlockNumber))
+	insertDKGResult(ctx, t, coreKeyperDB, int64(eon), true)
 
 	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
-			Eon:         int64(eon),
+			Eon:         keyperConfigIndex,
 			BlockNumber: int64(blockNumber),
 			Timestamp:   eventTimestamp,
 		},
@@ -266,6 +248,9 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 100
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+	keyperConfigIndex := int64(7)
+	earlierEon := int64(config.GetEon())
+	laterEon := earlierEon + 1
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -286,42 +271,25 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 		t.Fatalf("Eon is too large: %d", eon)
 	}
 
-	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
-		KeyperConfigIndex: 0,
-		Keypers:           []string{kpr.config.GetAddress().Hex()},
-		Threshold:         1,
-	})
-	assert.NilError(t, err)
+	insertBatchConfig(ctx, t, coreKeyperDB, keyperConfigIndex, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertEon(ctx, t, coreKeyperDB, earlierEon, keyperConfigIndex, int64(activationBlockNumber))
+	insertDKGResult(ctx, t, coreKeyperDB, earlierEon, true)
+	insertEon(ctx, t, coreKeyperDB, laterEon, keyperConfigIndex, int64(activationBlockNumber+50))
+	insertDKGResult(ctx, t, coreKeyperDB, laterEon, true)
 
-	// Insert eon 0
-	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(eon),
-		Height:                0,
-		ActivationBlockNumber: int64(activationBlockNumber),
-		KeyperConfigIndex:     0,
-	})
-	assert.NilError(t, err)
+	registeredEvent := servicedatabase.IdentityRegisteredEvent{
+		Eon:         keyperConfigIndex,
+		BlockNumber: int64(blockNumber),
+		Timestamp:   eventTimestamp,
+		Identity:    b32(0x01),
+	}
 
-	// Insert eon 1
-	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(eon + 1), //nolint:gosec
-		Height:                1,
-		ActivationBlockNumber: int64(activationBlockNumber + 50),
-		KeyperConfigIndex:     1,
-	})
-	assert.NilError(t, err)
-
-	// Test with event from eon 0, but current block is in eon 1
 	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
-		servicedatabase.IdentityRegisteredEvent{
-			Eon:         int64(eon), // Event from eon 0
-			BlockNumber: int64(blockNumber),
-			Timestamp:   eventTimestamp,
-		},
+		registeredEvent,
 		&event.LatestBlock{
 			Number: &number.BlockNumber{
-				Int: big.NewInt(int64(blockNumber + 100)), // Block in eon 1
+				Int: big.NewInt(int64(blockNumber + 100)),
 			},
 			Header: &types.Header{
 				Time:   uint64(blockTimestamp), //nolint:gosec
@@ -331,6 +299,15 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 	)
 	assert.NilError(t, err)
 	assert.Equal(t, trigger, true)
+
+	triggers, err := kpr.createTriggersFromIdentityRegisteredEvents(
+		ctx,
+		[]servicedatabase.IdentityRegisteredEvent{registeredEvent},
+		nil,
+	)
+	assert.NilError(t, err)
+	assert.Equal(t, len(triggers), 1)
+	assert.Equal(t, triggers[0].BlockNumber, uint64(activationBlockNumber+50))
 }
 
 func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
@@ -352,6 +329,7 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	eventTimestamp := time.Now().Unix()
 	blockNumber := 150 // Current block is 150, before activation
 	blockTimestamp := time.Now().Add(5 * time.Second).Unix()
+	keyperConfigIndex := int64(7)
 
 	kpr := &Keyper{
 		dbpool: dbpool,
@@ -367,32 +345,19 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
-		KeyperConfigIndex: 0,
-		Keypers:           []string{kpr.config.GetAddress().Hex()},
-		Threshold:         1,
-	})
-	assert.NilError(t, err)
-
 	eon := config.GetEon()
 	if eon > math.MaxInt64 {
 		t.Fatalf("Eon is too large: %d", eon)
 	}
 
-	// Insert eon 0 that activates at block 200
-	err = coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
-		Eon:                   int64(eon),
-		Height:                0,
-		ActivationBlockNumber: int64(activationBlockNumber),
-		KeyperConfigIndex:     0,
-	})
-	assert.NilError(t, err)
+	insertBatchConfig(ctx, t, coreKeyperDB, keyperConfigIndex, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertEon(ctx, t, coreKeyperDB, int64(eon), keyperConfigIndex, int64(activationBlockNumber))
+	insertDKGResult(ctx, t, coreKeyperDB, int64(eon), true)
 
-	// Test with event from eon 0, but current block (150) is before activation (200)
 	trigger, err := kpr.shouldTriggerDecryption(
 		ctx,
 		servicedatabase.IdentityRegisteredEvent{
-			Eon:         int64(eon), // Event from eon 0
+			Eon:         keyperConfigIndex,
 			BlockNumber: int64(blockNumber),
 			Timestamp:   eventTimestamp,
 		},
@@ -410,6 +375,61 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 	assert.Equal(t, trigger, false)
 }
 
+func TestShouldNotTriggerDecryptionWithoutSuccessfulDKG(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, servicedatabase.Definition)
+	t.Cleanup(dbclose)
+
+	coreKeyperDB := corekeyperdatabase.New(dbpool)
+
+	privateKey, _, _ := generateRandomAccount()
+
+	kpr := &Keyper{
+		dbpool: dbpool,
+		config: &Config{
+			Chain: &ChainConfig{
+				Node: &configuration.EthnodeConfig{
+					PrivateKey: &keys.ECDSAPrivate{
+						Key: privateKey,
+					},
+				},
+			},
+		},
+	}
+
+	keyperConfigIndex := int64(7)
+	activationBlockNumber := int64(100)
+	eon := int64(config.GetEon())
+
+	insertBatchConfig(ctx, t, coreKeyperDB, keyperConfigIndex, []string{kpr.config.GetAddress().Hex()}, activationBlockNumber)
+	insertEon(ctx, t, coreKeyperDB, eon, keyperConfigIndex, activationBlockNumber)
+	insertDKGResult(ctx, t, coreKeyperDB, eon, false)
+
+	trigger, err := kpr.shouldTriggerDecryption(
+		ctx,
+		servicedatabase.IdentityRegisteredEvent{
+			Eon:         keyperConfigIndex,
+			BlockNumber: activationBlockNumber + 1,
+			Timestamp:   time.Now().Unix(),
+		},
+		&event.LatestBlock{
+			Number: &number.BlockNumber{
+				Int: big.NewInt(activationBlockNumber + 10),
+			},
+			Header: &types.Header{
+				Time:   uint64(time.Now().Add(5 * time.Second).Unix()),
+				Number: big.NewInt(activationBlockNumber + 10),
+			},
+		},
+	)
+	assert.NilError(t, err)
+	assert.Equal(t, trigger, false)
+}
+
 func setupEventBasedOrderingTest(
 	ctx context.Context,
 	t *testing.T,
@@ -419,12 +439,6 @@ func setupEventBasedOrderingTest(
 
 	const keyperIndex = uint64(1)
 	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
-
-	eon := config.GetEon()
-	if eon > math.MaxInt64 {
-		t.Fatalf("Eon is too large: %d", eon)
-	}
-	eonInt64 := int64(eon)
 
 	privateKey, sender, err := generateRandomAccount()
 	assert.NilError(t, err)
@@ -439,16 +453,9 @@ func setupEventBasedOrderingTest(
 			},
 		},
 	}
+	_ = sender
 
-	err = obskeyper.New(dbpool).InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
-		KeyperConfigIndex:     1,
-		ActivationBlockNumber: 0,
-		Keypers:               []string{sender.Hex()},
-		Threshold:             1,
-	})
-	assert.NilError(t, err)
-
-	return kpr, servicedatabase.New(dbpool), eonInt64
+	return kpr, servicedatabase.New(dbpool), 1
 }
 
 func TestFiredTriggersProducesOrderedShares(t *testing.T) {
@@ -536,6 +543,62 @@ func TestFiredTriggersProducesOrderedShares(t *testing.T) {
 	validator := epochkghandler.NewDecryptionKeyShareHandler(config, dbpool)
 	res, err := validator.ValidateMessage(ctx, msg)
 	assert.Equal(t, res, pubsub.ValidationAccept)
+	assert.NilError(t, err)
+}
+
+func insertBatchConfig(
+	ctx context.Context,
+	t *testing.T,
+	coreKeyperDB *corekeyperdatabase.Queries,
+	keyperConfigIndex int64,
+	keypers []string,
+	activationBlockNumber int64,
+) {
+	t.Helper()
+
+	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
+		KeyperConfigIndex:     int32(keyperConfigIndex),
+		Keypers:               keypers,
+		Threshold:             1,
+		ActivationBlockNumber: activationBlockNumber,
+	})
+	assert.NilError(t, err)
+}
+
+func insertEon(
+	ctx context.Context,
+	t *testing.T,
+	coreKeyperDB *corekeyperdatabase.Queries,
+	eon int64,
+	keyperConfigIndex int64,
+	activationBlockNumber int64,
+) {
+	t.Helper()
+
+	err := coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
+		Eon:                   eon,
+		Height:                0,
+		ActivationBlockNumber: activationBlockNumber,
+		KeyperConfigIndex:     keyperConfigIndex,
+	})
+	assert.NilError(t, err)
+}
+
+func insertDKGResult(
+	ctx context.Context,
+	t *testing.T,
+	coreKeyperDB *corekeyperdatabase.Queries,
+	eon int64,
+	success bool,
+) {
+	t.Helper()
+
+	err := coreKeyperDB.InsertDKGResult(ctx, corekeyperdatabase.InsertDKGResultParams{
+		Eon:        eon,
+		Success:    success,
+		Error:      sql.NullString{},
+		PureResult: []byte{},
+	})
 	assert.NilError(t, err)
 }
 
