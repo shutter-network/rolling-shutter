@@ -1,7 +1,7 @@
 # Rolling Shutter
 
 Rolling Shutter is an MEV protection system for rollups. It prevents
-frontrunning and improves censorship resistance using a threshold encryption
+front-running and improves censorship resistance using a threshold encryption
 mechanism. The system can be integrated into any rollup with only slight
 modifications to its protocol.
 
