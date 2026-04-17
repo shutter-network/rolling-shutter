@@ -236,3 +236,10 @@ WHERE eons.eon = @eon;
 SELECT max(eons.eon)::INT
 FROM eons
 WHERE eons.keyper_config_index = @keyper_config_index;
+
+-- name: GetLatestStartedEonByKeyperConfigIndex :one
+SELECT *
+FROM eons
+WHERE keyper_config_index = $1
+ORDER BY eon DESC
+LIMIT 1;

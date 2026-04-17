@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -84,7 +83,10 @@ func (kpr *Keyper) prepareTimeBasedTriggers(ctx context.Context, block *synceven
 	for _, event := range nonTriggeredEvents {
 		trigger, err := kpr.shouldTriggerDecryption(ctx, event, block)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to check if should trigger decryption for event %d", event.Eon)
+			return nil, errors.Wrapf(err,
+				"failed to check if should trigger decryption for keyper set index %d",
+				event.Eon,
+			)
 		}
 		if trigger {
 			eventsToDecrypt = append(eventsToDecrypt, event)
@@ -100,28 +102,17 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	triggeredBlock *syncevent.LatestBlock,
 ) (bool, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
-	isKeyper, err := coreKeyperDB.GetKeyperStateForEon(ctx, corekeyperdatabase.GetKeyperStateForEonParams{
-		Eon:           event.Eon,
-		KeyperAddress: []string{kpr.config.GetAddress().Hex()},
-	})
+	eon, decryptable, err := kpr.resolveDecryptableEon(ctx, coreKeyperDB, event.Eon)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			log.Info().
-				Int64("eon", event.Eon).
-				Msg("skipping event as no eon has been found for it")
-			return false, nil
-		} else {
-			return false, errors.Wrapf(err, "failed to query keyper state for eon %d", event.Eon)
-		}
+		return false, errors.Wrapf(err, "failed to resolve decryptable eon for keyper set index %d", event.Eon)
 	}
-
-	eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to get eon %d", event.Eon)
+	if !decryptable {
+		return false, nil
 	}
 	if eon.ActivationBlockNumber > triggeredBlock.Header.Number.Int64() {
 		log.Info().
-			Int64("eon", event.Eon).
+			Int64("keyper-set-index", event.Eon).
+			Int64("resolved-eon", eon.Eon).
 			Int64("block-number", triggeredBlock.Header.Number.Int64()).
 			Msg("skipping event as eon activation block number is greater than triggered block number")
 		return false, nil
@@ -130,18 +121,76 @@ func (kpr *Keyper) shouldTriggerDecryption(
 	if event.Timestamp >= int64(triggeredBlock.Header.Time) {
 		return false, nil
 	}
+	return true, nil
+}
 
-	// don't trigger if we're not part of the keyper set
+func (kpr *Keyper) resolveDecryptableEon(
+	ctx context.Context,
+	coreKeyperDB *corekeyperdatabase.Queries,
+	keyperConfigIndex int64,
+) (corekeyperdatabase.Eon, bool, error) {
+	eon, err := coreKeyperDB.GetLatestStartedEonByKeyperConfigIndex(ctx, keyperConfigIndex)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			log.Info().
+				Int64("keyper-set-index", keyperConfigIndex).
+				Msg("skipping event as no started eon has been found for keyper set")
+			return corekeyperdatabase.Eon{}, false, nil
+		}
+		return corekeyperdatabase.Eon{}, false, errors.Wrapf(
+			err,
+			"failed to get latest started eon for keyper set index %d",
+			keyperConfigIndex,
+		)
+	}
+
+	_, isKeyper, err := coreKeyperDB.GetKeyperIndex(ctx, keyperConfigIndex, kpr.config.GetAddress())
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Info().
+				Int64("keyper-set-index", keyperConfigIndex).
+				Msg("skipping event as keyper set has not been found")
+			return corekeyperdatabase.Eon{}, false, nil
+		}
+		return corekeyperdatabase.Eon{}, false, errors.Wrapf(
+			err,
+			"failed to query keyper membership for keyper set index %d",
+			keyperConfigIndex,
+		)
+	}
 	if !isKeyper {
 		log.Info().
-			Int64("eon", event.Eon).
-			Int64("block-number", event.BlockNumber).
-			Str("identity", hex.EncodeToString(event.Identity)).
+			Int64("keyper-set-index", keyperConfigIndex).
+			Int64("eon", eon.Eon).
 			Str("address", kpr.config.GetAddress().Hex()).
 			Msg("skipping event as not part of keyper set")
-		return false, nil
+		return corekeyperdatabase.Eon{}, false, nil
 	}
-	return true, nil
+
+	dkgResult, err := coreKeyperDB.GetDKGResultForKeyperConfigIndex(ctx, keyperConfigIndex)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			log.Info().
+				Int64("keyper-set-index", keyperConfigIndex).
+				Int64("eon", eon.Eon).
+				Msg("skipping event as no DKG result has been found for keyper set")
+			return corekeyperdatabase.Eon{}, false, nil
+		}
+		return corekeyperdatabase.Eon{}, false, errors.Wrapf(
+			err,
+			"failed to query DKG result for keyper set index %d",
+			keyperConfigIndex,
+		)
+	}
+	if !dkgResult.Success {
+		log.Info().
+			Int64("keyper-set-index", keyperConfigIndex).
+			Int64("eon", eon.Eon).
+			Msg("skipping event as resolved eon is not decryptable")
+		return corekeyperdatabase.Eon{}, false, nil
+	}
+
+	return eon, true, nil
 }
 
 func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
@@ -153,9 +202,17 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 	identityPreimages := make(map[int64][]identitypreimage.IdentityPreimage)
 	lastEonBlock := make(map[int64]int64)
 	for _, event := range triggeredEvents {
-		eon, err := coreKeyperDB.GetEon(ctx, event.Eon)
+		eon, decryptable, err := kpr.resolveDecryptableEon(ctx, coreKeyperDB, event.Eon)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query eon %d from db", event.Eon)
+			return nil, errors.Wrapf(err, "failed to resolve decryptable eon for keyper set index %d", event.Eon)
+		}
+		if !decryptable {
+			log.Info().
+				Int64("keyper-set-index", event.Eon).
+				Int64("block-number", event.BlockNumber).
+				Str("identity", hex.EncodeToString(event.Identity)).
+				Msg("skipping event while creating triggers as no decryptable eon could be resolved")
+			continue
 		}
 
 		if identityPreimages[event.Eon] == nil {
@@ -185,7 +242,6 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghandler.DecryptionTrigger, error) {
 	coreKeyperDB := corekeyperdatabase.New(kpr.dbpool)
 	serviceDB := servicedatabase.New(kpr.dbpool)
-	obsDB := obskeyper.New(kpr.dbpool)
 
 	firedTriggers, err := serviceDB.GetUndecryptedFiredTriggers(ctx)
 	if err != nil {
@@ -202,30 +258,14 @@ func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghand
 		if len(firedTriggers) == 0 {
 			continue
 		}
-		eonStruct, err := coreKeyperDB.GetEon(ctx, eon)
+		eonStruct, decryptable, err := kpr.resolveDecryptableEon(ctx, coreKeyperDB, eon)
 		if err != nil {
-			if err == pgx.ErrNoRows {
-				log.Info().
-					Int64("eon", eon).
-					Msg("ignoring fired triggers as eon not found in db")
-				continue
-			}
-			return nil, errors.Wrapf(err, "failed to query eon %d from db", eon)
+			return nil, errors.Wrapf(err,
+				"failed to resolve decryptable eon for fired triggers with keyper set index %d",
+				eon,
+			)
 		}
-		keyperSet, err := obsDB.GetKeyperSet(ctx, eonStruct.ActivationBlockNumber)
-		if err != nil {
-			log.Err(err).
-				Int64("eon", eon).
-				Int64("activation-block-number", eonStruct.ActivationBlockNumber).
-				Msg("ignoring fired triggers as keyper set not found in db")
-			continue
-		}
-		if !keyperSet.Contains(kpr.config.GetAddress()) {
-			log.Info().
-				Int64("eon", eon).
-				Int64("activation-block-number", eonStruct.ActivationBlockNumber).
-				Str("address", kpr.config.GetAddress().Hex()).
-				Msg("ignoring fired triggers as not part of keyper set")
+		if !decryptable {
 			continue
 		}
 
