@@ -204,11 +204,20 @@ func initFilesWithConfig(tendermintConfig *cfg.Config, config *Config, appState 
 		privValStateFile := tendermintConfig.PrivValidatorStateFile()
 		var pv *privval.FilePV
 		if tmos.FileExists(privValKeyFile) {
-			pv = privval.LoadFilePV(privValKeyFile, privValStateFile)
-			log.Info().
-				Str("privValKeyFile", privValKeyFile).
-				Str("stateFile", privValStateFile).
-				Msg("Found private validator")
+			if tmos.FileExists(privValStateFile) {
+				pv = privval.LoadFilePV(privValKeyFile, privValStateFile)
+				log.Info().
+					Str("privValKeyFile", privValKeyFile).
+					Str("stateFile", privValStateFile).
+					Msg("Found private validator")
+			} else {
+				pv = privval.LoadFilePVEmptyState(privValKeyFile, privValStateFile)
+				pv.Save()
+				log.Info().
+					Str("privValKeyFile", privValKeyFile).
+					Str("stateFile", privValStateFile).
+					Msg("Found private validator but no state file")
+			}
 		} else {
 			pv = privval.GenFilePV(privValKeyFile, privValStateFile)
 			pv.Save()
