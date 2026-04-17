@@ -146,7 +146,7 @@ func (kpr *Keyper) resolveDecryptableEon(
 
 	_, isKeyper, err := coreKeyperDB.GetKeyperIndex(ctx, keyperConfigIndex, kpr.config.GetAddress())
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			log.Info().
 				Int64("keyper-set-index", keyperConfigIndex).
 				Msg("skipping event as keyper set has not been found")
