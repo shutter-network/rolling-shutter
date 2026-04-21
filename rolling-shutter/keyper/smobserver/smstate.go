@@ -262,7 +262,12 @@ func (st *ShuttermintState) handleBatchConfig(
 	for _, k := range e.Keypers {
 		keypers = append(keypers, shdb.EncodeAddress(k))
 	}
-	keypermetrics.MetricsKeyperBatchConfigInfo.WithLabelValues(strconv.FormatUint(e.KeyperConfigIndex, 10), strings.Join(keypers, ",")).Set(1)
+	keypermetrics.MetricsKeyperBatchConfigInfo.WithLabelValues(
+		strconv.FormatUint(e.KeyperConfigIndex, 10),
+		strings.Join(keypers, ","),
+		strconv.Itoa(len(e.Keypers)),
+		strconv.FormatUint(e.Threshold, 10),
+	).Set(1)
 	if err := queries.InsertBatchConfig(
 		ctx,
 		database.InsertBatchConfigParams{
