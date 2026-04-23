@@ -24,7 +24,7 @@ func init() {
 
 var ErrTestComplete = errors.New("test complete")
 
-// TestStartNetworkNode test that we can init two p2p nodes and make them send/receive messages.
+// TestStartNetworkNodeIntegration test that we can init two p2p nodes and make them send/receive messages.
 func TestStartNetworkNodeIntegration(t *testing.T) { //nolint:funlen
 	if testing.Short() {
 		t.Skip("skipping integration test")
