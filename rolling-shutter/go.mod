@@ -10,6 +10,7 @@ require (
 	github.com/bitwurx/jrpc2 v0.0.0-20220302204700-52c6dbbeb536
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/deepmap/oapi-codegen v1.9.1
+	github.com/edgelesssys/ego v1.7.0
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/ferranbt/fastssz v0.1.3
 	github.com/getkin/kin-openapi v0.87.0
@@ -103,6 +104,7 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/getsentry/sentry-go v0.28.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
