@@ -2,12 +2,15 @@ package shutterservice
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -2225,10 +2228,353 @@ func TestWithEVM(t *testing.T) {
 	}
 }
 
+// This test demonstrates a shortcoming in EventTriggerDefinition:
+// we currently have no way of matching array types in event data.
+// The event we test here has the format
+//
+//	event DynamicArgs(string note, bytes blob, uint256[] nums);
+//
+// and we can not create an ETD that matches on `nums`.
+//
+// We are lacking the deserialization knowledge, that an event
+// argument is an array of some other type
+// (i.e. word-wise encoded as `[array length][val@idx 0][val@idx 1],...`)
+// instead of an array of bytes (encoded as `[slice length][value bytes, word aligned]`).
+//
+// In this test we demonstrate how we also fail to interpret the array
+// data as a fixed size []byte argument.
+func TestDynamicEventFromSmokeTests(t *testing.T) {
+	setup := help.SetupBackend(t)
+	tx, err := setup.Contract.EmitDynamicSample(setup.Auth)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+	hexarg, err := hexutil.Decode("0xbeef")
+	assert.NilError(t, err, "error on hex decode", err)
+
+	etd := EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  4,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{[]byte("hello")},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  5,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{hexarg},
+				},
+			},
+		},
+	}
+	match, err := etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+
+	// matching dynamic array as []byte:
+	uintarray := make([]*big.Int, 2)
+	uintarray[0] = big.NewInt(1)
+	uintarray[1] = big.NewInt(2)
+	typ, err := abi.NewType("uint256[]", "", nil)
+	assert.NilError(t, err, "error creating type")
+	a := abi.Argument{
+		Name: "nums",
+		Type: typ,
+	}
+	args := abi.Arguments{a}
+	packed, err := args.Pack(uintarray)
+	assert.NilError(t, err, "error packing")
+
+	// first packed Word is offset
+	uintarraybytes := packed[32:]
+
+	etd = EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  4,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{[]byte("hello")},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  5,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{hexarg},
+				},
+			},
+			{
+				LogValueRef: LogValueRef{
+					Dynamic: true,
+					Offset:  6,
+				},
+				ValuePredicate: ValuePredicate{
+					Op:       BytesEq,
+					ByteArgs: [][]byte{uintarraybytes},
+				},
+			},
+		},
+	}
+
+	// we manage to create the same []byte:
+	backwardsoffset := len(vLog.Data) - len(uintarraybytes)
+	assert.Check(t, cmp.DeepEqual(vLog.Data[backwardsoffset:], uintarraybytes), "packed encoding did not match")
+	// but we fail to create a Match like this:
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "we could not match uint256[] as []byte.\nevent data is %v\nextracted value `GetValue(…)` at offset %v is %v",
+		vLog.Data, vLog.Data[2*32+31], etd.LogPredicates[2].LogValueRef.GetValue(vLog))
+}
+
+func TestStatic(t *testing.T) {
+	setup := help.SetupBackend(t)
+	tx, err := setup.Contract.EmitStaticSample(setup.Auth)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+
+	// Full event is
+	//   event StaticArgs(
+	// 		address user,
+	// 		bool ok,
+	// 		bytes4 sig,
+	// 		bytes32 tag,
+	// 		uint256 amount
+	//	)
+
+	// Testing `bytes32 tag`
+	tag := []byte("tag")
+	var tagbytes [32]byte
+	copy(tagbytes[:], tag)
+	ref := LogValueRef{
+		Dynamic: false,
+		Offset:  7,
+	}
+
+	lpTag := LogPredicate{
+		LogValueRef: ref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{tagbytes[:]},
+		},
+	}
+	etd := EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpTag},
+	}
+	match, err := etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "%v did not match data %v, extracted value is %v", tagbytes, vLog.Data, ref.GetValue(vLog))
+
+	// Testing `bytes4 sig`:
+	// we can match `bytes4` value as a static log value, if we right pad with 0s
+	sig, err := hex.DecodeString("deadbeef")
+	assert.NilError(t, err, "error decoding deadbeef")
+	sigbytes := RAlign(sig)
+	sigref := LogValueRef{
+		Dynamic: false,
+		Offset:  6,
+	}
+
+	lpSig := LogPredicate{
+		LogValueRef: sigref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{sigbytes},
+		},
+	}
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpSig},
+	}
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "%v did not match data %v, extracted value is %v", sigbytes, vLog.Data, ref.GetValue(vLog))
+
+	// Testing `address user`
+
+	// This test demonstrates how we can match an address in event data:
+	// pad the address bytes to word size and byte match 1 word (dynamic: false)
+	userbytes := Align(common.HexToAddress("0x1111111111111111111111111111111111111111").Bytes())
+
+	lpUser := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  4,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{userbytes},
+		},
+	}
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpUser},
+	}
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+
+	// Match all three
+	etd = EventTriggerDefinition{
+		Contract:      setup.ContractAddress,
+		LogPredicates: []LogPredicate{lpSig, lpUser, lpTag},
+	}
+	match, err = etd.Match(vLog)
+	assert.NilError(t, err, "error on match: %v", err)
+	assert.Check(t, match, "did not match", vLog)
+}
+
+func TestStaticCustomFromSmoke(t *testing.T) {
+	// Full event is
+	//   event StaticArgs(
+	// 		address user,
+	// 		bool ok,
+	// 		bytes4 sig,
+	// 		bytes32 tag,
+	// 		uint256 amount
+	//	)
+	//
+	// emitArgs from smoke test:
+	// [
+	// "0x2222222222222222222222222222222222222222",
+	// "false",
+	// "0x12345678",
+	// "0x746573742d746167000000000000000000000000000000000000000000000000",
+	// "777"
+	// ]
+	//
+	// trigger definition from smoke test:
+	// "args": [
+	// { "name": "user", "op": "eq", "bytes": "0x2222222222222222222222222222222222222222" },
+	// { "name": "ok", "op": "eq", "bytes": "0x00" },
+	// { "name": "sig", "op": "eq", "bytes": "0x12345678" },
+	// { "name": "tag", "op": "eq", "bytes": "0x746573742d746167000000000000000000000000000000000000000000000000" },
+	// { "name": "amount", "op": "eq", "number": "777" }
+	// ]
+	setup := help.SetupBackend(t)
+
+	userAddr := common.HexToAddress("0x2222222222222222222222222222222222222222")
+
+	sigFromHex, err := hex.DecodeString("12345678")
+	assert.NilError(t, err, "error decoding 12345678")
+	sigArg := [4]byte(sigFromHex)
+
+	tagFromHex, err := hex.DecodeString("746573742d746167000000000000000000000000000000000000000000000000")
+	assert.NilError(t, err, "error decoding tag")
+	tagArg := [32]byte(tagFromHex)
+
+	amount := big.NewInt(777)
+
+	tx, err := setup.Contract.EmitStaticCustom(
+		setup.Auth,
+		userAddr,
+		false,
+		sigArg,
+		tagArg,
+		amount,
+	)
+	assert.NilError(t, err, "error creating tx")
+	vLog, err := help.CollectLog(t, setup, tx)
+	assert.NilError(t, err, "error getting log")
+
+	userbytes := Align(userAddr.Bytes())
+
+	lpUser := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  4,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{userbytes},
+		},
+	}
+
+	lpOk := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  5,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{Align([]byte{0})},
+		},
+	}
+
+	sigbytes := RAlign(sigFromHex)
+	sigref := LogValueRef{
+		Dynamic: false,
+		Offset:  6,
+	}
+
+	lpSig := LogPredicate{
+		LogValueRef: sigref, ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{sigbytes},
+		},
+	}
+
+	lpTag := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  7,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:       BytesEq,
+			ByteArgs: [][]byte{tagFromHex},
+		},
+	}
+	lpAmount := LogPredicate{
+		LogValueRef: LogValueRef{
+			Dynamic: false,
+			Offset:  8,
+		},
+		ValuePredicate: ValuePredicate{
+			Op:      UintEq,
+			IntArgs: []*big.Int{amount},
+		},
+	}
+	etd := EventTriggerDefinition{
+		Contract: setup.ContractAddress,
+		LogPredicates: []LogPredicate{
+			lpUser, lpOk, lpSig, lpTag, lpAmount,
+		},
+	}
+	match, err := etd.Match(vLog)
+
+	assert.NilError(t, err, "error when matching")
+	assert.Check(t, match, "%v did not match %v", etd, vLog.Data)
+}
+
 // aligns []byte to 32 byte.
 func Align(val []byte) []byte {
 	words := (31 + len(val)) / Word
 	x := make([]byte, Word*words)
 	copy(x[len(x)-len(val):], val)
+	return x
+}
+
+// right aligns []byte to 32 byte.
+func RAlign(val []byte) []byte {
+	words := (31 + len(val)) / Word
+	x := make([]byte, Word*words)
+	copy(x[0:len(val)], val)
 	return x
 }
