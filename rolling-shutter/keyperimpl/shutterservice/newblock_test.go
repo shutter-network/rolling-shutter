@@ -1,7 +1,6 @@
 package shutterservice
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"math"
@@ -111,7 +110,9 @@ func TestProcessBlockSuccess(t *testing.T) {
 	select {
 	case ev := <-decryptionTriggerChannel:
 		assert.Equal(t, ev.Value.BlockNumber, activationBlockNumberUint64)
-		assert.DeepEqual(t, ev.Value.IdentityPreimages, []identitypreimage.IdentityPreimage{identity})
+		assert.DeepEqual(t, ev.Value.IdentityPreimages, []identitypreimage.IdentityPreimage{
+			identity,
+		})
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected decryption trigger")
 	}
@@ -455,10 +456,7 @@ func setupEventBasedOrderingTest(
 ) (*Keyper, *servicedatabase.Queries, int64) {
 	t.Helper()
 
-	const keyperIndex = uint64(1)
-	testsetup.InitializeEon(ctx, t, dbpool, config, keyperIndex)
-
-	privateKey, sender, err := generateRandomAccount()
+	privateKey, _, err := generateRandomAccount()
 	assert.NilError(t, err)
 
 	kpr := &Keyper{
@@ -471,12 +469,16 @@ func setupEventBasedOrderingTest(
 			},
 		},
 	}
-	_ = sender
+
+	// Register kpr's address as the keyper-at-index-1 so resolveDecryptableEon
+	// finds it in the keyper set.
+	const keyperIndex = uint64(1)
+	testsetup.InitializeEon(ctx, t, dbpool, &kprAddressTestConfig{addr: kpr.config.GetAddress()}, keyperIndex)
 
 	return kpr, servicedatabase.New(dbpool), 1
 }
 
-func TestFiredTriggersProducesOrderedShares(t *testing.T) {
+func TestFiredTriggersProducesUnbatchedDecryptionTriggers(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -531,15 +533,14 @@ func TestFiredTriggersProducesOrderedShares(t *testing.T) {
 
 	triggers, err := kpr.prepareEventBasedTriggers(ctx)
 	assert.NilError(t, err)
-	assert.Equal(t, len(triggers), 1)
-	assert.Equal(t, len(triggers[0].IdentityPreimages), len(inserted))
-	for i := 1; i < len(triggers[0].IdentityPreimages); i++ {
-		assert.Assert(t, bytes.Compare(
-			triggers[0].IdentityPreimages[i-1],
-			triggers[0].IdentityPreimages[i],
-		) < 0)
+
+	// Each fired trigger must produce its own DecryptionTrigger with exactly one identity (no batching).
+	assert.Equal(t, len(triggers), len(inserted))
+	for _, trigger := range triggers {
+		assert.Equal(t, len(trigger.IdentityPreimages), 1)
 	}
 
+	// Verify the first trigger can still be used to construct valid key shares.
 	coreDB := corekeyperdatabase.New(dbpool)
 	triggerBlockNumber := triggers[0].BlockNumber
 	if triggerBlockNumber > math.MaxInt64 {
@@ -551,14 +552,16 @@ func TestFiredTriggersProducesOrderedShares(t *testing.T) {
 
 	keyShareHandler := &epochkghandler.KeyShareHandler{
 		InstanceID:           config.GetInstanceID(),
-		KeyperAddress:        config.GetAddress(),
+		KeyperAddress:        kpr.config.GetAddress(),
 		MaxNumKeysPerMessage: config.GetMaxNumKeysPerMessage(),
 		DBPool:               dbpool,
 	}
 	msg, err := keyShareHandler.ConstructDecryptionKeyShares(ctx, triggerEon, triggers[0].IdentityPreimages)
 	assert.NilError(t, err)
 
-	validator := epochkghandler.NewDecryptionKeyShareHandler(config, dbpool)
+	validator := epochkghandler.NewDecryptionKeyShareHandler(&kprAddressTestConfig{
+		addr: kpr.config.GetAddress(),
+	}, dbpool)
 	res, err := validator.ValidateMessage(ctx, msg)
 	assert.Equal(t, res, pubsub.ValidationAccept)
 	assert.NilError(t, err)

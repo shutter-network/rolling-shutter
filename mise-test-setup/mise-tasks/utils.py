@@ -115,3 +115,41 @@ def get_created_contract_address(
         if isinstance(address, str) and address:
             return address
     return None
+
+
+def get_uups_proxy_address(
+    deployment_run: dict[str, object], impl_contract_name: str
+) -> str | None:
+    """Return the ERC1967Proxy address deployed for the given UUPS implementation.
+
+    The deployment script deploys the implementation first, then an ERC1967Proxy
+    whose constructor input encodes the implementation address.  We identify the
+    correct proxy by searching for the ERC1967Proxy CREATE that immediately follows
+    the implementation and whose input data contains the implementation address.
+    """
+    transactions = deployment_run.get("transactions")
+    if not isinstance(transactions, list):
+        return None
+    for i, tx in enumerate(transactions):
+        if not isinstance(tx, dict):
+            continue
+        if tx.get("contractName") != impl_contract_name:
+            continue
+        impl_addr = (tx.get("contractAddress") or "").lower().replace("0x", "")
+        if not impl_addr:
+            continue
+        for j in range(i + 1, len(transactions)):
+            candidate = transactions[j]
+            if not isinstance(candidate, dict):
+                continue
+            if candidate.get("contractName") != "ERC1967Proxy":
+                continue
+            input_data = (
+                candidate.get("transaction", {}).get("input") or ""
+            ).lower()
+            if impl_addr in input_data:
+                proxy_addr = candidate.get("contractAddress")
+                if isinstance(proxy_addr, str) and proxy_addr:
+                    return proxy_addr
+        break
+    return None

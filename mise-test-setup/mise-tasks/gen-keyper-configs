@@ -67,6 +67,9 @@ for index in range(int(os.environ["NUM_KEYPERS"])):
     elif deployment_type == "service":
         utils.set_toml_path(document, ["Chain", "Node", "EthereumURL"], "ws://ethereum:8545")
         utils.set_toml_path(document, ["Chain", "Contracts", "ShutterRegistry"], utils.get_created_contract_address(deployment_run, "ShutterRegistry"))
+        event_trigger_registry = utils.get_uups_proxy_address(deployment_run, "ShutterEventTriggerRegistryV1")
+        if event_trigger_registry:
+            utils.set_toml_path(document, ["Chain", "Contracts", "ShutterEventTriggerRegistry"], event_trigger_registry)
     else:
         raise SystemExit(f"Unsupported DEPLOYMENT_TYPE for config generation: {deployment_type}")
 
