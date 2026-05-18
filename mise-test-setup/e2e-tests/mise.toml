@@ -1,3 +1,11 @@
 # DKG e2e tests harness. Env vars and parent tasks (e.g. `clean`,
 # `wait-for-dkg`, `test-decryption`) are inherited from ../mise.toml via mise's
 # directory-walking config discovery. Tests scripts live in `mise-tasks/`.
+
+# jobs = 1 forces mise to run task dependencies serially so the `test`
+# runner's two depends execute in order and fail-fast (offline-recovery is
+# skipped if happy-path fails). Mise defaults to parallel (jobs = 4) which
+# would otherwise let both tests `mise run clean` simultaneously and clobber
+# each other's docker state.
+[settings]
+jobs = 1

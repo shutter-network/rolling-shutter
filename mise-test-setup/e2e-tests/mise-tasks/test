@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Run all DKG e2e tests in sequence (happy path, then offline recovery)"
+#MISE depends=["test-dkg-happy-path", "test-dkg-offline-recovery"]
+
+# Sequential execution and fail-fast are enforced by `jobs = 1` in the
+# sibling mise.toml; each depended-on test also calls `mise run clean` at
+# startup, so no cleanup between them is needed.
+echo "all DKG e2e tests passed"
