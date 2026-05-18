@@ -42,7 +42,7 @@ func (c *Client) GetValidatorByIndices(
 	stateID string,
 	validatorIndices []int64,
 ) (*GetValidatorByIndexResponse, error) {
-	path := c.url.JoinPath("/eth/v1/beacon/states/", stateID, "/validators/")
+	path := c.url.JoinPath("/eth/v1/beacon/states/", stateID, "/validators")
 	query := url.Values{}
 	for _, index := range validatorIndices {
 		query.Add("id", fmt.Sprint(index))
