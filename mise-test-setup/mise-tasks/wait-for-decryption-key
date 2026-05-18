@@ -2,6 +2,7 @@
 #MISE description="Wait for a decryption key"
 #USAGE flag "--eon <eon>" help="Target eon"
 #USAGE flag "--identity-prefix <identity_prefix>" help="Identity prefix hex string"
+#USAGE flag "--keyper-index <keyper_index>" help="Keyper index whose DB to query (default 0; use a member of the target set)"
 
 import os
 import time
@@ -12,6 +13,7 @@ import utils
 requested_eon = os.environ.get("usage_eon", "").strip()
 identity_prefix = os.environ.get("usage_identity_prefix", "").strip()
 poll_interval = float(os.environ["DECRYPTION_KEY_POLL_INTERVAL"])
+keyper_index = int(os.environ.get("usage_keyper_index") or "0")
 if not requested_eon or not identity_prefix:
     raise SystemExit("Provide both --eon and --identity-prefix")
 
@@ -37,7 +39,7 @@ while True:
         continue
 
     exists = utils.query_keyper_db(
-        0,
+        keyper_index,
         "SELECT EXISTS ("
         "SELECT 1 FROM decryption_key "
         f"WHERE eon = {int(keyper_set_index)} AND encode(epoch_id, 'hex') = '{identity}'"

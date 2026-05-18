@@ -69,18 +69,13 @@ def wait_for_dkg_success(
     directly for any row with `success = 't'`.
     """
     if keyper_set_index is not None:
+        cmd = [
+            "mise", "run", "wait-for-dkg",
+            "--keyper-set-index", str(keyper_set_index),
+            "--keyper-index", str(keyper_index),
+        ]
         try:
-            subprocess.run(
-                [
-                    "mise",
-                    "run",
-                    "wait-for-dkg",
-                    "--keyper-set-index",
-                    str(keyper_set_index),
-                ],
-                check=True,
-                timeout=timeout,
-            )
+            subprocess.run(cmd, check=True, timeout=timeout)
             return
         except subprocess.TimeoutExpired:
             raise SystemExit(

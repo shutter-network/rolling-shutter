@@ -2,6 +2,7 @@
 #MISE description="Wait for DKG completion"
 #USAGE flag "--keyper-set-index <keyper_set_index>" help="Wait for a successful DKG for this keyper set index"
 #USAGE flag "--eon <eon>" help="Wait for completion of this eon"
+#USAGE flag "--keyper-index <keyper_index>" help="Keyper index whose DB to query (default 0; use a member of the target set)"
 
 import os
 import time
@@ -12,6 +13,7 @@ import utils
 keyper_set_index = os.environ.get("usage_keyper_set_index", "").strip()
 eon = os.environ.get("usage_eon", "").strip()
 poll_interval = float(os.environ["DKG_RESULT_POLL_INTERVAL"])
+keyper_index = int(os.environ.get("usage_keyper_index") or "0")
 
 if bool(keyper_set_index) == bool(eon):
     raise SystemExit("Provide exactly one of --keyper-set-index or --eon")
@@ -31,9 +33,10 @@ while True:
         target_eon = str(int(eon))
 
     success = utils.query_keyper_db(
-        0,
+        keyper_index,
         f"SELECT success FROM dkg_result WHERE eon = {target_eon}",
     )
+
     if not success:
         time.sleep(poll_interval)
         continue

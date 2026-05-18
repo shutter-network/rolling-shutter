@@ -1,10 +1,14 @@
 #!/usr/bin/env -S uv run --script
 #MISE description="Submit a decryption trigger and wait for the key"
+#USAGE flag "--keyper-index <keyper_index>" help="Keyper index to query for decryption key (default 0; use a member of the target set)"
 
 import json
+import os
 
 import utils
 
+
+keyper_index = os.environ.get("usage_keyper_index", "").strip()
 
 result = utils.run(
     ["mise", "run", "submit-identity-registration"],
@@ -12,14 +16,11 @@ result = utils.run(
 )
 context = json.loads(result.stdout.strip().splitlines()[-1])
 
-utils.run(
-    [
-        "mise",
-        "run",
-        "wait-for-decryption-key",
-        "--eon",
-        context["eon"],
-        "--identity-prefix",
-        context["identity_prefix"],
-    ]
-)
+cmd = [
+    "mise", "run", "wait-for-decryption-key",
+    "--eon", context["eon"],
+    "--identity-prefix", context["identity_prefix"],
+]
+if keyper_index:
+    cmd += ["--keyper-index", keyper_index]
+utils.run(cmd)

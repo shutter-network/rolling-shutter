@@ -1,23 +1,21 @@
 #!/usr/bin/env -S uv run --script
 #MISE description="DKG e2e: initial set + three keyper-set transitions, with decryption after each"
+#MISE env={NUM_KEYPERS = "6", INITIAL_KEYPER_SET_INDICES = "0,1,2", INITIAL_THRESHOLD = "2"}
 
 import os
 
 from e2e_utils import utils, wait_for_dkg_success
 
 
-# NUM_KEYPERS=6 is required so the 3,4,5 zero-overlap replacement set has
-# enough distinct keyper indices to draw from. Initial set vars are restated
-# here to keep this test self-contained even if parent defaults change.
-os.environ["NUM_KEYPERS"] = "6"
-os.environ["INITIAL_KEYPER_SET_INDICES"] = "0,1,2"
-os.environ["INITIAL_THRESHOLD"] = "2"
-
-
-def add_set_and_verify(indices: str, threshold: str, keyper_set_index: int) -> None:
+def add_set_and_verify(
+    indices: str, threshold: str, keyper_set_index: int, keyper_index: int = 0
+) -> None:
     utils.run(["mise", "run", "add-keyper-set", "--indices", indices, "--threshold", threshold])
-    wait_for_dkg_success(keyper_set_index=keyper_set_index)
-    utils.run(["mise", "run", "test-decryption"])
+    wait_for_dkg_success(keyper_set_index=keyper_set_index, keyper_index=keyper_index)
+    cmd = ["mise", "run", "test-decryption"]
+    if keyper_index != 0:
+        cmd += ["--keyper-index", str(keyper_index)]
+    utils.run(cmd)
 
 
 utils.run(["mise", "run", "clean"])
@@ -30,7 +28,7 @@ utils.run(["mise", "run", "test-decryption"])
 add_set_and_verify("0,1,2,3", "3", 2)
 
 # Keyper set 3: zero-overlap replacement 3,4,5 / threshold 2.
-add_set_and_verify("3,4,5", "2", 3)
+add_set_and_verify("3,4,5", "2", 3, keyper_index=3)
 
 # Keyper set 4: return to original 0,1,2 / threshold 2.
 add_set_and_verify("0,1,2", "2", 4)
