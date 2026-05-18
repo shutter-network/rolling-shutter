@@ -1,0 +1,3 @@
+# DKG e2e tests harness. Env vars and parent tasks (e.g. `clean`,
+# `wait-for-dkg`, `test-decryption`) are inherited from ../mise.toml via mise's
+# directory-walking config discovery. Tests scripts live in `mise-tasks/`.
