@@ -1,55 +1,30 @@
 #!/usr/bin/env -S uv run --script
 #MISE description="DKG e2e: DKG fails below threshold, then succeeds once a third keyper comes online"
-
-import os
+#MISE env={NUM_KEYPERS = "4", INITIAL_KEYPER_SET_INDICES = "0,1,2,3", INITIAL_THRESHOLD = "2"}
 
 from e2e_utils import utils, wait_for_dkg_failure, wait_for_dkg_success
 
 
-# A 3-of-4 keyper set where only keypers 0 and 1 start. Below threshold => DKG
-# must fail at least once; bringing keyper-2 online must then trigger a retry
-# that succeeds.
-os.environ["NUM_KEYPERS"] = "4"
-os.environ["INITIAL_KEYPER_SET_INDICES"] = "0,1,2,3"
-os.environ["INITIAL_THRESHOLD"] = "3"
-
-
 utils.run(["mise", "run", "clean"])
 
-# Run the infrastructure setup that `up` would normally chain to, but skip
-# `up` itself so we can start keyper-2 and keyper-3 selectively below.
-utils.run(["mise", "run", "patch-genesis"])
-utils.run(["mise", "run", "init-keyper-dbs"])
+# Bootstrap: 2-of-4 initial DKG succeeds. This also establishes a previous
+# keyper set with threshold 2, which gates the next config vote.
+utils.run(["mise", "run", "wait-for-initial-dkg"])
 
-# Every service except keyper-2 and keyper-3. Chain nodes for all 4 keypers
-# come up so the two offline keypers' shuttermint history is available later.
-services = [
-    "db",
-    "ethereum",
-    "chain-seed",
-    "bootnode",
-    "chain-0",
-    "chain-1",
-    "chain-2",
-    "chain-3",
-    "keyper-0",
-    "keyper-1",
-]
-utils.run(["docker", "compose", "up", "-d", *services])
-utils.wait_for_service_health("ethereum")
-utils.wait_for_service_health("db")
-utils.wait_for_service_health("chain-seed")
-for index in range(4):
-    utils.wait_for_service_health(f"chain-{index}")
+# Stop keypers 2 and 3 before adding the 3-of-4 set.
+# The new set's config vote only needs 2 votes (previous threshold),
+# so keypers 0 and 1 can push it through despite the higher new threshold.
+utils.run(["docker", "compose", "stop", "keyper-2", "keyper-3"])
 
-utils.run(["mise", "run", "add-initial-keyper-set"])
+utils.run(["mise", "run", "add-keyper-set", "--indices", "0,1,2,3", "--threshold", "3"])
 
-# With only 2 of 3 required keypers online, the first DKG round must fail.
+# Only 2 of 3 required keypers online → DKG must fail.
 wait_for_dkg_failure()
 
 # Bring keyper-2 online to reach threshold; the keyper logic retries DKG.
 utils.run(["docker", "compose", "up", "-d", "keyper-2"])
 
-wait_for_dkg_success()
+# Use keyper_set_index=2 to avoid a false positive from eon 1's success row.
+wait_for_dkg_success(keyper_set_index=2)
 
 utils.run(["mise", "run", "test-decryption"])
