@@ -35,7 +35,10 @@ registry_address = utils.get_created_contract_address(deployment_run, "ShutterRe
 
 eon = os.environ.get("usage_eon", "").strip()
 if not eon:
-    eon = utils.query_keyper_db(0, "SELECT max(eon) FROM eons")
+    eon = utils.query_keyper_db(
+        0,
+        "SELECT keyper_config_index FROM eons ORDER BY eon DESC LIMIT 1",
+    )
     if not eon:
         raise SystemExit("No eon found")
 
