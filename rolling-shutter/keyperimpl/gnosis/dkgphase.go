@@ -31,12 +31,12 @@ func (p DKGPhase) String() string {
 	}
 }
 
-// InstanceStart returns the first block number at which the DKG Instance
+// DKGStart returns the first block number at which the DKG Instance
 // `(keyperSetIndex, retryCounter)` enters its Dealing phase. The formula
 // matches `DKGContract.dkgStart` in DKGContract.sol; using int64 internally
 // allows the result to be negative when the activation block is smaller than
 // the lead length (which the on-chain contract handles via int256).
-func InstanceStart(activationBlock, dkgLeadLength, phaseLength uint64, retryCounter uint64) int64 {
+func DKGStart(activationBlock, dkgLeadLength, phaseLength uint64, retryCounter uint64) int64 {
 	cycle := CycleLength(phaseLength)
 	return int64(activationBlock) - int64(dkgLeadLength) + int64(retryCounter)*int64(cycle)
 }
@@ -55,7 +55,7 @@ func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentB
 	if phaseLength == 0 {
 		return PhaseNone
 	}
-	start := InstanceStart(activationBlock, dkgLeadLength, phaseLength, retryCounter)
+	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, retryCounter)
 	offset := int64(currentBlock) - start
 	if offset < 0 {
 		return PhaseNone
@@ -77,7 +77,7 @@ func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentB
 
 // CurrentRetryCounter derives the active retry counter from block arithmetic.
 // Each failed cycle advances the counter by one; the counter is never stored
-// in the database. A block before `InstanceStart(..., 0)` returns 0 since the
+// in the database. A block before `DKGStart(..., 0)` returns 0 since the
 // loop has not begun yet (matching the contract's behaviour of treating early
 // blocks as "Phase.None" within retry 0).
 func CurrentRetryCounter(activationBlock, dkgLeadLength, phaseLength, currentBlock uint64) uint64 {
@@ -85,7 +85,7 @@ func CurrentRetryCounter(activationBlock, dkgLeadLength, phaseLength, currentBlo
 	if cycle == 0 {
 		return 0
 	}
-	start := InstanceStart(activationBlock, dkgLeadLength, phaseLength, 0)
+	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)
 	offset := int64(currentBlock) - start
 	if offset < 0 {
 		return 0

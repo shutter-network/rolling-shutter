@@ -15,7 +15,7 @@ func TestPhaseAtBoundaries(t *testing.T) {
 		phaseLength     uint64 = 10
 	)
 	// Retry 0: dealing starts at block 960 (1000 - 40).
-	start := InstanceStart(activationBlock, dkgLeadLength, phaseLength, 0)
+	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)
 	assert.Equal(t, int64(960), start)
 
 	cases := []struct {
@@ -52,7 +52,7 @@ func TestPhaseAtAcrossRetries(t *testing.T) {
 	cycle := CycleLength(phaseLength) // 40
 
 	// Retry 1 starts at block 1000 (960 + 40).
-	assert.Equal(t, int64(1000), InstanceStart(activationBlock, dkgLeadLength, phaseLength, 1))
+	assert.Equal(t, int64(1000), DKGStart(activationBlock, dkgLeadLength, phaseLength, 1))
 
 	// At block 1000 the retry-0 cycle has expired. Block arithmetic says we
 	// are in retry 1, which puts us at the dealing first-block boundary.
@@ -72,8 +72,8 @@ func TestPhaseAtAcrossRetries(t *testing.T) {
 
 	// Sanity check: the retry-2 start is exactly two cycles past retry 0.
 	assert.Equal(t,
-		InstanceStart(activationBlock, dkgLeadLength, phaseLength, 0)+2*int64(cycle),
-		InstanceStart(activationBlock, dkgLeadLength, phaseLength, 2),
+		DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)+2*int64(cycle),
+		DKGStart(activationBlock, dkgLeadLength, phaseLength, 2),
 	)
 }
 
