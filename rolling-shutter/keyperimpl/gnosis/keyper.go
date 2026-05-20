@@ -26,6 +26,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/slotticker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
 var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
@@ -49,6 +50,7 @@ type Keyper struct {
 	validatorSyncer     *ValidatorSyncer
 	latestTriggeredSlot *uint64
 	syncMonitor         *SyncMonitor
+	txSender            *txsender.TxSender
 
 	// DKG participation state. dkgPhaseLength and dkgLeadLength are read from
 	// the deployed DKG Contract at startup (immutable constructor parameters).
@@ -163,9 +165,14 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Gnosis.SyncMonitorCheckInterval) * time.Second,
 	}
+	kpr.txSender = txsender.New(txsender.Config{
+		DBPool:     kpr.dbpool,
+		Client:     kpr.chainSyncClient,
+		PrivateKey: kpr.config.Gnosis.Node.PrivateKey.Key,
+	})
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.txSender)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {

@@ -24,6 +24,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
 var ErrParseKeyperSet = errors.New("cannot parse KeyperSet")
@@ -38,6 +39,7 @@ type Keyper struct {
 	latestTriggeredTime *uint64
 	syncMonitor         *SyncMonitor
 	multiEventSyncer    *MultiEventSyncer
+	txSender            *txsender.TxSender
 
 	// input events
 	newBlocks     chan *syncevent.LatestBlock
@@ -109,8 +111,13 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		DBPool:        kpr.dbpool,
 		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
 	}
+	kpr.txSender = txsender.New(txsender.Config{
+		DBPool:     kpr.dbpool,
+		Client:     kpr.chainSyncClient,
+		PrivateKey: kpr.config.Chain.Node.PrivateKey.Key,
+	})
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.syncMonitor)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.syncMonitor, kpr.txSender)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
