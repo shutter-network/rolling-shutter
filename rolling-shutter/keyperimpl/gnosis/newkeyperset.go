@@ -67,12 +67,9 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			// somewhere to anchor when the activation block approaches.
 			// Existing rows are tolerated because the chainsync initial poll
 			// can re-deliver KeyperSetAdded events that were already processed.
-			existing, err := coredb.GetEon(ctx, keyperConfigIndex)
-			if err == nil {
-				_ = existing
+			if _, err := coredb.GetEon(ctx, keyperConfigIndex); err == nil {
 				return nil
-			}
-			if !errors.Is(err, pgx.ErrNoRows) {
+			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return errors.Wrap(err, "check existing eon row")
 			}
 			dkgContract, phaseLength, leadLength := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
@@ -155,4 +152,3 @@ func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 		sql.NullInt64{Int64: int64(phaseLength), Valid: true},
 		sql.NullInt64{Int64: int64(leadLength), Valid: true}
 }
-
