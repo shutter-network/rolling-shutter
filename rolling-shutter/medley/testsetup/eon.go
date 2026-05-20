@@ -16,6 +16,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/collator"
+	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testkeygen"
@@ -80,11 +81,12 @@ func InitializeEon(
 	dkgResultEncoded, err := shdb.EncodePureDKGResult(&dkgResult)
 	assert.NilError(tb, err)
 
-	err = keyperDB.InsertBatchConfig(ctx, database.InsertBatchConfigParams{
-		KeyperConfigIndex: 1,
-		Height:            0,
-		Keypers:           keypers,
-		Threshold:         int32(eonKeys.Threshold),
+	obskeyperDB := obskeyperdb.New(dbpool)
+	err = obskeyperDB.InsertKeyperSet(ctx, obskeyperdb.InsertKeyperSetParams{
+		KeyperConfigIndex:     1,
+		ActivationBlockNumber: 0,
+		Keypers:               keypers,
+		Threshold:             int32(eonKeys.Threshold),
 	})
 	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{

@@ -1,69 +1,26 @@
 package keyper
 
 import (
-	"context"
-	"errors"
-	"reflect"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
 
 type Option func(*options) error
 
 type options struct {
-	dbpool             *pgxpool.Pool
-	broadcastEonPubKey bool
-	messaging          p2p.Messaging
-	blockSyncClient    *ethclient.Client
-	messageHandler     []p2p.MessageHandler
-	eonPubkeyHandler   EonPublicKeyHandlerFunc
+	dbpool          *pgxpool.Pool
+	messaging       p2p.Messaging
+	blockSyncClient *ethclient.Client
+	messageHandler  []p2p.MessageHandler
 }
 
 func newDefaultOptions() *options {
 	return &options{
-		dbpool:             nil,
-		broadcastEonPubKey: true,
-		blockSyncClient:    nil,
-		messageHandler:     []p2p.MessageHandler{},
-		eonPubkeyHandler:   nil,
-	}
-}
-
-var keyperNewConfigType = reflect.TypeOf(contract.KeypersConfigsListNewConfig{})
-
-func validateOptions(o *options) error {
-	if !o.broadcastEonPubKey && o.eonPubkeyHandler == nil {
-		return errors.New("no eon public key broadcast nor handler function provided. " +
-			"newly negotiated eon public-keys would not be forwarded")
-	}
-	return nil
-}
-
-// NoBroadcastEonPublicKey deactivates the broadcasting of
-// the keyper's newly negotiated DKG public-keys via the P2P network.
-// If this option is given, an EonPublicKeyHandlerFunc MUST be
-// provided via the WithEonPublicKeyHandler option.
-func NoBroadcastEonPublicKey() Option {
-	return func(o *options) error {
-		o.broadcastEonPubKey = false
-		return nil
-	}
-}
-
-type EonPublicKeyHandlerFunc func(context.Context, EonPublicKey) error
-
-// WithEonPublicKeyHandler registers a handler function that will
-// be called whenever the keyper newly negotiated a DKG public key.
-// If the NoBroadcastEonPublicKey() option is given, an
-// EonPublicKeyHandlerFunc MUST be provided.
-func WithEonPublicKeyHandler(handler EonPublicKeyHandlerFunc) Option {
-	return func(o *options) error {
-		o.eonPubkeyHandler = handler
-		return nil
+		dbpool:          nil,
+		blockSyncClient: nil,
+		messageHandler:  []p2p.MessageHandler{},
 	}
 }
 

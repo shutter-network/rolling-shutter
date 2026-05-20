@@ -22,8 +22,7 @@ func Cmd() *cobra.Command {
 		main,
 		command.Usage(
 			"Run a Shutter optimism keyper node",
-			`This command runs a keyper node. It will connect to both an Optimism and a
-Shuttermint node which have to be started separately in advance.`,
+			"This command runs a keyper node. It will connect to an Optimism execution node which has to be started separately in advance.",
 		),
 		command.WithGenerateConfigSubcommand(),
 	)
@@ -35,7 +34,6 @@ func main(cfg *config.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Str("address", cfg.GetAddress().Hex()).
-		Str("shuttermint", cfg.Shuttermint.ShuttermintURL).
 		Msg("starting keyper")
 	kpr, err := keyper.New(cfg)
 	if err != nil {

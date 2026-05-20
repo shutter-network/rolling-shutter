@@ -14,7 +14,6 @@ import (
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -48,7 +47,6 @@ type Keyper struct {
 	chainSyncClient     *chainsync.Client
 	sequencerSyncer     *SequencerSyncer
 	validatorSyncer     *ValidatorSyncer
-	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredSlot *uint64
 	syncMonitor         *SyncMonitor
 
@@ -59,11 +57,10 @@ type Keyper struct {
 	dkgLeadLength  uint64
 
 	// input events
-	newBlocks        chan *syncevent.LatestBlock
-	newKeyperSets    chan *syncevent.KeyperSet
-	newEonPublicKeys chan keyper.EonPublicKey
-	newDKGEvents     chan *syncevent.DKGEvent
-	slotTicker       *slotticker.SlotTicker
+	newBlocks     chan *syncevent.LatestBlock
+	newKeyperSets chan *syncevent.KeyperSet
+	newDKGEvents  chan *syncevent.DKGEvent
+	slotTicker    *slotticker.SlotTicker
 
 	// outputs
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
@@ -82,7 +79,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
-	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
 	kpr.newDKGEvents = make(chan *syncevent.DKGEvent)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
@@ -137,20 +133,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	eonKeyPublisherClient, err := ethclient.DialContext(ctx, kpr.config.Gnosis.Node.EthereumURL)
-	if err != nil {
-		return errors.Wrapf(err, "failed to dial ethereum node at %s", kpr.config.Gnosis.Node.EthereumURL)
-	}
-	kpr.eonKeyPublisher, err = eonkeypublisher.NewEonKeyPublisher(
-		kpr.dbpool,
-		eonKeyPublisherClient,
-		kpr.config.Gnosis.Contracts.KeyperSetManager,
-		kpr.config.Gnosis.Node.PrivateKey.Key,
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize eon key publisher")
-	}
-
 	err = kpr.initSequencerSyncer(ctx)
 	if err != nil {
 		return err
@@ -183,7 +165,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
@@ -196,14 +178,11 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Gnosis.Node,
-			Shuttermint:          kpr.config.Shuttermint,
 			Metrics:              kpr.config.Metrics,
 			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
 		},
 		kpr.decryptionTriggerChannel,
 		keyper.WithDBPool(kpr.dbpool),
-		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
 		keyper.WithMessaging(messagingMiddleware),
 	)
 	return core, err
@@ -295,8 +274,6 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			err = kpr.processNewBlock(ctx, ev)
 		case ev := <-kpr.newKeyperSets:
 			err = kpr.processNewKeyperSet(ctx, ev)
-		case ev := <-kpr.newEonPublicKeys:
-			err = kpr.processNewEonPublicKey(ctx, ev)
 		case ev := <-kpr.newDKGEvents:
 			err = kpr.processNewDKGEvent(ctx, ev)
 		case slot := <-kpr.slotTicker.C:
@@ -326,15 +303,6 @@ func (kpr *Keyper) channelNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 func (kpr *Keyper) channelNewKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) error {
 	select {
 	case kpr.newKeyperSets <- ev:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (kpr *Keyper) channelNewEonPublicKey(ctx context.Context, key keyper.EonPublicKey) error {
-	select {
-	case kpr.newEonPublicKeys <- key:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

@@ -14,7 +14,6 @@ import (
 	triggerRegistryV1Bindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistryv1"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -36,15 +35,13 @@ type Keyper struct {
 
 	chainSyncClient     *chainsync.Client
 	registrySyncer      *RegistrySyncer
-	eonKeyPublisher     *eonkeypublisher.EonKeyPublisher
 	latestTriggeredTime *uint64
 	syncMonitor         *SyncMonitor
 	multiEventSyncer    *MultiEventSyncer
 
 	// input events
-	newBlocks        chan *syncevent.LatestBlock
-	newKeyperSets    chan *syncevent.KeyperSet
-	newEonPublicKeys chan keyper.EonPublicKey
+	newBlocks     chan *syncevent.LatestBlock
+	newKeyperSets chan *syncevent.KeyperSet
 
 	// outputs
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
@@ -61,7 +58,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
-	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	kpr.latestTriggeredTime = nil
@@ -97,20 +93,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	eonKeyPublisherClient, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
-	if err != nil {
-		return errors.Wrapf(err, "failed to dial ethereum node at %s", kpr.config.Chain.Node.EthereumURL)
-	}
-	kpr.eonKeyPublisher, err = eonkeypublisher.NewEonKeyPublisher(
-		kpr.dbpool,
-		eonKeyPublisherClient,
-		kpr.config.Chain.Contracts.KeyperSetManager,
-		kpr.config.Chain.Node.PrivateKey.Key,
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize eon key publisher")
-	}
-
 	err = kpr.initRegistrySyncer(ctx)
 	if err != nil {
 		return err
@@ -128,7 +110,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		CheckInterval: time.Duration(kpr.config.Chain.SyncMonitorCheckInterval) * time.Second,
 	}
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.eonKeyPublisher, kpr.syncMonitor)
+	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.syncMonitor)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
@@ -141,14 +123,11 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Chain.Node,
-			Shuttermint:          kpr.config.Shuttermint,
 			Metrics:              kpr.config.Metrics,
 			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
 		},
 		kpr.decryptionTriggerChannel,
 		keyper.WithDBPool(kpr.dbpool),
-		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
 		keyper.WithMessaging(messagingMiddleware),
 	)
 }
@@ -259,8 +238,6 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			err = kpr.processNewBlock(ctx, ev)
 		case ev := <-kpr.newKeyperSets:
 			err = kpr.processNewKeyperSet(ctx, ev)
-		case ev := <-kpr.newEonPublicKeys:
-			err = kpr.processNewEonPublicKey(ctx, ev)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -271,15 +248,6 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			// return err
 			log.Error().Err(err).Msg("error processing event")
 		}
-	}
-}
-
-func (kpr *Keyper) channelNewEonPublicKey(ctx context.Context, key keyper.EonPublicKey) error {
-	select {
-	case kpr.newEonPublicKeys <- key:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 }
 

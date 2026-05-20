@@ -22,8 +22,7 @@ func Cmd() *cobra.Command {
 		command.CommandName("snapshotkeyper"),
 		command.Usage(
 			"Run a Shutter snapshotkeyper node",
-			`This command runs a keyper node. It will connect to both an Ethereum and a
-Shuttermint node which have to be started separately in advance.`,
+			"This command runs a keyper node. It will connect to an Ethereum execution node which has to be started separately in advance.",
 		),
 		command.WithGenerateConfigSubcommand(),
 		command.WithDumpConfigSubcommand(),
@@ -36,7 +35,6 @@ func main(config *keyper.Config) error {
 	log.Info().
 		Str("version", shversion.Version()).
 		Str("address", config.GetAddress().Hex()).
-		Str("shuttermint", config.Shuttermint.ShuttermintURL).
 		Msg("starting snapshotkeyper")
 
 	kpr := keyper.New(config)

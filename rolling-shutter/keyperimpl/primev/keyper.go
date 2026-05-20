@@ -11,7 +11,6 @@ import (
 	providerregistry "github.com/primev/mev-commit/contracts-abi/clients/ProviderRegistry"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -33,9 +32,7 @@ type Keyper struct {
 
 	chainSyncClient        *chainsync.Client
 	providerRegistrySyncer *ProviderRegistrySyncer
-	eonKeyPublisher        *eonkeypublisher.EonKeyPublisher
 	newKeyperSets          chan *syncevent.KeyperSet
-	newEonPublicKeys       chan keyper.EonPublicKey
 	newBlocks              chan *syncevent.LatestBlock
 
 	// outputs
@@ -52,7 +49,6 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	var err error
 
 	k.newKeyperSets = make(chan *syncevent.KeyperSet)
-	k.newEonPublicKeys = make(chan keyper.EonPublicKey)
 	k.newBlocks = make(chan *syncevent.LatestBlock)
 	k.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
@@ -91,27 +87,13 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	}
 
-	eonKeyPublisherClient, err := ethclient.DialContext(ctx, k.config.Chain.Node.EthereumURL)
-	if err != nil {
-		return errors.Wrapf(err, "failed to dial ethereum node at %s", k.config.Chain.Node.EthereumURL)
-	}
-	k.eonKeyPublisher, err = eonkeypublisher.NewEonKeyPublisher(
-		k.dbpool,
-		eonKeyPublisherClient,
-		k.config.Chain.Contracts.KeyperSetManager,
-		k.config.Chain.Node.PrivateKey.Key,
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize eon key publisher")
-	}
-
 	err = k.initRegistrySyncer(ctx)
 	if err != nil {
 		return err
 	}
 
 	runner.Go(func() error { return k.processInputs(ctx) })
-	return runner.StartService(k.core, k.chainSyncClient, k.eonKeyPublisher)
+	return runner.StartService(k.core, k.chainSyncClient)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware p2p.Messaging) (*keyper.KeyperCore, error) {
@@ -124,14 +106,11 @@ func NewKeyper(kpr *Keyper, messagingMiddleware p2p.Messaging) (*keyper.KeyperCo
 			HTTPListenAddress:    kpr.config.HTTPListenAddress,
 			P2P:                  kpr.config.P2P,
 			Ethereum:             kpr.config.Chain.Node,
-			Shuttermint:          kpr.config.Shuttermint,
 			Metrics:              kpr.config.Metrics,
 			MaxNumKeysPerMessage: kpr.config.MaxNumKeysPerMessage,
 		},
 		kpr.decryptionTriggerChannel,
 		keyper.WithDBPool(kpr.dbpool),
-		keyper.NoBroadcastEonPublicKey(),
-		keyper.WithEonPublicKeyHandler(kpr.channelNewEonPublicKey),
 		keyper.WithMessaging(messagingMiddleware),
 	)
 }
@@ -177,24 +156,13 @@ func (k *Keyper) processInputs(ctx context.Context) error {
 			err = k.processNewBlock(ctx, ev)
 		case ev := <-k.newKeyperSets:
 			err = k.processNewKeyperSet(ctx, ev)
-		case ev := <-k.newEonPublicKeys:
-			err = k.processNewEonPublicKey(ctx, ev)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 		if err != nil {
-			// TODO: Check if it's safe to drop those events. If not, we should store the
-			// ones that remain on the channel in the db and process them when we restart.
-			// TODO: also, should we stop the keyper or just log the error and continue?
-			// return err
 			log.Error().Err(err).Msg("error processing event")
 		}
 	}
-}
-
-func (k *Keyper) channelNewEonPublicKey(_ context.Context, key keyper.EonPublicKey) error {
-	k.newEonPublicKeys <- key
-	return nil
 }
 
 func (k *Keyper) channelNewKeyperSet(_ context.Context, ev *syncevent.KeyperSet) error {

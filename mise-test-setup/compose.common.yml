@@ -34,21 +34,6 @@ services:
       timeout: 1s
       retries: 30
 
-  chain-seed:
-    image: rolling-shutter
-    entrypoint: /rolling-shutter
-    command:
-      - chain
-      - --config
-      - /chain/config/config.toml
-    volumes:
-      - ${DATA_DIR}/chain-seed:/chain
-    healthcheck:
-      test: curl -sf http://127.0.0.1:26657/status >/dev/null
-      interval: 1s
-      timeout: 1s
-      retries: 10
-
   bootnode:
     image: rolling-shutter
     entrypoint: /rolling-shutter

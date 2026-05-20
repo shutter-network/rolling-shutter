@@ -3,8 +3,6 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/bootstrap"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/chain"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/cryptocmd"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/gnosisaccessnode"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/cmd/gnosiskeyper"
@@ -19,10 +17,7 @@ import (
 
 func Subcommands() []*cobra.Command {
 	return []*cobra.Command{
-		bootstrap.Cmd(),
-		chain.Cmd(),
 		optimism.Cmd(),
-		optimism.OPBootstrapCmd(),
 		snapshot.Cmd(),
 		snapshotkeyper.Cmd(),
 		gnosiskeyper.Cmd(),

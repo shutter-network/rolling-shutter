@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -19,10 +18,9 @@ type Config struct {
 
 	Primev *PrimevConfig
 
-	Chain       *ChainConfig
-	P2P         *p2p.Config
-	Shuttermint *kprconfig.ShuttermintConfig
-	Metrics     *metricsserver.MetricsConfig
+	Chain   *ChainConfig
+	P2P     *p2p.Config
+	Metrics *metricsserver.MetricsConfig
 
 	MaxNumKeysPerMessage uint64
 }
@@ -36,7 +34,6 @@ func NewConfig() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Primev = NewPrimevConfig()
-	c.Shuttermint = kprconfig.NewShuttermintConfig()
 	c.Chain = NewChainConfig()
 	c.Metrics = metricsserver.NewConfig()
 }

@@ -4,28 +4,34 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/protobuf/proto"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2pmsg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/shmsg"
 )
 
-func GetKeyperIndex(addr common.Address, keypers []string) (uint64, bool) {
-	hexaddr := shdb.EncodeAddress(addr)
-	for i, a := range keypers {
-		if a == hexaddr {
-			return uint64(i), true
+// GetKeyperIndex returns the index of the keyper with the given address in the
+// keyper set with the given keyperConfigIndex (which equals the eon for the
+// keyper set). The keyper set is read from the chainobserver tables.
+func (q *Queries) GetKeyperIndex(ctx context.Context, keyperConfigIndex int64, addr common.Address) (int64, bool, error) {
+	ks, err := obskeyper.New(q.db).GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return -1, false, nil
+	}
+	if err != nil {
+		return -1, false, errors.Wrapf(err, "failed to get keyper set %d from db", keyperConfigIndex)
+	}
+	encodedAddress := shdb.EncodeAddress(addr)
+	for i, address := range ks.Keypers {
+		if address == encodedAddress {
+			return int64(i), true, nil
 		}
 	}
-	return uint64(0), false
-}
-
-func (bc *TendermintBatchConfig) KeyperIndex(addr common.Address) (uint64, bool) {
-	return GetKeyperIndex(addr, bc.Keypers)
+	return -1, false, nil
 }
 
 func (q *Queries) InsertDecryptionKeysMsg(ctx context.Context, msg *p2pmsg.DecryptionKeys) error {
@@ -64,42 +70,4 @@ func (q *Queries) InsertDecryptionKeySharesMsg(ctx context.Context, msg *p2pmsg.
 		}
 	}
 	return nil
-}
-
-func (q *Queries) ScheduleShutterMessage(
-	ctx context.Context,
-	description string,
-	msg *shmsg.Message,
-) error {
-	data, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	msgid, err := q.ScheduleSerializedShutterMessage(ctx, ScheduleSerializedShutterMessageParams{
-		Description: description,
-		Msg:         data,
-	})
-	if err != nil {
-		return err
-	}
-	log.Info().Int32("id", msgid).Str("description", description).
-		Msg("scheduled shuttermint message")
-	return nil
-}
-
-// GetKeyperIndex returns the index of the keyper with the given address in the keyper set with
-// the given index. If the keyper is not found, the second return value is false.
-func (q *Queries) GetKeyperIndex(ctx context.Context, keyperConfigIndex int64, addr common.Address) (int64, bool, error) {
-	batchConfig, err := q.GetBatchConfig(ctx, int32(keyperConfigIndex))
-	if err != nil {
-		return -1, false, errors.Wrapf(err, "failed to get config %d from db", keyperConfigIndex)
-	}
-
-	encodedAddress := shdb.EncodeAddress(addr)
-	for i, address := range batchConfig.Keypers {
-		if address == encodedAddress {
-			return int64(i), true, nil
-		}
-	}
-	return -1, false, nil
 }

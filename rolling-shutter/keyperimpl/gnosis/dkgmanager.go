@@ -233,7 +233,7 @@ func (kpr *Keyper) replayStoredMessages(
 }
 
 func (kpr *Keyper) decryptPolyEval(encrypted []byte) (*big.Int, error) {
-	priv := kpr.config.Shuttermint.EncryptionKey.Key
+	priv := kpr.config.ECIESPrivateKey.Key
 	eciesPriv := ecies.ImportECDSA(priv)
 	plaintext, err := eciesPriv.Decrypt(encrypted, []byte(""), []byte(""))
 	if err != nil {
