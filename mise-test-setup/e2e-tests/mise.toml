@@ -9,3 +9,12 @@
 # each other's docker state.
 [settings]
 jobs = 1
+
+[env]
+# The happy-path test needs keypers 3, 4, and 5 for the zero-overlap
+# replacement set; bump the pool to 6. Mise's directory-walking config
+# discovery means this override is applied to every `mise run` invocation
+# made from inside `e2e-tests/`, including child `mise run` subprocesses
+# spawned by test scripts — which need the larger pool to find
+# `keyper-4.toml`/`keyper-5.toml` when the test adds the 3,4,5 set.
+NUM_KEYPERS = "6"
