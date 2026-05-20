@@ -31,6 +31,9 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 			return err
 		}
 	}
+	if err := kpr.dkgMgr.HandleBlock(ctx, ev.Header.Number.Uint64()); err != nil {
+		return err
+	}
 	return kpr.maybeTriggerDecryption(ctx, ev)
 }
 

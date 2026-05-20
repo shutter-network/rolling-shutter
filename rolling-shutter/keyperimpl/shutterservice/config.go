@@ -1,11 +1,13 @@
 package shutterservice
 
 import (
+	"crypto/rand"
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
@@ -26,6 +28,7 @@ func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Metrics = metricsserver.NewConfig()
 	c.Chain = NewChainConfig()
+	c.ECIESPrivateKey = &keys.ECDSAPrivate{}
 }
 
 type Config struct {
@@ -39,6 +42,11 @@ type Config struct {
 	Chain   *ChainConfig
 	P2P     *p2p.Config
 	Metrics *metricsserver.MetricsConfig
+
+	// ECIESPrivateKey is the keyper's ECIES private key used to decrypt
+	// PolyEval blobs sent by other keypers during DKG. The corresponding
+	// public key is registered on-chain via the ECIES Key Registry.
+	ECIESPrivateKey *keys.ECDSAPrivate `shconfig:",required"`
 
 	MaxNumKeysPerMessage uint64
 }
@@ -67,6 +75,11 @@ func (c *Config) SetExampleValues() error {
 	}
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
+	eciesKey, err := keys.GenerateECDSAKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+	c.ECIESPrivateKey = eciesKey
 	return nil
 }
 
@@ -136,6 +149,8 @@ type ContractsConfig struct {
 	ShutterRegistry             common.Address `shconfig:",required"`
 	ShutterEventTriggerRegistry common.Address
 	KeyBroadcastContract        common.Address `shconfig:",required"`
+	ECIESKeyRegistry            common.Address `shconfig:",required"`
+	DKGContract                 common.Address `shconfig:",required"`
 }
 
 func NewContractsConfig() *ContractsConfig {
@@ -143,6 +158,8 @@ func NewContractsConfig() *ContractsConfig {
 		KeyperSetManager:     common.Address{},
 		ShutterRegistry:      common.Address{},
 		KeyBroadcastContract: common.Address{},
+		ECIESKeyRegistry:     common.Address{},
+		DKGContract:          common.Address{},
 	}
 }
 

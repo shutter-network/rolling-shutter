@@ -14,6 +14,7 @@ import (
 	triggerRegistryV1Bindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistryv1"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/dkg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -41,9 +42,14 @@ type Keyper struct {
 	multiEventSyncer    *MultiEventSyncer
 	txSender            *txsender.TxSender
 
+	// dkgMgr drives the per-block DKG participation loop. It owns no chain
+	// subscriptions and lives entirely off the database (see ADR 0004).
+	dkgMgr *dkg.Manager
+
 	// input events
 	newBlocks     chan *syncevent.LatestBlock
 	newKeyperSets chan *syncevent.KeyperSet
+	newDKGEvents  chan syncevent.DKGEvent
 
 	// outputs
 	decryptionTriggerChannel chan *broker.Event[*epochkghandler.DecryptionTrigger]
@@ -60,6 +66,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
+	kpr.newDKGEvents = make(chan syncevent.DKGEvent)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	kpr.latestTriggeredTime = nil
@@ -86,14 +93,26 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithClientURL(kpr.config.Chain.Node.EthereumURL),
 		chainsync.WithKeyperSetManager(kpr.config.Chain.Contracts.KeyperSetManager),
 		chainsync.WithKeyBroadcastContract(kpr.config.Chain.Contracts.KeyBroadcastContract),
+		chainsync.WithECIESKeyRegistry(kpr.config.Chain.Contracts.ECIESKeyRegistry),
+		chainsync.WithDKGContract(kpr.config.Chain.Contracts.DKGContract),
 		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
+		chainsync.WithSyncECIESKey(kpr.processNewECIESKey),
+		chainsync.WithSyncDKGEvent(kpr.channelNewDKGEvent),
 		chainsync.WithPrivateKey(kpr.config.Chain.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)
 	if err != nil {
 		return err
 	}
+
+	kpr.dkgMgr = dkg.New(dkg.NewConfigFromECDSA(
+		kpr.dbpool,
+		kpr.config.GetAddress(),
+		kpr.config.ECIESPrivateKey.Key,
+		kpr.config.Chain.Contracts.DKGContract,
+		kpr.config.Chain.Contracts.ECIESKeyRegistry,
+	))
 
 	err = kpr.initRegistrySyncer(ctx)
 	if err != nil {
@@ -245,6 +264,8 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			err = kpr.processNewBlock(ctx, ev)
 		case ev := <-kpr.newKeyperSets:
 			err = kpr.processNewKeyperSet(ctx, ev)
+		case ev := <-kpr.newDKGEvents:
+			err = kpr.processNewDKGEvent(ctx, ev)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -270,6 +291,15 @@ func (kpr *Keyper) channelNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 func (kpr *Keyper) channelNewKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) error {
 	select {
 	case kpr.newKeyperSets <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent) error {
+	select {
+	case kpr.newDKGEvents <- ev:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
