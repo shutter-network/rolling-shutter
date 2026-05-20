@@ -1,7 +1,8 @@
-package gnosis
+package dkg
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
 
@@ -19,13 +20,27 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
+// ReceiverIndicesForSender returns the keyper indices that should be receivers
+// of polyEvals submitted by `senderIndex` within a keyper set of size `n`:
+// all indices in [0, n) except `senderIndex`, in ascending order.
+func ReceiverIndicesForSender(n, senderIndex uint64) []uint64 {
+	out := make([]uint64, 0, n-1)
+	for i := uint64(0); i < n; i++ {
+		if i == senderIndex {
+			continue
+		}
+		out = append(out, i)
+	}
+	return out
+}
+
 // buildPureDKG reconstructs the in-memory puredkg state for a single DKG
 // attempt by replaying every stored message for `(keyperConfigIndex,
 // retryCounter)`. The DB is the source of truth; nothing is cached between
 // invocations. Returns isMember=false when the local keyper is not part of
 // the corresponding keyper set, in which case the other return values are
 // zero.
-func (kpr *Keyper) buildPureDKG(
+func (m *Manager) buildPureDKG(
 	ctx context.Context,
 	tx pgx.Tx,
 	keyperConfigIndex, retryCounter int64,
@@ -35,8 +50,7 @@ func (kpr *Keyper) buildPureDKG(
 	if err != nil {
 		return nil, nil, 0, false, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
 	}
-	ownAddr := kpr.config.GetAddress()
-	ownIndex, err = keyperSet.GetIndex(ownAddr)
+	ownIndex, err = keyperSet.GetIndex(m.cfg.OwnAddress)
 	if err != nil {
 		return nil, nil, 0, false, nil
 	}
@@ -51,7 +65,7 @@ func (kpr *Keyper) buildPureDKG(
 		uint64(keyperSet.Threshold),
 		ownIndex,
 	)
-	if err := kpr.replayStoredMessages(ctx, tx, &p, ownIndex, keyperConfigIndex, retryCounter); err != nil {
+	if err := m.replayStoredMessages(ctx, tx, &p, ownIndex, keyperConfigIndex, retryCounter); err != nil {
 		return nil, nil, 0, false, err
 	}
 	return &p, keypers, ownIndex, true, nil
@@ -62,7 +76,7 @@ func (kpr *Keyper) buildPureDKG(
 // four `Handle*` methods accept input while `pure.Phase` is at or below their
 // target phase, so leaving the in-memory state at `Phase = Off` until the
 // live phase boundary fires is correct here.
-func (kpr *Keyper) replayStoredMessages(
+func (m *Manager) replayStoredMessages(
 	ctx context.Context,
 	tx pgx.Tx,
 	pure *puredkg.PureDKG,
@@ -109,7 +123,7 @@ func (kpr *Keyper) replayStoredMessages(
 		if uint64(ev.ReceiverIndex) != ownIndex {
 			continue
 		}
-		eval, err := kpr.decryptPolyEval(ev.EncryptedEval)
+		eval, err := m.decryptPolyEval(ev.EncryptedEval)
 		if err != nil {
 			log.Debug().Err(err).
 				Int64("keyper-config-index", keyperConfigIndex).
@@ -184,17 +198,15 @@ func (kpr *Keyper) replayStoredMessages(
 	return nil
 }
 
-func (kpr *Keyper) decryptPolyEval(encrypted []byte) (*big.Int, error) {
-	priv := kpr.config.ECIESPrivateKey.Key
-	eciesPriv := ecies.ImportECDSA(priv)
-	plaintext, err := eciesPriv.Decrypt(encrypted, []byte(""), []byte(""))
+func (m *Manager) decryptPolyEval(encrypted []byte) (*big.Int, error) {
+	plaintext, err := m.cfg.ECIESPrivateKey.Decrypt(encrypted, []byte(""), []byte(""))
 	if err != nil {
 		return nil, errors.Wrap(err, "decrypt poly eval")
 	}
 	return new(big.Int).SetBytes(plaintext), nil
 }
 
-func (kpr *Keyper) encryptPolyEvalFor(
+func (m *Manager) encryptPolyEvalFor(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	receiverAddr common.Address,
@@ -213,4 +225,11 @@ func (kpr *Keyper) encryptPolyEvalFor(
 		return nil, errors.Wrap(err, "encrypt poly eval")
 	}
 	return ciphertext, nil
+}
+
+// eciesPrivateKeyFromECDSA constructs an `*ecies.PrivateKey` from a standard
+// `*ecdsa.PrivateKey`. Callers without ready access to the ecies form can use
+// this helper when building Config.
+func eciesPrivateKeyFromECDSA(priv *ecdsa.PrivateKey) *ecies.PrivateKey {
+	return ecies.ImportECDSA(priv)
 }

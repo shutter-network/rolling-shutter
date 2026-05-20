@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/dkg"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -120,7 +121,7 @@ func storeDealing(
 		return errors.Wrapf(err, "load keyper set %d for polyEval split", keyperConfigIndex)
 	}
 	n := uint64(len(keyperSet.Keypers))
-	receivers := ReceiverIndicesForSender(n, ev.KeyperIndex)
+	receivers := dkg.ReceiverIndicesForSender(n, ev.KeyperIndex)
 	if uint64(len(evals)) != uint64(len(receivers)) {
 		return errors.Errorf(
 			"polyEval count %d does not match expected receiver count %d for keyper set %d",
