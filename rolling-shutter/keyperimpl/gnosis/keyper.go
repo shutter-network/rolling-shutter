@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -51,10 +52,17 @@ type Keyper struct {
 	latestTriggeredSlot *uint64
 	syncMonitor         *SyncMonitor
 
+	// DKG participation state. dkgPhaseLength and dkgLeadLength are read from
+	// the deployed DKG Contract at startup (immutable constructor parameters).
+	dkgManager     *dkgManager
+	dkgPhaseLength uint64
+	dkgLeadLength  uint64
+
 	// input events
 	newBlocks        chan *syncevent.LatestBlock
 	newKeyperSets    chan *syncevent.KeyperSet
 	newEonPublicKeys chan keyper.EonPublicKey
+	newDKGEvents     chan *syncevent.DKGEvent
 	slotTicker       *slotticker.SlotTicker
 
 	// outputs
@@ -65,6 +73,7 @@ func New(c *Config) *Keyper {
 	return &Keyper{
 		config:      c,
 		syncMonitor: &SyncMonitor{},
+		dkgManager:  newDKGManager(),
 	}
 }
 
@@ -74,6 +83,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
 	kpr.newEonPublicKeys = make(chan keyper.EonPublicKey)
+	kpr.newDKGEvents = make(chan *syncevent.DKGEvent)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	kpr.latestTriggeredSlot = nil
@@ -115,9 +125,11 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
 		chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
 		chainsync.WithECIESKeyRegistry(kpr.config.Gnosis.Contracts.ECIESKeyRegistry),
+		chainsync.WithDKGContract(kpr.config.Gnosis.Contracts.DKGContract),
 		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
 		chainsync.WithSyncECIESKey(kpr.processNewECIESKey),
+		chainsync.WithSyncDKGEvent(kpr.channelNewDKGEvent),
 		chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)
@@ -146,6 +158,9 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	err = kpr.initValidatorSyncer(ctx)
 	if err != nil {
 		return err
+	}
+	if err := kpr.loadDKGContractParams(ctx); err != nil {
+		return errors.Wrap(err, "load DKG contract parameters")
 	}
 
 	if kpr.config.Metrics.Enabled {
@@ -282,6 +297,8 @@ func (kpr *Keyper) processInputs(ctx context.Context) error {
 			err = kpr.processNewKeyperSet(ctx, ev)
 		case ev := <-kpr.newEonPublicKeys:
 			err = kpr.processNewEonPublicKey(ctx, ev)
+		case ev := <-kpr.newDKGEvents:
+			err = kpr.processNewDKGEvent(ctx, ev)
 		case slot := <-kpr.slotTicker.C:
 			err = kpr.processNewSlot(ctx, slot)
 		case <-ctx.Done():
@@ -322,4 +339,35 @@ func (kpr *Keyper) channelNewEonPublicKey(ctx context.Context, key keyper.EonPub
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev *syncevent.DKGEvent) error {
+	select {
+	case kpr.newDKGEvents <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// loadDKGContractParams reads PHASE_LENGTH and DKG_LEAD_LENGTH from the
+// deployed DKG Contract. They are immutable constructor parameters so a
+// single startup read is enough — they cannot change later.
+func (kpr *Keyper) loadDKGContractParams(ctx context.Context) error {
+	opts := &bind.CallOpts{Context: ctx}
+	phaseLength, err := kpr.chainSyncClient.DKGContract.PHASELENGTH(opts)
+	if err != nil {
+		return errors.Wrap(err, "read PHASE_LENGTH")
+	}
+	leadLength, err := kpr.chainSyncClient.DKGContract.DKGLEADLENGTH(opts)
+	if err != nil {
+		return errors.Wrap(err, "read DKG_LEAD_LENGTH")
+	}
+	kpr.dkgPhaseLength = phaseLength
+	kpr.dkgLeadLength = leadLength
+	log.Info().
+		Uint64("dkg-phase-length", phaseLength).
+		Uint64("dkg-lead-length", leadLength).
+		Msg("loaded DKG contract phase parameters")
+	return nil
 }
