@@ -21,11 +21,6 @@ ACTIVATION_DELTA = "{{ get_env(name='ACTIVATION_DELTA', default='10') }}"
 DKG_RESULT_POLL_INTERVAL = "{{ get_env(name='DKG_RESULT_POLL_INTERVAL', default='1') }}"
 DECRYPTION_KEY_POLL_INTERVAL = "{{ get_env(name='DECRYPTION_KEY_POLL_INTERVAL', default='1') }}"
 DECRYPTION_TRIGGER_TIMESTAMP_DELTA = "{{ get_env(name='DECRYPTION_TRIGGER_TIMESTAMP_DELTA', default='10') }}"
-SHUTTERMINT_BLOCK_TIME = "{{ get_env(name='SHUTTERMINT_BLOCK_TIME', default='1') }}"
-SHUTTERMINT_DKG_PHASE_LENGTH = "{{ get_env(name='SHUTTERMINT_DKG_PHASE_LENGTH', default='10') }}"
-SHUTTERMINT_START_BLOCK_DELTA = "{{ get_env(name='SHUTTERMINT_START_BLOCK_DELTA', default='200') }}"
-SHUTTERMINT_RPC_PORT = "{{ get_env(name='SHUTTERMINT_RPC_PORT', default='26657') }}"
-SHUTTERMINT_P2P_PORT = "{{ get_env(name='SHUTTERMINT_P2P_PORT', default='26656') }}"
 DEPLOYMENT_TYPE = "{{ get_env(name='DEPLOYMENT_TYPE', default='service') }}"  # "gnosis" or "service"
 
 # Load optional overrides after defaults so .env wins when present.

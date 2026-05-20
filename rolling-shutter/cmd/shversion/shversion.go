@@ -11,7 +11,7 @@ import (
 // This gets set via ldflags when building via the Makefile.
 var version string
 
-// Version returns shuttermint's version string.
+// Version returns the rolling-shutter version string.
 func Version() string {
 	var raceinfo string
 	if raceDetectorEnabled {

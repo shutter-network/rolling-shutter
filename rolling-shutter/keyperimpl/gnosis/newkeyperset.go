@@ -118,7 +118,7 @@ func (kpr *Keyper) maybeRegisterECIESKey(
 		return nil
 	}
 
-	pubKey := ethcrypto.FromECDSAPub(&kpr.config.Shuttermint.EncryptionKey.Key.PublicKey)
+	pubKey := ethcrypto.FromECDSAPub(&kpr.config.ECIESPrivateKey.Key.PublicKey)
 	chainID, err := kpr.chainSyncClient.ChainID(ctx)
 	if err != nil {
 		return errors.Wrap(err, "get chain id")

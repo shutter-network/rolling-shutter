@@ -15,6 +15,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"gotest.tools/assert"
 
+	obskeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	servicedatabase "github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/shutterservice/database"
@@ -79,7 +80,7 @@ func TestProcessBlockSuccess(t *testing.T) {
 	identity := identityPrefix
 	identity = append(identity, sender.Bytes()...)
 
-	insertBatchConfig(ctx, t, coreKeyperDB, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertBatchConfig(ctx, t, dbpool, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
 	insertEon(ctx, t, coreKeyperDB, eonInt64, int64(activationBlockNumber))
 	insertDKGResult(ctx, t, coreKeyperDB, eonInt64, true)
 
@@ -164,7 +165,7 @@ func TestShouldTriggerDecryption(t *testing.T) {
 		t.Fatalf("Eon is too large: %d", eon)
 	}
 
-	insertBatchConfig(ctx, t, coreKeyperDB, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertBatchConfig(ctx, t, dbpool, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
 	insertEon(ctx, t, coreKeyperDB, int64(eon), int64(activationBlockNumber))
 	insertDKGResult(ctx, t, coreKeyperDB, int64(eon), true)
 
@@ -283,7 +284,7 @@ func TestShouldTriggerDecryptionDifferentEon(t *testing.T) {
 		decryptionTriggerChannel: decryptionTriggerChannel,
 	}
 
-	insertBatchConfig(ctx, t, coreKeyperDB, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertBatchConfig(ctx, t, dbpool, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
 	insertEon(ctx, t, coreKeyperDB, earlierEon, int64(activationBlockNumber))
 	insertDKGResult(ctx, t, coreKeyperDB, earlierEon, true)
 	insertEon(ctx, t, coreKeyperDB, laterEon, int64(laterActivationBlockNumber))
@@ -361,7 +362,7 @@ func TestShouldNotTriggerDecryptionBeforeActivation(t *testing.T) {
 		t.Fatalf("Eon is too large: %d", eon)
 	}
 
-	insertBatchConfig(ctx, t, coreKeyperDB, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
+	insertBatchConfig(ctx, t, dbpool, []string{kpr.config.GetAddress().Hex()}, int64(activationBlockNumber))
 	insertEon(ctx, t, coreKeyperDB, int64(eon), int64(activationBlockNumber))
 	insertDKGResult(ctx, t, coreKeyperDB, int64(eon), true)
 
@@ -423,7 +424,7 @@ func TestShouldNotTriggerDecryptionWithoutSuccessfulDKG(t *testing.T) {
 		t.Fatalf("blockTimestamp is negative: %d", blockTimestamp)
 	}
 
-	insertBatchConfig(ctx, t, coreKeyperDB, []string{kpr.config.GetAddress().Hex()}, activationBlockNumber)
+	insertBatchConfig(ctx, t, dbpool, []string{kpr.config.GetAddress().Hex()}, activationBlockNumber)
 	insertEon(ctx, t, coreKeyperDB, eonInt64, activationBlockNumber)
 	insertDKGResult(ctx, t, coreKeyperDB, eonInt64, false)
 
@@ -567,14 +568,14 @@ func TestFiredTriggersProducesOrderedShares(t *testing.T) {
 func insertBatchConfig(
 	ctx context.Context,
 	t *testing.T,
-	coreKeyperDB *corekeyperdatabase.Queries,
+	dbpool *pgxpool.Pool,
 	keypers []string,
 	activationBlockNumber int64,
 ) {
 	t.Helper()
-
-	err := coreKeyperDB.InsertBatchConfig(ctx, corekeyperdatabase.InsertBatchConfigParams{
-		KeyperConfigIndex:     testKeyperConfigIndex32,
+	obsKeyperDB := obskeyperdatabase.New(dbpool)
+	err := obsKeyperDB.InsertKeyperSet(ctx, obskeyperdatabase.InsertKeyperSetParams{
+		KeyperConfigIndex:     testKeyperConfigIndex,
 		Keypers:               keypers,
 		Threshold:             1,
 		ActivationBlockNumber: activationBlockNumber,

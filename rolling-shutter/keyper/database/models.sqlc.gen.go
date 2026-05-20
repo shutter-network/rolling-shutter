@@ -6,7 +6,6 @@ package database
 
 import (
 	"database/sql"
-	"time"
 )
 
 type DecryptionKey struct {
@@ -72,57 +71,4 @@ type Eon struct {
 	Eon                   int64
 	ActivationBlockNumber int64
 	KeyperConfigIndex     int64
-}
-
-type LastBatchConfigSent struct {
-	EnforceOneRow     bool
-	KeyperConfigIndex int64
-}
-
-type LastBlockSeen struct {
-	EnforceOneRow bool
-	BlockNumber   int64
-}
-
-type OutgoingEonKey struct {
-	EonPublicKey []byte
-	Eon          int64
-}
-
-type PolyEval struct {
-	Eon             int64
-	ReceiverAddress string
-	Eval            []byte
-}
-
-type Puredkg struct {
-	Eon     int64
-	Puredkg []byte
-}
-
-type TendermintBatchConfig struct {
-	KeyperConfigIndex     int32
-	Height                int64
-	Keypers               []string
-	Threshold             int32
-	Started               bool
-	ActivationBlockNumber int64
-}
-
-type TendermintEncryptionKey struct {
-	Address             string
-	EncryptionPublicKey []byte
-	Height              int64
-}
-
-type TendermintOutgoingMessage struct {
-	ID          int32
-	Description string
-	Msg         []byte
-}
-
-type TendermintSyncMetum struct {
-	CurrentBlock        int64
-	LastCommittedHeight int64
-	SyncTimestamp       time.Time
 }

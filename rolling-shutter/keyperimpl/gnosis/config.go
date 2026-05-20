@@ -1,14 +1,15 @@
 package gnosis
 
 import (
+	"crypto/rand"
 	"io"
 	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/keys"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/metricsserver"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
 )
@@ -33,8 +34,8 @@ func NewConfig() *Config {
 func (c *Config) Init() {
 	c.P2P = p2p.NewConfig()
 	c.Gnosis = NewGnosisConfig()
-	c.Shuttermint = kprconfig.NewShuttermintConfig()
 	c.Metrics = metricsserver.NewConfig()
+	c.ECIESPrivateKey = &keys.ECDSAPrivate{}
 }
 
 type Config struct {
@@ -46,10 +47,14 @@ type Config struct {
 	HTTPReadOnly      bool
 	HTTPListenAddress string
 
-	Gnosis      *GnosisConfig
-	P2P         *p2p.Config
-	Shuttermint *kprconfig.ShuttermintConfig
-	Metrics     *metricsserver.MetricsConfig
+	Gnosis  *GnosisConfig
+	P2P     *p2p.Config
+	Metrics *metricsserver.MetricsConfig
+
+	// ECIESPrivateKey is the keyper's ECIES private key used to decrypt
+	// PolyEval blobs sent by other keypers during DKG. The corresponding
+	// public key is registered on-chain via the ECIES Key Registry.
+	ECIESPrivateKey *keys.ECDSAPrivate `shconfig:",required"`
 
 	MaxNumKeysPerMessage uint64
 }
@@ -87,6 +92,12 @@ func (c *Config) SetExampleValues() error {
 	c.InstanceID = 42
 	c.DatabaseURL = "postgres://pguser:pgpassword@localhost:5432/shutter"
 	c.BeaconAPIURL = "http://localhost:5052"
+
+	eciesKey, err := keys.GenerateECDSAKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+	c.ECIESPrivateKey = eciesKey
 
 	return nil
 }

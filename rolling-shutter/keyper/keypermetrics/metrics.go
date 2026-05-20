@@ -3,7 +3,6 @@ package keypermetrics
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,15 +29,6 @@ var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
 	},
 )
 
-var MetricsKeyperCurrentBlockShuttermint = prometheus.NewGauge(
-	prometheus.GaugeOpts{
-		Namespace: "shutter",
-		Subsystem: "keyper",
-		Name:      "current_block_shuttermint",
-		Help:      "Current shuttermint block number",
-	},
-)
-
 var MetricsKeyperCurrentEon = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
@@ -56,16 +46,6 @@ var MetricsKeyperEonStartBlock = prometheus.NewGaugeVec(
 		Help:      "Block at which the eon becomes active",
 	},
 	[]string{"eon"},
-)
-
-var MetricsKeyperIsKeyper = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Namespace: "shutter",
-		Subsystem: "keyper",
-		Name:      "is_keyper",
-		Help:      "Is this node a Keyper in the respective batch config",
-	},
-	[]string{"batch_config_index"},
 )
 
 var MetricsKeyperCurrentPhase = prometheus.NewGaugeVec(
@@ -98,24 +78,6 @@ var MetricsKeyperDKGMessagesReceived = prometheus.NewCounterVec(
 	[]string{"eon", "message_type"},
 )
 
-var MetricsKeyperCurrentBatchConfigIndex = prometheus.NewGauge(
-	prometheus.GaugeOpts{
-		Namespace: "shutter",
-		Subsystem: "keyper",
-		Name:      "current_batch_config_index",
-		Help:      "Current batch config index",
-	},
-)
-
-var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Namespace: "shutter",
-		Subsystem: "keyper",
-		Name:      "batch_config_info",
-		Help:      "Information about the batch configuration in use",
-	},
-	[]string{"batch_config_index", "keyper_addresses"})
-
 var MetricsKeyperDKGStatus = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
@@ -145,13 +107,9 @@ var MetricsExecutionClientVersion = prometheus.NewGaugeVec(
 
 func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
-	prometheus.MustRegister(MetricsKeyperCurrentBlockShuttermint)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
 	prometheus.MustRegister(MetricsKeyperEonStartBlock)
-	prometheus.MustRegister(MetricsKeyperIsKeyper)
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
-	prometheus.MustRegister(MetricsKeyperCurrentBatchConfigIndex)
-	prometheus.MustRegister(MetricsKeyperBatchConfigInfo)
 	prometheus.MustRegister(MetricsKeyperDKGStatus)
 	prometheus.MustRegister(MetricsKeyperEthAddress)
 	prometheus.MustRegister(MetricsExecutionClientVersion)
@@ -180,8 +138,6 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 		currentEon := eons[len(eons)-1]
 
 		MetricsKeyperCurrentEon.Set(float64(currentEon.Eon))
-
-		MetricsKeyperCurrentBatchConfigIndex.Set(float64(currentEon.KeyperConfigIndex))
 
 		for _, eon := range eons {
 			eonStr := strconv.FormatInt(eon.Eon, 10)
@@ -213,37 +169,6 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 					MetricsKeyperDKGStatus.WithLabelValues(eonStr).Set(0)
 				}
 			}
-		}
-	}
-
-	// Populate MetricsKeyperBatchConfigInfo && MetricsKeyperIsKeyper
-	batchConfigs, err := queries.GetBatchConfigs(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("keypermetrics | Failed to fetch batch configs")
-	} else {
-		currentAddress := config.GetAddress().Hex()
-
-		for _, batchConfig := range batchConfigs {
-			batchConfigIndexStr := strconv.Itoa(int(batchConfig.KeyperConfigIndex))
-
-			// Join keyper addresses for the label
-			keyperAddresses := strings.Join(batchConfig.Keypers, ",")
-			MetricsKeyperBatchConfigInfo.WithLabelValues(batchConfigIndexStr, keyperAddresses).Set(1)
-
-			// Check if current node is a keyper in this batch config
-			isKeyper := false
-			for _, keyperAddr := range batchConfig.Keypers {
-				if strings.EqualFold(keyperAddr, currentAddress) {
-					isKeyper = true
-					break
-				}
-			}
-
-			var isKeyperValue float64
-			if isKeyper {
-				isKeyperValue = 1
-			}
-			MetricsKeyperIsKeyper.WithLabelValues(batchConfigIndexStr).Set(isKeyperValue)
 		}
 	}
 

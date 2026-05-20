@@ -3,10 +3,8 @@ package database
 import (
 	"context"
 	"embed"
-	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	chainobsdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db"
@@ -46,19 +44,7 @@ func (d *KeyperDB) Create(ctx context.Context, tx pgx.Tx) error {
 }
 
 func (d *KeyperDB) Init(ctx context.Context, tx pgx.Tx) error {
-	err := d.Definition.Init(ctx, tx)
-	if err != nil {
-		return err
-	}
-	err = New(tx).TMSetSyncMeta(ctx, TMSetSyncMetaParams{
-		CurrentBlock:        0,
-		LastCommittedHeight: -1,
-		SyncTimestamp:       time.Now(),
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to set current block")
-	}
-	return nil
+	return d.Definition.Init(ctx, tx)
 }
 
 func (d *KeyperDB) Validate(ctx context.Context, tx pgx.Tx) error {
