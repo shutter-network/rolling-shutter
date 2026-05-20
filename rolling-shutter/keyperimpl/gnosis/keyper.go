@@ -114,8 +114,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithClientURL(kpr.config.Gnosis.Node.EthereumURL),
 		chainsync.WithKeyperSetManager(kpr.config.Gnosis.Contracts.KeyperSetManager),
 		chainsync.WithKeyBroadcastContract(kpr.config.Gnosis.Contracts.KeyBroadcastContract),
+		chainsync.WithECIESKeyRegistry(kpr.config.Gnosis.Contracts.ECIESKeyRegistry),
 		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
+		chainsync.WithSyncECIESKey(kpr.processNewECIESKey),
 		chainsync.WithPrivateKey(kpr.config.Gnosis.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
 	)

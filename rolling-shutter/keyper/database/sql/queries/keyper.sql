@@ -243,3 +243,17 @@ FROM eons
 WHERE keyper_config_index = $1
 ORDER BY eon DESC
 LIMIT 1;
+
+-- name: UpsertECIESKey :exec
+INSERT INTO ecies_keys (keyper_address, ecies_public_key)
+VALUES ($1, $2)
+ON CONFLICT (keyper_address) DO UPDATE
+SET ecies_public_key = EXCLUDED.ecies_public_key;
+
+-- name: GetECIESKey :one
+SELECT * FROM ecies_keys WHERE keyper_address = $1;
+
+-- name: ExistsECIESKey :one
+SELECT EXISTS (
+    SELECT 1 FROM ecies_keys WHERE keyper_address = $1
+);

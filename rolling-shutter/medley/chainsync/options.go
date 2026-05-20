@@ -11,6 +11,7 @@ import (
 	"github.com/shutter-network/shop-contracts/bindings"
 	"github.com/shutter-network/shop-contracts/predeploy"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
@@ -23,6 +24,7 @@ type Option func(*options) error
 type options struct {
 	keyperSetManagerAddress     *common.Address
 	keyBroadcastContractAddress *common.Address
+	eciesKeyRegistryAddress     *common.Address
 	clientURL                   string
 	client                      syncclient.Client
 	logger                      log.Logger
@@ -34,6 +36,7 @@ type options struct {
 	handlerKeyperSet    event.KeyperSetHandler
 	handlerEonPublicKey event.EonPublicKeyHandler
 	handlerBlock        event.BlockHandler
+	handlerECIESKey     event.ECIESKeyHandler
 }
 
 func (o *options) verify() error {
@@ -132,6 +135,26 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	if o.handlerBlock != nil {
 		c.services = append(c.services, c.uhsync)
 	}
+
+	if o.handlerECIESKey != nil {
+		if o.eciesKeyRegistryAddress == nil {
+			return errors.New("ECIES key registry address must be set when an ECIES key handler is registered")
+		}
+		c.ECIESKeyRegistry, err = contract.NewECIESKeyRegistry(*o.eciesKeyRegistryAddress, client)
+		if err != nil {
+			return err
+		}
+		c.eciessync = &syncer.ECIESKeySyncer{
+			Client:           client,
+			Contract:         c.ECIESKeyRegistry,
+			KeyperSetManager: c.KeyperSetManager,
+			Log:              c.log,
+			StartBlock:       o.syncStart,
+			Handler:          o.handlerECIESKey,
+		}
+		c.services = append(c.services, c.eciessync)
+	}
+
 	c.privKey = o.privKey
 	return nil
 }
@@ -231,6 +254,20 @@ func WithSyncNewEonKey(handler event.EonPublicKeyHandler) Option {
 func WithSyncNewShutterState(handler event.ShutterStateHandler) Option {
 	return func(o *options) error {
 		o.handlerShutterState = handler
+		return nil
+	}
+}
+
+func WithECIESKeyRegistry(address common.Address) Option {
+	return func(o *options) error {
+		o.eciesKeyRegistryAddress = &address
+		return nil
+	}
+}
+
+func WithSyncECIESKey(handler event.ECIESKeyHandler) Option {
+	return func(o *options) error {
+		o.handlerECIESKey = handler
 		return nil
 	}
 }

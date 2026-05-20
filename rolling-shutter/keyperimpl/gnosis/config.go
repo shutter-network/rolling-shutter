@@ -176,6 +176,7 @@ type GnosisContractsConfig struct {
 	KeyBroadcastContract common.Address `shconfig:",required"`
 	Sequencer            common.Address `shconfig:",required"`
 	ValidatorRegistry    common.Address `shconfig:",required"`
+	ECIESKeyRegistry     common.Address `shconfig:",required"`
 }
 
 func NewGnosisContractsConfig() *GnosisContractsConfig {
@@ -184,6 +185,7 @@ func NewGnosisContractsConfig() *GnosisContractsConfig {
 		KeyBroadcastContract: common.Address{},
 		Sequencer:            common.Address{},
 		ValidatorRegistry:    common.Address{},
+		ECIESKeyRegistry:     common.Address{},
 	}
 }
 
