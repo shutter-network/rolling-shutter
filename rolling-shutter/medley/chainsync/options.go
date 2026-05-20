@@ -147,12 +147,11 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 			return err
 		}
 		c.eciessync = &syncer.ECIESKeySyncer{
-			Client:           client,
-			Contract:         c.ECIESKeyRegistry,
-			KeyperSetManager: c.KeyperSetManager,
-			Log:              c.log,
-			StartBlock:       o.syncStart,
-			Handler:          o.handlerECIESKey,
+			Client:     client,
+			Contract:   c.ECIESKeyRegistry,
+			Log:        c.log,
+			StartBlock: o.syncStart,
+			Handler:    o.handlerECIESKey,
 		}
 		c.services = append(c.services, c.eciessync)
 	}
