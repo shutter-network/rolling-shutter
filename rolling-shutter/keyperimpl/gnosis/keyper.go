@@ -61,7 +61,7 @@ type Keyper struct {
 	// input events
 	newBlocks     chan *syncevent.LatestBlock
 	newKeyperSets chan *syncevent.KeyperSet
-	newDKGEvents  chan *syncevent.DKGEvent
+	newDKGEvents  chan syncevent.DKGEvent
 	slotTicker    *slotticker.SlotTicker
 
 	// outputs
@@ -81,7 +81,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 
 	kpr.newBlocks = make(chan *syncevent.LatestBlock)
 	kpr.newKeyperSets = make(chan *syncevent.KeyperSet)
-	kpr.newDKGEvents = make(chan *syncevent.DKGEvent)
+	kpr.newDKGEvents = make(chan syncevent.DKGEvent)
 	kpr.decryptionTriggerChannel = make(chan *broker.Event[*epochkghandler.DecryptionTrigger])
 
 	kpr.latestTriggeredSlot = nil
@@ -316,7 +316,7 @@ func (kpr *Keyper) channelNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 	}
 }
 
-func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev *syncevent.DKGEvent) error {
+func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent) error {
 	select {
 	case kpr.newDKGEvents <- ev:
 		return nil

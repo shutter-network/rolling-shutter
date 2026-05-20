@@ -23,12 +23,13 @@ import (
 // Events for a `keyper_config_index` whose DKG already succeeded locally are
 // silently ignored so re-emitted or retried-and-superseded messages do not
 // pollute the message tables.
-func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev *syncevent.DKGEvent) error {
-	keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.KeyperSetIndex)
+func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent) error {
+	keyperSetIndex, retryCounter := dkgEventKeys(ev)
+	keyperConfigIndex, err := medley.Uint64ToInt64Safe(keyperSetIndex)
 	if err != nil {
 		return errors.Wrap(err, "convert keyper set index")
 	}
-	retryCounter, err := medley.Uint64ToInt64Safe(ev.RetryCounter)
+	retryCounterInt, err := medley.Uint64ToInt64Safe(retryCounter)
 	if err != nil {
 		return errors.Wrap(err, "convert retry counter")
 	}
@@ -45,46 +46,63 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev *syncevent.DKGEven
 		if err != nil {
 			return errors.Wrap(err, "check existing dkg_result success")
 		}
-		if exists && ev.Kind != syncevent.DKGEventKindSuccess {
+		if _, isSuccess := ev.(*syncevent.SuccessEvent); exists && !isSuccess {
 			log.Debug().
-				Uint64("keyper-set-index", ev.KeyperSetIndex).
-				Uint64("retry-counter", ev.RetryCounter).
-				Int("kind", int(ev.Kind)).
+				Uint64("keyper-set-index", keyperSetIndex).
+				Uint64("retry-counter", retryCounter).
 				Msg("ignoring DKG event for already-succeeded keyper set")
 			return nil
 		}
 
-		switch ev.Kind {
-		case syncevent.DKGEventKindDealing:
-			if err := storeDealing(ctx, queries, obsQueries, ev, keyperConfigIndex, retryCounter); err != nil {
+		switch e := ev.(type) {
+		case *syncevent.DealingEvent:
+			if err := storeDealing(ctx, queries, obsQueries, e, keyperConfigIndex, retryCounterInt); err != nil {
 				return err
 			}
-			return kpr.applyDealingToInstance(ctx, tx, ev, keyperConfigIndex, retryCounter)
-		case syncevent.DKGEventKindAccusation:
-			if err := storeAccusation(ctx, queries, ev, keyperConfigIndex, retryCounter); err != nil {
+			return kpr.applyDealingToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+		case *syncevent.AccusationEvent:
+			if err := storeAccusation(ctx, queries, e, keyperConfigIndex, retryCounterInt); err != nil {
 				return err
 			}
-			return kpr.applyAccusationToInstance(ctx, tx, ev, keyperConfigIndex, retryCounter)
-		case syncevent.DKGEventKindApology:
-			if err := storeApology(ctx, queries, ev, keyperConfigIndex, retryCounter); err != nil {
+			return kpr.applyAccusationToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+		case *syncevent.ApologyEvent:
+			if err := storeApology(ctx, queries, e, keyperConfigIndex, retryCounterInt); err != nil {
 				return err
 			}
-			return kpr.applyApologyToInstance(ctx, tx, ev, keyperConfigIndex, retryCounter)
-		case syncevent.DKGEventKindSuccessVote:
+			return kpr.applyApologyToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+		case *syncevent.SuccessVoteEvent:
 			// Success votes are not stored in their own table; the aggregate
 			// outcome arrives as a separate DKGSucceeded event.
 			log.Debug().
-				Uint64("keyper-set-index", ev.KeyperSetIndex).
-				Uint64("retry-counter", ev.RetryCounter).
-				Uint64("voter", ev.KeyperIndex).
+				Uint64("keyper-set-index", e.KeyperSetIndex).
+				Uint64("retry-counter", e.RetryCounter).
+				Uint64("voter", e.KeyperIndex).
 				Msg("observed DKG success vote")
 			return nil
-		case syncevent.DKGEventKindSuccess:
-			return storeDKGSuccess(ctx, queries, ev, keyperConfigIndex)
+		case *syncevent.SuccessEvent:
+			return storeDKGSuccess(ctx, queries, e, keyperConfigIndex)
 		default:
-			return errors.Errorf("unknown DKG event kind %d", ev.Kind)
+			return errors.Errorf("unknown DKG event type %T", ev)
 		}
 	})
+}
+
+// dkgEventKeys extracts the (keyperSetIndex, retryCounter) pair common to every
+// DKG event variant. SuccessEvent has no retry counter and reports zero.
+func dkgEventKeys(ev syncevent.DKGEvent) (keyperSetIndex, retryCounter uint64) {
+	switch e := ev.(type) {
+	case *syncevent.DealingEvent:
+		return e.KeyperSetIndex, e.RetryCounter
+	case *syncevent.AccusationEvent:
+		return e.KeyperSetIndex, e.RetryCounter
+	case *syncevent.ApologyEvent:
+		return e.KeyperSetIndex, e.RetryCounter
+	case *syncevent.SuccessVoteEvent:
+		return e.KeyperSetIndex, e.RetryCounter
+	case *syncevent.SuccessEvent:
+		return e.KeyperSetIndex, e.RetryCounter
+	}
+	return 0, 0
 }
 
 // applyDealingToInstance forwards an on-chain dealing to our cached puredkg
@@ -94,7 +112,7 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev *syncevent.DKGEven
 func (kpr *Keyper) applyDealingToInstance(
 	ctx context.Context,
 	tx pgx.Tx,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.DealingEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
@@ -161,7 +179,7 @@ func (kpr *Keyper) applyDealingToInstance(
 func (kpr *Keyper) applyAccusationToInstance(
 	ctx context.Context,
 	tx pgx.Tx,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.AccusationEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
@@ -186,7 +204,7 @@ func (kpr *Keyper) applyAccusationToInstance(
 func (kpr *Keyper) applyApologyToInstance(
 	ctx context.Context,
 	tx pgx.Tx,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.ApologyEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
@@ -217,7 +235,7 @@ func storeDealing(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	obsQueries *obskeyper.Queries,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.DealingEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	senderIndex, err := medley.Uint64ToInt64Safe(ev.KeyperIndex)
@@ -270,7 +288,7 @@ func storeDealing(
 func storeAccusation(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.AccusationEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	accuserIndex, err := medley.Uint64ToInt64Safe(ev.KeyperIndex)
@@ -297,7 +315,7 @@ func storeAccusation(
 func storeApology(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.ApologyEvent,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	if len(ev.AccuserIndices) != len(ev.PolyEvalData) {
@@ -331,7 +349,7 @@ func storeApology(
 func storeDKGSuccess(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
-	ev *syncevent.DKGEvent,
+	ev *syncevent.SuccessEvent,
 	keyperConfigIndex int64,
 ) error {
 	exists, err := queries.ExistsDKGResultSuccess(ctx, keyperConfigIndex)
