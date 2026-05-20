@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -20,101 +19,54 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-type dkgInstanceKey struct {
-	keyperConfigIndex int64
-	retryCounter      int64
-}
-
-// dkgInstance keeps the in-memory `puredkg` state for a single DKG attempt,
-// together with the keyper-set context needed to interpret messages. The DB
-// is the source of truth; this struct is a derived cache rebuilt on startup
-// and updated as live messages arrive.
-type dkgInstance struct {
-	pure      *puredkg.PureDKG
-	keypers   []common.Address
-	ownIndex  uint64
-	threshold uint64
-}
-
-type dkgManager struct {
-	mu        sync.Mutex
-	instances map[dkgInstanceKey]*dkgInstance
-}
-
-func newDKGManager() *dkgManager {
-	return &dkgManager{
-		instances: make(map[dkgInstanceKey]*dkgInstance),
-	}
-}
-
-func (m *dkgManager) get(k dkgInstanceKey) *dkgInstance {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.instances[k]
-}
-
-func (m *dkgManager) put(k dkgInstanceKey, inst *dkgInstance) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.instances[k] = inst
-}
-
-// loadOrBuildInstance returns the in-memory DKG state for the given instance
-// key, building it from stored messages if it isn't cached yet. Returns nil
-// when the keyper is not a member of the corresponding keyper set.
-func (kpr *Keyper) loadOrBuildInstance(
+// buildPureDKG reconstructs the in-memory puredkg state for a single DKG
+// attempt by replaying every stored message for `(keyperConfigIndex,
+// retryCounter)`. The DB is the source of truth; nothing is cached between
+// invocations. Returns isMember=false when the local keyper is not part of
+// the corresponding keyper set, in which case the other return values are
+// zero.
+func (kpr *Keyper) buildPureDKG(
 	ctx context.Context,
 	tx pgx.Tx,
 	keyperConfigIndex, retryCounter int64,
-) (*dkgInstance, error) {
-	key := dkgInstanceKey{keyperConfigIndex: keyperConfigIndex, retryCounter: retryCounter}
-	if existing := kpr.dkgManager.get(key); existing != nil {
-		return existing, nil
-	}
-
+) (pure *puredkg.PureDKG, keypers []common.Address, ownIndex uint64, isMember bool, err error) {
 	obsQueries := obskeyper.New(tx)
 	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
 	if err != nil {
-		return nil, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
+		return nil, nil, 0, false, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
 	}
 	ownAddr := kpr.config.GetAddress()
-	ownIndex, err := keyperSet.GetIndex(ownAddr)
+	ownIndex, err = keyperSet.GetIndex(ownAddr)
 	if err != nil {
-		return nil, nil
+		return nil, nil, 0, false, nil
 	}
-	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	keypers, err = shdb.DecodeAddresses(keyperSet.Keypers)
 	if err != nil {
-		return nil, errors.Wrap(err, "decode keyper addresses")
+		return nil, nil, 0, false, errors.Wrap(err, "decode keyper addresses")
 	}
 
-	pure := puredkg.NewPureDKG(
+	p := puredkg.NewPureDKG(
 		uint64(keyperConfigIndex),
 		uint64(len(keypers)),
 		uint64(keyperSet.Threshold),
 		ownIndex,
 	)
-	inst := &dkgInstance{
-		pure:      &pure,
-		keypers:   keypers,
-		ownIndex:  ownIndex,
-		threshold: uint64(keyperSet.Threshold),
+	if err := kpr.replayStoredMessages(ctx, tx, &p, ownIndex, keyperConfigIndex, retryCounter); err != nil {
+		return nil, nil, 0, false, err
 	}
-	if err := kpr.replayStoredMessages(ctx, tx, inst, keyperConfigIndex, retryCounter); err != nil {
-		return nil, err
-	}
-	kpr.dkgManager.put(key, inst)
-	return inst, nil
+	return &p, keypers, ownIndex, true, nil
 }
 
-// replayStoredMessages feeds every stored DKG message for the given instance
-// back into the in-memory puredkg, using puredkg's public `Handle*Msg` API.
-// All four `Handle*` methods accept input while `pure.Phase` is at or below
-// their target phase, so leaving the in-memory state at `Phase = Off` until
-// the live phase boundary fires is correct here.
+// replayStoredMessages feeds every stored DKG message for the given attempt
+// back into the given puredkg, using puredkg's public `Handle*Msg` API. All
+// four `Handle*` methods accept input while `pure.Phase` is at or below their
+// target phase, so leaving the in-memory state at `Phase = Off` until the
+// live phase boundary fires is correct here.
 func (kpr *Keyper) replayStoredMessages(
 	ctx context.Context,
 	tx pgx.Tx,
-	inst *dkgInstance,
+	pure *puredkg.PureDKG,
+	ownIndex uint64,
 	keyperConfigIndex, retryCounter int64,
 ) error {
 	queries := corekeyperdb.New(tx)
@@ -132,7 +84,7 @@ func (kpr *Keyper) replayStoredMessages(
 		if err := gammas.Unmarshal(c.Commitment); err != nil {
 			return errors.Wrapf(err, "decode commitment from sender %d", c.KeyperIndex)
 		}
-		err := inst.pure.HandlePolyCommitmentMsg(puredkg.PolyCommitmentMsg{
+		err := pure.HandlePolyCommitmentMsg(puredkg.PolyCommitmentMsg{
 			Eon:    eonForMsg,
 			Sender: uint64(c.KeyperIndex),
 			Gammas: gammas,
@@ -154,7 +106,7 @@ func (kpr *Keyper) replayStoredMessages(
 		return errors.Wrap(err, "load stored poly evals")
 	}
 	for _, ev := range polyEvals {
-		if uint64(ev.ReceiverIndex) != inst.ownIndex {
+		if uint64(ev.ReceiverIndex) != ownIndex {
 			continue
 		}
 		eval, err := kpr.decryptPolyEval(ev.EncryptedEval)
@@ -166,10 +118,10 @@ func (kpr *Keyper) replayStoredMessages(
 				Msg("ignoring undecryptable poly eval on replay")
 			continue
 		}
-		err = inst.pure.HandlePolyEvalMsg(puredkg.PolyEvalMsg{
+		err = pure.HandlePolyEvalMsg(puredkg.PolyEvalMsg{
 			Eon:      eonForMsg,
 			Sender:   uint64(ev.SenderIndex),
-			Receiver: inst.ownIndex,
+			Receiver: ownIndex,
 			Eval:     eval,
 		})
 		if err != nil {
@@ -189,7 +141,7 @@ func (kpr *Keyper) replayStoredMessages(
 		return errors.Wrap(err, "load stored accusations")
 	}
 	for _, a := range accusations {
-		err := inst.pure.HandleAccusationMsg(puredkg.AccusationMsg{
+		err := pure.HandleAccusationMsg(puredkg.AccusationMsg{
 			Eon:     eonForMsg,
 			Accuser: uint64(a.AccuserIndex),
 			Accused: uint64(a.AccusedIndex),
@@ -213,7 +165,7 @@ func (kpr *Keyper) replayStoredMessages(
 	}
 	for _, ap := range apologies {
 		eval := new(big.Int).SetBytes(ap.PolyEval)
-		err := inst.pure.HandleApologyMsg(puredkg.ApologyMsg{
+		err := pure.HandleApologyMsg(puredkg.ApologyMsg{
 			Eon:     eonForMsg,
 			Accuser: uint64(ap.AccuserIndex),
 			Accused: uint64(ap.ApologizerIndex),

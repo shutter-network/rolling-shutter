@@ -54,7 +54,6 @@ type Keyper struct {
 
 	// DKG participation state. dkgPhaseLength and dkgLeadLength are read from
 	// the deployed DKG Contract at startup (immutable constructor parameters).
-	dkgManager     *dkgManager
 	dkgPhaseLength uint64
 	dkgLeadLength  uint64
 
@@ -72,7 +71,6 @@ func New(c *Config) *Keyper {
 	return &Keyper{
 		config:      c,
 		syncMonitor: &SyncMonitor{},
-		dkgManager:  newDKGManager(),
 	}
 }
 

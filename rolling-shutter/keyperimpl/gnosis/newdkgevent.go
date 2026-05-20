@@ -3,14 +3,10 @@ package gnosis
 import (
 	"context"
 	"database/sql"
-	"math/big"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-
-	"github.com/shutter-network/shutter/shlib/puredkg"
-	"github.com/shutter-network/shutter/shlib/shcrypto"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -56,20 +52,11 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 
 		switch e := ev.(type) {
 		case *syncevent.DealingEvent:
-			if err := storeDealing(ctx, queries, obsQueries, e, keyperConfigIndex, retryCounterInt); err != nil {
-				return err
-			}
-			return kpr.applyDealingToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+			return storeDealing(ctx, queries, obsQueries, e, keyperConfigIndex, retryCounterInt)
 		case *syncevent.AccusationEvent:
-			if err := storeAccusation(ctx, queries, e, keyperConfigIndex, retryCounterInt); err != nil {
-				return err
-			}
-			return kpr.applyAccusationToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+			return storeAccusation(ctx, queries, e, keyperConfigIndex, retryCounterInt)
 		case *syncevent.ApologyEvent:
-			if err := storeApology(ctx, queries, e, keyperConfigIndex, retryCounterInt); err != nil {
-				return err
-			}
-			return kpr.applyApologyToInstance(ctx, tx, e, keyperConfigIndex, retryCounterInt)
+			return storeApology(ctx, queries, e, keyperConfigIndex, retryCounterInt)
 		case *syncevent.SuccessVoteEvent:
 			// Success votes are not stored in their own table; the aggregate
 			// outcome arrives as a separate DKGSucceeded event.
@@ -103,132 +90,6 @@ func dkgEventKeys(ev syncevent.DKGEvent) (keyperSetIndex, retryCounter uint64) {
 		return e.KeyperSetIndex, e.RetryCounter
 	}
 	return 0, 0
-}
-
-// applyDealingToInstance forwards an on-chain dealing to our cached puredkg
-// state. The DB store has already happened in the same transaction; this
-// keeps the in-memory state in sync so the next phase boundary can act on
-// up-to-date information.
-func (kpr *Keyper) applyDealingToInstance(
-	ctx context.Context,
-	tx pgx.Tx,
-	ev *syncevent.DealingEvent,
-	keyperConfigIndex, retryCounter int64,
-) error {
-	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
-	if err != nil || inst == nil {
-		return err
-	}
-	// Skip our own dealing — we already applied it to puredkg via the
-	// `StartPhase1Dealing` path.
-	if ev.KeyperIndex == inst.ownIndex {
-		return nil
-	}
-	gammas := &shcrypto.Gammas{}
-	if err := gammas.Unmarshal(ev.Commitment); err != nil {
-		log.Warn().Err(err).
-			Uint64("sender", ev.KeyperIndex).
-			Msg("ignoring undecodable commitment from chain")
-		return nil
-	}
-	if applyErr := inst.pure.HandlePolyCommitmentMsg(puredkg.PolyCommitmentMsg{
-		Eon:    uint64(keyperConfigIndex),
-		Sender: ev.KeyperIndex,
-		Gammas: gammas,
-	}); applyErr != nil {
-		log.Debug().Err(applyErr).
-			Uint64("sender", ev.KeyperIndex).
-			Msg("ignoring duplicate/late commitment")
-	}
-
-	evals := ev.PolyEvals
-	receivers := ReceiverIndicesForSender(uint64(len(inst.keypers)), ev.KeyperIndex)
-	if len(evals) != len(receivers) {
-		log.Warn().
-			Int("evals", len(evals)).
-			Int("receivers", len(receivers)).
-			Msg("poly eval blob size mismatch")
-		return nil
-	}
-	for i, recvIdx := range receivers {
-		if recvIdx != inst.ownIndex {
-			continue
-		}
-		eval, decErr := kpr.decryptPolyEval(evals[i])
-		if decErr != nil {
-			log.Debug().Err(decErr).
-				Uint64("sender", ev.KeyperIndex).
-				Msg("could not decrypt poly eval addressed to me")
-			return nil
-		}
-		if applyErr := inst.pure.HandlePolyEvalMsg(puredkg.PolyEvalMsg{
-			Eon:      uint64(keyperConfigIndex),
-			Sender:   ev.KeyperIndex,
-			Receiver: inst.ownIndex,
-			Eval:     eval,
-		}); applyErr != nil {
-			log.Debug().Err(applyErr).
-				Uint64("sender", ev.KeyperIndex).
-				Msg("ignoring duplicate/late poly eval")
-		}
-		break
-	}
-	return nil
-}
-
-func (kpr *Keyper) applyAccusationToInstance(
-	ctx context.Context,
-	tx pgx.Tx,
-	ev *syncevent.AccusationEvent,
-	keyperConfigIndex, retryCounter int64,
-) error {
-	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
-	if err != nil || inst == nil {
-		return err
-	}
-	for _, accused := range ev.AccusedIndices {
-		if err := inst.pure.HandleAccusationMsg(puredkg.AccusationMsg{
-			Eon:     uint64(keyperConfigIndex),
-			Accuser: ev.KeyperIndex,
-			Accused: accused,
-		}); err != nil {
-			log.Debug().Err(err).
-				Uint64("accuser", ev.KeyperIndex).
-				Uint64("accused", accused).
-				Msg("ignoring duplicate/late accusation")
-		}
-	}
-	return nil
-}
-
-func (kpr *Keyper) applyApologyToInstance(
-	ctx context.Context,
-	tx pgx.Tx,
-	ev *syncevent.ApologyEvent,
-	keyperConfigIndex, retryCounter int64,
-) error {
-	inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
-	if err != nil || inst == nil {
-		return err
-	}
-	if len(ev.AccuserIndices) != len(ev.PolyEvalData) {
-		return nil
-	}
-	for i, accuser := range ev.AccuserIndices {
-		eval := new(big.Int).SetBytes(ev.PolyEvalData[i])
-		if err := inst.pure.HandleApologyMsg(puredkg.ApologyMsg{
-			Eon:     uint64(keyperConfigIndex),
-			Accuser: accuser,
-			Accused: ev.KeyperIndex,
-			Eval:    eval,
-		}); err != nil {
-			log.Debug().Err(err).
-				Uint64("accuser", accuser).
-				Uint64("apologizer", ev.KeyperIndex).
-				Msg("ignoring duplicate/late apology")
-		}
-	}
-	return nil
 }
 
 func storeDealing(
