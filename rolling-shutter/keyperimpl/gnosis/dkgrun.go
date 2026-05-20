@@ -130,11 +130,11 @@ func (kpr *Keyper) handlePhaseBoundary(
 // transaction.
 func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, keypers, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
 			return err
 		}
-		if inst == nil {
+		if !isMember {
 			return nil
 		}
 
@@ -147,19 +147,19 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			return errors.Wrap(err, "load own dealing check")
 		}
 		for _, c := range commitments {
-			if uint64(c.KeyperIndex) == inst.ownIndex {
+			if uint64(c.KeyperIndex) == ownIndex {
 				return nil
 			}
 		}
 
-		if inst.pure.Phase != puredkg.Off {
+		if pure.Phase != puredkg.Off {
 			// Already advanced past Off — probably a duplicate trigger from
 			// the previous-block comparison after a restart. Nothing more
 			// to do.
 			return nil
 		}
 
-		commitmentMsg, polyEvalMsgs, err := inst.pure.StartPhase1Dealing()
+		commitmentMsg, polyEvalMsgs, err := pure.StartPhase1Dealing()
 		if err != nil {
 			return errors.Wrap(err, "puredkg StartPhase1Dealing")
 		}
@@ -169,14 +169,14 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 		if err := queries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 			KeyperConfigIndex: keyperConfigIndex,
 			RetryCounter:      retryCounter,
-			KeyperIndex:       int64(inst.ownIndex),
+			KeyperIndex:       int64(ownIndex),
 			Commitment:        commitmentBytes,
 		}); err != nil {
 			return errors.Wrap(err, "store own poly commitment")
 		}
 
 		// Encrypt one eval per other keyper, in receiver-index order.
-		receivers := ReceiverIndicesForSender(uint64(len(inst.keypers)), inst.ownIndex)
+		receivers := ReceiverIndicesForSender(uint64(len(keypers)), ownIndex)
 		encryptedEvals := make([][]byte, 0, len(receivers))
 		for _, recvIdx := range receivers {
 			var evalMsg *puredkg.PolyEvalMsg
@@ -189,7 +189,7 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			if evalMsg == nil {
 				return errors.Errorf("no poly eval for receiver %d", recvIdx)
 			}
-			recvAddr := inst.keypers[recvIdx]
+			recvAddr := keypers[recvIdx]
 			ciphertext, err := kpr.encryptPolyEvalFor(ctx, queries, recvAddr, evalMsg.Eval)
 			if err != nil {
 				return errors.Wrapf(err, "encrypt poly eval for receiver %d (%s)", recvIdx, recvAddr.Hex())
@@ -199,7 +199,7 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			if err := queries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 				KeyperConfigIndex: keyperConfigIndex,
 				RetryCounter:      retryCounter,
-				SenderIndex:       int64(inst.ownIndex),
+				SenderIndex:       int64(ownIndex),
 				ReceiverIndex:     int64(recvIdx),
 				EncryptedEval:     ciphertext,
 			}); err != nil {
@@ -215,7 +215,7 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			opts,
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
-			inst.ownIndex,
+			ownIndex,
 			commitmentBytes,
 			encryptedEvals,
 		)
@@ -225,7 +225,7 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
-			Uint64("keyper-index", inst.ownIndex).
+			Uint64("keyper-index", ownIndex).
 			Str("tx-hash", tx2.Hash().Hex()).
 			Msg("submitted DKG dealing")
 		return nil
@@ -237,11 +237,11 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 // single transaction if any are needed and we haven't already accused.
 func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
 			return err
 		}
-		if inst == nil {
+		if !isMember {
 			return nil
 		}
 
@@ -254,24 +254,24 @@ func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCo
 			return errors.Wrap(err, "load own accusation check")
 		}
 		for _, a := range existing {
-			if uint64(a.AccuserIndex) == inst.ownIndex {
+			if uint64(a.AccuserIndex) == ownIndex {
 				return nil
 			}
 		}
 
-		if inst.pure.Phase != puredkg.Dealing {
+		if pure.Phase != puredkg.Dealing {
 			// Most often after restart: we never advanced past Off because
 			// our polynomial is lost. Skip submitting; the next retry will
 			// generate a fresh one.
 			log.Debug().
 				Int64("keyper-config-index", keyperConfigIndex).
 				Int64("retry-counter", retryCounter).
-				Str("phase", inst.pure.Phase.String()).
+				Str("phase", pure.Phase.String()).
 				Msg("skipping accusations: puredkg phase not Dealing")
 			return nil
 		}
 
-		accusations := inst.pure.StartPhase2Accusing()
+		accusations := pure.StartPhase2Accusing()
 		if len(accusations) == 0 {
 			return nil
 		}
@@ -282,7 +282,7 @@ func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCo
 			if err := queries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 				KeyperConfigIndex: keyperConfigIndex,
 				RetryCounter:      retryCounter,
-				AccuserIndex:      int64(inst.ownIndex),
+				AccuserIndex:      int64(ownIndex),
 				AccusedIndex:      int64(a.Accused),
 			}); err != nil {
 				return errors.Wrap(err, "store own accusation row")
@@ -297,7 +297,7 @@ func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCo
 			opts,
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
-			inst.ownIndex,
+			ownIndex,
 			accusedIndices,
 		)
 		if err != nil {
@@ -317,11 +317,11 @@ func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCo
 // apology transaction iff someone accused us and we still hold our polynomial.
 func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
 			return err
 		}
-		if inst == nil {
+		if !isMember {
 			return nil
 		}
 
@@ -334,21 +334,21 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 			return errors.Wrap(err, "load own apology check")
 		}
 		for _, ap := range existing {
-			if uint64(ap.ApologizerIndex) == inst.ownIndex {
+			if uint64(ap.ApologizerIndex) == ownIndex {
 				return nil
 			}
 		}
 
-		if inst.pure.Phase != puredkg.Accusing {
+		if pure.Phase != puredkg.Accusing {
 			log.Debug().
 				Int64("keyper-config-index", keyperConfigIndex).
 				Int64("retry-counter", retryCounter).
-				Str("phase", inst.pure.Phase.String()).
+				Str("phase", pure.Phase.String()).
 				Msg("skipping apologies: puredkg phase not Accusing")
 			return nil
 		}
 
-		apologies := inst.pure.StartPhase3Apologizing()
+		apologies := pure.StartPhase3Apologizing()
 		if len(apologies) == 0 {
 			return nil
 		}
@@ -362,7 +362,7 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 			if err := queries.InsertDKGApology(ctx, corekeyperdb.InsertDKGApologyParams{
 				KeyperConfigIndex: keyperConfigIndex,
 				RetryCounter:      retryCounter,
-				ApologizerIndex:   int64(inst.ownIndex),
+				ApologizerIndex:   int64(ownIndex),
 				AccuserIndex:      int64(ap.Accuser),
 				PolyEval:          evalBytes,
 			}); err != nil {
@@ -378,7 +378,7 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 			opts,
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
-			inst.ownIndex,
+			ownIndex,
 			accuserIndices,
 			polyEvalData,
 		)
@@ -401,11 +401,11 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 // and dropped our polynomial) we cannot finalize and skip submitting.
 func (kpr *Keyper) startFinalizing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		inst, err := kpr.loadOrBuildInstance(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
 			return err
 		}
-		if inst == nil {
+		if !isMember {
 			return nil
 		}
 
@@ -418,17 +418,17 @@ func (kpr *Keyper) startFinalizing(ctx context.Context, keyperConfigIndex, retry
 			return nil
 		}
 
-		if inst.pure.Phase != puredkg.Apologizing {
+		if pure.Phase != puredkg.Apologizing {
 			log.Debug().
 				Int64("keyper-config-index", keyperConfigIndex).
 				Int64("retry-counter", retryCounter).
-				Str("phase", inst.pure.Phase.String()).
+				Str("phase", pure.Phase.String()).
 				Msg("skipping success vote: puredkg phase not Apologizing")
 			return nil
 		}
 
-		inst.pure.Finalize()
-		result, err := inst.pure.ComputeResult()
+		pure.Finalize()
+		result, err := pure.ComputeResult()
 		if err != nil {
 			log.Warn().Err(err).
 				Int64("keyper-config-index", keyperConfigIndex).
@@ -472,7 +472,7 @@ func (kpr *Keyper) startFinalizing(ctx context.Context, keyperConfigIndex, retry
 			opts,
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
-			inst.ownIndex,
+			ownIndex,
 			eonPubKeyBytes,
 		)
 		if err != nil {
