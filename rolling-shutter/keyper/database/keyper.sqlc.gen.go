@@ -127,7 +127,7 @@ func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
 }
 
 const getAllEons = `-- name: GetAllEons :many
-SELECT eon, activation_block_number, keyper_config_index FROM eons ORDER BY eon
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons ORDER BY eon
 `
 
 func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
@@ -139,7 +139,14 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 	var items []Eon
 	for rows.Next() {
 		var i Eon
-		if err := rows.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex); err != nil {
+		if err := rows.Scan(
+			&i.Eon,
+			&i.ActivationBlockNumber,
+			&i.KeyperConfigIndex,
+			&i.DkgContract,
+			&i.PhaseLength,
+			&i.LeadLength,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -401,18 +408,25 @@ func (q *Queries) GetECIESKey(ctx context.Context, keyperAddress string) (EciesK
 }
 
 const getEon = `-- name: GetEon :one
-SELECT eon, activation_block_number, keyper_config_index FROM eons WHERE eon=$1
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons WHERE eon=$1
 `
 
 func (q *Queries) GetEon(ctx context.Context, eon int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEon, eon)
 	var i Eon
-	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
+	err := row.Scan(
+		&i.Eon,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.DkgContract,
+		&i.PhaseLength,
+		&i.LeadLength,
+	)
 	return i, err
 }
 
 const getEonForBlockNumber = `-- name: GetEonForBlockNumber :one
-SELECT eon, activation_block_number, keyper_config_index FROM eons
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC
 LIMIT 1
@@ -421,7 +435,14 @@ LIMIT 1
 func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEonForBlockNumber, blockNumber)
 	var i Eon
-	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
+	err := row.Scan(
+		&i.Eon,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.DkgContract,
+		&i.PhaseLength,
+		&i.LeadLength,
+	)
 	return i, err
 }
 
@@ -439,7 +460,7 @@ func (q *Queries) GetLatestEonForKeyperConfig(ctx context.Context, keyperConfigI
 }
 
 const getLatestStartedEonByKeyperConfigIndex = `-- name: GetLatestStartedEonByKeyperConfigIndex :one
-SELECT eon, activation_block_number, keyper_config_index
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length
 FROM eons
 WHERE keyper_config_index = $1
 ORDER BY eon DESC
@@ -449,7 +470,14 @@ LIMIT 1
 func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getLatestStartedEonByKeyperConfigIndex, keyperConfigIndex)
 	var i Eon
-	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
+	err := row.Scan(
+		&i.Eon,
+		&i.ActivationBlockNumber,
+		&i.KeyperConfigIndex,
+		&i.DkgContract,
+		&i.PhaseLength,
+		&i.LeadLength,
+	)
 	return i, err
 }
 
@@ -611,18 +639,28 @@ func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryp
 }
 
 const insertEon = `-- name: InsertEon :exec
-INSERT INTO eons (eon, activation_block_number, keyper_config_index)
-VALUES ($1, $2, $3)
+INSERT INTO eons (eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertEonParams struct {
 	Eon                   int64
 	ActivationBlockNumber int64
 	KeyperConfigIndex     int64
+	DkgContract           sql.NullString
+	PhaseLength           sql.NullInt64
+	LeadLength            sql.NullInt64
 }
 
 func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
-	_, err := q.db.Exec(ctx, insertEon, arg.Eon, arg.ActivationBlockNumber, arg.KeyperConfigIndex)
+	_, err := q.db.Exec(ctx, insertEon,
+		arg.Eon,
+		arg.ActivationBlockNumber,
+		arg.KeyperConfigIndex,
+		arg.DkgContract,
+		arg.PhaseLength,
+		arg.LeadLength,
+	)
 	return err
 }
 

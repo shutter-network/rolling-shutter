@@ -204,6 +204,7 @@ func (s *KeyperSetSyncer) newEvent(
 		Members:         members,
 		Threshold:       threshold,
 		Eon:             eon,
+		Contract:        keyperSetContract,
 		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
 }

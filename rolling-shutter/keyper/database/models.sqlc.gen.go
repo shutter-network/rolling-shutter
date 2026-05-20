@@ -71,4 +71,7 @@ type Eon struct {
 	Eon                   int64
 	ActivationBlockNumber int64
 	KeyperConfigIndex     int64
+	DkgContract           sql.NullString
+	PhaseLength           sql.NullInt64
+	LeadLength            sql.NullInt64
 }

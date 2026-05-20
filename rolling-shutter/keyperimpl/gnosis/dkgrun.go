@@ -16,13 +16,30 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
+// phaseParamsForEon returns the DKG phase length and lead length for the
+// given eon. Rows populated by `processNewKeyperSet` carry the values read
+// from the keyper-set-specific DKG contract; rows from older databases (or
+// rows where the lookup failed) carry NULLs, in which case the keyper falls
+// back to the startup-time values from the config-supplied DKG contract.
+func (kpr *Keyper) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength uint64) {
+	if eon.PhaseLength.Valid && eon.LeadLength.Valid {
+		return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64)
+	}
+	log.Warn().
+		Int64("keyper-config-index", eon.KeyperConfigIndex).
+		Uint64("fallback-phase-length", kpr.dkgPhaseLength).
+		Uint64("fallback-lead-length", kpr.dkgLeadLength).
+		Msg("eons row missing DKG phase params; falling back to config-supplied DKG contract")
+	return kpr.dkgPhaseLength, kpr.dkgLeadLength
+}
+
 // processDKGBlock advances the DKG participation loop for every eons row the
 // keyper is a member of. It is invoked once per Gnosis Chain block from
 // `processNewBlock`. The phase boundary is detected by comparing the phase
 // at the current block with the phase at block N-1; on a boundary, the
 // corresponding `start*` action runs.
 func (kpr *Keyper) processDKGBlock(ctx context.Context, blockNumber uint64) error {
-	if kpr.dkgPhaseLength == 0 || blockNumber == 0 {
+	if blockNumber == 0 {
 		return nil
 	}
 	eons, err := corekeyperdb.New(kpr.dbpool).GetAllEons(ctx)
@@ -34,10 +51,14 @@ func (kpr *Keyper) processDKGBlock(ctx context.Context, blockNumber uint64) erro
 		if err != nil {
 			return errors.Wrap(err, "convert activation block")
 		}
-		retry := CurrentRetryCounter(activationBlock, kpr.dkgLeadLength, kpr.dkgPhaseLength, blockNumber)
-		phaseNow := PhaseAt(activationBlock, kpr.dkgLeadLength, kpr.dkgPhaseLength, retry, blockNumber)
-		phasePrev := PhaseAt(activationBlock, kpr.dkgLeadLength, kpr.dkgPhaseLength, retry, blockNumber-1)
-		retryPrev := CurrentRetryCounter(activationBlock, kpr.dkgLeadLength, kpr.dkgPhaseLength, blockNumber-1)
+		phaseLength, leadLength := kpr.phaseParamsForEon(eon)
+		if phaseLength == 0 {
+			continue
+		}
+		retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
+		phaseNow := PhaseAt(activationBlock, leadLength, phaseLength, retry, blockNumber)
+		phasePrev := PhaseAt(activationBlock, leadLength, phaseLength, retry, blockNumber-1)
+		retryPrev := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber-1)
 
 		// Phase boundary within the current retry, or a retry-boundary
 		// (which also surfaces as a Dealing-start for the new retry).

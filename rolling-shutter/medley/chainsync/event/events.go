@@ -13,6 +13,10 @@ type (
 		Members         []common.Address
 		Threshold       uint64
 		Eon             uint64
+		// Contract is the deployed `KeyperSet` contract address for this eon.
+		// Needed for callers that read per-keyper-set state (e.g.
+		// `getDKGContract`) that is not part of `KeyperSetManager`.
+		Contract common.Address
 
 		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}

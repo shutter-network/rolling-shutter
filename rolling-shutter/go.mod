@@ -244,3 +244,8 @@ require (
 )
 
 replace github.com/bitwurx/jrpc2 => github.com/ulope/jrpc2 v0.0.0-20230706135348-a95cf3d96bd2
+
+// Point at the local contracts/ source so the regenerated KeyperSet binding
+// (which exposes `GetDKGContract`) is picked up. The upstream module tag has
+// not been published yet.
+replace github.com/shutter-network/contracts/v2 => ../../contracts
