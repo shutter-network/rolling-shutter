@@ -186,11 +186,6 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			}
 		}
 
-		polyEvalBlob, err := EncodePolyEvalBlob(encryptedEvals)
-		if err != nil {
-			return errors.Wrap(err, "encode poly eval blob")
-		}
-
 		opts, err := kpr.makeTransactOpts(ctx)
 		if err != nil {
 			return err
@@ -201,7 +196,7 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			uint64(retryCounter),
 			inst.ownIndex,
 			commitmentBytes,
-			polyEvalBlob,
+			encryptedEvals,
 		)
 		if err != nil {
 			return errors.Wrap(err, "submit dealing transaction")

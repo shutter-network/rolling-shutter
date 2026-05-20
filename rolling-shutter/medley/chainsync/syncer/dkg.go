@@ -176,7 +176,7 @@ func (s *DKGEventSyncer) watchEvents(
 				RetryCounter:   ev.RetryCounter,
 				KeyperIndex:    ev.KeyperIndex,
 				Commitment:     ev.Commitment,
-				PolyEval:       ev.PolyEval,
+				PolyEvals:      ev.PolyEvals,
 				AtBlockNumber:  number.NewBlockNumber(&bn),
 			})
 		case ev, ok := <-s.accusationCh:
