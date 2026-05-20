@@ -33,6 +33,11 @@ type DkgResult struct {
 	PureResult []byte
 }
 
+type EciesKey struct {
+	KeyperAddress  string
+	EciesPublicKey []byte
+}
+
 type Eon struct {
 	Eon                   int64
 	Height                int64

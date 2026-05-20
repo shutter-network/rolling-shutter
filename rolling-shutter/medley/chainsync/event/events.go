@@ -32,4 +32,10 @@ type (
 		BlockHash common.Hash
 		Header    *types.Header
 	}
+	ECIESKey struct {
+		Keyper         common.Address
+		EciesPublicKey []byte
+
+		AtBlockNumber *number.BlockNumber `json:",omitempty"`
+	}
 )

@@ -51,22 +51,27 @@ for index in range(int(os.environ["NUM_KEYPERS"])):
             ]
         )
 
+    # The TOML section that holds the chain-specific config and contracts.
+    # The gnosis keyper config nests them under [Gnosis], while the
+    # shutterservice keyper uses [Chain].
+    chain_section = "Gnosis" if deployment_type == "gnosis" else "Chain"
+
     document = tomlkit.parse(config_path.read_text())
     utils.set_toml_path(document, ["DatabaseURL"], f"postgresql://postgres@db:5432/keyper-{index}")
     utils.set_toml_path(document, ["Shuttermint", "ShuttermintURL"], f"http://chain-{index}:{os.environ['SHUTTERMINT_RPC_PORT']}")
     utils.set_toml_path(document, ["Shuttermint", "DKGPhaseLength"], int(os.environ["SHUTTERMINT_DKG_PHASE_LENGTH"]))
     utils.set_toml_path(document, ["Shuttermint", "StartBlockDelta"], int(os.environ["SHUTTERMINT_START_BLOCK_DELTA"]))
     utils.set_toml_path(document, ["P2P", "CustomBootstrapAddresses"], bootstrap_addresses)
-    utils.set_toml_path(document, ["Chain", "Contracts", "KeyBroadcastContract"], utils.get_created_contract_address(deployment_run, "KeyBroadcastContract"))
-    utils.set_toml_path(document, ["Chain", "Contracts", "KeyperSetManager"], utils.get_created_contract_address(deployment_run, "KeyperSetManager"))
+    utils.set_toml_path(document, [chain_section, "Contracts", "KeyBroadcastContract"], utils.get_created_contract_address(deployment_run, "KeyBroadcastContract"))
+    utils.set_toml_path(document, [chain_section, "Contracts", "KeyperSetManager"], utils.get_created_contract_address(deployment_run, "KeyperSetManager"))
+    utils.set_toml_path(document, [chain_section, "Node", "EthereumURL"], "ws://ethereum:8545")
 
     if deployment_type == "gnosis":
-        utils.set_toml_path(document, ["Gnosis", "Node", "EthereumURL"], "ws://ethereum:8545")
-        utils.set_toml_path(document, ["Chain", "Contracts", "Sequencer"], utils.get_created_contract_address(deployment_run, "Sequencer"))
-        utils.set_toml_path(document, ["Chain", "Contracts", "ValidatorRegistry"], utils.get_created_contract_address(deployment_run, "ValidatorRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "Sequencer"], utils.get_created_contract_address(deployment_run, "Sequencer"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "ValidatorRegistry"], utils.get_created_contract_address(deployment_run, "ValidatorRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "ECIESKeyRegistry"], utils.get_created_contract_address(deployment_run, "ECIESKeyRegistry"))
     elif deployment_type == "service":
-        utils.set_toml_path(document, ["Chain", "Node", "EthereumURL"], "ws://ethereum:8545")
-        utils.set_toml_path(document, ["Chain", "Contracts", "ShutterRegistry"], utils.get_created_contract_address(deployment_run, "ShutterRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "ShutterRegistry"], utils.get_created_contract_address(deployment_run, "ShutterRegistry"))
     else:
         raise SystemExit(f"Unsupported DEPLOYMENT_TYPE for config generation: {deployment_type}")
 

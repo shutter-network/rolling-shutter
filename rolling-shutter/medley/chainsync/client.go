@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
@@ -34,11 +35,13 @@ type Client struct {
 
 	KeyperSetManager *bindings.KeyperSetManager
 	KeyBroadcast     *bindings.KeyBroadcastContract
+	ECIESKeyRegistry *contract.ECIESKeyRegistry
 
-	sssync  *syncer.ShutterStateSyncer
-	kssync  *syncer.KeyperSetSyncer
-	uhsync  *syncer.UnsafeHeadSyncer
-	epksync *syncer.EonPubKeySyncer
+	sssync    *syncer.ShutterStateSyncer
+	kssync    *syncer.KeyperSetSyncer
+	uhsync    *syncer.UnsafeHeadSyncer
+	epksync   *syncer.EonPubKeySyncer
+	eciessync *syncer.ECIESKeySyncer
 
 	services []service.Service
 }

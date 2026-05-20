@@ -172,6 +172,19 @@ func (q *Queries) ExistsDecryptionKeyShare(ctx context.Context, arg ExistsDecryp
 	return exists, err
 }
 
+const existsECIESKey = `-- name: ExistsECIESKey :one
+SELECT EXISTS (
+    SELECT 1 FROM ecies_keys WHERE keyper_address = $1
+)
+`
+
+func (q *Queries) ExistsECIESKey(ctx context.Context, keyperAddress string) (bool, error) {
+	row := q.db.QueryRow(ctx, existsECIESKey, keyperAddress)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getAllDKGResults = `-- name: GetAllDKGResults :many
 SELECT eon, success, error, pure_result FROM dkg_result
 ORDER BY eon ASC
@@ -418,6 +431,17 @@ func (q *Queries) GetDecryptionKeyShare(ctx context.Context, arg GetDecryptionKe
 		&i.KeyperIndex,
 		&i.DecryptionKeyShare,
 	)
+	return i, err
+}
+
+const getECIESKey = `-- name: GetECIESKey :one
+SELECT keyper_address, ecies_public_key FROM ecies_keys WHERE keyper_address = $1
+`
+
+func (q *Queries) GetECIESKey(ctx context.Context, keyperAddress string) (EciesKey, error) {
+	row := q.db.QueryRow(ctx, getECIESKey, keyperAddress)
+	var i EciesKey
+	err := row.Scan(&i.KeyperAddress, &i.EciesPublicKey)
 	return i, err
 }
 
@@ -964,5 +988,22 @@ type TMSetSyncMetaParams struct {
 
 func (q *Queries) TMSetSyncMeta(ctx context.Context, arg TMSetSyncMetaParams) error {
 	_, err := q.db.Exec(ctx, tMSetSyncMeta, arg.CurrentBlock, arg.LastCommittedHeight, arg.SyncTimestamp)
+	return err
+}
+
+const upsertECIESKey = `-- name: UpsertECIESKey :exec
+INSERT INTO ecies_keys (keyper_address, ecies_public_key)
+VALUES ($1, $2)
+ON CONFLICT (keyper_address) DO UPDATE
+SET ecies_public_key = EXCLUDED.ecies_public_key
+`
+
+type UpsertECIESKeyParams struct {
+	KeyperAddress  string
+	EciesPublicKey []byte
+}
+
+func (q *Queries) UpsertECIESKey(ctx context.Context, arg UpsertECIESKeyParams) error {
+	_, err := q.db.Exec(ctx, upsertECIESKey, arg.KeyperAddress, arg.EciesPublicKey)
 	return err
 }

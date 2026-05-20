@@ -13,6 +13,7 @@ REQUIRED_CONTRACTS: dict[str, list[str]] = {
         "KeyperSetManager",
         "Sequencer",
         "ValidatorRegistry",
+        "ECIESKeyRegistry",
     ],
     "service": ["KeyBroadcastContract", "KeyperSetManager", "ShutterRegistry"],
 }
