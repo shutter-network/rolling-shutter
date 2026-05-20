@@ -6,6 +6,9 @@ package database
 
 import (
 	"database/sql"
+	"time"
+
+	"github.com/jackc/pgtype"
 )
 
 type DecryptionKey struct {
@@ -74,4 +77,17 @@ type Eon struct {
 	DkgContract           sql.NullString
 	PhaseLength           sql.NullInt64
 	LeadLength            sql.NullInt64
+}
+
+type TxOutbox struct {
+	ID        int64
+	ToAddress string
+	Data      []byte
+	Value     pgtype.Numeric
+	Status    string
+	TxHash    sql.NullString
+	Nonce     sql.NullInt64
+	Error     sql.NullString
+	CreatedAt time.Time
+	UpdatedAt sql.NullTime
 }

@@ -146,3 +146,36 @@ ON CONFLICT DO NOTHING;
 SELECT * FROM dkg_apology
 WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY apologizer_index, accuser_index;
+
+-- name: InsertPendingTx :one
+INSERT INTO tx_outbox (to_address, data, value)
+VALUES ($1, $2, $3)
+RETURNING id;
+
+-- name: GetPendingTxs :many
+SELECT * FROM tx_outbox
+WHERE status = 'pending'
+ORDER BY id;
+
+-- name: GetSubmittedTxs :many
+SELECT * FROM tx_outbox
+WHERE status = 'submitted'
+ORDER BY id;
+
+-- name: GetTxOutboxByID :one
+SELECT * FROM tx_outbox WHERE id = $1;
+
+-- name: MarkTxSubmitted :exec
+UPDATE tx_outbox
+SET status = 'submitted', tx_hash = $2, nonce = $3, updated_at = NOW()
+WHERE id = $1;
+
+-- name: MarkTxConfirmed :exec
+UPDATE tx_outbox
+SET status = 'confirmed', updated_at = NOW()
+WHERE id = $1;
+
+-- name: MarkTxFailed :exec
+UPDATE tx_outbox
+SET status = 'failed', error = $2, updated_at = NOW()
+WHERE id = $1;

@@ -10,6 +10,7 @@ import (
 	"database/sql"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgtype"
 )
 
 const countDecryptionKeyShares = `-- name: CountDecryptionKeyShares :one
@@ -481,6 +482,102 @@ func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, ke
 	return i, err
 }
 
+const getPendingTxs = `-- name: GetPendingTxs :many
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox
+WHERE status = 'pending'
+ORDER BY id
+`
+
+func (q *Queries) GetPendingTxs(ctx context.Context) ([]TxOutbox, error) {
+	rows, err := q.db.Query(ctx, getPendingTxs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TxOutbox
+	for rows.Next() {
+		var i TxOutbox
+		if err := rows.Scan(
+			&i.ID,
+			&i.ToAddress,
+			&i.Data,
+			&i.Value,
+			&i.Status,
+			&i.TxHash,
+			&i.Nonce,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSubmittedTxs = `-- name: GetSubmittedTxs :many
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox
+WHERE status = 'submitted'
+ORDER BY id
+`
+
+func (q *Queries) GetSubmittedTxs(ctx context.Context) ([]TxOutbox, error) {
+	rows, err := q.db.Query(ctx, getSubmittedTxs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TxOutbox
+	for rows.Next() {
+		var i TxOutbox
+		if err := rows.Scan(
+			&i.ID,
+			&i.ToAddress,
+			&i.Data,
+			&i.Value,
+			&i.Status,
+			&i.TxHash,
+			&i.Nonce,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTxOutboxByID = `-- name: GetTxOutboxByID :one
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox WHERE id = $1
+`
+
+func (q *Queries) GetTxOutboxByID(ctx context.Context, id int64) (TxOutbox, error) {
+	row := q.db.QueryRow(ctx, getTxOutboxByID, id)
+	var i TxOutbox
+	err := row.Scan(
+		&i.ID,
+		&i.ToAddress,
+		&i.Data,
+		&i.Value,
+		&i.Status,
+		&i.TxHash,
+		&i.Nonce,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertDKGAccusation = `-- name: InsertDKGAccusation :exec
 INSERT INTO dkg_accusation (keyper_config_index, retry_counter, accuser_index, accused_index)
 VALUES ($1, $2, $3, $4)
@@ -661,6 +758,69 @@ func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 		arg.PhaseLength,
 		arg.LeadLength,
 	)
+	return err
+}
+
+const insertPendingTx = `-- name: InsertPendingTx :one
+INSERT INTO tx_outbox (to_address, data, value)
+VALUES ($1, $2, $3)
+RETURNING id
+`
+
+type InsertPendingTxParams struct {
+	ToAddress string
+	Data      []byte
+	Value     pgtype.Numeric
+}
+
+func (q *Queries) InsertPendingTx(ctx context.Context, arg InsertPendingTxParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertPendingTx, arg.ToAddress, arg.Data, arg.Value)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const markTxConfirmed = `-- name: MarkTxConfirmed :exec
+UPDATE tx_outbox
+SET status = 'confirmed', updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) MarkTxConfirmed(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, markTxConfirmed, id)
+	return err
+}
+
+const markTxFailed = `-- name: MarkTxFailed :exec
+UPDATE tx_outbox
+SET status = 'failed', error = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type MarkTxFailedParams struct {
+	ID    int64
+	Error sql.NullString
+}
+
+func (q *Queries) MarkTxFailed(ctx context.Context, arg MarkTxFailedParams) error {
+	_, err := q.db.Exec(ctx, markTxFailed, arg.ID, arg.Error)
+	return err
+}
+
+const markTxSubmitted = `-- name: MarkTxSubmitted :exec
+UPDATE tx_outbox
+SET status = 'submitted', tx_hash = $2, nonce = $3, updated_at = NOW()
+WHERE id = $1
+`
+
+type MarkTxSubmittedParams struct {
+	ID     int64
+	TxHash sql.NullString
+	Nonce  sql.NullInt64
+}
+
+func (q *Queries) MarkTxSubmitted(ctx context.Context, arg MarkTxSubmittedParams) error {
+	_, err := q.db.Exec(ctx, markTxSubmitted, arg.ID, arg.TxHash, arg.Nonce)
 	return err
 }
 
