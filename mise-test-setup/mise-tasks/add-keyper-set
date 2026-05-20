@@ -26,6 +26,7 @@ run_path = (
 deployment_run = json.loads(run_path.read_text())
 keyper_set_manager = utils.get_created_contract_address(deployment_run, "KeyperSetManager")
 key_broadcast_contract = utils.get_created_contract_address(deployment_run, "KeyBroadcastContract")
+dkg_contract = utils.get_created_contract_address(deployment_run, "DKGContract") or ""
 keyper_addresses = ",".join(
     utils.keyper_address(data_dir / f"keyper-{index}.toml") for index in indices
 )
@@ -46,6 +47,8 @@ utils.run(
         f"KEYPERSETMANAGER_ADDRESS={keyper_set_manager}",
         "--env",
         f"KEYBROADCAST_ADDRESS={key_broadcast_contract}",
+        "--env",
+        f"DKG_CONTRACT_ADDRESS={dkg_contract}",
         "--env",
         f"KEYPER_ADDRESSES={keyper_addresses}",
         "--env",

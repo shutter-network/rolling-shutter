@@ -67,8 +67,11 @@ for index in range(int(os.environ["NUM_KEYPERS"])):
         utils.set_toml_path(document, [chain_section, "Contracts", "Sequencer"], utils.get_created_contract_address(deployment_run, "Sequencer"))
         utils.set_toml_path(document, [chain_section, "Contracts", "ValidatorRegistry"], utils.get_created_contract_address(deployment_run, "ValidatorRegistry"))
         utils.set_toml_path(document, [chain_section, "Contracts", "ECIESKeyRegistry"], utils.get_created_contract_address(deployment_run, "ECIESKeyRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "DKGContract"], utils.get_created_contract_address(deployment_run, "DKGContract"))
     elif deployment_type == "service":
         utils.set_toml_path(document, [chain_section, "Contracts", "ShutterRegistry"], utils.get_created_contract_address(deployment_run, "ShutterRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "ECIESKeyRegistry"], utils.get_created_contract_address(deployment_run, "ECIESKeyRegistry"))
+        utils.set_toml_path(document, [chain_section, "Contracts", "DKGContract"], utils.get_created_contract_address(deployment_run, "DKGContract"))
     else:
         raise SystemExit(f"Unsupported DEPLOYMENT_TYPE for config generation: {deployment_type}")
 
