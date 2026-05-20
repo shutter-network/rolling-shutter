@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -14,6 +13,7 @@ import (
 	sequencerBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/sequencer"
 	validatorRegistryBindings "github.com/shutter-network/gnosh-contracts/gnoshcontracts/validatorregistry"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/dkg"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/kprconfig"
@@ -52,10 +52,9 @@ type Keyper struct {
 	syncMonitor         *SyncMonitor
 	txSender            *txsender.TxSender
 
-	// DKG participation state. dkgPhaseLength and dkgLeadLength are read from
-	// the deployed DKG Contract at startup (immutable constructor parameters).
-	dkgPhaseLength uint64
-	dkgLeadLength  uint64
+	// dkgMgr drives the per-block DKG participation loop. It owns no chain
+	// subscriptions and lives entirely off the database (see ADR 0004).
+	dkgMgr *dkg.Manager
 
 	// input events
 	newBlocks     chan *syncevent.LatestBlock
@@ -141,9 +140,14 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return err
 	}
-	if err := kpr.loadDKGContractParams(ctx); err != nil {
-		return errors.Wrap(err, "load DKG contract parameters")
-	}
+
+	kpr.dkgMgr = dkg.New(dkg.NewConfigFromECDSA(
+		kpr.dbpool,
+		kpr.config.GetAddress(),
+		kpr.config.ECIESPrivateKey.Key,
+		kpr.config.Gnosis.Contracts.DKGContract,
+		kpr.config.Gnosis.Contracts.ECIESKeyRegistry,
+	))
 
 	if kpr.config.Metrics.Enabled {
 		InitMetrics(kpr.beaconAPIClient)
@@ -323,24 +327,3 @@ func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 	}
 }
 
-// loadDKGContractParams reads PHASE_LENGTH and DKG_LEAD_LENGTH from the
-// deployed DKG Contract. They are immutable constructor parameters so a
-// single startup read is enough — they cannot change later.
-func (kpr *Keyper) loadDKGContractParams(ctx context.Context) error {
-	opts := &bind.CallOpts{Context: ctx}
-	phaseLength, err := kpr.chainSyncClient.DKGContract.PHASELENGTH(opts)
-	if err != nil {
-		return errors.Wrap(err, "read PHASE_LENGTH")
-	}
-	leadLength, err := kpr.chainSyncClient.DKGContract.DKGLEADLENGTH(opts)
-	if err != nil {
-		return errors.Wrap(err, "read DKG_LEAD_LENGTH")
-	}
-	kpr.dkgPhaseLength = phaseLength
-	kpr.dkgLeadLength = leadLength
-	log.Info().
-		Uint64("dkg-phase-length", phaseLength).
-		Uint64("dkg-lead-length", leadLength).
-		Msg("loaded DKG contract phase parameters")
-	return nil
-}

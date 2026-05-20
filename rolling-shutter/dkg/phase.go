@@ -1,20 +1,25 @@
-package gnosis
+// Package dkg implements the DKG participation logic as a database-driven
+// reactor. The host keyper calls HandleBlock on every new block; the manager
+// iterates all active eons and writes any required actions (DKG message rows
+// and tx_outbox entries) back to the database. The package owns no chainsync
+// subscriptions and makes no live chain calls — see ADR 0004.
+package dkg
 
-// DKGPhase mirrors the on-chain enum defined in DKGContract.sol. The numeric
+// Phase mirrors the on-chain enum defined in DKGContract.sol. The numeric
 // values match the contract so that values returned by `DKGContract.currentPhase`
 // can be compared directly. PhaseNone is used for blocks before the dealing
 // window starts (negative offset) and for blocks past the finalizing window.
-type DKGPhase uint8
+type Phase uint8
 
 const (
-	PhaseNone DKGPhase = iota
+	PhaseNone Phase = iota
 	PhaseDealing
 	PhaseAccusing
 	PhaseApologizing
 	PhaseFinalizing
 )
 
-func (p DKGPhase) String() string {
+func (p Phase) String() string {
 	switch p {
 	case PhaseNone:
 		return "None"
@@ -31,7 +36,7 @@ func (p DKGPhase) String() string {
 	}
 }
 
-// DKGStart returns the first block number at which the DKG Instance
+// DKGStart returns the first block number at which the DKG instance
 // `(keyperSetIndex, retryCounter)` enters its Dealing phase. The formula
 // matches `DKGContract.dkgStart` in DKGContract.sol; using int64 internally
 // allows the result to be negative when the activation block is smaller than
@@ -51,7 +56,7 @@ func CycleLength(phaseLength uint64) uint64 {
 // at the given block number. Blocks before the dealing window or past the
 // finalizing window return PhaseNone. The boundaries are half-open: a phase
 // covers `[start + n*phaseLength, start + (n+1)*phaseLength)` for n = 0..3.
-func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentBlock uint64) DKGPhase {
+func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentBlock uint64) Phase {
 	if phaseLength == 0 {
 		return PhaseNone
 	}
