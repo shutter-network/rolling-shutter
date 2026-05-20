@@ -5,15 +5,18 @@ import (
 	"database/sql"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
 // phaseParamsForEon returns the DKG phase length and lead length for the
@@ -31,6 +34,19 @@ func (kpr *Keyper) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLen
 		Uint64("fallback-lead-length", kpr.dkgLeadLength).
 		Msg("eons row missing DKG phase params; falling back to config-supplied DKG contract")
 	return kpr.dkgPhaseLength, kpr.dkgLeadLength
+}
+
+// dkgContractAddrForEon returns the on-chain DKG contract address responsible
+// for the given eon. Rows populated by `processNewKeyperSet` carry the
+// per-keyper-set contract address resolved from the keyper set's
+// `getDKGContract()`; rows where the lookup failed (or rows from older
+// databases) carry NULL, in which case the keyper falls back to the
+// config-supplied DKG contract.
+func (kpr *Keyper) dkgContractAddrForEon(eon corekeyperdb.Eon) common.Address {
+	if eon.DkgContract.Valid {
+		return common.HexToAddress(eon.DkgContract.String)
+	}
+	return kpr.config.Gnosis.Contracts.DKGContract
 }
 
 // processDKGBlock advances the DKG participation loop for every eons row the
@@ -103,15 +119,17 @@ func (kpr *Keyper) handlePhaseBoundary(
 		}
 	}
 
+	dkgAddr := kpr.dkgContractAddrForEon(eon)
+
 	switch phaseNow {
 	case PhaseDealing:
-		return kpr.startDealing(ctx, keyperConfigIndex, retryInt64)
+		return kpr.startDealing(ctx, dkgAddr, keyperConfigIndex, retryInt64)
 	case PhaseAccusing:
-		return kpr.startAccusing(ctx, keyperConfigIndex, retryInt64)
+		return kpr.startAccusing(ctx, dkgAddr, keyperConfigIndex, retryInt64)
 	case PhaseApologizing:
-		return kpr.startApologizing(ctx, keyperConfigIndex, retryInt64)
+		return kpr.startApologizing(ctx, dkgAddr, keyperConfigIndex, retryInt64)
 	case PhaseFinalizing:
-		return kpr.startFinalizing(ctx, keyperConfigIndex, retryInt64)
+		return kpr.startFinalizing(ctx, dkgAddr, keyperConfigIndex, retryInt64)
 	case PhaseNone:
 		// Finalizing-ended boundary within the same retry: write a failure
 		// row if the DKG did not succeed.
@@ -126,9 +144,9 @@ func (kpr *Keyper) handlePhaseBoundary(
 // startDealing runs at the Dealing-phase boundary. If we have already stored
 // our own commitment row for `(k, r)`, we treat the message as already sent
 // and skip the on-chain transaction. Otherwise we drive puredkg through
-// `StartPhase1Dealing`, persist our own dealing locally, and submit the
-// transaction.
-func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
+// `StartPhase1Dealing`, persist our own dealing locally, and enqueue a
+// `submitDealing` row in `tx_outbox` for `TxSender` to sign and submit.
+func (kpr *Keyper) startDealing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, keypers, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
@@ -207,12 +225,12 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			}
 		}
 
-		opts, err := kpr.makeTransactOpts(ctx)
+		abi, err := contract.DKGContractMetaData.GetAbi()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "load DKG contract ABI")
 		}
-		tx2, err := kpr.chainSyncClient.DKGContract.SubmitDealing(
-			opts,
+		data, err := abi.Pack(
+			"submitDealing",
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
 			ownIndex,
@@ -220,22 +238,26 @@ func (kpr *Keyper) startDealing(ctx context.Context, keyperConfigIndex, retryCou
 			encryptedEvals,
 		)
 		if err != nil {
-			return errors.Wrap(err, "submit dealing transaction")
+			return errors.Wrap(err, "pack submitDealing calldata")
+		}
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		if err != nil {
+			return errors.Wrap(err, "enqueue submitDealing tx")
 		}
 		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
 			Uint64("keyper-index", ownIndex).
-			Str("tx-hash", tx2.Hash().Hex()).
-			Msg("submitted DKG dealing")
+			Int64("tx-outbox-id", outboxID).
+			Msg("enqueued DKG dealing")
 		return nil
 	})
 }
 
 // startAccusing runs at the Accusing-phase boundary. It calls
-// `StartPhase2Accusing` to produce the list of accusations and submits a
-// single transaction if any are needed and we haven't already accused.
-func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
+// `StartPhase2Accusing` to produce the list of accusations and enqueues a
+// single `tx_outbox` row if any are needed and we haven't already accused.
+func (kpr *Keyper) startAccusing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
@@ -289,33 +311,37 @@ func (kpr *Keyper) startAccusing(ctx context.Context, keyperConfigIndex, retryCo
 			}
 		}
 
-		opts, err := kpr.makeTransactOpts(ctx)
+		abi, err := contract.DKGContractMetaData.GetAbi()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "load DKG contract ABI")
 		}
-		tx2, err := kpr.chainSyncClient.DKGContract.SubmitAccusation(
-			opts,
+		data, err := abi.Pack(
+			"submitAccusation",
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
 			ownIndex,
 			accusedIndices,
 		)
 		if err != nil {
-			return errors.Wrap(err, "submit accusation transaction")
+			return errors.Wrap(err, "pack submitAccusation calldata")
+		}
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		if err != nil {
+			return errors.Wrap(err, "enqueue submitAccusation tx")
 		}
 		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
 			Int("count", len(accusedIndices)).
-			Str("tx-hash", tx2.Hash().Hex()).
-			Msg("submitted DKG accusations")
+			Int64("tx-outbox-id", outboxID).
+			Msg("enqueued DKG accusations")
 		return nil
 	})
 }
 
-// startApologizing runs at the Apologizing-phase boundary, submitting an
+// startApologizing runs at the Apologizing-phase boundary, enqueueing an
 // apology transaction iff someone accused us and we still hold our polynomial.
-func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
+func (kpr *Keyper) startApologizing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
@@ -370,12 +396,12 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 			}
 		}
 
-		opts, err := kpr.makeTransactOpts(ctx)
+		abi, err := contract.DKGContractMetaData.GetAbi()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "load DKG contract ABI")
 		}
-		tx2, err := kpr.chainSyncClient.DKGContract.SubmitApology(
-			opts,
+		data, err := abi.Pack(
+			"submitApology",
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
 			ownIndex,
@@ -383,23 +409,27 @@ func (kpr *Keyper) startApologizing(ctx context.Context, keyperConfigIndex, retr
 			polyEvalData,
 		)
 		if err != nil {
-			return errors.Wrap(err, "submit apology transaction")
+			return errors.Wrap(err, "pack submitApology calldata")
+		}
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		if err != nil {
+			return errors.Wrap(err, "enqueue submitApology tx")
 		}
 		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
 			Int("count", len(accuserIndices)).
-			Str("tx-hash", tx2.Hash().Hex()).
-			Msg("submitted DKG apologies")
+			Int64("tx-outbox-id", outboxID).
+			Msg("enqueued DKG apologies")
 		return nil
 	})
 }
 
-// startFinalizing runs at the Finalizing-phase boundary, casting the success
-// vote with the locally-computed eon public key. If puredkg's local state was
-// not advanced past Apologizing (e.g. we restarted in the middle of the DKG
-// and dropped our polynomial) we cannot finalize and skip submitting.
-func (kpr *Keyper) startFinalizing(ctx context.Context, keyperConfigIndex, retryCounter int64) error {
+// startFinalizing runs at the Finalizing-phase boundary, enqueueing the
+// success vote with the locally-computed eon public key. If puredkg's local
+// state was not advanced past Apologizing (e.g. we restarted in the middle of
+// the DKG and dropped our polynomial) we cannot finalize and skip enqueueing.
+func (kpr *Keyper) startFinalizing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, _, ownIndex, isMember, err := kpr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
@@ -464,25 +494,29 @@ func (kpr *Keyper) startFinalizing(ctx context.Context, keyperConfigIndex, retry
 			return errors.Wrap(err, "encode eon public key")
 		}
 
-		opts, err := kpr.makeTransactOpts(ctx)
+		abi, err := contract.DKGContractMetaData.GetAbi()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "load DKG contract ABI")
 		}
-		tx2, err := kpr.chainSyncClient.DKGContract.SubmitSuccessVote(
-			opts,
+		data, err := abi.Pack(
+			"submitSuccessVote",
 			uint64(keyperConfigIndex),
 			uint64(retryCounter),
 			ownIndex,
 			eonPubKeyBytes,
 		)
 		if err != nil {
-			return errors.Wrap(err, "submit success vote transaction")
+			return errors.Wrap(err, "pack submitSuccessVote calldata")
+		}
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		if err != nil {
+			return errors.Wrap(err, "enqueue submitSuccessVote tx")
 		}
 		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
-			Str("tx-hash", tx2.Hash().Hex()).
-			Msg("submitted DKG success vote")
+			Int64("tx-outbox-id", outboxID).
+			Msg("enqueued DKG success vote")
 		return nil
 	})
 }
@@ -528,17 +562,3 @@ func (kpr *Keyper) hasVotedOnChain(ctx context.Context, keyperSetIndex, retryCou
 	return kpr.chainSyncClient.DKGContract.HasVoted(opts, keyperSetIndex, retryCounter, kpr.config.GetAddress())
 }
 
-// makeTransactOpts produces signed transaction opts for the keyper's signing
-// key, with the context attached so caller cancellation propagates.
-func (kpr *Keyper) makeTransactOpts(ctx context.Context) (*bind.TransactOpts, error) {
-	chainID, err := kpr.chainSyncClient.ChainID(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "get chain id")
-	}
-	opts, err := bind.NewKeyedTransactorWithChainID(kpr.config.Gnosis.Node.PrivateKey.Key, chainID)
-	if err != nil {
-		return nil, errors.Wrap(err, "construct signer transaction opts")
-	}
-	opts.Context = ctx
-	return opts, nil
-}
