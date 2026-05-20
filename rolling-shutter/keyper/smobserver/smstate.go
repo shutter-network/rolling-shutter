@@ -125,10 +125,11 @@ func (st *ShuttermintState) loadDKG(ctx context.Context, queries *database.Queri
 
 		st.dkg[uint64(dkg.Eon)] = &ActiveDKG{
 			pure:        pure,
-			startHeight: keyperEon.Height,
+			startHeight: 0,
 			dirty:       false,
 			keypers:     keypers,
 		}
+		_ = keyperEon
 	}
 	return nil
 }
@@ -304,7 +305,6 @@ func (st *ShuttermintState) handleEonStarted(
 	}
 	err := queries.InsertEon(ctx, database.InsertEonParams{
 		Eon:                   int64(e.Eon),
-		Height:                e.Height,
 		ActivationBlockNumber: int64(e.ActivationBlockNumber),
 		KeyperConfigIndex:     int64(e.KeyperConfigIndex),
 	})

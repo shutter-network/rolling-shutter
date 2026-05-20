@@ -593,7 +593,6 @@ func insertEon(
 
 	err := coreKeyperDB.InsertEon(ctx, corekeyperdatabase.InsertEonParams{
 		Eon:                   eon,
-		Height:                0,
 		ActivationBlockNumber: activationBlockNumber,
 		KeyperConfigIndex:     testKeyperConfigIndex,
 	})

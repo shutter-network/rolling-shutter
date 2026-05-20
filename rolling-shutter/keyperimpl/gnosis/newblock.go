@@ -17,6 +17,9 @@ func (kpr *Keyper) processNewBlock(ctx context.Context, ev *syncevent.LatestBloc
 	if err != nil {
 		return err
 	}
+	if err := kpr.processDKGBlock(ctx, ev.Header.Number.Uint64()); err != nil {
+		return err
+	}
 	slot := medley.BlockTimestampToSlot(
 		ev.Header.Time,
 		kpr.config.Gnosis.GenesisSlotTimestamp,

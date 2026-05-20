@@ -130,8 +130,8 @@ DELETE FROM tendermint_outgoing_messages WHERE id=$1;
 DELETE FROM tendermint_outgoing_messages WHERE description=$1;
 
 -- name: InsertEon :exec
-INSERT INTO eons (eon, height, activation_block_number, keyper_config_index)
-VALUES ($1, $2, $3, $4);
+INSERT INTO eons (eon, activation_block_number, keyper_config_index)
+VALUES ($1, $2, $3);
 
 -- name: GetEon :one
 SELECT * FROM eons WHERE eon=$1;
@@ -139,7 +139,7 @@ SELECT * FROM eons WHERE eon=$1;
 -- name: GetEonForBlockNumber :one
 SELECT * FROM eons
 WHERE activation_block_number <= sqlc.arg(block_number)
-ORDER BY activation_block_number DESC, height DESC
+ORDER BY activation_block_number DESC
 LIMIT 1;
 
 -- name: GetAllEons :many
@@ -156,13 +156,10 @@ WITH latest_keys AS (
     ORDER BY address, height DESC
 )
 SELECT ev.eon, ev.receiver_address, ev.eval,
-       k.encryption_public_key,
-       eon.height
+       k.encryption_public_key
 FROM poly_evals ev
 INNER JOIN latest_keys k
       ON ev.receiver_address = k.address
-INNER JOIN eons eon
-      ON ev.eon = eon.eon
 ORDER BY ev.eon;
 
 -- PolyEvalsWithEncryptionKeys could probably already delete the entries from the poly_evals table.
@@ -182,10 +179,15 @@ VALUES ($1,$2,$3,$4);
 SELECT * FROM dkg_result
 WHERE eon = $1;
 
+-- name: ExistsDKGResultSuccess :one
+SELECT EXISTS (
+    SELECT 1 FROM dkg_result WHERE eon = $1 AND success = TRUE
+);
+
 -- name: GetDKGResultForBlockNumber :one
 SELECT * FROM dkg_result
 WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= sqlc.arg(block_number)
-ORDER BY activation_block_number DESC, height DESC
+ORDER BY activation_block_number DESC
 LIMIT 1);
 
 -- name: GetDKGResultForKeyperConfigIndex :one
@@ -257,3 +259,43 @@ SELECT * FROM ecies_keys WHERE keyper_address = $1;
 SELECT EXISTS (
     SELECT 1 FROM ecies_keys WHERE keyper_address = $1
 );
+
+-- name: InsertDKGPolyCommitment :exec
+INSERT INTO dkg_poly_commitment (keyper_config_index, retry_counter, keyper_index, commitment)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDKGPolyCommitments :many
+SELECT * FROM dkg_poly_commitment
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY keyper_index;
+
+-- name: InsertDKGPolyEval :exec
+INSERT INTO dkg_poly_eval (keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDKGPolyEvals :many
+SELECT * FROM dkg_poly_eval
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY sender_index, receiver_index;
+
+-- name: InsertDKGAccusation :exec
+INSERT INTO dkg_accusation (keyper_config_index, retry_counter, accuser_index, accused_index)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDKGAccusations :many
+SELECT * FROM dkg_accusation
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY accuser_index, accused_index;
+
+-- name: InsertDKGApology :exec
+INSERT INTO dkg_apology (keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDKGApologies :many
+SELECT * FROM dkg_apology
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY apologizer_index, accuser_index;

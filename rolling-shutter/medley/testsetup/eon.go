@@ -89,7 +89,6 @@ func InitializeEon(
 	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{
 		Eon:                   int64(config.GetEon()),
-		Height:                0,
 		ActivationBlockNumber: 0,
 		KeyperConfigIndex:     1,
 	})

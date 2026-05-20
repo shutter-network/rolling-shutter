@@ -26,6 +26,36 @@ type DecryptionTrigger struct {
 	EpochID []byte
 }
 
+type DkgAccusation struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	AccuserIndex      int64
+	AccusedIndex      int64
+}
+
+type DkgApology struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	ApologizerIndex   int64
+	AccuserIndex      int64
+	PolyEval          []byte
+}
+
+type DkgPolyCommitment struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	KeyperIndex       int64
+	Commitment        []byte
+}
+
+type DkgPolyEval struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	SenderIndex       int64
+	ReceiverIndex     int64
+	EncryptedEval     []byte
+}
+
 type DkgResult struct {
 	Eon        int64
 	Success    bool
@@ -40,7 +70,6 @@ type EciesKey struct {
 
 type Eon struct {
 	Eon                   int64
-	Height                int64
 	ActivationBlockNumber int64
 	KeyperConfigIndex     int64
 }

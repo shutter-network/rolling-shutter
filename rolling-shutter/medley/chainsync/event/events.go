@@ -38,4 +38,33 @@ type (
 
 		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}
+
+	// DKGEventKind identifies which DKG Contract event a DKGEvent represents.
+	DKGEventKind int
+
+	// DKGEvent is a unified envelope for any DKG Contract event observed
+	// (live or synthesised at startup). Fields are populated according to Kind.
+	DKGEvent struct {
+		Kind           DKGEventKind
+		KeyperSetIndex uint64
+		RetryCounter   uint64
+		KeyperIndex    uint64
+
+		Commitment     []byte
+		PolyEval       []byte
+		AccusedIndices []uint64
+		AccuserIndices []uint64
+		PolyEvalData   [][]byte
+		EonPublicKey   []byte
+
+		AtBlockNumber *number.BlockNumber `json:",omitempty"`
+	}
+)
+
+const (
+	DKGEventKindDealing DKGEventKind = iota
+	DKGEventKindAccusation
+	DKGEventKindApology
+	DKGEventKindSuccessVote
+	DKGEventKindSuccess
 )

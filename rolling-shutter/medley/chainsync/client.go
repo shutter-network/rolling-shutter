@@ -36,12 +36,14 @@ type Client struct {
 	KeyperSetManager *bindings.KeyperSetManager
 	KeyBroadcast     *bindings.KeyBroadcastContract
 	ECIESKeyRegistry *contract.ECIESKeyRegistry
+	DKGContract      *contract.DKGContract
 
 	sssync    *syncer.ShutterStateSyncer
 	kssync    *syncer.KeyperSetSyncer
 	uhsync    *syncer.UnsafeHeadSyncer
 	epksync   *syncer.EonPubKeySyncer
 	eciessync *syncer.ECIESKeySyncer
+	dkgsync   *syncer.DKGEventSyncer
 
 	services []service.Service
 }

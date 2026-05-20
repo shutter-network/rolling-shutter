@@ -38,6 +38,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 
 	err := kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
+		coredb := corekeyperdb.New(tx)
 
 		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
 		if err != nil {
@@ -52,12 +53,37 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
 		}
 
-		return obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
+		if err := obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
 			KeyperConfigIndex:     keyperConfigIndex,
 			ActivationBlockNumber: activationBlockNumber,
 			Keypers:               shdb.EncodeAddresses(ev.Members),
 			Threshold:             int32(threshold),
-		})
+		}); err != nil {
+			return err
+		}
+
+		if isMember {
+			// Eagerly insert an eons row so the DKG participation loop has
+			// somewhere to anchor when the activation block approaches.
+			// Existing rows are tolerated because the chainsync initial poll
+			// can re-deliver KeyperSetAdded events that were already processed.
+			existing, err := coredb.GetEon(ctx, keyperConfigIndex)
+			if err == nil {
+				_ = existing
+				return nil
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return errors.Wrap(err, "check existing eon row")
+			}
+			if err := coredb.InsertEon(ctx, corekeyperdb.InsertEonParams{
+				Eon:                   keyperConfigIndex,
+				ActivationBlockNumber: activationBlockNumber,
+				KeyperConfigIndex:     keyperConfigIndex,
+			}); err != nil {
+				return errors.Wrap(err, "insert eon row for new keyper set")
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return err

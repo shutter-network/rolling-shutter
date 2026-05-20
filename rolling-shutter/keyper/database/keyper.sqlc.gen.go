@@ -131,6 +131,19 @@ func (q *Queries) DeleteShutterMessageByDesc(ctx context.Context, description st
 	return err
 }
 
+const existsDKGResultSuccess = `-- name: ExistsDKGResultSuccess :one
+SELECT EXISTS (
+    SELECT 1 FROM dkg_result WHERE eon = $1 AND success = TRUE
+)
+`
+
+func (q *Queries) ExistsDKGResultSuccess(ctx context.Context, eon int64) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDKGResultSuccess, eon)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1
@@ -216,7 +229,7 @@ func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
 }
 
 const getAllEons = `-- name: GetAllEons :many
-SELECT eon, height, activation_block_number, keyper_config_index FROM eons ORDER BY eon
+SELECT eon, activation_block_number, keyper_config_index FROM eons ORDER BY eon
 `
 
 func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
@@ -228,12 +241,7 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 	var items []Eon
 	for rows.Next() {
 		var i Eon
-		if err := rows.Scan(
-			&i.Eon,
-			&i.Height,
-			&i.ActivationBlockNumber,
-			&i.KeyperConfigIndex,
-		); err != nil {
+		if err := rows.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -341,6 +349,152 @@ func (q *Queries) GetBatchConfigs(ctx context.Context) ([]TendermintBatchConfig,
 	return items, nil
 }
 
+const getDKGAccusations = `-- name: GetDKGAccusations :many
+SELECT keyper_config_index, retry_counter, accuser_index, accused_index FROM dkg_accusation
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY accuser_index, accused_index
+`
+
+type GetDKGAccusationsParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+}
+
+func (q *Queries) GetDKGAccusations(ctx context.Context, arg GetDKGAccusationsParams) ([]DkgAccusation, error) {
+	rows, err := q.db.Query(ctx, getDKGAccusations, arg.KeyperConfigIndex, arg.RetryCounter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgAccusation
+	for rows.Next() {
+		var i DkgAccusation
+		if err := rows.Scan(
+			&i.KeyperConfigIndex,
+			&i.RetryCounter,
+			&i.AccuserIndex,
+			&i.AccusedIndex,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDKGApologies = `-- name: GetDKGApologies :many
+SELECT keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval FROM dkg_apology
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY apologizer_index, accuser_index
+`
+
+type GetDKGApologiesParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+}
+
+func (q *Queries) GetDKGApologies(ctx context.Context, arg GetDKGApologiesParams) ([]DkgApology, error) {
+	rows, err := q.db.Query(ctx, getDKGApologies, arg.KeyperConfigIndex, arg.RetryCounter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgApology
+	for rows.Next() {
+		var i DkgApology
+		if err := rows.Scan(
+			&i.KeyperConfigIndex,
+			&i.RetryCounter,
+			&i.ApologizerIndex,
+			&i.AccuserIndex,
+			&i.PolyEval,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDKGPolyCommitments = `-- name: GetDKGPolyCommitments :many
+SELECT keyper_config_index, retry_counter, keyper_index, commitment FROM dkg_poly_commitment
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY keyper_index
+`
+
+type GetDKGPolyCommitmentsParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+}
+
+func (q *Queries) GetDKGPolyCommitments(ctx context.Context, arg GetDKGPolyCommitmentsParams) ([]DkgPolyCommitment, error) {
+	rows, err := q.db.Query(ctx, getDKGPolyCommitments, arg.KeyperConfigIndex, arg.RetryCounter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgPolyCommitment
+	for rows.Next() {
+		var i DkgPolyCommitment
+		if err := rows.Scan(
+			&i.KeyperConfigIndex,
+			&i.RetryCounter,
+			&i.KeyperIndex,
+			&i.Commitment,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDKGPolyEvals = `-- name: GetDKGPolyEvals :many
+SELECT keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval FROM dkg_poly_eval
+WHERE keyper_config_index = $1 AND retry_counter = $2
+ORDER BY sender_index, receiver_index
+`
+
+type GetDKGPolyEvalsParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+}
+
+func (q *Queries) GetDKGPolyEvals(ctx context.Context, arg GetDKGPolyEvalsParams) ([]DkgPolyEval, error) {
+	rows, err := q.db.Query(ctx, getDKGPolyEvals, arg.KeyperConfigIndex, arg.RetryCounter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DkgPolyEval
+	for rows.Next() {
+		var i DkgPolyEval
+		if err := rows.Scan(
+			&i.KeyperConfigIndex,
+			&i.RetryCounter,
+			&i.SenderIndex,
+			&i.ReceiverIndex,
+			&i.EncryptedEval,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDKGResult = `-- name: GetDKGResult :one
 SELECT eon, success, error, pure_result FROM dkg_result
 WHERE eon = $1
@@ -361,7 +515,7 @@ func (q *Queries) GetDKGResult(ctx context.Context, eon int64) (DkgResult, error
 const getDKGResultForBlockNumber = `-- name: GetDKGResultForBlockNumber :one
 SELECT eon, success, error, pure_result FROM dkg_result
 WHERE eon = (SELECT eon FROM eons WHERE activation_block_number <= $1
-ORDER BY activation_block_number DESC, height DESC
+ORDER BY activation_block_number DESC
 LIMIT 1)
 `
 
@@ -472,37 +626,27 @@ func (q *Queries) GetEncryptionKeys(ctx context.Context) ([]TendermintEncryption
 }
 
 const getEon = `-- name: GetEon :one
-SELECT eon, height, activation_block_number, keyper_config_index FROM eons WHERE eon=$1
+SELECT eon, activation_block_number, keyper_config_index FROM eons WHERE eon=$1
 `
 
 func (q *Queries) GetEon(ctx context.Context, eon int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEon, eon)
 	var i Eon
-	err := row.Scan(
-		&i.Eon,
-		&i.Height,
-		&i.ActivationBlockNumber,
-		&i.KeyperConfigIndex,
-	)
+	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
 	return i, err
 }
 
 const getEonForBlockNumber = `-- name: GetEonForBlockNumber :one
-SELECT eon, height, activation_block_number, keyper_config_index FROM eons
+SELECT eon, activation_block_number, keyper_config_index FROM eons
 WHERE activation_block_number <= $1
-ORDER BY activation_block_number DESC, height DESC
+ORDER BY activation_block_number DESC
 LIMIT 1
 `
 
 func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getEonForBlockNumber, blockNumber)
 	var i Eon
-	err := row.Scan(
-		&i.Eon,
-		&i.Height,
-		&i.ActivationBlockNumber,
-		&i.KeyperConfigIndex,
-	)
+	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
 	return i, err
 }
 
@@ -596,7 +740,7 @@ func (q *Queries) GetLatestEonForKeyperConfig(ctx context.Context, keyperConfigI
 }
 
 const getLatestStartedEonByKeyperConfigIndex = `-- name: GetLatestStartedEonByKeyperConfigIndex :one
-SELECT eon, height, activation_block_number, keyper_config_index
+SELECT eon, activation_block_number, keyper_config_index
 FROM eons
 WHERE keyper_config_index = $1
 ORDER BY eon DESC
@@ -606,12 +750,7 @@ LIMIT 1
 func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, keyperConfigIndex int64) (Eon, error) {
 	row := q.db.QueryRow(ctx, getLatestStartedEonByKeyperConfigIndex, keyperConfigIndex)
 	var i Eon
-	err := row.Scan(
-		&i.Eon,
-		&i.Height,
-		&i.ActivationBlockNumber,
-		&i.KeyperConfigIndex,
-	)
+	err := row.Scan(&i.Eon, &i.ActivationBlockNumber, &i.KeyperConfigIndex)
 	return i, err
 }
 
@@ -650,6 +789,102 @@ func (q *Queries) InsertBatchConfig(ctx context.Context, arg InsertBatchConfigPa
 		arg.Threshold,
 		arg.Started,
 		arg.ActivationBlockNumber,
+	)
+	return err
+}
+
+const insertDKGAccusation = `-- name: InsertDKGAccusation :exec
+INSERT INTO dkg_accusation (keyper_config_index, retry_counter, accuser_index, accused_index)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDKGAccusationParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	AccuserIndex      int64
+	AccusedIndex      int64
+}
+
+func (q *Queries) InsertDKGAccusation(ctx context.Context, arg InsertDKGAccusationParams) error {
+	_, err := q.db.Exec(ctx, insertDKGAccusation,
+		arg.KeyperConfigIndex,
+		arg.RetryCounter,
+		arg.AccuserIndex,
+		arg.AccusedIndex,
+	)
+	return err
+}
+
+const insertDKGApology = `-- name: InsertDKGApology :exec
+INSERT INTO dkg_apology (keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDKGApologyParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	ApologizerIndex   int64
+	AccuserIndex      int64
+	PolyEval          []byte
+}
+
+func (q *Queries) InsertDKGApology(ctx context.Context, arg InsertDKGApologyParams) error {
+	_, err := q.db.Exec(ctx, insertDKGApology,
+		arg.KeyperConfigIndex,
+		arg.RetryCounter,
+		arg.ApologizerIndex,
+		arg.AccuserIndex,
+		arg.PolyEval,
+	)
+	return err
+}
+
+const insertDKGPolyCommitment = `-- name: InsertDKGPolyCommitment :exec
+INSERT INTO dkg_poly_commitment (keyper_config_index, retry_counter, keyper_index, commitment)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDKGPolyCommitmentParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	KeyperIndex       int64
+	Commitment        []byte
+}
+
+func (q *Queries) InsertDKGPolyCommitment(ctx context.Context, arg InsertDKGPolyCommitmentParams) error {
+	_, err := q.db.Exec(ctx, insertDKGPolyCommitment,
+		arg.KeyperConfigIndex,
+		arg.RetryCounter,
+		arg.KeyperIndex,
+		arg.Commitment,
+	)
+	return err
+}
+
+const insertDKGPolyEval = `-- name: InsertDKGPolyEval :exec
+INSERT INTO dkg_poly_eval (keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING
+`
+
+type InsertDKGPolyEvalParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	SenderIndex       int64
+	ReceiverIndex     int64
+	EncryptedEval     []byte
+}
+
+func (q *Queries) InsertDKGPolyEval(ctx context.Context, arg InsertDKGPolyEvalParams) error {
+	_, err := q.db.Exec(ctx, insertDKGPolyEval,
+		arg.KeyperConfigIndex,
+		arg.RetryCounter,
+		arg.SenderIndex,
+		arg.ReceiverIndex,
+		arg.EncryptedEval,
 	)
 	return err
 }
@@ -734,24 +969,18 @@ func (q *Queries) InsertEncryptionKey(ctx context.Context, arg InsertEncryptionK
 }
 
 const insertEon = `-- name: InsertEon :exec
-INSERT INTO eons (eon, height, activation_block_number, keyper_config_index)
-VALUES ($1, $2, $3, $4)
+INSERT INTO eons (eon, activation_block_number, keyper_config_index)
+VALUES ($1, $2, $3)
 `
 
 type InsertEonParams struct {
 	Eon                   int64
-	Height                int64
 	ActivationBlockNumber int64
 	KeyperConfigIndex     int64
 }
 
 func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
-	_, err := q.db.Exec(ctx, insertEon,
-		arg.Eon,
-		arg.Height,
-		arg.ActivationBlockNumber,
-		arg.KeyperConfigIndex,
-	)
+	_, err := q.db.Exec(ctx, insertEon, arg.Eon, arg.ActivationBlockNumber, arg.KeyperConfigIndex)
 	return err
 }
 
@@ -808,13 +1037,10 @@ WITH latest_keys AS (
     ORDER BY address, height DESC
 )
 SELECT ev.eon, ev.receiver_address, ev.eval,
-       k.encryption_public_key,
-       eon.height
+       k.encryption_public_key
 FROM poly_evals ev
 INNER JOIN latest_keys k
       ON ev.receiver_address = k.address
-INNER JOIN eons eon
-      ON ev.eon = eon.eon
 ORDER BY ev.eon
 `
 
@@ -823,7 +1049,6 @@ type PolyEvalsWithEncryptionKeysRow struct {
 	ReceiverAddress     string
 	Eval                []byte
 	EncryptionPublicKey []byte
-	Height              int64
 }
 
 func (q *Queries) PolyEvalsWithEncryptionKeys(ctx context.Context) ([]PolyEvalsWithEncryptionKeysRow, error) {
@@ -840,7 +1065,6 @@ func (q *Queries) PolyEvalsWithEncryptionKeys(ctx context.Context) ([]PolyEvalsW
 			&i.ReceiverAddress,
 			&i.Eval,
 			&i.EncryptionPublicKey,
-			&i.Height,
 		); err != nil {
 			return nil, err
 		}
