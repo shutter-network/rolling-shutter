@@ -127,7 +127,7 @@ func (s *DKGEventSyncer) Start(ctx context.Context, runner service.Runner) error
 // getInitialSuccesses queries DKGContract.succeeded(k) for each known keyper
 // set index. Already-succeeded instances are delivered as synthetic events so
 // the local cache (e.g. dkg_result) can be populated before any live events.
-func (s *DKGEventSyncer) getInitialSuccesses(ctx context.Context) ([]*event.DKGEvent, error) {
+func (s *DKGEventSyncer) getInitialSuccesses(ctx context.Context) ([]event.DKGEvent, error) {
 	opts := &bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: s.StartBlock.Int,
@@ -141,7 +141,7 @@ func (s *DKGEventSyncer) getInitialSuccesses(ctx context.Context) ([]*event.DKGE
 		return nil, errors.Wrap(err, "get num keyper sets")
 	}
 
-	events := []*event.DKGEvent{}
+	events := []event.DKGEvent{}
 	for i := uint64(0); i < numKS; i++ {
 		succeeded, err := s.Contract.Succeeded(opts, i)
 		if err != nil {
@@ -150,8 +150,7 @@ func (s *DKGEventSyncer) getInitialSuccesses(ctx context.Context) ([]*event.DKGE
 		if !succeeded {
 			continue
 		}
-		events = append(events, &event.DKGEvent{
-			Kind:           event.DKGEventKindSuccess,
+		events = append(events, &event.SuccessEvent{
 			KeyperSetIndex: i,
 			AtBlockNumber:  number.BigToBlockNumber(opts.BlockNumber),
 		})
@@ -170,8 +169,7 @@ func (s *DKGEventSyncer) watchEvents(
 				return nil
 			}
 			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DKGEvent{
-				Kind:           event.DKGEventKindDealing,
+			s.deliver(ctx, &event.DealingEvent{
 				KeyperSetIndex: ev.KeyperSetIndex,
 				RetryCounter:   ev.RetryCounter,
 				KeyperIndex:    ev.KeyperIndex,
@@ -184,8 +182,7 @@ func (s *DKGEventSyncer) watchEvents(
 				return nil
 			}
 			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DKGEvent{
-				Kind:           event.DKGEventKindAccusation,
+			s.deliver(ctx, &event.AccusationEvent{
 				KeyperSetIndex: ev.KeyperSetIndex,
 				RetryCounter:   ev.RetryCounter,
 				KeyperIndex:    ev.KeyperIndex,
@@ -197,8 +194,7 @@ func (s *DKGEventSyncer) watchEvents(
 				return nil
 			}
 			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DKGEvent{
-				Kind:           event.DKGEventKindApology,
+			s.deliver(ctx, &event.ApologyEvent{
 				KeyperSetIndex: ev.KeyperSetIndex,
 				RetryCounter:   ev.RetryCounter,
 				KeyperIndex:    ev.KeyperIndex,
@@ -211,8 +207,7 @@ func (s *DKGEventSyncer) watchEvents(
 				return nil
 			}
 			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DKGEvent{
-				Kind:           event.DKGEventKindSuccessVote,
+			s.deliver(ctx, &event.SuccessVoteEvent{
 				KeyperSetIndex: ev.KeyperSetIndex,
 				RetryCounter:   ev.RetryCounter,
 				KeyperIndex:    ev.KeyperIndex,
@@ -224,8 +219,7 @@ func (s *DKGEventSyncer) watchEvents(
 				return nil
 			}
 			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DKGEvent{
-				Kind:           event.DKGEventKindSuccess,
+			s.deliver(ctx, &event.SuccessEvent{
 				KeyperSetIndex: ev.KeyperSetIndex,
 				RetryCounter:   ev.RetryCounter,
 				EonPublicKey:   ev.EonPublicKey,
@@ -257,14 +251,12 @@ func (s *DKGEventSyncer) watchEvents(
 	}
 }
 
-func (s *DKGEventSyncer) deliver(ctx context.Context, ev *event.DKGEvent) {
+func (s *DKGEventSyncer) deliver(ctx context.Context, ev event.DKGEvent) {
 	if err := s.Handler(ctx, ev); err != nil {
 		s.Log.Error(
 			"handler for DKG event errored",
 			"error",
 			err.Error(),
-			"kind",
-			ev.Kind,
 		)
 	}
 }

@@ -42,33 +42,62 @@ type (
 
 		AtBlockNumber *number.BlockNumber `json:",omitempty"`
 	}
-
-	// DKGEventKind identifies which DKG Contract event a DKGEvent represents.
-	DKGEventKind int
-
-	// DKGEvent is a unified envelope for any DKG Contract event observed
-	// (live or synthesised at startup). Fields are populated according to Kind.
-	DKGEvent struct {
-		Kind           DKGEventKind
-		KeyperSetIndex uint64
-		RetryCounter   uint64
-		KeyperIndex    uint64
-
-		Commitment     []byte
-		PolyEvals      [][]byte
-		AccusedIndices []uint64
-		AccuserIndices []uint64
-		PolyEvalData   [][]byte
-		EonPublicKey   []byte
-
-		AtBlockNumber *number.BlockNumber `json:",omitempty"`
-	}
 )
 
-const (
-	DKGEventKindDealing DKGEventKind = iota
-	DKGEventKindAccusation
-	DKGEventKindApology
-	DKGEventKindSuccessVote
-	DKGEventKindSuccess
-)
+// DKGEvent is any event observed from the DKG Contract (live or synthesised
+// at startup). Consumers type-switch on the concrete event types below.
+type DKGEvent interface {
+	isDKGEvent()
+}
+
+type DealingEvent struct {
+	KeyperSetIndex uint64
+	RetryCounter   uint64
+	KeyperIndex    uint64
+	Commitment     []byte
+	PolyEvals      [][]byte
+
+	AtBlockNumber *number.BlockNumber `json:",omitempty"`
+}
+
+type AccusationEvent struct {
+	KeyperSetIndex uint64
+	RetryCounter   uint64
+	KeyperIndex    uint64
+	AccusedIndices []uint64
+
+	AtBlockNumber *number.BlockNumber `json:",omitempty"`
+}
+
+type ApologyEvent struct {
+	KeyperSetIndex uint64
+	RetryCounter   uint64
+	KeyperIndex    uint64
+	AccuserIndices []uint64
+	PolyEvalData   [][]byte
+
+	AtBlockNumber *number.BlockNumber `json:",omitempty"`
+}
+
+type SuccessVoteEvent struct {
+	KeyperSetIndex uint64
+	RetryCounter   uint64
+	KeyperIndex    uint64
+	EonPublicKey   []byte
+
+	AtBlockNumber *number.BlockNumber `json:",omitempty"`
+}
+
+type SuccessEvent struct {
+	KeyperSetIndex uint64
+	RetryCounter   uint64
+	EonPublicKey   []byte
+
+	AtBlockNumber *number.BlockNumber `json:",omitempty"`
+}
+
+func (*DealingEvent) isDKGEvent()     {}
+func (*AccusationEvent) isDKGEvent()  {}
+func (*ApologyEvent) isDKGEvent()     {}
+func (*SuccessVoteEvent) isDKGEvent() {}
+func (*SuccessEvent) isDKGEvent()     {}
