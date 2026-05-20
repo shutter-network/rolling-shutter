@@ -51,7 +51,7 @@ type (
 		KeyperIndex    uint64
 
 		Commitment     []byte
-		PolyEval       []byte
+		PolyEvals      [][]byte
 		AccusedIndices []uint64
 		AccuserIndices []uint64
 		PolyEvalData   [][]byte

@@ -123,11 +123,7 @@ func (kpr *Keyper) applyDealingToInstance(
 			Msg("ignoring duplicate/late commitment")
 	}
 
-	evals, err := DecodePolyEvalBlob(ev.PolyEval)
-	if err != nil {
-		log.Warn().Err(err).Msg("decode poly eval blob in apply")
-		return nil
-	}
+	evals := ev.PolyEvals
 	receivers := ReceiverIndicesForSender(uint64(len(inst.keypers)), ev.KeyperIndex)
 	if len(evals) != len(receivers) {
 		log.Warn().
@@ -238,10 +234,7 @@ func storeDealing(
 		return errors.Wrap(err, "insert dkg_poly_commitment")
 	}
 
-	evals, err := DecodePolyEvalBlob(ev.PolyEval)
-	if err != nil {
-		return errors.Wrap(err, "decode polyEval blob")
-	}
+	evals := ev.PolyEvals
 
 	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
 	if err != nil {

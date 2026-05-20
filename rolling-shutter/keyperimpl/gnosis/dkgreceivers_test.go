@@ -1,31 +1,10 @@
 package gnosis
 
 import (
-	"bytes"
 	"testing"
 
 	"gotest.tools/v3/assert"
 )
-
-func TestPolyEvalBlobRoundtrip(t *testing.T) {
-	cases := [][][]byte{
-		{},
-		{{0xaa}},
-		{{0x01, 0x02, 0x03}, {0x04, 0x05}, {0x06}},
-		{{}, {0x42}, {}},
-	}
-	for _, evals := range cases {
-		blob, err := EncodePolyEvalBlob(evals)
-		assert.NilError(t, err)
-		decoded, err := DecodePolyEvalBlob(blob)
-		assert.NilError(t, err)
-		assert.Equal(t, len(decoded), len(evals))
-		for i := range evals {
-			assert.Assert(t, bytes.Equal(decoded[i], evals[i]),
-				"entry %d roundtrip mismatch", i)
-		}
-	}
-}
 
 func TestReceiverIndicesForSender(t *testing.T) {
 	cases := []struct {
