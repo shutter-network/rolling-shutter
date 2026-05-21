@@ -22,6 +22,12 @@ import (
 // one accusation. The function is safely re-invokable: presence of a
 // `dkg_sent_actions` row for `(k, r, "accusing")` is the idempotency marker.
 //
+// Our own accusation rows are NOT written to the shared `dkg_accusations`
+// table — the chain syncer is the sole writer to it, so every keyper has
+// the same view at each block height. Replay in `buildPureDKG` picks up
+// our own accusations only after the on-chain submitAccusation event is
+// indexed.
+//
 // The caller passes a `pure` returned by `buildPureDKG(PhaseAccusing)` —
 // Phase=Dealing with commitments + evals applied; here we call
 // StartPhase2Accusing, which advances the phase and emits accusations for
@@ -59,14 +65,6 @@ func (m *Manager) maybeAccuse(
 	accusedIndices := make([]uint64, 0, len(accusations))
 	for _, a := range accusations {
 		accusedIndices = append(accusedIndices, a.Accused)
-		if err := queries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-			KeyperConfigIndex: keyperConfigIndex,
-			RetryCounter:      retryCounter,
-			AccuserIndex:      int64(ownIndex),
-			AccusedIndex:      int64(a.Accused),
-		}); err != nil {
-			return errors.Wrap(err, "store own accusation row")
-		}
 	}
 
 	abi, err := contract.DKGContractMetaData.GetAbi()

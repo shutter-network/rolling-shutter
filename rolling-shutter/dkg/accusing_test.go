@@ -181,9 +181,10 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 }
 
 // TestMaybeAccuseEnqueuesAccusationForMissingDealing asserts that maybeAccuse
-// emits one accusation per dealer whose PolyEval is missing — the bug-fix
-// path. Without our local refactor `pure.Phase` would remain Off after
-// replay and the function would silently skip.
+// enqueues one submitAccusation tx when at least one dealer's PolyEval is
+// missing — the bug-fix path. The function must NOT write to the shared
+// `dkg_accusations` table (the chain syncer owns it); the test checks
+// presence of the tx_outbox row and the `dkg_sent_actions` marker instead.
 func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -196,7 +197,7 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Neither keyper 0 nor keyper 2 deals: their commitment+eval rows are
-	// absent. maybeAccuse must accuse both.
+	// absent. maybeAccuse must enqueue a submitAccusation for both.
 	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
@@ -206,13 +207,15 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, 2, len(accusations), "expected one accusation per missing dealer")
-	got := map[int64]bool{}
-	for _, a := range accusations {
-		assert.Equal(t, int64(1), a.AccuserIndex)
-		got[a.AccusedIndex] = true
-	}
-	assert.Assert(t, got[0] && got[2], "expected accusations against keypers 0 and 2")
+	assert.Equal(t, 0, len(accusations), "maybeAccuse must not write to dkg_accusations — chain syncer owns it")
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionAccusing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the accusing action as enqueued")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
@@ -252,8 +255,9 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	assert.Equal(t, 1, len(pending))
 }
 
-// TestMaybeAccuseIdempotent asserts that a second invocation does not write
-// additional accusation or outbox rows.
+// TestMaybeAccuseIdempotent asserts that a second invocation does not enqueue
+// an additional submitAccusation tx_outbox row. The shared `dkg_accusations`
+// table is never written by the reactor in either invocation.
 func TestMaybeAccuseIdempotent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -266,11 +270,6 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 
 	coreQueries := corekeyperdb.New(env.dbpool)
-	first, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
-		KeyperConfigIndex: testKsi,
-		RetryCounter:      testRetry,
-	})
-	assert.NilError(t, err)
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
@@ -284,14 +283,14 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
-	second, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
+	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperConfigIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
+	assert.Equal(t, 0, len(accusations), "maybeAccuse must not write to dkg_accusations on any invocation")
 	secondPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 
-	assert.Equal(t, len(first), len(second))
-	assert.Equal(t, len(firstPending), len(secondPending))
+	assert.Equal(t, len(firstPending), len(secondPending), "no extra tx_outbox rows on idempotent call")
 }

@@ -69,10 +69,11 @@ func runMaybeDealLocal(
 // TestMaybeDealPersistsInitialStateAndIsIdempotent exercises the two
 // acceptance criteria for the maybeDeal refactor:
 //
-//  1. First invocation writes a dkg_initial_states row plus the own poly
-//     commitment, the per-receiver poly evals (including the self-eval), a
-//     tx_outbox row for submitDealing, and a dkg_sent_actions row marking
-//     the dealing action as enqueued.
+//  1. First invocation writes a dkg_initial_states row, a tx_outbox row for
+//     submitDealing, and a dkg_sent_actions row marking the dealing action
+//     as enqueued. It must NOT write to the shared `dkg_poly_commitments`
+//     or `dkg_poly_evals` tables — those are populated exclusively by the
+//     chain syncer from indexed events.
 //  2. Second invocation is a no-op — no new rows are inserted in any of those
 //     tables, because the dkg_sent_actions row already exists.
 func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
@@ -164,16 +165,14 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 		RetryCounter:      retryCounter,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, 1, len(commitments))
-	assert.Equal(t, int64(1), commitments[0].KeyperIndex)
+	assert.Equal(t, 0, len(commitments), "maybeDeal must not write to dkg_poly_commitments — chain syncer owns it")
 
 	evals, err := coreQueries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
 	})
 	assert.NilError(t, err)
-	// One row per receiver, including the self-row: 3 keypers → 3 rows.
-	assert.Equal(t, 3, len(evals))
+	assert.Equal(t, 0, len(evals), "maybeDeal must not write to dkg_poly_evals — chain syncer owns it")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
@@ -198,14 +197,14 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 		RetryCounter:      retryCounter,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, len(commitments), len(commitmentsAfter), "no extra commitment rows on idempotent call")
+	assert.Equal(t, 0, len(commitmentsAfter), "dkg_poly_commitments still empty on idempotent call")
 
 	evalsAfter, err := coreQueries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, len(evals), len(evalsAfter), "no extra poly eval rows on idempotent call")
+	assert.Equal(t, 0, len(evalsAfter), "dkg_poly_evals still empty on idempotent call")
 
 	pendingAfter, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
