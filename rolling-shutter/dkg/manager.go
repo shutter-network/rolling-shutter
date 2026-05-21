@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 )
@@ -88,8 +89,8 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 }
 
 // handleEon runs the per-eon dispatch logic inside a single database
-// transaction. Returns nil for "nothing to do" (eon already succeeded, no
-// active phase at this block, not a member, no initial state for non-Dealing
+// transaction. Returns nil for "nothing to do" (not a member, eon already
+// succeeded, no active phase at this block, no initial state for non-Dealing
 // phases). Returns an error for missing per-eon configuration (NULL
 // `dkg_contract` or NULL `phase_length`/`lead_length`). The caller logs but
 // does not abort on error.
@@ -101,6 +102,18 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	phaseLength, leadLength, err := m.phaseParamsForEon(eon)
 	if err != nil {
 		return err
+	}
+
+	// Early exit: skip eons whose keyper set does not include this keyper.
+	// Membership is the most selective filter — fire it before any other
+	// DB work so we do not query dkg_result for unrelated sets.
+	obsQueries := obskeyper.New(m.cfg.DBPool)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
+	if err != nil {
+		return errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
+	}
+	if _, err := keyperSet.GetIndex(m.cfg.OwnAddress); err != nil {
+		return nil
 	}
 
 	// Early exit: a successful dkg_result row means either we already voted
