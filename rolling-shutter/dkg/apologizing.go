@@ -9,24 +9,27 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/shutter/shlib/puredkg"
-
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
-// startApologizing is the per-block reactor for the Apologizing phase. It
-// enqueues an apology tx iff someone accused us and our polynomial is still
-// in memory. Presence of our own apology row for `(k, r)` is the idempotency
-// marker.
-func (m *Manager) startApologizing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
+// maybeApologize is the per-block reactor for the Apologizing phase. It
+// enqueues an apology tx when our locally-rebuilt puredkg has at least one
+// accusation against us. Presence of our own apology row for `(k, r)` is the
+// idempotency marker.
+//
+// `buildPureDKG(PhaseApologizing)` returns the puredkg at Phase=Accusing
+// with commitments + evals + accusations replayed. We call
+// StartPhase3Apologizing here, which advances the phase and emits apology
+// messages with the polynomial loaded from `dkg_initial_states`.
+func (m *Manager) maybeApologize(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, _, ownIndex, isMember, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, _, ownIndex, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseApologizing)
 		if err != nil {
 			return err
 		}
-		if !isMember {
+		if pure == nil {
 			return nil
 		}
 
@@ -44,17 +47,12 @@ func (m *Manager) startApologizing(ctx context.Context, dkgAddr common.Address, 
 			}
 		}
 
-		if pure.Phase != puredkg.Accusing {
+		apologies := pure.StartPhase3Apologizing()
+		if len(apologies) == 0 {
 			log.Debug().
 				Int64("keyper-config-index", keyperConfigIndex).
 				Int64("retry-counter", retryCounter).
-				Str("phase", pure.Phase.String()).
-				Msg("skipping apologies: puredkg phase not Accusing")
-			return nil
-		}
-
-		apologies := pure.StartPhase3Apologizing()
-		if len(apologies) == 0 {
+				Msg("no DKG apologies to submit: nobody accused us")
 			return nil
 		}
 
