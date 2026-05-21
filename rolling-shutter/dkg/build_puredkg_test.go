@@ -24,7 +24,7 @@ func TestBuildPureDKGReturnsExpectedPhasePerBlockPhase(t *testing.T) {
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
 
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
 
 	cases := []struct {

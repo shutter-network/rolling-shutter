@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/v3/assert"
 
@@ -93,6 +94,33 @@ func setupDKGTestEnv(ctx context.Context, t *testing.T) *dkgTestEnv {
 	}
 }
 
+// runMaybe wraps a single dispatch the way `HandleBlock` does: open a
+// transaction, build the puredkg for the given block phase, and call the
+// matching maybe-function. Returns nil silently if the manager would not
+// participate (non-member or no initial state for non-Dealing phases).
+func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
+	return env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		pure, keypers, ownIndex, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, phase)
+		if err != nil {
+			return err
+		}
+		if pure == nil {
+			return nil
+		}
+		switch phase {
+		case PhaseDealing:
+			return env.mgr.maybeDeal(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
+		case PhaseAccusing:
+			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+		case PhaseApologizing:
+			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+		case PhaseFinalizing:
+			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+		}
+		return nil
+	})
+}
+
 // insertForeignDealing simulates `dealerIdx` having dealt: insert their poly
 // commitment and the encrypted-for-us PolyEval row. Both are derived from a
 // fresh puredkg run by the test in-process.
@@ -141,12 +169,12 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 	env := setupDKGTestEnv(ctx, t)
 
 	// Local keyper deals — populates dkg_initial_states.
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
 
 	// Neither keyper 0 nor keyper 2 deals: their commitment+eval rows are
 	// absent. maybeAccuse must accuse both.
-	err = env.mgr.maybeAccuse(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
 	coreQueries := corekeyperdb.New(env.dbpool)
@@ -179,12 +207,12 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
 
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
 	env.insertForeignDealing(ctx, t, 0)
 	env.insertForeignDealing(ctx, t, 2)
 
-	err = env.mgr.maybeAccuse(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
 	coreQueries := corekeyperdb.New(env.dbpool)
@@ -209,9 +237,9 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	}
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
-	err = env.mgr.maybeAccuse(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
 	coreQueries := corekeyperdb.New(env.dbpool)
@@ -223,7 +251,7 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 
-	err = env.mgr.maybeAccuse(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)
 
 	second, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{

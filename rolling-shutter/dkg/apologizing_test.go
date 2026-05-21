@@ -21,7 +21,7 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
 
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
 
 	// Keyper 0 accuses us (keyper 1). The accusation row drives StartPhase3
@@ -35,7 +35,7 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = env.mgr.maybeApologize(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseApologizing)
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
@@ -63,7 +63,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	}
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
-	err := env.mgr.maybeDeal(ctx, env.dkgAddr, testKsi, testRetry)
+	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
 
 	// Accusation against another keyper (0 → 2), not us.
@@ -76,7 +76,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = env.mgr.maybeApologize(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseApologizing)
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
@@ -110,7 +110,7 @@ func TestMaybeApologizeNoopWithoutInitialState(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	err = env.mgr.maybeApologize(ctx, env.dkgAddr, testKsi, testRetry)
+	err = env.runMaybe(ctx, PhaseApologizing)
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{

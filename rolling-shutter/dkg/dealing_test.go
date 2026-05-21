@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/v3/assert"
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
@@ -15,6 +17,28 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
+
+// runMaybeDealLocal mirrors the dispatch HandleBlock performs: build the
+// puredkg in a transaction and invoke maybeDeal. Used by dealing_test.go
+// tests that wire a Manager by hand instead of going through dkgTestEnv.
+func runMaybeDealLocal(
+	ctx context.Context,
+	dbpool *pgxpool.Pool,
+	mgr *Manager,
+	dkgAddr common.Address,
+	keyperConfigIndex, retryCounter int64,
+) error {
+	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		pure, keypers, ownIndex, err := mgr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseDealing)
+		if err != nil {
+			return err
+		}
+		if pure == nil {
+			return nil
+		}
+		return mgr.maybeDeal(ctx, tx, dkgAddr, keyperConfigIndex, retryCounter, pure, keypers, ownIndex)
+	})
+}
 
 // TestMaybeDealPersistsInitialStateAndIsIdempotent exercises the two
 // acceptance criteria for the maybeDeal refactor:
@@ -94,7 +118,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	assert.Assert(t, err != nil, "no initial state row expected before maybeDeal")
 
 	// First invocation: writes rows.
-	err = mgr.maybeDeal(ctx, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
 	assert.NilError(t, err)
 
 	initial, err := coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
@@ -132,7 +156,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	firstOutboxID := pending[0].ID
 
 	// Second invocation: idempotent — no new rows in any tracked table.
-	err = mgr.maybeDeal(ctx, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
 	assert.NilError(t, err)
 
 	commitmentsAfter, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
@@ -206,7 +230,7 @@ func TestMaybeDealNoopWhenInitialStateExists(t *testing.T) {
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 
-	err = mgr.maybeDeal(ctx, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
 	assert.NilError(t, err)
 
 	commitments, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
