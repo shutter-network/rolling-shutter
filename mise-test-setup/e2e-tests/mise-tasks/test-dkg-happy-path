@@ -11,7 +11,7 @@ def add_set_and_verify(
     indices: str, threshold: str, keyper_set_index: int, keyper_index: int = 0
 ) -> None:
     utils.run(["mise", "run", "add-keyper-set", "--indices", indices, "--threshold", threshold])
-    wait_for_dkg_success(keyper_set_index=keyper_set_index, keyper_index=keyper_index)
+    wait_for_dkg_success(keyper_set_index=keyper_set_index)
     cmd = ["mise", "run", "test-decryption"]
     if keyper_index != 0:
         cmd += ["--keyper-index", str(keyper_index)]

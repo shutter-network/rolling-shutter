@@ -1,8 +1,9 @@
 #!/usr/bin/env -S uv run --script
-#MISE description="Wait for DKG completion"
-#USAGE flag "--keyper-set-index <keyper_set_index>" help="Wait for a successful DKG for this keyper set index"
-#USAGE flag "--eon <eon>" help="Wait for completion of this eon"
-#USAGE flag "--keyper-index <keyper_index>" help="Keyper index whose DB to query (default 0; use a member of the target set)"
+#MISE description="Wait for DKG completion on the DKG Contract"
+#USAGE flag "--ksi <ksi>" help="Keyper Set Index to watch (default: latest registered)"
+#USAGE flag "--retry <retry>" help="Retry counter to watch (default: derived from current block)"
+#USAGE flag "--success" help="Require eventual DKG success; exit nonzero on failure"
+#USAGE flag "--failure" help="Require DKG failure; exit nonzero on success"
 
 import os
 import time
@@ -10,47 +11,50 @@ import time
 import utils
 
 
-keyper_set_index = os.environ.get("usage_keyper_set_index", "").strip()
-eon = os.environ.get("usage_eon", "").strip()
+require_success = os.environ.get("usage_success", "").lower() == "true"
+require_failure = os.environ.get("usage_failure", "").lower() == "true"
+if require_success and require_failure:
+    raise SystemExit("--success and --failure are mutually exclusive")
+
+ksi_raw = os.environ.get("usage_ksi", "").strip()
+retry_raw = os.environ.get("usage_retry", "").strip()
 poll_interval = float(os.environ["DKG_RESULT_POLL_INTERVAL"])
-keyper_index = int(os.environ.get("usage_keyper_index") or "0")
 
-if bool(keyper_set_index) == bool(eon):
-    raise SystemExit("Provide exactly one of --keyper-set-index or --eon")
+ksi = int(ksi_raw) if ksi_raw else utils.get_latest_keyper_set_index()
+retry_fixed: int | None = int(retry_raw) if retry_raw else None
 
-last_reported_failed_eon: str | None = None
+# Which retry's timeout do we treat as a "failure" signal?
+# - With --retry N: that retry.
+# - Without --retry: retry 0 (first one that can time out). Once retry 0's
+#   window has elapsed without succeeded[ksi], at least one DKG Instance has
+#   completed-as-failure — enough for "neither" and "--failure" to exit.
+#   "--success" without --retry ignores this and keeps polling.
+target_retry = retry_fixed if retry_fixed is not None else 0
 
 while True:
-    if keyper_set_index:
-        target_eon = utils.query_keyper_db(
-            0,
-            f"SELECT max(eon) FROM eons WHERE keyper_config_index = {int(keyper_set_index)}",
-        )
-        if not target_eon:
-            time.sleep(poll_interval)
-            continue
+    succeeded = utils.get_succeeded(ksi)
+    window_elapsed = utils.retry_window_elapsed(ksi, target_retry)
+
+    if require_success:
+        if succeeded:
+            print(f"DKG succeeded for ksi {ksi}")
+            raise SystemExit(0)
+        if retry_fixed is not None and window_elapsed:
+            print(f"DKG retry {retry_fixed} failed for ksi {ksi}; required success")
+            raise SystemExit(1)
+    elif require_failure:
+        if window_elapsed:
+            print(f"DKG retry {target_retry} failed for ksi {ksi}")
+            raise SystemExit(0)
+        if succeeded:
+            print(f"DKG succeeded for ksi {ksi}; required failure")
+            raise SystemExit(1)
     else:
-        target_eon = str(int(eon))
+        if succeeded:
+            print(f"DKG succeeded for ksi {ksi}")
+            raise SystemExit(0)
+        if window_elapsed:
+            print(f"DKG retry {target_retry} failed for ksi {ksi}")
+            raise SystemExit(0)
 
-    success = utils.query_keyper_db(
-        keyper_index,
-        f"SELECT success FROM dkg_result WHERE eon = {target_eon}",
-    )
-
-    if not success:
-        time.sleep(poll_interval)
-        continue
-
-    if success == "t":
-        print(f"DKG finished successfully for eon {target_eon}")
-        raise SystemExit(0)
-
-    if keyper_set_index:
-        if target_eon != last_reported_failed_eon:
-            print(f"DKG failed for eon {target_eon}")
-            last_reported_failed_eon = target_eon
-        time.sleep(poll_interval)
-        continue
-
-    print(f"DKG failed for eon {target_eon}")
-    raise SystemExit(1)
+    time.sleep(poll_interval)
