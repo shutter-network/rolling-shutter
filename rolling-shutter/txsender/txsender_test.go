@@ -59,6 +59,7 @@ type fakeClient struct {
 	gasLimit                 uint64
 	gasPrice                 *big.Int
 	receiptErr               error
+	sendErr                  error
 	sentTxs                  []*types.Transaction
 	receiptCallsByHash       map[common.Hash]int
 	sendTransactionCallCount int32
@@ -105,8 +106,11 @@ func (c *fakeClient) EstimateGas(_ context.Context, _ ethereum.CallMsg) (uint64,
 func (c *fakeClient) SendTransaction(_ context.Context, tx *types.Transaction) error {
 	atomic.AddInt32(&c.sendTransactionCallCount, 1)
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sendErr != nil {
+		return c.sendErr
+	}
 	c.sentTxs = append(c.sentTxs, tx)
-	c.mu.Unlock()
 	return nil
 }
 
@@ -185,3 +189,81 @@ func TestPollProcessesBothPhasesInOneIteration(t *testing.T) {
 	assert.Equal(t, 1, fc.receiptCallsByHash[preexistingHash],
 		"confirm phase: expected one TransactionReceipt call for the pre-existing submitted row")
 }
+
+// TestSubmitRowMarksFailedWhenSendFails verifies the mark-before-send ordering:
+// when SendTransaction returns an error after the row has already been marked
+// submitted, the row must end up in `failed` status (the submitted -> failed
+// transition is intentional and recorded via MarkTxFailed).
+func TestSubmitRowMarksFailedWhenSendFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	s, fc := newTestSender(t, dbpool)
+	fc.sendErr = stubError("rpc connection refused")
+
+	queries := corekeyperdb.New(dbpool)
+	zero, err := bigIntToNumeric(big.NewInt(0))
+	assert.NilError(t, err)
+	id, err := queries.InsertPendingTx(ctx, corekeyperdb.InsertPendingTxParams{
+		ToAddress: common.HexToAddress("0x000000000000000000000000000000000000dead").Hex(),
+		Data:      []byte{0x01, 0x02, 0x03},
+		Value:     zero,
+	})
+	assert.NilError(t, err)
+
+	s.poll(ctx)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&fc.sendTransactionCallCount),
+		"SendTransaction should be invoked exactly once before failure is recorded")
+	row, err := queries.GetTxOutboxByID(ctx, id)
+	assert.NilError(t, err)
+	assert.Equal(t, "failed", row.Status,
+		"row should be marked failed after SendTransaction error")
+	assert.Assert(t, row.Error.Valid, "failure error column should be populated")
+	assert.Assert(t, row.TxHash.Valid,
+		"tx_hash should be persisted (mark-before-send wrote it prior to send)")
+}
+
+// TestSubmitRowSkipsSendWhenMarkSubmittedFails verifies that if the DB update
+// to mark the row submitted fails, SendTransaction is never called. We force
+// the failure by dropping the tx_outbox table mid-flight, then driving
+// submitRow directly with a hand-constructed row so the absent table is only
+// surfaced at the MarkTxSubmitted step (not earlier in GetPendingTxs).
+func TestSubmitRowSkipsSendWhenMarkSubmittedFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	s, fc := newTestSender(t, dbpool)
+
+	zero, err := bigIntToNumeric(big.NewInt(0))
+	assert.NilError(t, err)
+	row := corekeyperdb.TxOutbox{
+		ID:        1,
+		ToAddress: common.HexToAddress("0x000000000000000000000000000000000000dead").Hex(),
+		Data:      []byte{0x01, 0x02, 0x03},
+		Value:     zero,
+		Status:    "pending",
+	}
+
+	_, err = dbpool.Exec(ctx, "DROP TABLE tx_outbox")
+	assert.NilError(t, err)
+
+	s.submitRow(ctx, row)
+
+	assert.Equal(t, int32(0), atomic.LoadInt32(&fc.sendTransactionCallCount),
+		"SendTransaction must not be called when MarkTxSubmitted fails")
+}
+
+type stubError string
+
+func (e stubError) Error() string { return string(e) }

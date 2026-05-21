@@ -184,16 +184,13 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		s.markFailed(ctx, row.ID, errors.Wrap(err, "sign transaction"))
 		return
 	}
-	if err := s.cfg.Client.SendTransaction(ctx, signed); err != nil {
-		// SendTransaction can fail for transient (RPC) or terminal (already
-		// known, replacement underpriced) reasons. Treat them all as failed so
-		// the producer can decide whether to enqueue a fresh row; resubmission
-		// from the outbox itself would require nonce-replacement logic that
-		// is out of scope for the initial cut.
-		s.markFailed(ctx, row.ID, errors.Wrap(err, "send transaction"))
-		return
-	}
 
+	// Mark the row submitted BEFORE broadcasting. If the process crashes
+	// between this update and the SendTransaction call, the row stays
+	// `submitted` with its tx hash stored; the confirm loop then polls for the
+	// receipt. This is preferable to the inverse ordering (send first, mark
+	// after), which would leave a crashed row as `pending` and cause a
+	// duplicate broadcast on restart with a fresh nonce.
 	if err := queries.MarkTxSubmitted(ctx, corekeyperdb.MarkTxSubmittedParams{
 		ID:     row.ID,
 		TxHash: sql.NullString{String: signed.Hash().Hex(), Valid: true},
@@ -202,9 +199,20 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		log.Error().Err(err).
 			Int64("id", row.ID).
 			Str("tx-hash", signed.Hash().Hex()).
-			Msg("tx outbox: mark submitted failed; tx already on the wire")
+			Msg("tx outbox: mark submitted failed; skipping send")
 		return
 	}
+
+	if err := s.cfg.Client.SendTransaction(ctx, signed); err != nil {
+		// SendTransaction can fail for transient (RPC) or terminal (already
+		// known, replacement underpriced) reasons. Mark the row failed in all
+		// cases — MarkTxFailed has no precondition on the current status so
+		// the submitted -> failed transition is valid. Re-broadcast logic for
+		// stuck submitted rows (without on-chain inclusion) is out of scope.
+		s.markFailed(ctx, row.ID, errors.Wrap(err, "send transaction"))
+		return
+	}
+
 	log.Info().
 		Int64("id", row.ID).
 		Str("to", row.ToAddress).
