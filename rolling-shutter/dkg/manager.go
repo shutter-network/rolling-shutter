@@ -199,9 +199,9 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 		case PhaseDealing:
 			return m.maybeDeal(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
 		case PhaseAccusing:
-			return m.maybeAccuse(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+			return m.maybeAccuse(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
 		case PhaseApologizing:
-			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return m.maybeFinalize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
 		default:
@@ -263,6 +263,10 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 	}
 
 	var pureBytes []byte
+	var resultNumKeypers, resultThreshold uint64
+	var accusationCount, apologyCount int
+	var hasResult bool
+
 	ownIndex, memberErr := keyperSet.GetIndex(m.cfg.OwnAddress)
 	if memberErr == nil {
 		keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
@@ -286,6 +290,11 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 					Int64("retry-counter", retryCounter).
 					Msg("cannot compute DKG result on success event; storing nil")
 			} else {
+				hasResult = true
+				resultNumKeypers = result.NumKeypers
+				resultThreshold = result.Threshold
+				accusationCount = len(pure.Accusations)
+				apologyCount = len(pure.Apologies)
 				pureBytes, err = shdb.EncodePureDKGResult(&result)
 				if err != nil {
 					return errors.Wrap(err, "encode pure DKG result")
@@ -294,10 +303,17 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 		}
 	}
 
-	log.Info().
+	event := log.Info().
 		Int64("keyper-config-index", keyperConfigIndex).
-		Int64("retry-counter", retryCounter).
-		Msg("recording DKG success")
+		Int64("retry-counter", retryCounter)
+	if hasResult {
+		event = event.
+			Uint64("keyper-count", resultNumKeypers).
+			Uint64("threshold", resultThreshold).
+			Int("accusation-count", accusationCount).
+			Int("apology-count", apologyCount)
+	}
+	event.Msg("DKG succeeded")
 	return queries.InsertDKGResult(ctx, corekeyperdb.InsertDKGResultParams{
 		Eon:        keyperConfigIndex,
 		Success:    true,

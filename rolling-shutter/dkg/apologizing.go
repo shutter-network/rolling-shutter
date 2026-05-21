@@ -36,6 +36,7 @@ func (m *Manager) maybeApologize(
 	dkgAddr common.Address,
 	keyperConfigIndex, retryCounter int64,
 	pure *puredkg.PureDKG,
+	keypers []common.Address,
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
@@ -53,18 +54,20 @@ func (m *Manager) maybeApologize(
 
 	apologies := pure.StartPhase3Apologizing()
 	if len(apologies) == 0 {
-		log.Debug().
+		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
-			Msg("no DKG apologies to submit: nobody accused us")
+			Msg("Not sending apologies, nobody accused us")
 		return nil
 	}
 
 	accuserIndices := make([]uint64, 0, len(apologies))
+	accuserDescriptions := make([]string, 0, len(apologies))
 	polyEvalData := make([][]byte, 0, len(apologies))
 	for _, ap := range apologies {
 		evalBytes := ap.Eval.Bytes()
 		accuserIndices = append(accuserIndices, ap.Accuser)
+		accuserDescriptions = append(accuserDescriptions, fmt.Sprintf("%d (%s)", ap.Accuser, keypers[ap.Accuser].Hex()))
 		polyEvalData = append(polyEvalData, evalBytes)
 	}
 
@@ -100,7 +103,7 @@ func (m *Manager) maybeApologize(
 		Int64("keyper-config-index", keyperConfigIndex).
 		Int64("retry-counter", retryCounter).
 		Int("count", len(accuserIndices)).
-		Int64("tx-outbox-id", outboxID).
-		Msg("enqueued DKG apologies")
+		Strs("accusers", accuserDescriptions).
+		Msg("submitting DKG apologies")
 	return nil
 }

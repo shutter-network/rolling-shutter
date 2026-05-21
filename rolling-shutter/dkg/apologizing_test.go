@@ -150,7 +150,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 
 	// Write tx: dispatch maybeApologize with the snapshot from the read tx.
 	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+		return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
 	})
 	assert.NilError(t, err, "maybeApologize must tolerate a late accusation arriving between read tx and write tx")
 

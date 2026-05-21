@@ -38,6 +38,7 @@ func (m *Manager) maybeAccuse(
 	dkgAddr common.Address,
 	keyperConfigIndex, retryCounter int64,
 	pure *puredkg.PureDKG,
+	keypers []common.Address,
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
@@ -55,16 +56,18 @@ func (m *Manager) maybeAccuse(
 
 	accusations := pure.StartPhase2Accusing()
 	if len(accusations) == 0 {
-		log.Debug().
+		log.Info().
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
-			Msg("no DKG accusations to submit: all dealers honest")
+			Msg("Not sending accusations, no misbehavior detected")
 		return nil
 	}
 
 	accusedIndices := make([]uint64, 0, len(accusations))
+	accusedDescriptions := make([]string, 0, len(accusations))
 	for _, a := range accusations {
 		accusedIndices = append(accusedIndices, a.Accused)
+		accusedDescriptions = append(accusedDescriptions, fmt.Sprintf("%d (%s)", a.Accused, keypers[a.Accused].Hex()))
 	}
 
 	abi, err := contract.DKGContractMetaData.GetAbi()
@@ -98,7 +101,7 @@ func (m *Manager) maybeAccuse(
 		Int64("keyper-config-index", keyperConfigIndex).
 		Int64("retry-counter", retryCounter).
 		Int("count", len(accusedIndices)).
-		Int64("tx-outbox-id", outboxID).
-		Msg("enqueued DKG accusations")
+		Strs("accused", accusedDescriptions).
+		Msg("submitting DKG accusations")
 	return nil
 }
