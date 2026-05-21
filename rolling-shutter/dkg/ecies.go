@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
@@ -72,7 +73,8 @@ func (m *Manager) maybeRegisterECIESKey(ctx context.Context, eon corekeyperdb.Eo
 		if err != nil {
 			return errors.Wrap(err, "pack registerKey calldata")
 		}
-		outboxID, err := txsender.EnqueueTx(ctx, tx, m.cfg.ECIESRegistryAddr, data, nil)
+		label := fmt.Sprintf("registerKey ksi=%d", eon.KeyperConfigIndex)
+		outboxID, err := txsender.EnqueueTx(ctx, tx, m.cfg.ECIESRegistryAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue registerKey tx")
 		}

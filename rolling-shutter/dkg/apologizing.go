@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -89,7 +90,8 @@ func (m *Manager) startApologizing(ctx context.Context, dkgAddr common.Address, 
 		if err != nil {
 			return errors.Wrap(err, "pack submitApology calldata")
 		}
-		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		label := fmt.Sprintf("submitApology ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue submitApology tx")
 		}

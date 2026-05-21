@@ -148,8 +148,8 @@ WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY apologizer_index, accuser_index;
 
 -- name: InsertPendingTx :one
-INSERT INTO tx_outbox (to_address, data, value)
-VALUES ($1, $2, $3)
+INSERT INTO tx_outbox (to_address, data, value, label)
+VALUES ($1, $2, $3, $4)
 RETURNING id;
 
 -- name: GetPendingTxs :many

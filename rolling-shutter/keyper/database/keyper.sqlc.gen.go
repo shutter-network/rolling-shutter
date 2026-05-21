@@ -483,7 +483,7 @@ func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, ke
 }
 
 const getPendingTxs = `-- name: GetPendingTxs :many
-SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at, label FROM tx_outbox
 WHERE status = 'pending'
 ORDER BY id
 `
@@ -508,6 +508,7 @@ func (q *Queries) GetPendingTxs(ctx context.Context) ([]TxOutbox, error) {
 			&i.Error,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Label,
 		); err != nil {
 			return nil, err
 		}
@@ -520,7 +521,7 @@ func (q *Queries) GetPendingTxs(ctx context.Context) ([]TxOutbox, error) {
 }
 
 const getSubmittedTxs = `-- name: GetSubmittedTxs :many
-SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at, label FROM tx_outbox
 WHERE status = 'submitted'
 ORDER BY id
 `
@@ -545,6 +546,7 @@ func (q *Queries) GetSubmittedTxs(ctx context.Context) ([]TxOutbox, error) {
 			&i.Error,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Label,
 		); err != nil {
 			return nil, err
 		}
@@ -557,7 +559,7 @@ func (q *Queries) GetSubmittedTxs(ctx context.Context) ([]TxOutbox, error) {
 }
 
 const getTxOutboxByID = `-- name: GetTxOutboxByID :one
-SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at FROM tx_outbox WHERE id = $1
+SELECT id, to_address, data, value, status, tx_hash, nonce, error, created_at, updated_at, label FROM tx_outbox WHERE id = $1
 `
 
 func (q *Queries) GetTxOutboxByID(ctx context.Context, id int64) (TxOutbox, error) {
@@ -574,6 +576,7 @@ func (q *Queries) GetTxOutboxByID(ctx context.Context, id int64) (TxOutbox, erro
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Label,
 	)
 	return i, err
 }
@@ -762,8 +765,8 @@ func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 }
 
 const insertPendingTx = `-- name: InsertPendingTx :one
-INSERT INTO tx_outbox (to_address, data, value)
-VALUES ($1, $2, $3)
+INSERT INTO tx_outbox (to_address, data, value, label)
+VALUES ($1, $2, $3, $4)
 RETURNING id
 `
 
@@ -771,10 +774,16 @@ type InsertPendingTxParams struct {
 	ToAddress string
 	Data      []byte
 	Value     pgtype.Numeric
+	Label     string
 }
 
 func (q *Queries) InsertPendingTx(ctx context.Context, arg InsertPendingTxParams) (int64, error) {
-	row := q.db.QueryRow(ctx, insertPendingTx, arg.ToAddress, arg.Data, arg.Value)
+	row := q.db.QueryRow(ctx, insertPendingTx,
+		arg.ToAddress,
+		arg.Data,
+		arg.Value,
+		arg.Label,
+	)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

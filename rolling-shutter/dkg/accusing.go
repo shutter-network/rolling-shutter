@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -88,7 +89,8 @@ func (m *Manager) startAccusing(ctx context.Context, dkgAddr common.Address, key
 		if err != nil {
 			return errors.Wrap(err, "pack submitAccusation calldata")
 		}
-		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		label := fmt.Sprintf("submitAccusation ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue submitAccusation tx")
 		}

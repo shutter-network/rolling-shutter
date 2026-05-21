@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/assert"
 
@@ -262,6 +263,39 @@ func TestSubmitRowSkipsSendWhenMarkSubmittedFails(t *testing.T) {
 
 	assert.Equal(t, int32(0), atomic.LoadInt32(&fc.sendTransactionCallCount),
 		"SendTransaction must not be called when MarkTxSubmitted fails")
+}
+
+// TestEnqueueTxPersistsLabel verifies that a label passed to EnqueueTx is
+// stored on the row and readable back via the standard query path.
+func TestEnqueueTxPersistsLabel(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	const wantLabel = "submitDealing ksi=7 retry=2"
+
+	var id int64
+	err := dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var inner error
+		id, inner = EnqueueTx(
+			ctx,
+			tx,
+			common.HexToAddress("0x000000000000000000000000000000000000dead"),
+			[]byte{0x01, 0x02, 0x03},
+			big.NewInt(0),
+			wantLabel,
+		)
+		return inner
+	})
+	assert.NilError(t, err)
+
+	row, err := corekeyperdb.New(dbpool).GetTxOutboxByID(ctx, id)
+	assert.NilError(t, err)
+	assert.Equal(t, wantLabel, row.Label)
 }
 
 type stubError string

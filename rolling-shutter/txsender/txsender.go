@@ -141,7 +141,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 
 	value, err := numericToBigInt(row.Value)
 	if err != nil {
-		s.markFailed(ctx, row.ID, errors.Wrap(err, "decode tx_outbox value"))
+		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "decode tx_outbox value"))
 		return
 	}
 	to := common.HexToAddress(row.ToAddress)
@@ -150,7 +150,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	if err != nil {
 		// Transient network error — leave the row pending so the next tick
 		// retries.
-		log.Warn().Err(err).Int64("id", row.ID).Msg("tx outbox: read nonce")
+		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: read nonce")
 		return
 	}
 	gasLimit, err := s.cfg.Client.EstimateGas(ctx, ethereum.CallMsg{
@@ -162,12 +162,12 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	if err != nil {
 		// Gas estimation failures usually mean the transaction would revert;
 		// record it as failed so an operator can inspect the calldata.
-		s.markFailed(ctx, row.ID, errors.Wrap(err, "estimate gas"))
+		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
 		return
 	}
 	gasPrice, err := s.cfg.Client.SuggestGasPrice(ctx)
 	if err != nil {
-		log.Warn().Err(err).Int64("id", row.ID).Msg("tx outbox: suggest gas price")
+		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: suggest gas price")
 		return
 	}
 
@@ -181,7 +181,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	})
 	signed, err := types.SignTx(tx, types.LatestSignerForChainID(s.chainID), s.cfg.PrivateKey)
 	if err != nil {
-		s.markFailed(ctx, row.ID, errors.Wrap(err, "sign transaction"))
+		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "sign transaction"))
 		return
 	}
 
@@ -198,6 +198,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	}); err != nil {
 		log.Error().Err(err).
 			Int64("id", row.ID).
+			Str("label", row.Label).
 			Str("tx-hash", signed.Hash().Hex()).
 			Msg("tx outbox: mark submitted failed; skipping send")
 		return
@@ -209,12 +210,13 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		// cases — MarkTxFailed has no precondition on the current status so
 		// the submitted -> failed transition is valid. Re-broadcast logic for
 		// stuck submitted rows (without on-chain inclusion) is out of scope.
-		s.markFailed(ctx, row.ID, errors.Wrap(err, "send transaction"))
+		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "send transaction"))
 		return
 	}
 
 	log.Info().
 		Int64("id", row.ID).
+		Str("label", row.Label).
 		Str("to", row.ToAddress).
 		Str("tx-hash", signed.Hash().Hex()).
 		Uint64("nonce", nonce).
@@ -241,7 +243,7 @@ func (s *TxSender) processSubmitted(ctx context.Context) error {
 func (s *TxSender) checkReceipt(ctx context.Context, row corekeyperdb.TxOutbox) {
 	if !row.TxHash.Valid {
 		// Submitted without a tx hash is a bug — flag it and stop polling.
-		s.markFailed(ctx, row.ID, errors.New("submitted row has no tx_hash"))
+		s.markFailed(ctx, row.ID, row.Label, errors.New("submitted row has no tx_hash"))
 		return
 	}
 	queries := corekeyperdb.New(s.cfg.DBPool)
@@ -251,39 +253,48 @@ func (s *TxSender) checkReceipt(ctx context.Context, row corekeyperdb.TxOutbox) 
 		if errors.Is(err, ethereum.NotFound) {
 			return
 		}
-		log.Warn().Err(err).Int64("id", row.ID).Str("tx-hash", row.TxHash.String).
+		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Str("tx-hash", row.TxHash.String).
 			Msg("tx outbox: fetch receipt")
 		return
 	}
 	if receipt.Status == types.ReceiptStatusSuccessful {
 		if err := queries.MarkTxConfirmed(ctx, row.ID); err != nil {
-			log.Error().Err(err).Int64("id", row.ID).Msg("tx outbox: mark confirmed")
+			log.Error().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: mark confirmed")
+			return
 		}
+		log.Info().Int64("id", row.ID).Str("label", row.Label).Str("tx-hash", row.TxHash.String).
+			Msg("tx outbox: confirmed")
 		return
 	}
-	s.markFailed(ctx, row.ID, errors.Errorf("tx receipt status %d", receipt.Status))
+
+	s.markFailed(ctx, row.ID, row.Label, errors.Errorf("tx receipt status %d", receipt.Status))
 }
 
-func (s *TxSender) markFailed(ctx context.Context, id int64, cause error) {
-	log.Error().Err(cause).Int64("id", id).Msg("tx outbox: marking failed")
+func (s *TxSender) markFailed(ctx context.Context, id int64, label string, cause error) {
+	log.Error().Err(cause).Int64("id", id).Str("label", label).Msg("tx outbox: marking failed")
 	queries := corekeyperdb.New(s.cfg.DBPool)
 	if err := queries.MarkTxFailed(ctx, corekeyperdb.MarkTxFailedParams{
 		ID:    id,
 		Error: sql.NullString{String: cause.Error(), Valid: true},
 	}); err != nil {
-		log.Error().Err(err).Int64("id", id).Msg("tx outbox: mark failed update")
+		log.Error().Err(err).Int64("id", id).Str("label", label).Msg("tx outbox: mark failed update")
 	}
 }
 
 // EnqueueTx inserts a pending row into `tx_outbox`. Producers use this from
 // within their own database transactions so the intent to send a transaction
 // is committed atomically with the state that motivated it.
+//
+// The label is an opaque, caller-supplied string. TxSender stores it as-is
+// and includes it in every log line for the row so operators can identify
+// what a transaction is for without decoding calldata.
 func EnqueueTx(
 	ctx context.Context,
 	tx pgx.Tx,
 	to common.Address,
 	data []byte,
 	value *big.Int,
+	label string,
 ) (int64, error) {
 	num, err := bigIntToNumeric(value)
 	if err != nil {
@@ -293,6 +304,7 @@ func EnqueueTx(
 		ToAddress: to.Hex(),
 		Data:      data,
 		Value:     num,
+		Label:     label,
 	})
 }
 
