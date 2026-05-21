@@ -82,7 +82,6 @@ func setupDKGTestEnv(ctx context.Context, t *testing.T) *dkgTestEnv {
 		DBPool:            dbpool,
 		OwnAddress:        ownAddr,
 		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
-		DKGContractAddr:   dkgAddr,
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 

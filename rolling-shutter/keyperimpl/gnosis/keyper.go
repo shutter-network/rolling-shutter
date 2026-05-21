@@ -145,7 +145,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		kpr.dbpool,
 		kpr.config.GetAddress(),
 		kpr.config.ECIESPrivateKey.Key,
-		kpr.config.Gnosis.Contracts.DKGContract,
 		kpr.config.Gnosis.Contracts.ECIESKeyRegistry,
 	))
 

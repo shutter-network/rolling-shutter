@@ -59,7 +59,6 @@ func TestMaybeRegisterECIESKeyIsIdempotent(t *testing.T) {
 		DBPool:            dbpool,
 		OwnAddress:        ownAddr,
 		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
-		DKGContractAddr:   common.HexToAddress("0xd0000000000000000000000000000000000000aa"),
 		ECIESRegistryAddr: registryAddr,
 	})
 
@@ -130,7 +129,6 @@ func TestMaybeRegisterECIESKeyNotMemberIsNoop(t *testing.T) {
 		DBPool:            dbpool,
 		OwnAddress:        ownAddr,
 		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
-		DKGContractAddr:   common.HexToAddress("0xd0000000000000000000000000000000000000aa"),
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 
