@@ -1,0 +1,68 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Fund keyper Ethereum addresses with ETH from ANVIL_KEY_0 if balance is zero"
+
+import os
+from pathlib import Path
+
+import utils
+
+
+FUND_VALUE = "1000ether"
+ANVIL_RPC_URL = "http://ethereum:8545"
+
+
+def cast_balance(address: str) -> int:
+    result = utils.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--entrypoint",
+            "cast",
+            "contracts",
+            "balance",
+            "--rpc-url",
+            ANVIL_RPC_URL,
+            address,
+        ],
+        capture_output=True,
+    )
+    return int(result.stdout.strip())
+
+
+def cast_send_fund(address: str, value: str, private_key: str) -> None:
+    utils.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--entrypoint",
+            "cast",
+            "contracts",
+            "send",
+            "--rpc-url",
+            ANVIL_RPC_URL,
+            "--private-key",
+            private_key,
+            "--value",
+            value,
+            address,
+        ]
+    )
+
+
+data_dir = Path(os.environ["DATA_DIR"])
+num_keypers = int(os.environ["NUM_KEYPERS"])
+private_key = os.environ["ANVIL_KEY_0"]
+
+for index in range(num_keypers):
+    config_path = data_dir / f"keyper-{index}.toml"
+    address = utils.keyper_address(config_path)
+    balance = cast_balance(address)
+    if balance > 0:
+        print(f"keyper-{index} ({address}) balance={balance} wei; skipping")
+        continue
+    print(f"keyper-{index} ({address}) balance=0; funding with {FUND_VALUE}")
+    cast_send_fund(address, FUND_VALUE, private_key)
