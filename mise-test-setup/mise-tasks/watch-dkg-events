@@ -10,12 +10,13 @@ import utils
 
 
 # Event signature hashes match those in show-dkg-status.
+DKG_SUCCEEDED_TOPIC = "0xe6c9bd3daa50b9218615605cdf333410d405b7f3b8dbeee5a2373769679aa9f5"
 EVENT_NAMES = {
     "0xa5074728b92791250d48ccdc55266aca7b1cca22f89e1ef2ab91ccd7ae0f337d": "DealingSubmitted",
     "0xb5cc05e740a503c13e1b7ac3ad2d5abf41b91d2e5fca79455d34e515fb70849a": "AccusationSubmitted",
     "0x62729f0820cf3ab60fbd63a51cdeae0554d0ab24f843b86bd0d2591594d69136": "ApologySubmitted",
     "0xacfc0aa3f6ba36ac0ffda53e00d2cdace2fd4a9e41e2fe3214032794332c37c3": "SuccessVoteSubmitted",
-    "0xe6c9bd3daa50b9218615605cdf333410d405b7f3b8dbeee5a2373769679aa9f5": "DKGSucceeded",
+    DKG_SUCCEEDED_TOPIC: "DKGSucceeded",
 }
 
 # AccusationSubmitted and ApologySubmitted both carry a uint64[] of indices as
@@ -104,6 +105,24 @@ def passes_filter(ev: dict, ksi_filter: int | None, retry_filter: int | None) ->
     return True
 
 
+def is_terminal_dkg_succeeded(ev: dict, ksi_filter: int | None) -> bool:
+    """True when this event should auto-stop the watcher.
+
+    Only fires when a ksi filter is active and the event is a `DKGSucceeded`
+    for that ksi. The retry filter is intentionally ignored here: a
+    `DKGSucceeded` log terminates the entire DKG cycle for the ksi, so even a
+    watcher pinned to a non-final retry should be notified and exit.
+    """
+    if ksi_filter is None:
+        return False
+    topics = ev.get("topics", [])
+    if not topics or topics[0].lower() != DKG_SUCCEEDED_TOPIC:
+        return False
+    if len(topics) < 2 or utils.topic_to_uint(topics[1]) != ksi_filter:
+        return False
+    return True
+
+
 ksi_raw = os.environ.get("usage_ksi", "").strip()
 retry_raw = os.environ.get("usage_retry", "").strip()
 ksi_filter = int(ksi_raw) if ksi_raw else None
@@ -134,11 +153,14 @@ try:
                 )
             )
             for ev in events:
-                if not passes_filter(ev, ksi_filter, retry_filter):
+                auto_stop = is_terminal_dkg_succeeded(ev, ksi_filter)
+                if not auto_stop and not passes_filter(ev, ksi_filter, retry_filter):
                     continue
                 line = format_event(ev)
                 if line is not None:
                     print(line, flush=True)
+                if auto_stop:
+                    raise SystemExit(0)
             next_block = head + 1
         time.sleep(poll_interval)
 except KeyboardInterrupt:
