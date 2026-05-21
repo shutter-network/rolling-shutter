@@ -108,44 +108,53 @@ SELECT EXISTS (
 );
 
 -- name: InsertDKGPolyCommitment :exec
-INSERT INTO dkg_poly_commitment (keyper_config_index, retry_counter, keyper_index, commitment)
+INSERT INTO dkg_poly_commitments (keyper_config_index, retry_counter, keyper_index, commitment)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING;
 
 -- name: GetDKGPolyCommitments :many
-SELECT * FROM dkg_poly_commitment
+SELECT * FROM dkg_poly_commitments
 WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY keyper_index;
 
 -- name: InsertDKGPolyEval :exec
-INSERT INTO dkg_poly_eval (keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval)
+INSERT INTO dkg_poly_evals (keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING;
 
 -- name: GetDKGPolyEvals :many
-SELECT * FROM dkg_poly_eval
+SELECT * FROM dkg_poly_evals
 WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY sender_index, receiver_index;
 
 -- name: InsertDKGAccusation :exec
-INSERT INTO dkg_accusation (keyper_config_index, retry_counter, accuser_index, accused_index)
+INSERT INTO dkg_accusations (keyper_config_index, retry_counter, accuser_index, accused_index)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING;
 
 -- name: GetDKGAccusations :many
-SELECT * FROM dkg_accusation
+SELECT * FROM dkg_accusations
 WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY accuser_index, accused_index;
 
 -- name: InsertDKGApology :exec
-INSERT INTO dkg_apology (keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval)
+INSERT INTO dkg_apologies (keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING;
 
 -- name: GetDKGApologies :many
-SELECT * FROM dkg_apology
+SELECT * FROM dkg_apologies
 WHERE keyper_config_index = $1 AND retry_counter = $2
 ORDER BY apologizer_index, accuser_index;
+
+-- name: InsertDKGInitialState :exec
+INSERT INTO dkg_initial_states (keyper_config_index, retry_counter, puredkg_bytes)
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING;
+
+-- name: GetDKGInitialState :one
+SELECT * FROM dkg_initial_states
+WHERE keyper_config_index = $1 AND retry_counter = $2;
 
 -- name: InsertPendingTx :one
 INSERT INTO tx_outbox (to_address, data, value, label)

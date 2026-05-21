@@ -43,6 +43,12 @@ type DkgApology struct {
 	PolyEval          []byte
 }
 
+type DkgInitialState struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	PuredkgBytes      []byte
+}
+
 type DkgPolyCommitment struct {
 	KeyperConfigIndex int64
 	RetryCounter      int64
