@@ -14,6 +14,7 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -288,4 +289,115 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 		RetryCounter:      retryCounter,
 	})
 	assert.Assert(t, err != nil, "no initial state row should be written when sent action exists")
+}
+
+// TestMaybeDealSubstitutesEmptyEvalForMissingECIESKey asserts the graceful-
+// fallback behavior added for the "single misconfigured keyper must not block
+// the entire DKG" problem: when one receiver has no `ecies_keys` row, the
+// dealing is still enqueued, the `polyEvals` array still has length N−1, and
+// the slot for the missing receiver is empty bytes (positional semantics
+// preserved). Other receivers' slots remain populated with valid ciphertexts.
+func TestMaybeDealSubstitutesEmptyEvalForMissingECIESKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	const (
+		keyperConfigIndex int64 = 11
+		retryCounter      int64 = 0
+	)
+
+	// Build a 3-keyper set where we are the keyper at index 1, the receiver
+	// at index 0 has no ECIES key, and the receiver at index 2 does.
+	ownECDSA, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	ownAddr := crypto.PubkeyToAddress(ownECDSA.PublicKey)
+	other0, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	other0Addr := crypto.PubkeyToAddress(other0.PublicKey)
+	other2, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	other2Addr := crypto.PubkeyToAddress(other2.PublicKey)
+	keypers := []common.Address{other0Addr, ownAddr, other2Addr}
+
+	obsQueries := obskeyperdb.New(dbpool)
+	err = obsQueries.InsertKeyperSet(ctx, obskeyperdb.InsertKeyperSetParams{
+		KeyperConfigIndex:     keyperConfigIndex,
+		ActivationBlockNumber: 0,
+		Keypers:               shdb.EncodeAddresses(keypers),
+		Threshold:             2,
+	})
+	assert.NilError(t, err)
+
+	coreQueries := corekeyperdb.New(dbpool)
+	// Register ECIES keys for self and `other2` only; `other0` is intentionally
+	// absent — simulating a keyper that has not (yet) registered.
+	for _, kp := range []struct {
+		addr common.Address
+		key  *ecies.PrivateKey
+	}{
+		{addr: ownAddr, key: ecies.ImportECDSA(ownECDSA)},
+		{addr: other2Addr, key: ecies.ImportECDSA(other2)},
+	} {
+		err = coreQueries.UpsertECIESKey(ctx, corekeyperdb.UpsertECIESKeyParams{
+			KeyperAddress:  shdb.EncodeAddress(kp.addr),
+			EciesPublicKey: shdb.EncodeEciesPublicKey(&kp.key.PublicKey),
+		})
+		assert.NilError(t, err)
+	}
+
+	dkgAddr := common.HexToAddress("0xd0000000000000000000000000000000000000aa")
+	mgr := New(Config{
+		DBPool:            dbpool,
+		OwnAddress:        ownAddr,
+		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
+		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
+	})
+
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
+	assert.NilError(t, err, "missing ECIES key for one receiver must not abort dealing")
+
+	// Dealing was enqueued — initial state, sent-action marker, and tx_outbox
+	// row must all be present.
+	_, err = coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+	})
+	assert.NilError(t, err, "initial state row should be written despite missing ECIES key")
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionDealing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should be written for the dealing action")
+
+	pending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(pending), "one submitDealing outbox row expected")
+	assert.Equal(t, dkgAddr.Hex(), pending[0].ToAddress)
+
+	// Decode the submitDealing calldata to inspect the polyEvals payload.
+	// Calldata layout is [4-byte selector][ABI-encoded args].
+	abi, err := contract.DKGContractMetaData.GetAbi()
+	assert.NilError(t, err)
+	method, ok := abi.Methods["submitDealing"]
+	assert.Assert(t, ok, "submitDealing method must be present on the ABI")
+	assert.Assert(t, len(pending[0].Data) >= 4, "calldata must contain the 4-byte selector")
+	args, err := method.Inputs.Unpack(pending[0].Data[4:])
+	assert.NilError(t, err)
+	polyEvals, ok := args[4].([][]byte)
+	assert.Assert(t, ok, "polyEvals arg must decode to [][]byte")
+
+	// N=3, sender index 1 → receivers [0, 2] → polyEvals length 2.
+	// Slot 0 corresponds to receiver 0 (missing key, empty); slot 1 to
+	// receiver 2 (present, non-empty ciphertext).
+	assert.Equal(t, 2, len(polyEvals), "polyEvals length must equal N-1")
+	assert.Equal(t, 0, len(polyEvals[0]), "missing-key slot must be empty bytes")
+	assert.Assert(t, len(polyEvals[1]) > 0, "present-key slot must contain ciphertext")
 }
