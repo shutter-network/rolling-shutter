@@ -37,14 +37,15 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		Bool("is-member", isMember).
 		Msg("new keyper set added")
 
-	return kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+	keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
+	if err != nil {
+		return errors.Wrap(err, ErrParseKeyperSet.Error())
+	}
+
+	if err := kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
 		coredb := corekeyperdb.New(tx)
 
-		keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
-		if err != nil {
-			return errors.Wrap(err, ErrParseKeyperSet.Error())
-		}
 		activationBlockNumber, err := medley.Uint64ToInt64Safe(ev.ActivationBlock)
 		if err != nil {
 			return errors.Wrap(err, ErrParseKeyperSet.Error())
@@ -86,7 +87,15 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	// ECIES key registration runs at the same architectural level as
+	// HandleBlock — once per discovered keyper set, after the keyper set
+	// row is committed (MaybeRegisterECIESKey reads it). It is idempotent
+	// and a no-op for non-members.
+	return kpr.dkgMgr.MaybeRegisterECIESKey(ctx, keyperConfigIndex)
 }
 
 // fetchDKGParamsForKeyperSet asks the keyper set contract for its DKG contract

@@ -16,11 +16,11 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
-// maybeRegisterECIESKey enqueues a `registerKey` outbox row for the ECIES
-// key registry if we are a member of the given eon's keyper set and our
-// public key is not yet present in `ecies_keys`. The DB cache is populated
-// by the host keyper's ECIES syncer (both initial poll and live events) and
-// is the source of truth for prior registrations.
+// MaybeRegisterECIESKey enqueues a `registerKey` outbox row for the ECIES
+// key registry if we are a member of the given keyper set and our public
+// key is not yet present in `ecies_keys`. The DB cache is populated by the
+// host keyper's ECIES syncer (both initial poll and live events) and is the
+// source of truth for prior registrations.
 //
 // Per ADR 0004 this writes to `tx_outbox` instead of calling the registry
 // directly; `TxSender` handles signing and submission. The check is
@@ -28,17 +28,17 @@ import (
 // subsequent calls become no-ops.
 //
 // The destination address is the manager's configured `ECIESRegistryAddr`
-// (a single registry serves all keyper sets).
-func (m *Manager) maybeRegisterECIESKey(ctx context.Context, eon corekeyperdb.Eon) error {
-	// Resolve membership: pull the keyper set, locate own index. A
-	// non-member keyper has nothing to register for this eon.
+// (a single registry serves all keyper sets). This is intended to be called
+// by the host keyper's Keyper Set Syncer handler once per discovered keyper
+// set, at the same architectural level as `HandleBlock`.
+func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperConfigIndex int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obsQueries := obskeyper.New(tx)
 		coreQueries := corekeyperdb.New(tx)
 
-		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
+		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
 		if err != nil {
-			return errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
+			return errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
 		}
 		ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
 		if err != nil {
@@ -66,20 +66,20 @@ func (m *Manager) maybeRegisterECIESKey(ctx context.Context, eon corekeyperdb.Eo
 		}
 		data, err := abi.Pack(
 			"registerKey",
-			uint64(eon.KeyperConfigIndex),
+			uint64(keyperConfigIndex),
 			ownIndex,
 			pubKey,
 		)
 		if err != nil {
 			return errors.Wrap(err, "pack registerKey calldata")
 		}
-		label := fmt.Sprintf("registerKey ksi=%d", eon.KeyperConfigIndex)
+		label := fmt.Sprintf("registerKey ksi=%d", keyperConfigIndex)
 		outboxID, err := txsender.EnqueueTx(ctx, tx, m.cfg.ECIESRegistryAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue registerKey tx")
 		}
 		log.Info().
-			Int64("keyper-config-index", eon.KeyperConfigIndex).
+			Int64("keyper-config-index", keyperConfigIndex).
 			Uint64("keyper-index", ownIndex).
 			Int64("tx-outbox-id", outboxID).
 			Msg("enqueued ECIES key registration")
