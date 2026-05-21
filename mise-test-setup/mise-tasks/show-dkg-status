@@ -1,0 +1,122 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Print on-chain DKG state for a Keyper Set Index"
+#USAGE flag "--ksi <ksi>" help="Keyper Set Index to inspect (default: latest registered)"
+#USAGE flag "--retry <retry>" help="Limit output to a single retry counter (default: all retries up to current)"
+
+import os
+
+import utils
+
+
+# Event signature hashes (keccak256 of the canonical event signatures from DKGContract.sol).
+TOPIC_DEALING = "0xa5074728b92791250d48ccdc55266aca7b1cca22f89e1ef2ab91ccd7ae0f337d"
+TOPIC_ACCUSATION = "0xb5cc05e740a503c13e1b7ac3ad2d5abf41b91d2e5fca79455d34e515fb70849a"
+TOPIC_APOLOGY = "0x62729f0820cf3ab60fbd63a51cdeae0554d0ab24f843b86bd0d2591594d69136"
+TOPIC_VOTE = "0xacfc0aa3f6ba36ac0ffda53e00d2cdace2fd4a9e41e2fe3214032794332c37c3"
+TOPIC_SUCCEEDED = "0xe6c9bd3daa50b9218615605cdf333410d405b7f3b8dbeee5a2373769679aa9f5"
+
+SUBMITTER_EVENTS = {
+    TOPIC_DEALING: "Dealings",
+    TOPIC_ACCUSATION: "Accusations",
+    TOPIC_APOLOGY: "Apologies",
+    TOPIC_VOTE: "Votes",
+}
+
+PHASE_NAMES = ["None", "Dealing", "Accusing", "Apologizing", "Finalizing"]
+
+
+def phase_for_offset(offset: int, phase_len: int) -> int:
+    if offset < 0:
+        return 0
+    if offset < phase_len:
+        return 1
+    if offset < 2 * phase_len:
+        return 2
+    if offset < 3 * phase_len:
+        return 3
+    if offset < 4 * phase_len:
+        return 4
+    return 0
+
+
+def collect_submitters(events: list[dict], topic0: str, ksi: int, retry: int) -> list[int]:
+    indices: set[int] = set()
+    for ev in events:
+        topics = ev.get("topics", [])
+        if len(topics) < 4:
+            continue
+        if topics[0].lower() != topic0:
+            continue
+        if utils.topic_to_uint(topics[1]) != ksi:
+            continue
+        if utils.topic_to_uint(topics[2]) != retry:
+            continue
+        indices.add(utils.topic_to_uint(topics[3]))
+    return sorted(indices)
+
+
+def print_instance(
+    ksi: int,
+    retry: int,
+    current_block: int,
+    phase_len: int,
+    cycle_len: int,
+    succeeded: bool,
+    events: list[dict],
+) -> None:
+    start = utils.get_dkg_start(ksi, retry)
+    offset = current_block - start
+    phase_idx = phase_for_offset(offset, phase_len)
+    phase_name = PHASE_NAMES[phase_idx]
+
+    print(f"=== DKG Instance (ksi={ksi}, retry={retry}) ===")
+    print(f"  current block: {current_block}")
+    print(f"  dkg start:     {start}")
+    print(
+        f"  phase windows: Dealing [{start}-{start + phase_len - 1}], "
+        f"Accusing [{start + phase_len}-{start + 2 * phase_len - 1}], "
+        f"Apologizing [{start + 2 * phase_len}-{start + 3 * phase_len - 1}], "
+        f"Finalizing [{start + 3 * phase_len}-{start + 4 * phase_len - 1}]"
+    )
+    if phase_idx == 0:
+        if offset < 0:
+            print(f"  current phase: None (starts in {-offset} blocks)")
+        else:
+            print(f"  current phase: None (cycle ended {offset - cycle_len} blocks ago)")
+    else:
+        phase_end = start + phase_idx * phase_len - 1
+        remaining = phase_end - current_block
+        print(f"  current phase: {phase_name} ({remaining} blocks remaining)")
+    print(f"  ksi succeeded on-chain: {'yes' if succeeded else 'no'}")
+
+    for topic, label in SUBMITTER_EVENTS.items():
+        submitters = collect_submitters(events, topic, ksi, retry)
+        if submitters:
+            indices_str = ", ".join(str(i) for i in submitters)
+        else:
+            indices_str = "(none)"
+        print(f"  {label:<13} keyper indices: {indices_str}")
+    print()
+
+
+ksi_raw = os.environ.get("usage_ksi", "").strip()
+retry_raw = os.environ.get("usage_retry", "").strip()
+
+ksi = int(ksi_raw) if ksi_raw else utils.get_latest_keyper_set_index()
+
+phase_len = utils.get_phase_length()
+cycle_len = utils.get_cycle_length()
+current_block = utils.cast_block_number()
+succeeded = utils.get_succeeded(ksi)
+
+dkg_address = utils.get_deployed_address("DKGContract")
+events = utils.cast_logs_at_address(dkg_address)
+
+if retry_raw:
+    retries = [int(retry_raw)]
+else:
+    derived = utils.derive_retry_counter(ksi)
+    retries = list(range(derived + 1))
+
+for retry in retries:
+    print_instance(ksi, retry, current_block, phase_len, cycle_len, succeeded, events)
