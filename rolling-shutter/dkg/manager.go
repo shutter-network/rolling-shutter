@@ -19,6 +19,17 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
+// Action names recorded in the `dkg_sent_actions` table by each reactor on
+// the success path. The table is the uniform idempotency store across all
+// four reactors; `maybeFinalize` writes a row for auditability but uses
+// `ExistsDKGResultSuccess` as its entry guard.
+const (
+	ActionDealing     = "dealing"
+	ActionAccusing    = "accusing"
+	ActionApologizing = "apologizing"
+	ActionFinalizing  = "finalizing"
+)
+
 // Config carries the dependencies needed to run a DKG Manager. The manager
 // reads chain state exclusively through the database (populated by the host
 // keyper's chain syncers) and writes both message rows and outbox tx intents

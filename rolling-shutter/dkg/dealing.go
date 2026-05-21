@@ -18,13 +18,14 @@ import (
 )
 
 // maybeDeal is the per-block reactor for the Dealing phase. Idempotency is
-// keyed on the presence of an initial-state row in `dkg_initial_states`; if
-// one exists for `(k, r)` the call is a no-op. Otherwise we sample a
-// polynomial via `puredkg.StartPhase1Dealing`, persist the resulting puredkg
-// state (so accusations/apologies can be produced on later blocks even after
-// a process restart), persist our own commitment + per-receiver evals, and
-// enqueue a `submitDealing` row in `tx_outbox` for `TxSender` to sign and
-// submit.
+// keyed on the presence of a `dkg_sent_actions` row for
+// `(keyperConfigIndex, retryCounter, "dealing")`; if one exists the call is a
+// no-op. Otherwise we sample a polynomial via `puredkg.StartPhase1Dealing`,
+// persist the resulting puredkg state (so accusations/apologies can be
+// produced on later blocks even after a process restart), persist our own
+// commitment + per-receiver evals, enqueue a `submitDealing` row in
+// `tx_outbox` for `TxSender` to sign and submit, and insert the
+// `dkg_sent_actions` marker atomically with the outbox row.
 //
 // The caller owns the (write) transaction and is responsible for committing
 // or rolling back. `pure`, `keypers`, and `ownIndex` come from a prior read
@@ -39,15 +40,16 @@ func (m *Manager) maybeDeal(
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
-	_, err := queries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
+	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
+		Action:            ActionDealing,
 	})
-	if err == nil {
-		return nil
+	if err != nil {
+		return errors.Wrap(err, "check dkg sent action existence")
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return errors.Wrap(err, "check dkg initial state existence")
+	if alreadySent {
+		return nil
 	}
 
 	commitmentMsg, polyEvalMsgs, err := pure.StartPhase1Dealing()
@@ -156,6 +158,14 @@ func (m *Manager) maybeDeal(
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitDealing tx")
+	}
+	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionDealing,
+		OutboxID:          outboxID,
+	}); err != nil {
+		return errors.Wrap(err, "store dealing sent action marker")
 	}
 	log.Info().
 		Int64("keyper-config-index", keyperConfigIndex).

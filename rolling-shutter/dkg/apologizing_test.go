@@ -162,6 +162,61 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	assert.Equal(t, int64(0), apologies[0].AccuserIndex)
 }
 
+// TestMaybeApologizeIdempotent asserts that a second invocation does not
+// write additional apology or outbox rows: the dkg_sent_actions row written
+// on the first invocation is the idempotency marker.
+func TestMaybeApologizeIdempotent(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+	env := setupDKGTestEnv(ctx, t)
+
+	err := env.runMaybe(ctx, PhaseDealing)
+	assert.NilError(t, err)
+
+	coreQueries := corekeyperdb.New(env.dbpool)
+	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		AccuserIndex:      0,
+		AccusedIndex:      1,
+	})
+	assert.NilError(t, err)
+
+	err = env.runMaybe(ctx, PhaseApologizing)
+	assert.NilError(t, err)
+
+	first, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(first))
+	firstPending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionApologizing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the apologizing action")
+
+	err = env.runMaybe(ctx, PhaseApologizing)
+	assert.NilError(t, err)
+
+	second, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+	})
+	assert.NilError(t, err)
+	secondPending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(first), len(second), "no extra apology rows on idempotent call")
+	assert.Equal(t, len(firstPending), len(secondPending), "no extra tx_outbox rows on idempotent call")
+}
+
 // TestMaybeApologizeNoopWithoutInitialState asserts that maybeApologize
 // returns silently when `dkg_initial_states` has no row — buildPureDKG
 // returns nil and the action is skipped.

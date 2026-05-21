@@ -254,7 +254,10 @@ func TestSubmitRowSkipsSendWhenMarkSubmittedFails(t *testing.T) {
 		Status:    "pending",
 	}
 
-	_, err = dbpool.Exec(ctx, "DROP TABLE tx_outbox")
+	// CASCADE because dkg_sent_actions has a FK on tx_outbox; the goal is to
+	// force MarkTxSubmitted to fail, and dropping the table accomplishes that
+	// regardless of what depends on it.
+	_, err = dbpool.Exec(ctx, "DROP TABLE tx_outbox CASCADE")
 	assert.NilError(t, err)
 
 	s.submitRow(ctx, row)

@@ -18,8 +18,8 @@ import (
 
 // maybeApologize is the per-block reactor for the Apologizing phase. It
 // enqueues an apology tx when our locally-rebuilt puredkg has at least one
-// accusation against us. Presence of our own apology row for `(k, r)` is the
-// idempotency marker.
+// accusation against us. Presence of a `dkg_sent_actions` row for
+// `(k, r, "apologizing")` is the idempotency marker.
 //
 // The caller passes a `pure` returned by `buildPureDKG(PhaseApologizing)` —
 // Phase=Accusing with commitments + evals + accusations replayed. We call
@@ -34,17 +34,16 @@ func (m *Manager) maybeApologize(
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
-	existing, err := queries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
+	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
+		Action:            ActionApologizing,
 	})
 	if err != nil {
-		return errors.Wrap(err, "load own apology check")
+		return errors.Wrap(err, "check dkg sent action existence")
 	}
-	for _, ap := range existing {
-		if uint64(ap.ApologizerIndex) == ownIndex {
-			return nil
-		}
+	if alreadySent {
+		return nil
 	}
 
 	apologies := pure.StartPhase3Apologizing()
@@ -92,6 +91,14 @@ func (m *Manager) maybeApologize(
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitApology tx")
+	}
+	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionApologizing,
+		OutboxID:          outboxID,
+	}); err != nil {
+		return errors.Wrap(err, "store apologizing sent action marker")
 	}
 	log.Info().
 		Int64("keyper-config-index", keyperConfigIndex).
