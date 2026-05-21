@@ -4,4 +4,4 @@
 
 import utils
 
-utils.run(["mise", "run", "wait-for-dkg", "--keyper-set-index", "1"])
+utils.run(["mise", "run", "wait-for-dkg", "--ksi", "1", "--success"])

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -115,3 +117,98 @@ def get_created_contract_address(
         if isinstance(address, str) and address:
             return address
     return None
+
+
+def load_deployment_run() -> dict[str, object]:
+    deployment_type = resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+    data_dir = Path(os.environ["DATA_DIR"])
+    run_path = (
+        data_dir
+        / "contracts"
+        / "broadcast"
+        / DEPLOYMENT_SCRIPTS[deployment_type]
+        / os.environ["ETHEREUM_CHAIN_ID"]
+        / "run-latest.json"
+    )
+    return json.loads(run_path.read_text())
+
+
+def get_deployed_address(contract_name: str) -> str:
+    address = get_created_contract_address(load_deployment_run(), contract_name)
+    if not address:
+        raise SystemExit(f"{contract_name} address not found in deployment broadcast")
+    return address
+
+
+def cast_call(address: str, selector: str, *args: str) -> str:
+    return run(
+        [
+            "docker", "compose", "run", "--rm", "--entrypoint", "cast",
+            "contracts", "call",
+            "--rpc-url", "http://ethereum:8545",
+            address, selector, *args,
+        ],
+        capture_output=True,
+    ).stdout.strip()
+
+
+def cast_block_number() -> int:
+    return int(
+        run(
+            [
+                "docker", "compose", "run", "--rm", "--entrypoint", "cast",
+                "contracts", "block-number",
+                "--rpc-url", "http://ethereum:8545",
+            ],
+            capture_output=True,
+        ).stdout.strip()
+    )
+
+
+def get_latest_keyper_set_index() -> int:
+    """Return the highest Keyper Set Index registered on-chain.
+
+    Index 0 is the bootstrap guard keyper set; real sets start at 1.
+    """
+    ksm = get_deployed_address("KeyperSetManager")
+    count = int(cast_call(ksm, "getNumKeyperSets()(uint64)"))
+    if count == 0:
+        raise SystemExit("No keyper sets exist on-chain")
+    return count - 1
+
+
+def get_dkg_start(ksi: int, retry: int) -> int:
+    dkg = get_deployed_address("DKGContract")
+    return int(cast_call(dkg, "dkgStart(uint64,uint64)(int256)", str(ksi), str(retry)))
+
+
+def get_cycle_length() -> int:
+    dkg = get_deployed_address("DKGContract")
+    return int(cast_call(dkg, "cycleLength()(uint64)"))
+
+
+def get_succeeded(ksi: int) -> bool:
+    dkg = get_deployed_address("DKGContract")
+    result = cast_call(dkg, "succeeded(uint64)(bool)", str(ksi))
+    return result.lower() == "true"
+
+
+def derive_retry_counter(ksi: int) -> int:
+    """Derive the active retry counter for a Keyper Set Index from the current block.
+
+    Returns the largest n such that dkgStart(ksi, n) <= currentBlock, or 0 if
+    no retry has started yet.
+    """
+    current = cast_block_number()
+    start_0 = get_dkg_start(ksi, 0)
+    cycle = get_cycle_length()
+    if current < start_0:
+        return 0
+    return (current - start_0) // cycle
+
+
+def retry_window_elapsed(ksi: int, retry: int) -> bool:
+    """Return True once the full cycle window for (ksi, retry) has passed."""
+    start = get_dkg_start(ksi, retry)
+    cycle = get_cycle_length()
+    return cast_block_number() > start + cycle
