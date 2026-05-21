@@ -3,6 +3,7 @@ package dkg
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -21,8 +22,7 @@ import (
 
 // Action names recorded in the `dkg_sent_actions` table by each reactor on
 // the success path. The table is the uniform idempotency store across all
-// four reactors; `maybeFinalize` writes a row for auditability but uses
-// `ExistsDKGResultSuccess` as its entry guard.
+// four reactors.
 const (
 	ActionDealing     = "dealing"
 	ActionAccusing    = "accusing"
@@ -85,6 +85,10 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
 	}
+	// Fetches all eons then filters per-eon (membership, dkg_result). A single
+	// query joining eons + keyper sets + dkg_result would be more efficient,
+	// but keyper sets live in the observer schema (separate connection pool),
+	// so cross-schema joins are not possible here.
 	queries := corekeyperdb.New(m.cfg.DBPool)
 	eons, err := queries.GetAllEons(ctx)
 	if err != nil {
@@ -233,4 +237,71 @@ func (m *Manager) dkgContractAddrForEon(eon corekeyperdb.Eon) (common.Address, e
 		)
 	}
 	return common.HexToAddress(eon.DkgContract.String), nil
+}
+
+// HandleDKGSuccess is called by the chain-event handler when a DKGSucceeded
+// event arrives on chain. It is the single writer of `dkg_result` rows: the
+// chain event is the source of truth for which retry actually won.
+//
+// If this keyper participated in `retryCounter` it rebuilds the puredkg state
+// and stores the computed result in `pure_result`; otherwise `pure_result` is
+// nil. Both outcomes produce a `dkg_result` row with `success=true`.
+func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigIndex, retryCounter int64) error {
+	queries := corekeyperdb.New(tx)
+	exists, err := queries.ExistsDKGResultSuccess(ctx, keyperConfigIndex)
+	if err != nil {
+		return errors.Wrap(err, "check existing dkg_result")
+	}
+	if exists {
+		return nil
+	}
+
+	obsQueries := obskeyper.New(tx)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+	if err != nil {
+		return errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
+	}
+
+	var pureBytes []byte
+	ownIndex, memberErr := keyperSet.GetIndex(m.cfg.OwnAddress)
+	if memberErr == nil {
+		keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+		if err != nil {
+			return errors.Wrap(err, "decode keyper addresses")
+		}
+		threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
+		if err != nil {
+			return errors.Wrap(err, "convert threshold")
+		}
+		pure, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseFinalizing, keypers, ownIndex, threshold)
+		if err != nil {
+			return errors.Wrap(err, "rebuild puredkg for success")
+		}
+		if pure != nil {
+			pure.Finalize()
+			result, err := pure.ComputeResult()
+			if err != nil {
+				log.Warn().Err(err).
+					Int64("keyper-config-index", keyperConfigIndex).
+					Int64("retry-counter", retryCounter).
+					Msg("cannot compute DKG result on success event; storing nil")
+			} else {
+				pureBytes, err = shdb.EncodePureDKGResult(&result)
+				if err != nil {
+					return errors.Wrap(err, "encode pure DKG result")
+				}
+			}
+		}
+	}
+
+	log.Info().
+		Int64("keyper-config-index", keyperConfigIndex).
+		Int64("retry-counter", retryCounter).
+		Msg("recording DKG success")
+	return queries.InsertDKGResult(ctx, corekeyperdb.InsertDKGResultParams{
+		Eon:        keyperConfigIndex,
+		Success:    true,
+		Error:      sql.NullString{},
+		PureResult: pureBytes,
+	})
 }

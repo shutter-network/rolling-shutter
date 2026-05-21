@@ -144,6 +144,89 @@ func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
 	})
 }
 
+// runMaybeRetry is like runMaybe but uses an explicit retryCounter instead of
+// testRetry. Useful for multi-retry tests.
+func (env *dkgTestEnv) runMaybeRetry(ctx context.Context, phase Phase, retry int64) error {
+	obsQueries := obskeyperdb.New(env.dbpool)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, testKsi)
+	if err != nil {
+		return err
+	}
+	ownIndex, err := keyperSet.GetIndex(env.mgr.cfg.OwnAddress)
+	if err != nil {
+		return nil
+	}
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return err
+	}
+	threshold := uint64(keyperSet.Threshold)
+
+	var pure *puredkg.PureDKG
+	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		p, err := env.mgr.buildPureDKG(ctx, tx, testKsi, retry, phase, keypers, ownIndex, threshold)
+		if err != nil {
+			return err
+		}
+		pure = p
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if pure == nil {
+		return nil
+	}
+	return env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		switch phase {
+		case PhaseDealing:
+			return env.mgr.maybeDeal(ctx, tx, env.dkgAddr, testKsi, retry, pure, keypers, ownIndex)
+		case PhaseAccusing:
+			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+		case PhaseApologizing:
+			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+		case PhaseFinalizing:
+			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+		}
+		return nil
+	})
+}
+
+// insertForeignDealingRetry is like insertForeignDealing but accepts an
+// explicit retryCounter for multi-retry tests.
+func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing.T, dealerIdx uint64, retry int64) {
+	t.Helper()
+	const eon = uint64(testKsi)
+	p := puredkg.NewPureDKG(eon, 3, 2, dealerIdx)
+	commit, evals, err := p.StartPhase1Dealing()
+	assert.NilError(t, err)
+
+	coreQueries := corekeyperdb.New(env.dbpool)
+	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      retry,
+		KeyperIndex:       int64(dealerIdx),
+		Commitment:        commit.Gammas.Marshal(),
+	})
+	assert.NilError(t, err)
+
+	for _, ev := range evals {
+		if ev.Receiver != 1 {
+			continue
+		}
+		ciphertext, err := ecies.Encrypt(rand.Reader, &env.ownECIES.PublicKey, ev.Eval.Bytes(), nil, nil)
+		assert.NilError(t, err)
+		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
+			KeyperConfigIndex: testKsi,
+			RetryCounter:      retry,
+			SenderIndex:       int64(dealerIdx),
+			ReceiverIndex:     1,
+			EncryptedEval:     ciphertext,
+		})
+		assert.NilError(t, err)
+	}
+}
+
 // insertForeignDealing simulates `dealerIdx` having dealt: insert their poly
 // commitment and the encrypted-for-us PolyEval row. Both are derived from a
 // fresh puredkg run by the test in-process.
