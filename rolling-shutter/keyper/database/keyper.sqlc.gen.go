@@ -754,7 +754,7 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 }
 
 const insertDKGSentAction = `-- name: InsertDKGSentAction :exec
-INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, outbox_id)
+INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, tx_outbox_id)
 VALUES ($1, $2, $3, $4)
 `
 
@@ -762,7 +762,7 @@ type InsertDKGSentActionParams struct {
 	KeyperConfigIndex int64
 	RetryCounter      int64
 	Action            string
-	OutboxID          int64
+	TxOutboxID        sql.NullInt64
 }
 
 func (q *Queries) InsertDKGSentAction(ctx context.Context, arg InsertDKGSentActionParams) error {
@@ -770,7 +770,7 @@ func (q *Queries) InsertDKGSentAction(ctx context.Context, arg InsertDKGSentActi
 		arg.KeyperConfigIndex,
 		arg.RetryCounter,
 		arg.Action,
-		arg.OutboxID,
+		arg.TxOutboxID,
 	)
 	return err
 }

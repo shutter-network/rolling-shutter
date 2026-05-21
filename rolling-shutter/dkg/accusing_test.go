@@ -308,7 +308,9 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 
 // TestMaybeAccuseNoopWhenAllDealersHonest asserts the silent-success path:
 // when every dealer's commitment + eval is present and valid, maybeAccuse
-// writes nothing.
+// enqueues no submitAccusation tx but still writes a `dkg_sent_actions` row
+// so the reactor short-circuits on subsequent blocks (no log spam, no
+// repeated puredkg replay). A second call is a no-op.
 func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -336,6 +338,22 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	assert.NilError(t, err)
 	// Only the submitDealing entry from maybeDeal — no submitAccusation.
 	assert.Equal(t, 1, len(pending))
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionAccusing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when no accusations are sent")
+
+	// Second invocation: short-circuits on the existing dkg_sent_actions
+	// row, returns without error, and writes nothing new.
+	err = env.runMaybe(ctx, PhaseAccusing)
+	assert.NilError(t, err)
+	pendingAfter, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(pending), len(pendingAfter), "no extra tx_outbox rows on idempotent no-accusations call")
 }
 
 // TestMaybeAccuseIdempotent asserts that a second invocation does not enqueue

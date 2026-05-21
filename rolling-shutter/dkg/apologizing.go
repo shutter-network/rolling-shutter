@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -58,6 +59,18 @@ func (m *Manager) maybeApologize(
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
 			Msg("Not sending apologies, nobody accused us")
+		// Mark the phase as resolved with a NULL tx_outbox_id row so the
+		// log line above runs at most once per DKG Instance. The set of
+		// on-chain accusations against us is fixed before the Apologizing
+		// phase begins, so re-evaluating on every block is redundant work.
+		if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+			KeyperConfigIndex: keyperConfigIndex,
+			RetryCounter:      retryCounter,
+			Action:            ActionApologizing,
+			TxOutboxID:        sql.NullInt64{},
+		}); err != nil {
+			return errors.Wrap(err, "store apologizing sent action marker (no apologies)")
+		}
 		return nil
 	}
 
@@ -95,7 +108,7 @@ func (m *Manager) maybeApologize(
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionApologizing,
-		OutboxID:          outboxID,
+		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store apologizing sent action marker")
 	}

@@ -157,7 +157,7 @@ SELECT * FROM dkg_initial_states
 WHERE keyper_config_index = $1 AND retry_counter = $2;
 
 -- name: InsertDKGSentAction :exec
-INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, outbox_id)
+INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, tx_outbox_id)
 VALUES ($1, $2, $3, $4);
 
 -- name: ExistsDKGSentAction :one
