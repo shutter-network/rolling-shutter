@@ -110,11 +110,14 @@ func (m *Manager) buildPureDKG(
 		// slices into non-nil zero-value pointers on decode (via the
 		// elements' GobDecoder), which would defeat puredkg's
 		// "duplicate msg" check during the subsequent DB replay. Reset
-		// the slices and re-derive the self-eval from the loaded
-		// polynomial.
+		// the slices, then re-derive the self-eval and self-commitment
+		// from the loaded polynomial — both are fully determined by the
+		// polynomial, so we do not depend on chain-syncer indexing of
+		// our own submitDealing event to populate these slots.
 		pure.Commitments = make([]*shcrypto.Gammas, pure.NumKeypers)
 		pure.Evals = make([]*big.Int, pure.NumKeypers)
 		pure.Evals[pure.Keyper] = pure.Polynomial.EvalForKeyper(int(pure.Keyper))
+		pure.Commitments[pure.Keyper] = pure.Polynomial.Gammas()
 	default:
 		return nil, nil
 	}
@@ -153,9 +156,10 @@ func (m *Manager) buildPureDKG(
 // back into `pure`. Both handlers require Phase ≤ Dealing; the caller is
 // responsible for the puredkg being at that phase or below.
 //
-// Duplicate-row errors (e.g. the self PolyEval that was re-applied by
-// StartPhase1Dealing during initial dealing and is now also present as a
-// DB row) are logged at debug level and ignored.
+// Duplicate-row errors (e.g. our own PolyCommitment row indexed by the
+// chain syncer after the on-chain submitDealing event, which collides
+// with `pure.Commitments[ownIndex]` already derived from the polynomial)
+// are logged at debug level and ignored.
 func (m *Manager) replayCommitmentsAndEvals(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,

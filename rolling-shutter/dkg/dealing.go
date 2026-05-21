@@ -22,10 +22,15 @@ import (
 // `(keyperConfigIndex, retryCounter, "dealing")`; if one exists the call is a
 // no-op. Otherwise we sample a polynomial via `puredkg.StartPhase1Dealing`,
 // persist the resulting puredkg state (so accusations/apologies can be
-// produced on later blocks even after a process restart), persist our own
-// commitment + per-receiver evals, enqueue a `submitDealing` row in
-// `tx_outbox` for `TxSender` to sign and submit, and insert the
-// `dkg_sent_actions` marker atomically with the outbox row.
+// produced on later blocks even after a process restart), enqueue a
+// `submitDealing` row in `tx_outbox` for `TxSender` to sign and submit, and
+// insert the `dkg_sent_actions` marker atomically with the outbox row.
+//
+// Our own PolyCommitment and PolyEval rows are NOT written to the shared
+// `dkg_poly_commitments` / `dkg_poly_evals` tables — the chain syncer is
+// the sole writer to those, so every keyper has the same view at each
+// block height. Replay in `buildPureDKG` re-derives our own commitment and
+// self-eval from the polynomial in `dkg_initial_states`.
 //
 // The caller owns the (write) transaction and is responsible for committing
 // or rolling back. `pure`, `keypers`, and `ownIndex` come from a prior read
@@ -74,15 +79,6 @@ func (m *Manager) maybeDeal(
 	}
 
 	commitmentBytes := commitmentMsg.Gammas.Marshal()
-	if err := queries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
-		KeyperConfigIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
-		KeyperIndex:       int64(ownIndex),
-		Commitment:        commitmentBytes,
-	}); err != nil {
-		return errors.Wrap(err, "store own poly commitment")
-	}
-
 	receivers := ReceiverIndicesForSender(uint64(len(keypers)), ownIndex)
 	encryptedEvals := make([][]byte, 0, len(receivers))
 	for _, recvIdx := range receivers {
@@ -102,41 +98,6 @@ func (m *Manager) maybeDeal(
 			return errors.Wrapf(err, "encrypt poly eval for receiver %d (%s)", recvIdx, recvAddr.Hex())
 		}
 		encryptedEvals = append(encryptedEvals, ciphertext)
-
-		if err := queries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
-			KeyperConfigIndex: keyperConfigIndex,
-			RetryCounter:      retryCounter,
-			SenderIndex:       int64(ownIndex),
-			ReceiverIndex:     int64(recvIdx),
-			EncryptedEval:     ciphertext,
-		}); err != nil {
-			return errors.Wrap(err, "store own poly eval row")
-		}
-	}
-
-	// Also persist the self-eval. puredkg's `StartPhase1Dealing` consumes
-	// the self-message in-memory (setting `pure.Evals[ownIndex]`); without
-	// a DB-backed copy the replay path leaves that slot nil and we cannot
-	// later compute the result on a per-block reactor cycle. We encrypt
-	// to ourselves so `decryptPolyEval` recovers it transparently during
-	// replay; the on-chain `submitDealing` call does NOT include this row
-	// (it is excluded by `ReceiverIndicesForSender`).
-	selfEval := pure.Evals[ownIndex]
-	if selfEval == nil {
-		return errors.Errorf("puredkg did not produce a self-eval after StartPhase1Dealing")
-	}
-	selfCiphertext, err := m.encryptPolyEvalFor(ctx, queries, m.cfg.OwnAddress, selfEval)
-	if err != nil {
-		return errors.Wrap(err, "encrypt self poly eval")
-	}
-	if err := queries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
-		KeyperConfigIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
-		SenderIndex:       int64(ownIndex),
-		ReceiverIndex:     int64(ownIndex),
-		EncryptedEval:     selfCiphertext,
-	}); err != nil {
-		return errors.Wrap(err, "store self poly eval row")
 	}
 
 	abi, err := contract.DKGContractMetaData.GetAbi()

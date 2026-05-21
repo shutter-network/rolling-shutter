@@ -21,6 +21,11 @@ import (
 // accusation against us. Presence of a `dkg_sent_actions` row for
 // `(k, r, "apologizing")` is the idempotency marker.
 //
+// Our own apology rows are NOT written to the shared `dkg_apologies` table
+// — the chain syncer is the sole writer to it, so every keyper has the
+// same view at each block height. Replay in `buildPureDKG` picks up our
+// own apologies only after the on-chain submitApology event is indexed.
+//
 // The caller passes a `pure` returned by `buildPureDKG(PhaseApologizing)` —
 // Phase=Accusing with commitments + evals + accusations replayed. We call
 // StartPhase3Apologizing here, which advances the phase and emits apology
@@ -61,15 +66,6 @@ func (m *Manager) maybeApologize(
 		evalBytes := ap.Eval.Bytes()
 		accuserIndices = append(accuserIndices, ap.Accuser)
 		polyEvalData = append(polyEvalData, evalBytes)
-		if err := queries.InsertDKGApology(ctx, corekeyperdb.InsertDKGApologyParams{
-			KeyperConfigIndex: keyperConfigIndex,
-			RetryCounter:      retryCounter,
-			ApologizerIndex:   int64(ownIndex),
-			AccuserIndex:      int64(ap.Accuser),
-			PolyEval:          evalBytes,
-		}); err != nil {
-			return errors.Wrap(err, "store own apology row")
-		}
 	}
 
 	abi, err := contract.DKGContractMetaData.GetAbi()

@@ -13,10 +13,10 @@ import (
 )
 
 // TestMaybeApologizeEnqueuesApologyWhenAccused asserts that maybeApologize
-// writes one apology row plus a tx_outbox entry when an accusation against
-// us is present — the bug-fix path. Without our local refactor the
-// puredkg's Phase would remain Off after replay and the function would
-// silently skip.
+// enqueues a submitApology tx_outbox entry when an accusation against us is
+// present — the bug-fix path. The function must NOT write to the shared
+// `dkg_apologies` table (the chain syncer owns it); the test checks the
+// tx_outbox row and `dkg_sent_actions` marker instead.
 func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -46,10 +46,15 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, 1, len(apologies))
-	assert.Equal(t, int64(1), apologies[0].ApologizerIndex)
-	assert.Equal(t, int64(0), apologies[0].AccuserIndex)
-	assert.Assert(t, len(apologies[0].PolyEval) > 0, "apology should carry a non-empty poly eval")
+	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies — chain syncer owns it")
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionApologizing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the apologizing action as enqueued")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
@@ -154,17 +159,28 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
-	// Exactly one apology — for accuser 0, the only accusation the read tx
-	// saw. Keyper 2's accusation arrived too late and is left for the next
-	// block within the Apologizing phase window.
-	assert.Equal(t, 1, len(apologies))
-	assert.Equal(t, int64(1), apologies[0].ApologizerIndex)
-	assert.Equal(t, int64(0), apologies[0].AccuserIndex)
+	// maybeApologize no longer writes its own apology row — the chain
+	// syncer owns dkg_apologies. The acceptance signal that the call
+	// processed exactly the read-tx snapshot is the single tx_outbox entry
+	// recorded against the apologizing sent-action marker; the late
+	// accusation from keyper 2 is left for the next block within the
+	// Apologizing phase window.
+	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies")
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionApologizing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the apologizing action as enqueued")
 }
 
 // TestMaybeApologizeIdempotent asserts that a second invocation does not
-// write additional apology or outbox rows: the dkg_sent_actions row written
-// on the first invocation is the idempotency marker.
+// enqueue an additional submitApology tx_outbox row. The dkg_sent_actions
+// row written on the first invocation is the idempotency marker. The
+// shared `dkg_apologies` table is never written by the reactor in either
+// invocation.
 func TestMaybeApologizeIdempotent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -187,12 +203,6 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	err = env.runMaybe(ctx, PhaseApologizing)
 	assert.NilError(t, err)
 
-	first, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
-		RetryCounter:      testRetry,
-	})
-	assert.NilError(t, err)
-	assert.Equal(t, 1, len(first))
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
@@ -206,14 +216,14 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	err = env.runMaybe(ctx, PhaseApologizing)
 	assert.NilError(t, err)
 
-	second, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
+	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperConfigIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
+	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies on any invocation")
 	secondPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
-	assert.Equal(t, len(first), len(second), "no extra apology rows on idempotent call")
 	assert.Equal(t, len(firstPending), len(secondPending), "no extra tx_outbox rows on idempotent call")
 }
 
