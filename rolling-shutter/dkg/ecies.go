@@ -51,6 +51,10 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperConfigIndex i
 			return errors.Wrap(err, "query ecies_keys for own address")
 		}
 		if exists {
+			log.Debug().
+				Int64("keyper-config-index", keyperConfigIndex).
+				Uint64("keyper-index", ownIndex).
+				Msg("ECIES key already registered for keyper set, skipping")
 			return nil
 		}
 

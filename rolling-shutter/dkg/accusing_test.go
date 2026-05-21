@@ -134,9 +134,9 @@ func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
 		case PhaseDealing:
 			return env.mgr.maybeDeal(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
 		case PhaseAccusing:
-			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
 		case PhaseApologizing:
-			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
 		}
@@ -182,9 +182,9 @@ func (env *dkgTestEnv) runMaybeRetry(ctx context.Context, phase Phase, retry int
 		case PhaseDealing:
 			return env.mgr.maybeDeal(ctx, tx, env.dkgAddr, testKsi, retry, pure, keypers, ownIndex)
 		case PhaseAccusing:
-			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+			return env.mgr.maybeAccuse(ctx, tx, env.dkgAddr, testKsi, retry, pure, keypers, ownIndex)
 		case PhaseApologizing:
-			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, retry, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
 		}

@@ -79,6 +79,7 @@ func (m *Manager) maybeDeal(
 	}
 
 	commitmentBytes := commitmentMsg.Gammas.Marshal()
+	missingECIESCount := 0
 	receivers := ReceiverIndicesForSender(uint64(len(keypers)), ownIndex)
 	encryptedEvals := make([][]byte, 0, len(receivers))
 	for _, recvIdx := range receivers {
@@ -107,6 +108,7 @@ func (m *Manager) maybeDeal(
 					Uint64("receiver-index", recvIdx).
 					Str("receiver-address", recvAddr.Hex()).
 					Msg("no ECIES key registered for receiver; substituting empty eval and continuing")
+				missingECIESCount++
 				encryptedEvals = append(encryptedEvals, []byte{})
 				continue
 			}
@@ -147,7 +149,8 @@ func (m *Manager) maybeDeal(
 		Int64("keyper-config-index", keyperConfigIndex).
 		Int64("retry-counter", retryCounter).
 		Uint64("keyper-index", ownIndex).
-		Int64("tx-outbox-id", outboxID).
-		Msg("enqueued DKG dealing")
+		Int("keyper-count", len(keypers)).
+		Int("missing-ecies-count", missingECIESCount).
+		Msg("submitting DKG dealing")
 	return nil
 }
