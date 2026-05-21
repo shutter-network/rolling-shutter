@@ -39,6 +39,20 @@ def phase_for_offset(offset: int, phase_len: int) -> int:
     return 0
 
 
+def find_succeeded_retry(events: list[dict], ksi: int) -> int | None:
+    """Return the retry counter from the DKGSucceeded event for ksi, or None."""
+    for ev in events:
+        topics = ev.get("topics", [])
+        if len(topics) < 3:
+            continue
+        if topics[0].lower() != TOPIC_SUCCEEDED:
+            continue
+        if utils.topic_to_uint(topics[1]) != ksi:
+            continue
+        return utils.topic_to_uint(topics[2])
+    return None
+
+
 def collect_submitters(events: list[dict], topic0: str, ksi: int, retry: int) -> list[int]:
     indices: set[int] = set()
     for ev in events:
@@ -115,8 +129,12 @@ events = utils.cast_logs_at_address(dkg_address)
 if retry_raw:
     retries = [int(retry_raw)]
 else:
-    derived = utils.derive_retry_counter(ksi)
-    retries = list(range(derived + 1))
+    upper = utils.derive_retry_counter(ksi)
+    if succeeded:
+        succeeded_retry = find_succeeded_retry(events, ksi)
+        if succeeded_retry is not None:
+            upper = succeeded_retry
+    retries = list(range(upper + 1))
 
 for retry in retries:
     print_instance(ksi, retry, current_block, phase_len, cycle_len, succeeded, events)
