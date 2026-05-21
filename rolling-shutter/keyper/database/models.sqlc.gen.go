@@ -71,6 +71,13 @@ type DkgResult struct {
 	PureResult []byte
 }
 
+type DkgSentAction struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	Action            string
+	OutboxID          int64
+}
+
 type EciesKey struct {
 	KeyperAddress  string
 	EciesPublicKey []byte

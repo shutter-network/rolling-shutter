@@ -156,6 +156,16 @@ ON CONFLICT DO NOTHING;
 SELECT * FROM dkg_initial_states
 WHERE keyper_config_index = $1 AND retry_counter = $2;
 
+-- name: InsertDKGSentAction :exec
+INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, outbox_id)
+VALUES ($1, $2, $3, $4);
+
+-- name: ExistsDKGSentAction :one
+SELECT EXISTS (
+    SELECT 1 FROM dkg_sent_actions
+    WHERE keyper_config_index = $1 AND retry_counter = $2 AND action = $3
+);
+
 -- name: InsertPendingTx :one
 INSERT INTO tx_outbox (to_address, data, value, label)
 VALUES ($1, $2, $3, $4)

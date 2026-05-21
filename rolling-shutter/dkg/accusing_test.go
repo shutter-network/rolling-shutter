@@ -273,6 +273,13 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionAccusing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the accusing action")
 
 	err = env.runMaybe(ctx, PhaseAccusing)
 	assert.NilError(t, err)

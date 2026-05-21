@@ -21,11 +21,15 @@ import (
 // maybeFinalize is the per-block reactor for the Finalizing phase. It
 // enqueues a `submitSuccessVote` tx with the locally-computed eon public key.
 //
-// Idempotency: a successful `dkg_result` row already exists either because
-// the local finalization wrote it last time around, or because a chain-side
-// `SuccessEvent` arrived and was handled by the host keyper. The
-// `HandleBlock` loop also short-circuits the entire eon when this row is
-// present; the check here defends against direct invocations.
+// Idempotency uses `ExistsDKGResultSuccess` rather than the
+// `dkg_sent_actions` table: a failed `ComputeResult` produces no outbox row
+// and therefore no `dkg_sent_actions` row, yet the keyper should keep
+// retrying on subsequent blocks until either the local computation succeeds
+// or the chain has concluded the DKG (success row written by the host
+// keyper's syncer). The `HandleBlock` loop also short-circuits the entire
+// eon when the success row is present; the check here defends against direct
+// invocations. A `dkg_sent_actions` row is still written on the success path
+// for auditability and consistency with the other reactors.
 //
 // The caller passes a `pure` returned by `buildPureDKG(PhaseFinalizing)` —
 // Phase=Apologizing with all stored apologies applied. We bypass puredkg's
@@ -103,6 +107,14 @@ func (m *Manager) maybeFinalize(
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitSuccessVote tx")
+	}
+	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionFinalizing,
+		OutboxID:          outboxID,
+	}); err != nil {
+		return errors.Wrap(err, "store finalizing sent action marker")
 	}
 	log.Info().
 		Int64("keyper-config-index", keyperConfigIndex).

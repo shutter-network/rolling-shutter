@@ -2,7 +2,6 @@ package dkg
 
 import (
 	"context"
-	"crypto/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +17,7 @@ import (
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
 // runMaybeDealLocal mirrors the dispatch handleEon performs: look up the
@@ -70,10 +70,11 @@ func runMaybeDealLocal(
 // acceptance criteria for the maybeDeal refactor:
 //
 //  1. First invocation writes a dkg_initial_states row plus the own poly
-//     commitment, the per-receiver poly evals (including the self-eval), and
-//     a tx_outbox row for submitDealing.
+//     commitment, the per-receiver poly evals (including the self-eval), a
+//     tx_outbox row for submitDealing, and a dkg_sent_actions row marking
+//     the dealing action as enqueued.
 //  2. Second invocation is a no-op — no new rows are inserted in any of those
-//     tables, because the dkg_initial_states row already exists.
+//     tables, because the dkg_sent_actions row already exists.
 func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -180,6 +181,14 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	assert.Equal(t, dkgAddr.Hex(), pending[0].ToAddress)
 	firstOutboxID := pending[0].ID
 
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionDealing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the dealing action")
+
 	// Second invocation: idempotent — no new rows in any tracked table.
 	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
 	assert.NilError(t, err)
@@ -204,10 +213,11 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	assert.Equal(t, firstOutboxID, pendingAfter[0].ID, "same outbox row as before")
 }
 
-// TestMaybeDealNoopWhenInitialStateExists asserts that the dkg_initial_states
-// row is the sole idempotency signal: even if commitment/eval/outbox rows are
-// absent, presence of the initial-state row alone short-circuits maybeDeal.
-func TestMaybeDealNoopWhenInitialStateExists(t *testing.T) {
+// TestMaybeDealNoopWhenSentActionExists asserts that a pre-seeded
+// dkg_sent_actions row for the dealing action short-circuits maybeDeal — no
+// commitment, eval, or outbox row is written. This is the new idempotency
+// signal that replaces the previous dkg_initial_states check.
+func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -233,16 +243,22 @@ func TestMaybeDealNoopWhenInitialStateExists(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	// Pre-seed dkg_initial_states with arbitrary bytes (the contents are not
-	// inspected by maybeDeal's idempotency check).
-	pseudoBlob := make([]byte, 8)
-	_, err = rand.Read(pseudoBlob)
-	assert.NilError(t, err)
+	// Pre-seed a tx_outbox row (via EnqueueTx) so the dkg_sent_actions FK is
+	// satisfied, then the dkg_sent_actions marker for the dealing action.
 	coreQueries := corekeyperdb.New(dbpool)
-	err = coreQueries.InsertDKGInitialState(ctx, corekeyperdb.InsertDKGInitialStateParams{
-		KeyperConfigIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
-		PuredkgBytes:      pseudoBlob,
+	var outboxID int64
+	err = dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		id, inner := txsender.EnqueueTx(ctx, tx, common.HexToAddress("0xd0000000000000000000000000000000000000aa"), []byte{0x01}, nil, "preseed")
+		if inner != nil {
+			return inner
+		}
+		outboxID = id
+		return corekeyperdb.New(tx).InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+			KeyperConfigIndex: keyperConfigIndex,
+			RetryCounter:      retryCounter,
+			Action:            ActionDealing,
+			OutboxID:          id,
+		})
 	})
 	assert.NilError(t, err)
 
@@ -262,9 +278,15 @@ func TestMaybeDealNoopWhenInitialStateExists(t *testing.T) {
 		RetryCounter:      retryCounter,
 	})
 	assert.NilError(t, err)
-	assert.Equal(t, 0, len(commitments), "no commitment row should be written when initial state already exists")
+	assert.Equal(t, 0, len(commitments), "no commitment row should be written when sent action exists")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
-	assert.Equal(t, 0, len(pending), "no outbox row should be written when initial state already exists")
+	assert.Equal(t, 1, len(pending), "only the pre-seeded outbox row should remain")
+	assert.Equal(t, outboxID, pending[0].ID)
+	_, err = coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+	})
+	assert.Assert(t, err != nil, "no initial state row should be written when sent action exists")
 }

@@ -43,6 +43,26 @@ func (q *Queries) ExistsDKGResultSuccess(ctx context.Context, eon int64) (bool, 
 	return exists, err
 }
 
+const existsDKGSentAction = `-- name: ExistsDKGSentAction :one
+SELECT EXISTS (
+    SELECT 1 FROM dkg_sent_actions
+    WHERE keyper_config_index = $1 AND retry_counter = $2 AND action = $3
+)
+`
+
+type ExistsDKGSentActionParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	Action            string
+}
+
+func (q *Queries) ExistsDKGSentAction(ctx context.Context, arg ExistsDKGSentActionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsDKGSentAction, arg.KeyperConfigIndex, arg.RetryCounter, arg.Action)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const existsDecryptionKey = `-- name: ExistsDecryptionKey :one
 SELECT EXISTS (
     SELECT 1
@@ -729,6 +749,28 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 		arg.Success,
 		arg.Error,
 		arg.PureResult,
+	)
+	return err
+}
+
+const insertDKGSentAction = `-- name: InsertDKGSentAction :exec
+INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, outbox_id)
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertDKGSentActionParams struct {
+	KeyperConfigIndex int64
+	RetryCounter      int64
+	Action            string
+	OutboxID          int64
+}
+
+func (q *Queries) InsertDKGSentAction(ctx context.Context, arg InsertDKGSentActionParams) error {
+	_, err := q.db.Exec(ctx, insertDKGSentAction,
+		arg.KeyperConfigIndex,
+		arg.RetryCounter,
+		arg.Action,
+		arg.OutboxID,
 	)
 	return err
 }

@@ -19,8 +19,8 @@ import (
 // maybeAccuse is the per-block reactor for the Accusing phase. It enqueues a
 // `submitAccusation` row when our locally-rebuilt puredkg (loaded from
 // `dkg_initial_states` and replayed with received dealings) yields at least
-// one accusation. The function is safely re-invokable: presence of any own
-// accusation row for `(k, r)` is the idempotency marker.
+// one accusation. The function is safely re-invokable: presence of a
+// `dkg_sent_actions` row for `(k, r, "accusing")` is the idempotency marker.
 //
 // The caller passes a `pure` returned by `buildPureDKG(PhaseAccusing)` —
 // Phase=Dealing with commitments + evals applied; here we call
@@ -35,17 +35,16 @@ func (m *Manager) maybeAccuse(
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
-	existing, err := queries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
+	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
+		Action:            ActionAccusing,
 	})
 	if err != nil {
-		return errors.Wrap(err, "load own accusation check")
+		return errors.Wrap(err, "check dkg sent action existence")
 	}
-	for _, a := range existing {
-		if uint64(a.AccuserIndex) == ownIndex {
-			return nil
-		}
+	if alreadySent {
+		return nil
 	}
 
 	accusations := pure.StartPhase2Accusing()
@@ -88,6 +87,14 @@ func (m *Manager) maybeAccuse(
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitAccusation tx")
+	}
+	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+		KeyperConfigIndex: keyperConfigIndex,
+		RetryCounter:      retryCounter,
+		Action:            ActionAccusing,
+		OutboxID:          outboxID,
+	}); err != nil {
+		return errors.Wrap(err, "store accusing sent action marker")
 	}
 	log.Info().
 		Int64("keyper-config-index", keyperConfigIndex).
