@@ -19,6 +19,7 @@ def add_set_and_verify(
 
 
 utils.run(["mise", "run", "clean"])
+utils.run(["mise", "run", "fund-keypers"])
 
 # Keyper set 1 (initial): 0,1,2 / threshold 2.
 utils.run(["mise", "run", "wait-for-initial-dkg"])
