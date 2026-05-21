@@ -1,7 +1,7 @@
 # Mise Test Setup
 
 `mise test setup` is a local mise-driven setup for running the shutter service
-flow with Ethereum, shuttermint, keypers, and supporting infrastructure.
+flow with Ethereum, keypers, and supporting infrastructure.
 
 For the normal happy path, the two main commands are:
 
@@ -57,9 +57,6 @@ can still run them directly if you want to test specific parts of the system:
 - `up-ethereum`
 - `deploy`
 - `gen-keyper-configs`
-- `init-chain-seed`
-- `init-chain-nodes`
-- `patch-genesis`
 - `init-keyper-dbs`
 - `up`
 - `down`
@@ -71,14 +68,6 @@ Dependency flow for `wait-for-initial-dkg`:
 ```text
 - `wait-for-initial-dkg`
   - `up`
-    - `patch-genesis`
-      - `init-chain-nodes`
-        - `init-chain-seed`
-          - `gen-compose`
-        - `gen-keyper-configs`
-          - `deploy`
-            - `up-ethereum`
-              - `gen-compose`
     - `init-keyper-dbs`
       - `up-db`
         - `gen-compose`

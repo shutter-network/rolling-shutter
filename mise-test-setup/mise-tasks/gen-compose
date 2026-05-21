@@ -23,7 +23,5 @@ compose_keypers = environment.get_template("compose.keypers.yml.j2").render(
 )
 (generated_dir / "compose.keypers.yml").write_text(compose_keypers)
 
-compose = environment.get_template("compose.yml.j2").render(
-    deployment_type=deployment_type,
-)
+compose = environment.get_template("compose.yml.j2").render()
 (generated_dir / "compose.yml").write_text(compose)
