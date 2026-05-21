@@ -33,14 +33,6 @@ import (
 // `Accusations` / `Apologies`, all of which are populated by replay.
 func (m *Manager) startFinalizing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, _, ownIndex, isMember, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
-		if err != nil {
-			return err
-		}
-		if !isMember {
-			return nil
-		}
-
 		queries := corekeyperdb.New(tx)
 
 		// Idempotency: presence of a `dkg_result` success row means either
@@ -55,14 +47,18 @@ func (m *Manager) startFinalizing(ctx context.Context, dkgAddr common.Address, k
 			return nil
 		}
 
-		// We never persist puredkg's internal phase, and the rebuild path
-		// leaves `pure.Phase` at `Off`. `ComputeResult` requires phase
-		// `>= Finalized`; set it directly. The other phase-gated methods
-		// (`Finalize`, the `Start*` calls) are not invoked here — instead
-		// we rely on the replayed `Commitments` / `Evals` / `Accusations` /
-		// `Apologies` state that `ComputeResult` actually reads. The
-		// self-eval row written by `maybeDeal` populates
-		// `pure.Evals[ownIndex]` during replay.
+		pure, _, ownIndex, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseFinalizing)
+		if err != nil {
+			return err
+		}
+		if pure == nil {
+			return nil
+		}
+
+		// buildPureDKG returns the puredkg at Phase=Apologizing with all
+		// stored apologies applied. `ComputeResult` requires phase
+		// `>= Finalized`; set it directly rather than calling `Finalize`
+		// because we want to skip the trivial `setPhase` invariant check.
 		pure.Phase = puredkg.Finalized
 		result, err := pure.ComputeResult()
 		if err != nil {

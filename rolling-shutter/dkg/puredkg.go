@@ -35,55 +35,142 @@ func ReceiverIndicesForSender(n, senderIndex uint64) []uint64 {
 }
 
 // buildPureDKG reconstructs the in-memory puredkg state for a single DKG
-// attempt by replaying every stored message for `(keyperConfigIndex,
-// retryCounter)`. The DB is the source of truth; nothing is cached between
-// invocations. Returns isMember=false when the local keyper is not part of
-// the corresponding keyper set, in which case the other return values are
-// zero.
+// attempt at the phase the corresponding maybe-function expects to operate
+// in. The DB is the source of truth; nothing is cached between invocations.
+//
+// Returns (nil, nil, 0, nil) when this keyper should not participate:
+//   - not a member of the keyper set, or
+//   - no `dkg_initial_states` row for a non-Dealing phase (Keyper crashed
+//     before dealing — they cannot accuse/apologize/finalize via local
+//     replay because the polynomial is unrecoverable).
+//
+// Phase-by-phase reconstruction:
+//
+//   - PhaseDealing: fresh PureDKG (Phase=Off). Apply already-received
+//     PolyCommitment + PolyEval messages. The caller (`maybeDeal`) decides
+//     whether to call StartPhase1Dealing based on the dkg_initial_states
+//     idempotency check.
+//   - PhaseAccusing: load from dkg_initial_states (Phase=Dealing, polynomial
+//     set, self-eval populated). Apply PolyCommitment + PolyEval messages.
+//     The caller (`maybeAccuse`) calls StartPhase2Accusing.
+//   - PhaseApologizing: load from dkg_initial_states. Apply PolyCommitment +
+//     PolyEval. Fast-forward via StartPhase2Accusing (output discarded —
+//     accusations were already committed to chain). Apply Accusation
+//     messages. The caller (`maybeApologize`) calls StartPhase3Apologizing.
+//   - PhaseFinalizing: load from dkg_initial_states. Apply PolyCommitment +
+//     PolyEval. Fast-forward via StartPhase2Accusing + StartPhase3Apologizing
+//     (polynomial alive from the initial state makes Phase3 a no-op for
+//     accusations not addressed to us). Apply Apology messages. The caller
+//     sets Phase=Finalized directly and calls ComputeResult.
+//
+// Messages are applied in phase order: each `Start*` call is interleaved
+// before the next message type so puredkg's per-handler phase guards are
+// satisfied (`HandleAccusationMsg` requires Phase ≤ Accusing,
+// `HandleApologyMsg` requires Phase ≤ Apologizing).
 func (m *Manager) buildPureDKG(
 	ctx context.Context,
 	tx pgx.Tx,
 	keyperConfigIndex, retryCounter int64,
-) (pure *puredkg.PureDKG, keypers []common.Address, ownIndex uint64, isMember bool, err error) {
+	blockPhase Phase,
+) (*puredkg.PureDKG, []common.Address, uint64, error) {
 	obsQueries := obskeyper.New(tx)
 	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
 	if err != nil {
-		return nil, nil, 0, false, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
+		return nil, nil, 0, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
 	}
-	ownIndex, err = keyperSet.GetIndex(m.cfg.OwnAddress)
+	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
 	if err != nil {
-		return nil, nil, 0, false, nil
+		return nil, nil, 0, nil
 	}
-	keypers, err = shdb.DecodeAddresses(keyperSet.Keypers)
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
 	if err != nil {
-		return nil, nil, 0, false, errors.Wrap(err, "decode keyper addresses")
+		return nil, nil, 0, errors.Wrap(err, "decode keyper addresses")
 	}
 
-	p := puredkg.NewPureDKG(
-		uint64(keyperConfigIndex),
-		uint64(len(keypers)),
-		uint64(keyperSet.Threshold),
-		ownIndex,
-	)
-	if err := m.replayStoredMessages(ctx, tx, &p, ownIndex, keyperConfigIndex, retryCounter); err != nil {
-		return nil, nil, 0, false, err
+	queries := corekeyperdb.New(tx)
+
+	var pure *puredkg.PureDKG
+	switch blockPhase {
+	case PhaseDealing:
+		p := puredkg.NewPureDKG(
+			uint64(keyperConfigIndex),
+			uint64(len(keypers)),
+			uint64(keyperSet.Threshold),
+			ownIndex,
+		)
+		pure = &p
+	case PhaseAccusing, PhaseApologizing, PhaseFinalizing:
+		row, err := queries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
+			KeyperConfigIndex: keyperConfigIndex,
+			RetryCounter:      retryCounter,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, 0, nil
+			}
+			return nil, nil, 0, errors.Wrap(err, "load dkg initial state")
+		}
+		pure, err = shdb.DecodePureDKG(row.PuredkgBytes)
+		if err != nil {
+			return nil, nil, 0, errors.Wrap(err, "decode dkg initial state")
+		}
+		// gob converts nil pointers in `[]*shcrypto.Gammas` / `[]*big.Int`
+		// slices into non-nil zero-value pointers on decode (via the
+		// elements' GobDecoder), which would defeat puredkg's
+		// "duplicate msg" check during the subsequent DB replay. Reset
+		// the slices and re-derive the self-eval from the loaded
+		// polynomial.
+		pure.Commitments = make([]*shcrypto.Gammas, pure.NumKeypers)
+		pure.Evals = make([]*big.Int, pure.NumKeypers)
+		pure.Evals[pure.Keyper] = pure.Polynomial.EvalForKeyper(int(pure.Keyper))
+	default:
+		return nil, nil, 0, nil
 	}
-	return &p, keypers, ownIndex, true, nil
+
+	if err := m.replayCommitmentsAndEvals(ctx, queries, pure, ownIndex, keyperConfigIndex, retryCounter); err != nil {
+		return nil, nil, 0, err
+	}
+
+	if blockPhase == PhaseDealing || blockPhase == PhaseAccusing {
+		return pure, keypers, ownIndex, nil
+	}
+
+	// Fast-forward into Accusing so HandleAccusationMsg accepts the stored
+	// rows. The output is discarded — the on-chain accusations are the
+	// authoritative copy.
+	_ = pure.StartPhase2Accusing()
+	if err := m.replayAccusations(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
+		return nil, nil, 0, err
+	}
+
+	if blockPhase == PhaseApologizing {
+		return pure, keypers, ownIndex, nil
+	}
+
+	// PhaseFinalizing: fast-forward into Apologizing and replay apologies.
+	// StartPhase3Apologizing reads pure.Polynomial — which is alive because
+	// it was loaded from dkg_initial_states.
+	_ = pure.StartPhase3Apologizing()
+	if err := m.replayApologies(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
+		return nil, nil, 0, err
+	}
+	return pure, keypers, ownIndex, nil
 }
 
-// replayStoredMessages feeds every stored DKG message for the given attempt
-// back into the given puredkg, using puredkg's public `Handle*Msg` API. All
-// four `Handle*` methods accept input while `pure.Phase` is at or below their
-// target phase, so leaving the in-memory state at `Phase = Off` until the
-// live phase boundary fires is correct here.
-func (m *Manager) replayStoredMessages(
+// replayCommitmentsAndEvals feeds stored PolyCommitment and PolyEval rows
+// back into `pure`. Both handlers require Phase ≤ Dealing; the caller is
+// responsible for the puredkg being at that phase or below.
+//
+// Duplicate-row errors (e.g. the self PolyEval that was re-applied by
+// StartPhase1Dealing during initial dealing and is now also present as a
+// DB row) are logged at debug level and ignored.
+func (m *Manager) replayCommitmentsAndEvals(
 	ctx context.Context,
-	tx pgx.Tx,
+	queries *corekeyperdb.Queries,
 	pure *puredkg.PureDKG,
 	ownIndex uint64,
 	keyperConfigIndex, retryCounter int64,
 ) error {
-	queries := corekeyperdb.New(tx)
 	eonForMsg := uint64(keyperConfigIndex)
 
 	commitments, err := queries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
@@ -146,7 +233,16 @@ func (m *Manager) replayStoredMessages(
 				Msg("ignoring poly eval on replay")
 		}
 	}
+	return nil
+}
 
+func (m *Manager) replayAccusations(
+	ctx context.Context,
+	queries *corekeyperdb.Queries,
+	pure *puredkg.PureDKG,
+	keyperConfigIndex, retryCounter int64,
+) error {
+	eonForMsg := uint64(keyperConfigIndex)
 	accusations, err := queries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
@@ -169,7 +265,16 @@ func (m *Manager) replayStoredMessages(
 				Msg("ignoring accusation on replay")
 		}
 	}
+	return nil
+}
 
+func (m *Manager) replayApologies(
+	ctx context.Context,
+	queries *corekeyperdb.Queries,
+	pure *puredkg.PureDKG,
+	keyperConfigIndex, retryCounter int64,
+) error {
+	eonForMsg := uint64(keyperConfigIndex)
 	apologies, err := queries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
@@ -194,7 +299,6 @@ func (m *Manager) replayStoredMessages(
 				Msg("ignoring apology on replay")
 		}
 	}
-
 	return nil
 }
 

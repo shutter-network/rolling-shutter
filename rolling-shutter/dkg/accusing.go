@@ -9,25 +9,28 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/shutter-network/shutter/shlib/puredkg"
-
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
-// startAccusing is the per-block reactor for the Accusing phase. It enqueues
-// a `submitAccusation` row iff this keyper has a valid in-memory dealing
-// state (i.e. our polynomial is still alive in this process) and produces
-// at least one accusation. The function is safely re-invokable: presence of
-// any own accusation row for `(k, r)` is the idempotency marker.
-func (m *Manager) startAccusing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
+// maybeAccuse is the per-block reactor for the Accusing phase. It enqueues a
+// `submitAccusation` row when our locally-rebuilt puredkg (loaded from
+// `dkg_initial_states` and replayed with received dealings) yields at least
+// one accusation. The function is safely re-invokable: presence of any own
+// accusation row for `(k, r)` is the idempotency marker.
+//
+// `buildPureDKG(PhaseAccusing)` returns the puredkg at Phase=Dealing with
+// commitments + evals applied; we call StartPhase2Accusing here, which
+// advances the phase and emits accusations for dealers whose PolyEval is
+// missing or fails verification.
+func (m *Manager) maybeAccuse(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, _, ownIndex, isMember, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, _, ownIndex, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseAccusing)
 		if err != nil {
 			return err
 		}
-		if !isMember {
+		if pure == nil {
 			return nil
 		}
 
@@ -45,20 +48,12 @@ func (m *Manager) startAccusing(ctx context.Context, dkgAddr common.Address, key
 			}
 		}
 
-		if pure.Phase != puredkg.Dealing {
-			// Per ADR 0003, the polynomial is not persisted. Without it we
-			// cannot drive puredkg forward from Off → Accusing within this
-			// invocation; skip submitting and the retry will start fresh.
+		accusations := pure.StartPhase2Accusing()
+		if len(accusations) == 0 {
 			log.Debug().
 				Int64("keyper-config-index", keyperConfigIndex).
 				Int64("retry-counter", retryCounter).
-				Str("phase", pure.Phase.String()).
-				Msg("skipping accusations: puredkg phase not Dealing")
-			return nil
-		}
-
-		accusations := pure.StartPhase2Accusing()
-		if len(accusations) == 0 {
+				Msg("no DKG accusations to submit: all dealers honest")
 			return nil
 		}
 

@@ -116,13 +116,13 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 				Uint64("retry-counter", retry).
 				Msg("DKG manager: dealing action failed")
 		}
-		if err := m.startAccusing(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
+		if err := m.maybeAccuse(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
 			log.Error().Err(err).
 				Int64("keyper-config-index", eon.KeyperConfigIndex).
 				Uint64("retry-counter", retry).
 				Msg("DKG manager: accusing action failed")
 		}
-		if err := m.startApologizing(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
+		if err := m.maybeApologize(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
 			log.Error().Err(err).
 				Int64("keyper-config-index", eon.KeyperConfigIndex).
 				Uint64("retry-counter", retry).

@@ -27,11 +27,11 @@ import (
 // submit.
 func (m *Manager) maybeDeal(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, keypers, ownIndex, isMember, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
+		pure, keypers, ownIndex, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseDealing)
 		if err != nil {
 			return err
 		}
-		if !isMember {
+		if pure == nil {
 			return nil
 		}
 
