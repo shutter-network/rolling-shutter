@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
-#MISE description="E2E test: event-based decryption triggers without batching"
-#MISE depends=["wait-for-initial-dkg", "deploy"]
+# MISE description="E2E test: event-based decryption triggers without batching"
+# MISE depends=["wait-for-initial-dkg", "deploy"]
 
 import json
 import os
@@ -14,6 +14,7 @@ import utils
 # RLP helpers — minimal subset needed for EventTriggerDefinition encoding
 # ---------------------------------------------------------------------------
 
+
 def _rlp_bytes(data: bytes) -> bytes:
     if len(data) == 1 and data[0] < 0x80:
         return data
@@ -22,7 +23,7 @@ def _rlp_bytes(data: bytes) -> bytes:
     if len(data) <= 55:
         return bytes([0x80 + len(data)]) + data
     lb = len(data).to_bytes((len(data).bit_length() + 7) // 8, "big")
-    return bytes([0xb7 + len(lb)]) + lb + data
+    return bytes([0xB7 + len(lb)]) + lb + data
 
 
 def _rlp_uint(n: int) -> bytes:
@@ -35,12 +36,14 @@ def _rlp_uint(n: int) -> bytes:
 def _rlp_list(items: list[bytes]) -> bytes:
     payload = b"".join(items)
     if len(payload) <= 55:
-        return bytes([0xc0 + len(payload)]) + payload
+        return bytes([0xC0 + len(payload)]) + payload
     lb = len(payload).to_bytes((len(payload).bit_length() + 7) // 8, "big")
-    return bytes([0xf7 + len(lb)]) + lb + payload
+    return bytes([0xF7 + len(lb)]) + lb + payload
 
 
-def encode_trigger_def(contract_addr: bytes, topic_index: int, topic_value: bytes) -> bytes:
+def encode_trigger_def(
+    contract_addr: bytes, topic_index: int, topic_value: bytes
+) -> bytes:
     """
     Encode an EventTriggerDefinition (version 0x02 + RLP) that matches logs from
     `contract_addr` where topic[topic_index] == topic_value (32 bytes).
@@ -51,20 +54,26 @@ def encode_trigger_def(contract_addr: bytes, topic_index: int, topic_value: byte
     [Op, *int_args, *byte_args] — NOT [Op, [IntArgs], [ByteArgs]].
     For BytesEq (Op=5) there are 0 int args and 1 byte arg, so the list is [5, topic_value].
     """
-    log_value_ref = _rlp_list([
-        _rlp_uint(0),               # Dynamic = false (bool encoded as uint 0)
-        _rlp_uint(topic_index),
-    ])
+    log_value_ref = _rlp_list(
+        [
+            _rlp_uint(0),  # Dynamic = false (bool encoded as uint 0)
+            _rlp_uint(topic_index),
+        ]
+    )
     # Flat list: [Op, byteArg]  (no IntArgs for BytesEq, one ByteArg)
-    value_predicate = _rlp_list([
-        _rlp_uint(5),               # Op = BytesEq
-        _rlp_bytes(topic_value),    # the single byte argument, directly in the list
-    ])
+    value_predicate = _rlp_list(
+        [
+            _rlp_uint(5),  # Op = BytesEq
+            _rlp_bytes(topic_value),  # the single byte argument, directly in the list
+        ]
+    )
     log_predicate = _rlp_list([log_value_ref, value_predicate])
-    definition = _rlp_list([
-        _rlp_bytes(contract_addr),
-        _rlp_list([log_predicate]),
-    ])
+    definition = _rlp_list(
+        [
+            _rlp_bytes(contract_addr),
+            _rlp_list([log_predicate]),
+        ]
+    )
     return bytes([0x02]) + definition
 
 
@@ -86,8 +95,15 @@ def cast(*args: str, capture: bool = True) -> str:
 
 def cast_send(*args: str) -> dict:
     """Broadcast a transaction and return the parsed JSON receipt."""
-    raw = cast("send", "--json", "--rpc-url", RPC,
-               "--private-key", os.environ["DEPLOY_KEY"], *args)
+    raw = cast(
+        "send",
+        "--json",
+        "--rpc-url",
+        RPC,
+        "--private-key",
+        os.environ["DEPLOY_KEY"],
+        *args,
+    )
     return json.loads(raw)
 
 
@@ -96,12 +112,19 @@ def deploy_contract(bytecode_hex: str) -> str:
     receipt = cast_send("--create", bytecode_hex)
     addr = receipt.get("contractAddress") or receipt.get("creates")
     if not addr:
-        raise SystemExit(f"Could not find contractAddress in receipt:\n{json.dumps(receipt, indent=2)}")
+        raise SystemExit(
+            f"Could not find contractAddress in receipt:\n{json.dumps(receipt, indent=2)}"
+        )
     return addr
 
 
-def call_register(registry_addr: str, keyper_config_index: int,
-                  identity_prefix_hex: str, trigger_def_hex: str, ttl: int) -> None:
+def call_register(
+    registry_addr: str,
+    keyper_config_index: int,
+    identity_prefix_hex: str,
+    trigger_def_hex: str,
+    ttl: int,
+) -> None:
     cast_send(
         registry_addr,
         "register(uint64,bytes32,bytes,uint64)",
@@ -124,15 +147,6 @@ def call_trigger(helper_addr: str, topic2_hex: str) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# DB helpers
-# ---------------------------------------------------------------------------
-
-
-def query_db(sql: str, keyper_index: int = 0) -> str:
-    return utils.query_keyper_db(keyper_index, sql)
-
-
 def wait_for_event_decryption_key(
     keyper_config_index: int,
     identity_prefix_hex: str,
@@ -151,25 +165,29 @@ def wait_for_event_decryption_key(
                 f"identity_prefix={identity_prefix_hex}, eon={keyper_config_index}"
             )
 
-        identity = query_db(
+        identity = utils.query_keyper_db(
+            0,
             f"SELECT encode(identity, 'hex') FROM event_trigger_registered_event "
             f"WHERE eon = {keyper_config_index} "
             f"AND encode(identity_prefix, 'hex') = '{identity_prefix_hex}' "
-            "LIMIT 1"
+            "LIMIT 1",
         )
         if not identity:
             time.sleep(poll_interval)
             continue
 
-        exists = query_db(
+        exists = utils.query_keyper_db(
+            0,
             "SELECT EXISTS ("
             "  SELECT 1 FROM decryption_key "
             f" WHERE eon = {keyper_config_index} "
             f" AND encode(epoch_id, 'hex') = '{identity}'"
-            ")"
+            ")",
         )
         if exists == "t":
-            print(f"  Decryption key ready: identity_prefix={identity_prefix_hex} → epoch_id={identity}")
+            print(
+                f"  Decryption key ready: identity_prefix={identity_prefix_hex} → epoch_id={identity}"
+            )
             return identity
 
         time.sleep(poll_interval)
@@ -189,9 +207,10 @@ def assert_no_batching(
     """
     deadline = time.time() + timeout
     while True:
-        count_str = query_db(
+        count_str = utils.query_keyper_db(
+            0,
             f"SELECT COUNT(DISTINCT identities_hash) FROM decryption_signatures "
-            f"WHERE eon = {keyper_config_index}"
+            f"WHERE eon = {keyper_config_index}",
         )
         count = int(count_str) if count_str else 0
         if count >= num_triggers:
@@ -213,30 +232,43 @@ def assert_no_batching(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def get_registry_address(data_dir: Path) -> str:
     broadcast = json.loads(
-        (data_dir / "contracts" / "broadcast"
-         / utils.DEPLOYMENT_SCRIPTS["service"]
-         / os.environ["ETHEREUM_CHAIN_ID"]
-         / "run-latest.json").read_text()
+        (
+            data_dir
+            / "contracts"
+            / "broadcast"
+            / utils.DEPLOYMENT_SCRIPTS["service"]
+            / os.environ["ETHEREUM_CHAIN_ID"]
+            / "run-latest.json"
+        ).read_text()
     )
     addr = utils.get_uups_proxy_address(broadcast, "ShutterEventTriggerRegistryV1")
     if not addr:
-        raise SystemExit("ShutterEventTriggerRegistryV1 proxy not found in deployment artifacts")
+        raise SystemExit(
+            "ShutterEventTriggerRegistryV1 proxy not found in deployment artifacts"
+        )
     return addr
 
 
 def get_helper_bytecode(data_dir: Path) -> str:
     artifact = json.loads(
-        (data_dir / "contracts" / "out"
-         / "EventTriggerTestHelper.sol"
-         / "EventTriggerTestHelper.json").read_text()
+        (
+            data_dir
+            / "contracts"
+            / "out"
+            / "EventTriggerTestHelper.sol"
+            / "EventTriggerTestHelper.json"
+        ).read_text()
     )
     return artifact["bytecode"]["object"].removeprefix("0x")
 
 
 def main() -> None:
-    deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+    deployment_type = utils.resolve_deployment_type(
+        os.environ.get("DEPLOYMENT_TYPE", "")
+    )
     if deployment_type != "service":
         raise SystemExit("test-event-decryption only supports DEPLOYMENT_TYPE=service")
 
@@ -247,13 +279,13 @@ def main() -> None:
     # --- Resolve eon and keyper_config_index -----------------------------------
     # ShutterEventTriggerRegistryV1.register() takes the *keyper_config_index*,
     # not the eon number. We obtain both from the eons table and use accordingly.
-    eon_str = query_db("SELECT max(eon) FROM eons")
+    eon_str = utils.query_keyper_db(0, "SELECT max(eon) FROM eons")
     if not eon_str:
         raise SystemExit("No eon found in keyper DB — has DKG completed?")
     eon_number = int(eon_str)
 
-    keyper_config_index_str = query_db(
-        f"SELECT keyper_config_index FROM eons WHERE eon = {eon_number} LIMIT 1"
+    keyper_config_index_str = utils.query_keyper_db(
+        0, f"SELECT keyper_config_index FROM eons WHERE eon = {eon_number} LIMIT 1"
     )
     if not keyper_config_index_str:
         raise SystemExit(f"No keyper_config_index found for eon={eon_number}")
@@ -276,7 +308,7 @@ def main() -> None:
     helper_addr_bytes = bytes.fromhex(helper_addr.removeprefix("0x").zfill(40))
     trigger_def = encode_trigger_def(
         contract_addr=helper_addr_bytes,
-        topic_index=2,          # topic[2] = topic2 (bytes32 indexed)
+        topic_index=2,  # topic[2] = topic2 (bytes32 indexed)
         topic_value=trigger_topic,
     )
     trigger_def_hex = trigger_def.hex()
@@ -310,7 +342,9 @@ def main() -> None:
         wait_for_event_decryption_key(keyper_config_index, ip_hex, poll_interval)
 
     # --- Assert no batching ---------------------------------------------------
-    print("Asserting no-batching (each trigger must produce a distinct identities_hash)…")
+    print(
+        "Asserting no-batching (each trigger must produce a distinct identities_hash)…"
+    )
     assert_no_batching(keyper_config_index, num_triggers)
 
     print(
