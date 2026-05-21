@@ -36,7 +36,6 @@ type Client interface {
 	ChainID(ctx context.Context) (*big.Int, error)
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
-	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 	EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
@@ -165,19 +164,34 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
 		return
 	}
-	gasPrice, err := s.cfg.Client.SuggestGasPrice(ctx)
+	tipCap, err := s.cfg.Client.SuggestGasTipCap(ctx)
 	if err != nil {
-		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: suggest gas price")
+		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: suggest gas tip cap")
 		return
 	}
+	latestHeader, err := s.cfg.Client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: read latest header")
+		return
+	}
+	if latestHeader.BaseFee == nil {
+		s.markFailed(ctx, row.ID, row.Label, errors.New("latest header has no base fee (non-EIP-1559 chain)"))
+		return
+	}
+	// GasFeeCap = 2 * baseFee + tipCap. The 2x multiplier provides headroom
+	// for base-fee growth across a few blocks of inclusion delay.
+	feeCap := new(big.Int).Mul(latestHeader.BaseFee, big.NewInt(2))
+	feeCap.Add(feeCap, tipCap)
 
-	tx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		GasPrice: gasPrice,
-		Gas:      gasLimit,
-		To:       &to,
-		Value:    value,
-		Data:     row.Data,
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   s.chainID,
+		Nonce:     nonce,
+		GasTipCap: tipCap,
+		GasFeeCap: feeCap,
+		Gas:       gasLimit,
+		To:        &to,
+		Value:     value,
+		Data:      row.Data,
 	})
 	signed, err := types.SignTx(tx, types.LatestSignerForChainID(s.chainID), s.cfg.PrivateKey)
 	if err != nil {
