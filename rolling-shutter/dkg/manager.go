@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -67,75 +68,85 @@ func New(cfg Config) *Manager {
 	return &Manager{cfg: cfg}
 }
 
-// HandleBlock is called once per new block by the host keyper. For every
-// eon row in the database it dispatches all action handlers unconditionally:
-// each handler's idempotency check (presence of an own message row in the
-// relevant DKG table, or presence of a `dkg_result` row, or the ECIES key
-// cache) makes repeated invocations safe and cheap.
-//
-// Errors from individual eons are logged but do not abort the loop — a
-// per-eon failure must not stop the others.
+// HandleBlock is called once per new block by the host keyper. For every eon
+// row in the database it computes the current DKG phase and dispatches to at
+// most one action function inside a single per-eon transaction. Errors from
+// individual eons are logged but do not abort the loop — a per-eon failure
+// must not stop the others.
 func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
 	}
-	eons, err := corekeyperdb.New(m.cfg.DBPool).GetAllEons(ctx)
+	queries := corekeyperdb.New(m.cfg.DBPool)
+	eons, err := queries.GetAllEons(ctx)
 	if err != nil {
 		return errors.Wrap(err, "list eons")
 	}
 	for _, eon := range eons {
-		activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
-		if err != nil {
+		if err := m.handleEon(ctx, eon, blockNumber); err != nil {
 			log.Error().Err(err).
 				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Msg("DKG manager: convert activation block")
-			continue
-		}
-		phaseLength, leadLength := m.phaseParamsForEon(eon)
-		if phaseLength == 0 {
-			continue
-		}
-		retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
-		dkgAddr := m.dkgContractAddrForEon(eon)
-
-		// ECIES registration is independent of phase and runs once per
-		// (eon, own keyper) pair until the registry confirms.
-		if err := m.maybeRegisterECIESKey(ctx, eon); err != nil {
-			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Msg("DKG manager: ECIES key registration")
-		}
-
-		// The four DKG actions all run on every block; each is idempotent
-		// via DB-state checks. Operate in dependency order: dealing, then
-		// the message exchange, then finalisation.
-		retryInt64 := int64(retry)
-		if err := m.maybeDeal(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
-			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Uint64("retry-counter", retry).
-				Msg("DKG manager: dealing action failed")
-		}
-		if err := m.maybeAccuse(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
-			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Uint64("retry-counter", retry).
-				Msg("DKG manager: accusing action failed")
-		}
-		if err := m.maybeApologize(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
-			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Uint64("retry-counter", retry).
-				Msg("DKG manager: apologizing action failed")
-		}
-		if err := m.startFinalizing(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
-			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
-				Uint64("retry-counter", retry).
-				Msg("DKG manager: finalizing action failed")
+				Uint64("block-number", blockNumber).
+				Msg("DKG manager: per-eon handler failed")
 		}
 	}
 	return nil
+}
+
+// handleEon runs the per-eon dispatch logic inside a single database
+// transaction. Returns nil for "nothing to do" (eon already succeeded, no
+// active phase at this block, not a member, no initial state for non-Dealing
+// phases). The caller logs but does not abort on error.
+func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
+	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
+	if err != nil {
+		return errors.Wrap(err, "convert activation block")
+	}
+	phaseLength, leadLength := m.phaseParamsForEon(eon)
+	if phaseLength == 0 {
+		return nil
+	}
+
+	// Early exit: a successful dkg_result row means either we already voted
+	// or the chain has concluded the DKG. Nothing more to do for this eon.
+	queries := corekeyperdb.New(m.cfg.DBPool)
+	alreadySucceeded, err := queries.ExistsDKGResultSuccess(ctx, eon.KeyperConfigIndex)
+	if err != nil {
+		return errors.Wrap(err, "check existing dkg_result")
+	}
+	if alreadySucceeded {
+		return nil
+	}
+
+	retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
+	retryInt64 := int64(retry)
+	blockPhase := PhaseAt(activationBlock, leadLength, phaseLength, retry, blockNumber)
+	if blockPhase == PhaseNone {
+		return nil
+	}
+	dkgAddr := m.dkgContractAddrForEon(eon)
+
+	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		pure, keypers, ownIndex, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase)
+		if err != nil {
+			return errors.Wrap(err, "build puredkg")
+		}
+		if pure == nil {
+			return nil
+		}
+		switch blockPhase {
+		case PhaseDealing:
+			return m.maybeDeal(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
+		case PhaseAccusing:
+			return m.maybeAccuse(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+		case PhaseApologizing:
+			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+		case PhaseFinalizing:
+			return m.maybeFinalize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+		default:
+			return nil
+		}
+	})
 }
 
 // phaseParamsForEon returns the DKG phase length and lead length for the
