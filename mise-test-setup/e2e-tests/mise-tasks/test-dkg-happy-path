@@ -12,6 +12,7 @@ def add_set_and_verify(
 ) -> None:
     utils.run(["mise", "run", "add-keyper-set", "--indices", indices, "--threshold", threshold])
     wait_for_dkg_success(keyper_set_index=keyper_set_index)
+    utils.run(["mise", "run", "check-dkg", "--ksi", str(keyper_set_index)])
     cmd = ["mise", "run", "test-decryption"]
     if keyper_index != 0:
         cmd += ["--keyper-index", str(keyper_index)]
@@ -23,6 +24,7 @@ utils.run(["mise", "run", "fund-keypers"])
 
 # Keyper set 1 (initial): 0,1,2 / threshold 2.
 utils.run(["mise", "run", "wait-for-initial-dkg"])
+utils.run(["mise", "run", "check-dkg", "--ksi", "1"])
 utils.run(["mise", "run", "test-decryption"])
 
 # Keyper set 2: grow to 0,1,2,3 / threshold 3.
