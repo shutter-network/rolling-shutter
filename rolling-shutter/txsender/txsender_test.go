@@ -1,11 +1,23 @@
 package txsender
 
 import (
+	"context"
+	"database/sql"
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/assert"
+
+	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 )
 
 func TestBigIntNumericRoundtrip(t *testing.T) {
@@ -36,4 +48,140 @@ func TestNullNumericDecodesAsZero(t *testing.T) {
 	got, err := numericToBigInt(pgtype.Numeric{Status: pgtype.Null})
 	assert.NilError(t, err)
 	assert.Equal(t, got.Sign(), 0)
+}
+
+// fakeClient records the calls made into it so tests can assert on which
+// chain-side operations the sender performed.
+type fakeClient struct {
+	mu                       sync.Mutex
+	chainID                  *big.Int
+	nonce                    uint64
+	gasLimit                 uint64
+	gasPrice                 *big.Int
+	receiptErr               error
+	sentTxs                  []*types.Transaction
+	receiptCallsByHash       map[common.Hash]int
+	sendTransactionCallCount int32
+}
+
+func newFakeClient() *fakeClient {
+	return &fakeClient{
+		chainID:            big.NewInt(1337),
+		gasLimit:           21000,
+		gasPrice:           big.NewInt(1_000_000_000),
+		receiptErr:         ethereum.NotFound,
+		receiptCallsByHash: map[common.Hash]int{},
+	}
+}
+
+func (c *fakeClient) ChainID(_ context.Context) (*big.Int, error) {
+	return c.chainID, nil
+}
+
+func (c *fakeClient) PendingNonceAt(_ context.Context, _ common.Address) (uint64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := c.nonce
+	c.nonce++
+	return n, nil
+}
+
+func (c *fakeClient) SuggestGasTipCap(_ context.Context) (*big.Int, error) {
+	return big.NewInt(0), nil
+}
+
+func (c *fakeClient) SuggestGasPrice(_ context.Context) (*big.Int, error) {
+	return c.gasPrice, nil
+}
+
+func (c *fakeClient) HeaderByNumber(_ context.Context, _ *big.Int) (*types.Header, error) {
+	return &types.Header{}, nil
+}
+
+func (c *fakeClient) EstimateGas(_ context.Context, _ ethereum.CallMsg) (uint64, error) {
+	return c.gasLimit, nil
+}
+
+func (c *fakeClient) SendTransaction(_ context.Context, tx *types.Transaction) error {
+	atomic.AddInt32(&c.sendTransactionCallCount, 1)
+	c.mu.Lock()
+	c.sentTxs = append(c.sentTxs, tx)
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *fakeClient) TransactionReceipt(_ context.Context, h common.Hash) (*types.Receipt, error) {
+	c.mu.Lock()
+	c.receiptCallsByHash[h]++
+	c.mu.Unlock()
+	return nil, c.receiptErr
+}
+
+func newTestSender(t *testing.T, dbpool *pgxpool.Pool) (*TxSender, *fakeClient) {
+	t.Helper()
+	key, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	fc := newFakeClient()
+	s := New(Config{
+		DBPool:     dbpool,
+		Client:     fc,
+		PrivateKey: key,
+	})
+	s.chainID = fc.chainID
+	return s, fc
+}
+
+// TestPollProcessesBothPhasesInOneIteration verifies the merged poll loop:
+// injecting one pending row and one submitted row results in both being
+// processed within a single poll iteration. The pending row should be sent
+// via the fake client, and the submitted row should have its receipt queried.
+func TestPollProcessesBothPhasesInOneIteration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	s, fc := newTestSender(t, dbpool)
+
+	queries := corekeyperdb.New(dbpool)
+	zero, err := bigIntToNumeric(big.NewInt(0))
+	assert.NilError(t, err)
+
+	// One pending row, to be picked up by the submit phase.
+	pendingID, err := queries.InsertPendingTx(ctx, corekeyperdb.InsertPendingTxParams{
+		ToAddress: common.HexToAddress("0x000000000000000000000000000000000000dead").Hex(),
+		Data:      []byte{0x01, 0x02, 0x03},
+		Value:     zero,
+	})
+	assert.NilError(t, err)
+
+	// One row pre-marked submitted, to be picked up by the confirm phase.
+	submittedID, err := queries.InsertPendingTx(ctx, corekeyperdb.InsertPendingTxParams{
+		ToAddress: common.HexToAddress("0x00000000000000000000000000000000000000ff").Hex(),
+		Data:      []byte{0xaa, 0xbb},
+		Value:     zero,
+	})
+	assert.NilError(t, err)
+	preexistingHash := common.HexToHash("0xabc0000000000000000000000000000000000000000000000000000000000001")
+	err = queries.MarkTxSubmitted(ctx, corekeyperdb.MarkTxSubmittedParams{
+		ID:     submittedID,
+		TxHash: sql.NullString{String: preexistingHash.Hex(), Valid: true},
+		Nonce:  sql.NullInt64{Int64: 42, Valid: true},
+	})
+	assert.NilError(t, err)
+
+	s.poll(ctx)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&fc.sendTransactionCallCount),
+		"submit phase: expected exactly one SendTransaction call (the pending row)")
+	pendingAfter, err := queries.GetTxOutboxByID(ctx, pendingID)
+	assert.NilError(t, err)
+	assert.Equal(t, "submitted", pendingAfter.Status,
+		"submit phase: pending row should be marked submitted")
+
+	assert.Equal(t, 1, fc.receiptCallsByHash[preexistingHash],
+		"confirm phase: expected one TransactionReceipt call for the pre-existing submitted row")
 }

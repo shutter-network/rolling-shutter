@@ -52,8 +52,9 @@ type Config struct {
 }
 
 // TxSender is a service that drains the `tx_outbox` table and reports
-// receipts back to it. It runs two goroutines: one submits pending rows in id
-// order, the other watches submitted rows for receipts.
+// receipts back to it. It runs a single poll loop that, on each tick, first
+// submits all pending rows in id order, then checks all submitted rows for
+// receipts.
 type TxSender struct {
 	cfg     Config
 	address common.Address
@@ -70,8 +71,8 @@ func New(cfg Config) *TxSender {
 	return &TxSender{cfg: cfg, address: addr}
 }
 
-// Start implements service.Service. The submit loop and the confirm loop are
-// independent and run in the same errgroup.
+// Start implements service.Service. A single poll loop runs both phases
+// sequentially per tick: submit pending rows, then check submitted rows.
 func (s *TxSender) Start(ctx context.Context, runner service.Runner) error {
 	chainID, err := s.cfg.Client.ChainID(ctx)
 	if err != nil {
@@ -84,12 +85,11 @@ func (s *TxSender) Start(ctx context.Context, runner service.Runner) error {
 		Dur("poll-interval", s.cfg.PollInterval).
 		Msg("starting tx outbox sender")
 
-	runner.Go(func() error { return s.submitLoop(ctx) })
-	runner.Go(func() error { return s.confirmLoop(ctx) })
+	runner.Go(func() error { return s.pollLoop(ctx) })
 	return nil
 }
 
-func (s *TxSender) submitLoop(ctx context.Context) error {
+func (s *TxSender) pollLoop(ctx context.Context) error {
 	ticker := time.NewTicker(s.cfg.PollInterval)
 	defer ticker.Stop()
 	for {
@@ -97,25 +97,21 @@ func (s *TxSender) submitLoop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := s.processPending(ctx); err != nil {
-				log.Error().Err(err).Msg("tx outbox: submit loop iteration failed")
-			}
+			s.poll(ctx)
 		}
 	}
 }
 
-func (s *TxSender) confirmLoop(ctx context.Context) error {
-	ticker := time.NewTicker(s.cfg.PollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if err := s.processSubmitted(ctx); err != nil {
-				log.Error().Err(err).Msg("tx outbox: confirm loop iteration failed")
-			}
-		}
+// poll runs one iteration of the sender: it first submits all pending rows,
+// then checks all submitted rows for receipts. The phases are sequential so
+// that a row enqueued and submitted within the same tick can also be checked
+// for a receipt on the next tick without ordering surprises.
+func (s *TxSender) poll(ctx context.Context) {
+	if err := s.processPending(ctx); err != nil {
+		log.Error().Err(err).Msg("tx outbox: submit phase failed")
+	}
+	if err := s.processSubmitted(ctx); err != nil {
+		log.Error().Err(err).Msg("tx outbox: confirm phase failed")
 	}
 }
 
