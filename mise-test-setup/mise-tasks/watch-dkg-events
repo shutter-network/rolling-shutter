@@ -1,0 +1,145 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Stream DKG Contract events in real time"
+#USAGE flag "--ksi <ksi>" help="Filter the stream to a single Keyper Set Index"
+#USAGE flag "--retry <retry>" help="Filter the stream to a single retry counter"
+
+import os
+import time
+
+import utils
+
+
+# Event signature hashes match those in show-dkg-status.
+EVENT_NAMES = {
+    "0xa5074728b92791250d48ccdc55266aca7b1cca22f89e1ef2ab91ccd7ae0f337d": "DealingSubmitted",
+    "0xb5cc05e740a503c13e1b7ac3ad2d5abf41b91d2e5fca79455d34e515fb70849a": "AccusationSubmitted",
+    "0x62729f0820cf3ab60fbd63a51cdeae0554d0ab24f843b86bd0d2591594d69136": "ApologySubmitted",
+    "0xacfc0aa3f6ba36ac0ffda53e00d2cdace2fd4a9e41e2fe3214032794332c37c3": "SuccessVoteSubmitted",
+    "0xe6c9bd3daa50b9218615605cdf333410d405b7f3b8dbeee5a2373769679aa9f5": "DKGSucceeded",
+}
+
+# AccusationSubmitted and ApologySubmitted both carry a uint64[] of indices as
+# the first dynamic ABI argument in event data; the others have no useful
+# non-indexed indices for diagnostics.
+INDICES_LABEL = {
+    "0xb5cc05e740a503c13e1b7ac3ad2d5abf41b91d2e5fca79455d34e515fb70849a": "accused",
+    "0x62729f0820cf3ab60fbd63a51cdeae0554d0ab24f843b86bd0d2591594d69136": "accusers",
+}
+
+
+def parse_first_uint64_array(data_hex: str) -> list[int]:
+    """Decode the first dynamic uint64[] parameter in event data.
+
+    Both AccusationSubmitted and ApologySubmitted start with a uint64[] in
+    non-indexed args; for other events this returns an empty list rather than
+    raising, so the watcher tolerates malformed or unfamiliar data fields.
+    """
+    if not data_hex:
+        return []
+    data = data_hex[2:] if data_hex.startswith("0x") else data_hex
+    if len(data) < 64:
+        return []
+    try:
+        offset_chars = int(data[:64], 16) * 2
+        if len(data) < offset_chars + 64:
+            return []
+        length = int(data[offset_chars : offset_chars + 64], 16)
+        result: list[int] = []
+        for i in range(length):
+            start = offset_chars + 64 + i * 64
+            end = start + 64
+            if len(data) < end:
+                break
+            result.append(int(data[start:end], 16))
+        return result
+    except ValueError:
+        return []
+
+
+def block_number_of(ev: dict) -> int:
+    raw = ev.get("blockNumber")
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        return int(raw, 16) if raw.startswith("0x") else int(raw)
+    return 0
+
+
+def format_event(ev: dict) -> str | None:
+    topics = ev.get("topics", [])
+    if not topics:
+        return None
+    topic0 = topics[0].lower()
+    name = EVENT_NAMES.get(topic0)
+    if name is None:
+        return None
+    block = block_number_of(ev)
+    ksi = utils.topic_to_uint(topics[1]) if len(topics) >= 2 else None
+    retry = utils.topic_to_uint(topics[2]) if len(topics) >= 3 else None
+    keyper = utils.topic_to_uint(topics[3]) if len(topics) >= 4 else None
+    parts = [
+        f"block={block}",
+        f"event={name}",
+        f"ksi={ksi}",
+        f"retry={retry}",
+    ]
+    if keyper is not None:
+        parts.append(f"keyper={keyper}")
+    indices_label = INDICES_LABEL.get(topic0)
+    if indices_label is not None:
+        data = ev.get("data", "") or ""
+        indices = parse_first_uint64_array(data)
+        parts.append(f"{indices_label}=[{','.join(str(i) for i in indices)}]")
+    return " ".join(parts)
+
+
+def passes_filter(ev: dict, ksi_filter: int | None, retry_filter: int | None) -> bool:
+    topics = ev.get("topics", [])
+    if ksi_filter is not None:
+        if len(topics) < 2 or utils.topic_to_uint(topics[1]) != ksi_filter:
+            return False
+    if retry_filter is not None:
+        if len(topics) < 3 or utils.topic_to_uint(topics[2]) != retry_filter:
+            return False
+    return True
+
+
+ksi_raw = os.environ.get("usage_ksi", "").strip()
+retry_raw = os.environ.get("usage_retry", "").strip()
+ksi_filter = int(ksi_raw) if ksi_raw else None
+retry_filter = int(retry_raw) if retry_raw else None
+
+poll_interval = float(os.environ.get("DKG_RESULT_POLL_INTERVAL", "1"))
+
+dkg_address = utils.get_deployed_address("DKGContract")
+
+# Tail semantics: start from the next block, not history.
+next_block = utils.cast_block_number() + 1
+
+try:
+    while True:
+        head = utils.cast_block_number()
+        if head >= next_block:
+            events = utils.cast_logs_at_address(
+                dkg_address,
+                from_block=str(next_block),
+                to_block=str(head),
+            )
+            events.sort(
+                key=lambda e: (
+                    block_number_of(e),
+                    int(e.get("logIndex", "0x0"), 16)
+                    if isinstance(e.get("logIndex"), str)
+                    else int(e.get("logIndex") or 0),
+                )
+            )
+            for ev in events:
+                if not passes_filter(ev, ksi_filter, retry_filter):
+                    continue
+                line = format_event(ev)
+                if line is not None:
+                    print(line, flush=True)
+            next_block = head + 1
+        time.sleep(poll_interval)
+except KeyboardInterrupt:
+    raise SystemExit(0)
