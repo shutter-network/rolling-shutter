@@ -2,7 +2,6 @@ package shutterservice
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -62,7 +61,7 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 				Msg("observed DKG success vote")
 			return nil
 		case *syncevent.SuccessEvent:
-			return storeDKGSuccess(ctx, queries, e, keyperConfigIndex)
+			return kpr.dkgMgr.HandleDKGSuccess(ctx, tx, keyperConfigIndex, retryCounterInt)
 		default:
 			return errors.Errorf("unknown DKG event type %T", ev)
 		}
@@ -202,27 +201,3 @@ func storeApology(
 	return nil
 }
 
-func storeDKGSuccess(
-	ctx context.Context,
-	queries *corekeyperdb.Queries,
-	ev *syncevent.SuccessEvent,
-	keyperConfigIndex int64,
-) error {
-	exists, err := queries.ExistsDKGResultSuccess(ctx, keyperConfigIndex)
-	if err != nil {
-		return errors.Wrap(err, "check existing dkg_result success")
-	}
-	if exists {
-		return nil
-	}
-	log.Info().
-		Uint64("keyper-set-index", ev.KeyperSetIndex).
-		Uint64("retry-counter", ev.RetryCounter).
-		Msg("recording DKG success")
-	return queries.InsertDKGResult(ctx, corekeyperdb.InsertDKGResultParams{
-		Eon:        keyperConfigIndex,
-		Success:    true,
-		Error:      sql.NullString{},
-		PureResult: nil,
-	})
-}
