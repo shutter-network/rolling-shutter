@@ -187,6 +187,37 @@ def get_cycle_length() -> int:
     return int(cast_call(dkg, "cycleLength()(uint64)"))
 
 
+def get_phase_length() -> int:
+    dkg = get_deployed_address("DKGContract")
+    return int(cast_call(dkg, "PHASE_LENGTH()(uint64)"))
+
+
+def cast_logs_at_address(address: str, *, from_block: str = "earliest") -> list[dict]:
+    """Fetch all logs for the given contract address as parsed JSON entries.
+
+    A single `cast logs` invocation; no topic filtering — callers narrow
+    results client-side via topic0 (event signature) and topic1..3.
+    """
+    result = run(
+        [
+            "docker", "compose", "run", "--rm", "--entrypoint", "cast",
+            "contracts", "logs",
+            "--rpc-url", "http://ethereum:8545",
+            "--address", address,
+            "--from-block", from_block,
+            "--json",
+        ],
+        capture_output=True,
+    ).stdout.strip()
+    if not result:
+        return []
+    return json.loads(result)
+
+
+def topic_to_uint(topic: str) -> int:
+    return int(topic, 16)
+
+
 def get_succeeded(ksi: int) -> bool:
     dkg = get_deployed_address("DKGContract")
     result = cast_call(dkg, "succeeded(uint64)(bool)", str(ksi))
