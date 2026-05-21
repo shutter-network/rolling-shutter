@@ -192,23 +192,28 @@ def get_phase_length() -> int:
     return int(cast_call(dkg, "PHASE_LENGTH()(uint64)"))
 
 
-def cast_logs_at_address(address: str, *, from_block: str = "earliest") -> list[dict]:
+def cast_logs_at_address(
+    address: str,
+    *,
+    from_block: str = "earliest",
+    to_block: str | None = None,
+) -> list[dict]:
     """Fetch all logs for the given contract address as parsed JSON entries.
 
     A single `cast logs` invocation; no topic filtering — callers narrow
     results client-side via topic0 (event signature) and topic1..3.
     """
-    result = run(
-        [
-            "docker", "compose", "run", "--rm", "--entrypoint", "cast",
-            "contracts", "logs",
-            "--rpc-url", "http://ethereum:8545",
-            "--address", address,
-            "--from-block", from_block,
-            "--json",
-        ],
-        capture_output=True,
-    ).stdout.strip()
+    cmd = [
+        "docker", "compose", "run", "--rm", "--entrypoint", "cast",
+        "contracts", "logs",
+        "--rpc-url", "http://ethereum:8545",
+        "--address", address,
+        "--from-block", from_block,
+    ]
+    if to_block is not None:
+        cmd += ["--to-block", to_block]
+    cmd.append("--json")
+    result = run(cmd, capture_output=True).stdout.strip()
     if not result:
         return []
     return json.loads(result)
