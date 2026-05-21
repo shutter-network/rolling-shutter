@@ -95,6 +95,21 @@ func (m *Manager) maybeDeal(
 		recvAddr := keypers[recvIdx]
 		ciphertext, err := m.encryptPolyEvalFor(ctx, queries, recvAddr, evalMsg.Eval)
 		if err != nil {
+			// A missing ECIES key for one receiver is a recoverable
+			// condition: substitute empty bytes at that slot so the
+			// positional N−1 layout is preserved for all other receivers,
+			// and continue. The receiver will fail to decrypt their slot
+			// and accuse us through the normal Accusation flow.
+			if errors.Is(err, pgx.ErrNoRows) {
+				log.Warn().
+					Int64("keyper-config-index", keyperConfigIndex).
+					Int64("retry-counter", retryCounter).
+					Uint64("receiver-index", recvIdx).
+					Str("receiver-address", recvAddr.Hex()).
+					Msg("no ECIES key registered for receiver; substituting empty eval and continuing")
+				encryptedEvals = append(encryptedEvals, []byte{})
+				continue
+			}
 			return errors.Wrapf(err, "encrypt poly eval for receiver %d (%s)", recvIdx, recvAddr.Hex())
 		}
 		encryptedEvals = append(encryptedEvals, ciphertext)
