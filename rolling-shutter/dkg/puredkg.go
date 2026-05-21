@@ -15,7 +15,6 @@ import (
 	"github.com/shutter-network/shutter/shlib/puredkg"
 	"github.com/shutter-network/shutter/shlib/shcrypto"
 
-	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -38,11 +37,15 @@ func ReceiverIndicesForSender(n, senderIndex uint64) []uint64 {
 // attempt at the phase the corresponding maybe-function expects to operate
 // in. The DB is the source of truth; nothing is cached between invocations.
 //
-// Returns (nil, nil, 0, nil) when this keyper should not participate:
-//   - not a member of the keyper set, or
-//   - no `dkg_initial_states` row for a non-Dealing phase (Keyper crashed
-//     before dealing — they cannot accuse/apologize/finalize via local
-//     replay because the polynomial is unrecoverable).
+// The caller is responsible for the keyper-set lookup and membership check
+// (both run as pool queries inside `handleEon` before this function is
+// entered). `keypers`, `ownIndex`, and `threshold` are passed in as
+// parameters so this function performs no observer-db reads.
+//
+// Returns (nil, nil) when this keyper has no `dkg_initial_states` row for a
+// non-Dealing phase (Keyper crashed before dealing — they cannot
+// accuse/apologize/finalize via local replay because the polynomial is
+// unrecoverable).
 //
 // Phase-by-phase reconstruction:
 //
@@ -72,21 +75,10 @@ func (m *Manager) buildPureDKG(
 	tx pgx.Tx,
 	keyperConfigIndex, retryCounter int64,
 	blockPhase Phase,
-) (*puredkg.PureDKG, []common.Address, uint64, error) {
-	obsQueries := obskeyper.New(tx)
-	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
-	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
-	}
-	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
-	if err != nil {
-		return nil, nil, 0, nil
-	}
-	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
-	if err != nil {
-		return nil, nil, 0, errors.Wrap(err, "decode keyper addresses")
-	}
-
+	keypers []common.Address,
+	ownIndex uint64,
+	threshold uint64,
+) (*puredkg.PureDKG, error) {
 	queries := corekeyperdb.New(tx)
 
 	var pure *puredkg.PureDKG
@@ -95,7 +87,7 @@ func (m *Manager) buildPureDKG(
 		p := puredkg.NewPureDKG(
 			uint64(keyperConfigIndex),
 			uint64(len(keypers)),
-			uint64(keyperSet.Threshold),
+			threshold,
 			ownIndex,
 		)
 		pure = &p
@@ -106,13 +98,13 @@ func (m *Manager) buildPureDKG(
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, nil, 0, nil
+				return nil, nil
 			}
-			return nil, nil, 0, errors.Wrap(err, "load dkg initial state")
+			return nil, errors.Wrap(err, "load dkg initial state")
 		}
 		pure, err = shdb.DecodePureDKG(row.PuredkgBytes)
 		if err != nil {
-			return nil, nil, 0, errors.Wrap(err, "decode dkg initial state")
+			return nil, errors.Wrap(err, "decode dkg initial state")
 		}
 		// gob converts nil pointers in `[]*shcrypto.Gammas` / `[]*big.Int`
 		// slices into non-nil zero-value pointers on decode (via the
@@ -124,15 +116,15 @@ func (m *Manager) buildPureDKG(
 		pure.Evals = make([]*big.Int, pure.NumKeypers)
 		pure.Evals[pure.Keyper] = pure.Polynomial.EvalForKeyper(int(pure.Keyper))
 	default:
-		return nil, nil, 0, nil
+		return nil, nil
 	}
 
 	if err := m.replayCommitmentsAndEvals(ctx, queries, pure, ownIndex, keyperConfigIndex, retryCounter); err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 
 	if blockPhase == PhaseDealing || blockPhase == PhaseAccusing {
-		return pure, keypers, ownIndex, nil
+		return pure, nil
 	}
 
 	// Fast-forward into Accusing so HandleAccusationMsg accepts the stored
@@ -140,11 +132,11 @@ func (m *Manager) buildPureDKG(
 	// authoritative copy.
 	_ = pure.StartPhase2Accusing()
 	if err := m.replayAccusations(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 
 	if blockPhase == PhaseApologizing {
-		return pure, keypers, ownIndex, nil
+		return pure, nil
 	}
 
 	// PhaseFinalizing: fast-forward into Apologizing and replay apologies.
@@ -152,9 +144,9 @@ func (m *Manager) buildPureDKG(
 	// it was loaded from dkg_initial_states.
 	_ = pure.StartPhase3Apologizing()
 	if err := m.replayApologies(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
-	return pure, keypers, ownIndex, nil
+	return pure, nil
 }
 
 // replayCommitmentsAndEvals feeds stored PolyCommitment and PolyEval rows

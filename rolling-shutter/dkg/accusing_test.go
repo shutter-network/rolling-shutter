@@ -93,19 +93,43 @@ func setupDKGTestEnv(ctx context.Context, t *testing.T) *dkgTestEnv {
 	}
 }
 
-// runMaybe wraps a single dispatch the way `HandleBlock` does: open a
-// transaction, build the puredkg for the given block phase, and call the
-// matching maybe-function. Returns nil silently if the manager would not
-// participate (non-member or no initial state for non-Dealing phases).
+// runMaybe wraps a single dispatch the way `handleEon` does: look up the
+// keyper set, open a read transaction for `buildPureDKG`, then open a
+// separate write transaction for the matching maybe-function. Returns nil
+// silently if the manager would not participate (non-member or no initial
+// state for non-Dealing phases).
 func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
-	return env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, keypers, ownIndex, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, phase)
+	obsQueries := obskeyperdb.New(env.dbpool)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, testKsi)
+	if err != nil {
+		return err
+	}
+	ownIndex, err := keyperSet.GetIndex(env.mgr.cfg.OwnAddress)
+	if err != nil {
+		return nil
+	}
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return err
+	}
+	threshold := uint64(keyperSet.Threshold)
+
+	var pure *puredkg.PureDKG
+	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		p, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, phase, keypers, ownIndex, threshold)
 		if err != nil {
 			return err
 		}
-		if pure == nil {
-			return nil
-		}
+		pure = p
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if pure == nil {
+		return nil
+	}
+	return env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		switch phase {
 		case PhaseDealing:
 			return env.mgr.maybeDeal(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)

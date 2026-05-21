@@ -4,13 +4,32 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
+	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
+
+// loadKeyperSetParams looks up keypers/ownIndex/threshold for testKsi via the
+// observer-db, matching the pool query handleEon runs before opening the
+// buildPureDKG read tx. Tests call this once and pass the values into
+// buildPureDKG so the function itself performs no observer-db reads.
+func loadKeyperSetParams(ctx context.Context, t *testing.T, env *dkgTestEnv) ([]common.Address, uint64, uint64) {
+	t.Helper()
+	obsQueries := obskeyperdb.New(env.dbpool)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, testKsi)
+	assert.NilError(t, err)
+	ownIndex, err := keyperSet.GetIndex(env.mgr.cfg.OwnAddress)
+	assert.NilError(t, err)
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	assert.NilError(t, err)
+	return keypers, ownIndex, uint64(keyperSet.Threshold)
+}
 
 // TestBuildPureDKGReturnsExpectedPhasePerBlockPhase asserts the per-phase
 // reconstruction contract: each `blockPhase` input must leave the returned
@@ -26,6 +45,7 @@ func TestBuildPureDKGReturnsExpectedPhasePerBlockPhase(t *testing.T) {
 
 	err := env.runMaybe(ctx, PhaseDealing)
 	assert.NilError(t, err)
+	keypers, ownIndex, threshold := loadKeyperSetParams(ctx, t, env)
 
 	cases := []struct {
 		name      string
@@ -41,7 +61,7 @@ func TestBuildPureDKGReturnsExpectedPhasePerBlockPhase(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var pure *puredkg.PureDKG
 			err := env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-				p, _, _, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, tc.phase)
+				p, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, tc.phase, keypers, ownIndex, threshold)
 				pure = p
 				return err
 			})
@@ -61,12 +81,13 @@ func TestBuildPureDKGNilWithoutInitialStateForNonDealingPhases(t *testing.T) {
 	}
 	ctx := context.Background()
 	env := setupDKGTestEnv(ctx, t)
+	keypers, ownIndex, threshold := loadKeyperSetParams(ctx, t, env)
 
 	for _, p := range []Phase{PhaseAccusing, PhaseApologizing, PhaseFinalizing} {
 		t.Run(p.String(), func(t *testing.T) {
 			var pure *puredkg.PureDKG
 			err := env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-				got, _, _, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, p)
+				got, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, p, keypers, ownIndex, threshold)
 				pure = got
 				return err
 			})
@@ -94,9 +115,10 @@ func TestBuildPureDKGDealingDoesNotRequireInitialState(t *testing.T) {
 	})
 	assert.Assert(t, err != nil)
 
+	keypers, ownIndex, threshold := loadKeyperSetParams(ctx, t, env)
 	var pure *puredkg.PureDKG
 	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		p, _, _, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, PhaseDealing)
+		p, err := env.mgr.buildPureDKG(ctx, tx, testKsi, testRetry, PhaseDealing, keypers, ownIndex, threshold)
 		pure = p
 		return err
 	})
