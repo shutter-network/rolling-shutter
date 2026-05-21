@@ -27,10 +27,6 @@ type Config struct {
 	// ECIESPrivateKey is the keyper's ECIES private key used to decrypt
 	// PolyEval messages addressed to us.
 	ECIESPrivateKey *ecies.PrivateKey
-	// DKGContractAddr is the fallback DKG contract address for eons whose
-	// `eons.dkg_contract` column is NULL (older databases or rows where the
-	// per-keyper-set DKG contract lookup failed at insert time).
-	DKGContractAddr common.Address
 	// ECIESRegistryAddr is the ECIES key registry contract address. Used as
 	// the destination for the `registerKey` outbox entry on first
 	// participation in a keyper set.
@@ -44,14 +40,12 @@ func NewConfigFromECDSA(
 	dbPool *pgxpool.Pool,
 	ownAddress common.Address,
 	eciesECDSAPrivateKey *ecdsa.PrivateKey,
-	dkgContractAddr common.Address,
 	eciesRegistryAddr common.Address,
 ) Config {
 	return Config{
 		DBPool:            dbPool,
 		OwnAddress:        ownAddress,
 		ECIESPrivateKey:   eciesPrivateKeyFromECDSA(eciesECDSAPrivateKey),
-		DKGContractAddr:   dkgContractAddr,
 		ECIESRegistryAddr: eciesRegistryAddr,
 	}
 }
@@ -96,15 +90,17 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 // handleEon runs the per-eon dispatch logic inside a single database
 // transaction. Returns nil for "nothing to do" (eon already succeeded, no
 // active phase at this block, not a member, no initial state for non-Dealing
-// phases). The caller logs but does not abort on error.
+// phases). Returns an error for missing per-eon configuration (NULL
+// `dkg_contract` or NULL `phase_length`/`lead_length`). The caller logs but
+// does not abort on error.
 func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
 	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
 	if err != nil {
 		return errors.Wrap(err, "convert activation block")
 	}
-	phaseLength, leadLength := m.phaseParamsForEon(eon)
-	if phaseLength == 0 {
-		return nil
+	phaseLength, leadLength, err := m.phaseParamsForEon(eon)
+	if err != nil {
+		return err
 	}
 
 	// Early exit: a successful dkg_result row means either we already voted
@@ -124,7 +120,10 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	if blockPhase == PhaseNone {
 		return nil
 	}
-	dkgAddr := m.dkgContractAddrForEon(eon)
+	dkgAddr, err := m.dkgContractAddrForEon(eon)
+	if err != nil {
+		return err
+	}
 
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, keypers, ownIndex, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase)
@@ -151,27 +150,29 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 
 // phaseParamsForEon returns the DKG phase length and lead length for the
 // given eon. Rows populated by `processNewKeyperSet` carry the values read
-// from the keyper-set-specific DKG contract; rows from older databases (or
-// rows where the lookup failed) carry NULLs and are skipped — there is no
-// global fallback in the module because the module owns no chain client to
-// fetch one.
-func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength uint64) {
-	if eon.PhaseLength.Valid && eon.LeadLength.Valid {
-		return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64)
+// from the keyper-set-specific DKG contract; rows with NULL columns are a
+// fatal configuration error — the module owns no chain client and there is
+// no fallback to fetch them from.
+func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength uint64, err error) {
+	if !eon.PhaseLength.Valid || !eon.LeadLength.Valid {
+		return 0, 0, errors.Errorf(
+			"eons row %d missing DKG phase params (phase_length and/or lead_length is NULL)",
+			eon.KeyperConfigIndex,
+		)
 	}
-	log.Warn().
-		Int64("keyper-config-index", eon.KeyperConfigIndex).
-		Msg("eons row missing DKG phase params; skipping DKG actions for this eon")
-	return 0, 0
+	return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), nil
 }
 
 // dkgContractAddrForEon returns the on-chain DKG contract address responsible
-// for the given eon. Rows where the per-keyper-set lookup succeeded carry the
-// concrete address; rows with NULL fall back to the manager's configured
-// `DKGContractAddr`.
-func (m *Manager) dkgContractAddrForEon(eon corekeyperdb.Eon) common.Address {
-	if eon.DkgContract.Valid {
-		return common.HexToAddress(eon.DkgContract.String)
+// for the given eon. A NULL `dkg_contract` column is a fatal configuration
+// error — there is no global fallback that could mask a misconfigured keyper
+// set.
+func (m *Manager) dkgContractAddrForEon(eon corekeyperdb.Eon) (common.Address, error) {
+	if !eon.DkgContract.Valid {
+		return common.Address{}, errors.Errorf(
+			"eons row %d missing DKG contract address (dkg_contract is NULL)",
+			eon.KeyperConfigIndex,
+		)
 	}
-	return m.cfg.DKGContractAddr
+	return common.HexToAddress(eon.DkgContract.String), nil
 }
