@@ -27,7 +27,7 @@ import (
 // no fresh vote is needed.
 //
 // The recovery path on every block: rebuild `puredkg` from stored messages
-// (including the self-eval row written by `startDealing`), bypass puredkg's
+// (including the self-eval row written by `maybeDeal`), bypass puredkg's
 // phase machinery by setting `pure.Phase = Finalized` directly, and call
 // `ComputeResult`. The result depends only on `Commitments` / `Evals` /
 // `Accusations` / `Apologies`, all of which are populated by replay.
@@ -61,7 +61,7 @@ func (m *Manager) startFinalizing(ctx context.Context, dkgAddr common.Address, k
 		// (`Finalize`, the `Start*` calls) are not invoked here — instead
 		// we rely on the replayed `Commitments` / `Evals` / `Accusations` /
 		// `Apologies` state that `ComputeResult` actually reads. The
-		// self-eval row written by `startDealing` populates
+		// self-eval row written by `maybeDeal` populates
 		// `pure.Evals[ownIndex]` during replay.
 		pure.Phase = puredkg.Finalized
 		result, err := pure.ComputeResult()

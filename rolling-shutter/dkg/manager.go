@@ -110,7 +110,7 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 		// via DB-state checks. Operate in dependency order: dealing, then
 		// the message exchange, then finalisation.
 		retryInt64 := int64(retry)
-		if err := m.startDealing(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
+		if err := m.maybeDeal(ctx, dkgAddr, eon.KeyperConfigIndex, retryInt64); err != nil {
 			log.Error().Err(err).
 				Int64("keyper-config-index", eon.KeyperConfigIndex).
 				Uint64("retry-counter", retry).
