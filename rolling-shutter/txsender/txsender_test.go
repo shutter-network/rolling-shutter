@@ -58,7 +58,8 @@ type fakeClient struct {
 	chainID                  *big.Int
 	nonce                    uint64
 	gasLimit                 uint64
-	gasPrice                 *big.Int
+	tipCap                   *big.Int
+	baseFee                  *big.Int
 	receiptErr               error
 	sendErr                  error
 	sentTxs                  []*types.Transaction
@@ -70,7 +71,8 @@ func newFakeClient() *fakeClient {
 	return &fakeClient{
 		chainID:            big.NewInt(1337),
 		gasLimit:           21000,
-		gasPrice:           big.NewInt(1_000_000_000),
+		tipCap:             big.NewInt(2_000_000_000),
+		baseFee:            big.NewInt(5_000_000_000),
 		receiptErr:         ethereum.NotFound,
 		receiptCallsByHash: map[common.Hash]int{},
 	}
@@ -89,15 +91,11 @@ func (c *fakeClient) PendingNonceAt(_ context.Context, _ common.Address) (uint64
 }
 
 func (c *fakeClient) SuggestGasTipCap(_ context.Context) (*big.Int, error) {
-	return big.NewInt(0), nil
-}
-
-func (c *fakeClient) SuggestGasPrice(_ context.Context) (*big.Int, error) {
-	return c.gasPrice, nil
+	return new(big.Int).Set(c.tipCap), nil
 }
 
 func (c *fakeClient) HeaderByNumber(_ context.Context, _ *big.Int) (*types.Header, error) {
-	return &types.Header{}, nil
+	return &types.Header{BaseFee: new(big.Int).Set(c.baseFee)}, nil
 }
 
 func (c *fakeClient) EstimateGas(_ context.Context, _ ethereum.CallMsg) (uint64, error) {
@@ -296,6 +294,47 @@ func TestEnqueueTxPersistsLabel(t *testing.T) {
 	row, err := corekeyperdb.New(dbpool).GetTxOutboxByID(ctx, id)
 	assert.NilError(t, err)
 	assert.Equal(t, wantLabel, row.Label)
+}
+
+// TestSubmitRowBuildsDynamicFeeTx verifies that submitRow constructs an
+// EIP-1559 DynamicFeeTx with GasTipCap from SuggestGasTipCap and
+// GasFeeCap = 2 * baseFee + tipCap from the latest header's BaseFee.
+func TestSubmitRowBuildsDynamicFeeTx(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	s, fc := newTestSender(t, dbpool)
+	fc.tipCap = big.NewInt(1_500_000_000)
+	fc.baseFee = big.NewInt(7_000_000_000)
+
+	queries := corekeyperdb.New(dbpool)
+	zero, err := bigIntToNumeric(big.NewInt(0))
+	assert.NilError(t, err)
+	_, err = queries.InsertPendingTx(ctx, corekeyperdb.InsertPendingTxParams{
+		ToAddress: common.HexToAddress("0x000000000000000000000000000000000000dead").Hex(),
+		Data:      []byte{0x01, 0x02, 0x03},
+		Value:     zero,
+	})
+	assert.NilError(t, err)
+
+	s.poll(ctx)
+
+	assert.Equal(t, 1, len(fc.sentTxs), "expected exactly one submitted tx")
+	tx := fc.sentTxs[0]
+	assert.Equal(t, uint8(types.DynamicFeeTxType), tx.Type(),
+		"submitted tx should be EIP-1559 DynamicFeeTx")
+	assert.Equal(t, fc.tipCap.String(), tx.GasTipCap().String(),
+		"GasTipCap should match SuggestGasTipCap")
+	// 2*baseFee + tipCap = 2*7e9 + 1.5e9 = 15.5e9
+	wantFeeCap := new(big.Int).Mul(fc.baseFee, big.NewInt(2))
+	wantFeeCap.Add(wantFeeCap, fc.tipCap)
+	assert.Equal(t, wantFeeCap.String(), tx.GasFeeCap().String(),
+		"GasFeeCap should equal 2*baseFee + tipCap")
 }
 
 type stubError string
