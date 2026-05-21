@@ -13,15 +13,19 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
-// startDealing is the per-block reactor for the Dealing phase. If we have
-// already stored our own commitment row for `(k, r)`, the call is a no-op.
-// Otherwise we sample a polynomial via `puredkg.StartPhase1Dealing`, persist
-// our own commitment + per-receiver evals, and enqueue a `submitDealing` row
-// in `tx_outbox` for `TxSender` to sign and submit.
-func (m *Manager) startDealing(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
+// maybeDeal is the per-block reactor for the Dealing phase. Idempotency is
+// keyed on the presence of an initial-state row in `dkg_initial_states`; if
+// one exists for `(k, r)` the call is a no-op. Otherwise we sample a
+// polynomial via `puredkg.StartPhase1Dealing`, persist the resulting puredkg
+// state (so accusations/apologies can be produced on later blocks even after
+// a process restart), persist our own commitment + per-receiver evals, and
+// enqueue a `submitDealing` row in `tx_outbox` for `TxSender` to sign and
+// submit.
+func (m *Manager) maybeDeal(ctx context.Context, dkgAddr common.Address, keyperConfigIndex, retryCounter int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		pure, keypers, ownIndex, isMember, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter)
 		if err != nil {
@@ -32,29 +36,36 @@ func (m *Manager) startDealing(ctx context.Context, dkgAddr common.Address, keyp
 		}
 
 		queries := corekeyperdb.New(tx)
-		commitments, err := queries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
+		_, err = queries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 			KeyperConfigIndex: keyperConfigIndex,
 			RetryCounter:      retryCounter,
 		})
-		if err != nil {
-			return errors.Wrap(err, "load own dealing check")
-		}
-		for _, c := range commitments {
-			if uint64(c.KeyperIndex) == ownIndex {
-				return nil
-			}
-		}
-
-		if pure.Phase != puredkg.Off {
-			// Already advanced past Off — probably a re-entry within the
-			// same process where the replay ran but we have not yet
-			// persisted our row. Nothing more to do.
+		if err == nil {
 			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return errors.Wrap(err, "check dkg initial state existence")
 		}
 
 		commitmentMsg, polyEvalMsgs, err := pure.StartPhase1Dealing()
 		if err != nil {
 			return errors.Wrap(err, "puredkg StartPhase1Dealing")
+		}
+
+		// Persist the initial puredkg state — Phase=Dealing, polynomial set,
+		// `Evals[ownIndex]` populated from the self-eval — before writing any
+		// downstream rows. Subsequent blocks (and post-restart invocations)
+		// can rebuild from this blob to drive Accusing/Apologizing.
+		pureBytes, err := shdb.EncodePureDKG(pure)
+		if err != nil {
+			return errors.Wrap(err, "encode initial puredkg state")
+		}
+		if err := queries.InsertDKGInitialState(ctx, corekeyperdb.InsertDKGInitialStateParams{
+			KeyperConfigIndex: keyperConfigIndex,
+			RetryCounter:      retryCounter,
+			PuredkgBytes:      pureBytes,
+		}); err != nil {
+			return errors.Wrap(err, "store initial puredkg state")
 		}
 
 		commitmentBytes := commitmentMsg.Gammas.Marshal()

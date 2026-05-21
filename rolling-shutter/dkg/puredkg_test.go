@@ -198,7 +198,7 @@ func TestComputeResultAfterReplayWithSelfEval(t *testing.T) {
 			assert.NilError(t, replay.HandlePolyEvalMsg(ev))
 		}
 	}
-	// The self-eval (sender=0, receiver=0) is what `startDealing` now also
+	// The self-eval (sender=0, receiver=0) is what `maybeDeal` now also
 	// persists as a dedicated row. Replay it here.
 	assert.NilError(t, replay.HandlePolyEvalMsg(puredkg.PolyEvalMsg{
 		Eon: eon, Sender: 0, Receiver: 0, Eval: selfEvals[0],
