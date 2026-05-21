@@ -61,6 +61,53 @@ func TestMaybeFinalizeWritesSentActionNotDKGResult(t *testing.T) {
 	assert.Equal(t, len(firstPending), len(secondPending), "no extra tx_outbox rows on idempotent call")
 }
 
+// TestMaybeFinalizeWritesSentActionOnComputeResultFailure asserts that when
+// ComputeResult fails (e.g. a dealer is missing without an accusation
+// against them) maybeFinalize still writes a `dkg_sent_actions` row so the
+// "cannot compute DKG result" warning runs at most once per DKG Instance. A
+// second invocation is a no-op.
+func TestMaybeFinalizeWritesSentActionOnComputeResultFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+	env := setupDKGTestEnv(ctx, t)
+
+	// Local keyper deals — populates dkg_initial_states. Neither keyper 0
+	// nor keyper 2's PolyCommitment+PolyEval ever arrives, and we do NOT
+	// record an accusation against them, so isCorrupt(0)/isCorrupt(2) is
+	// false at Finalize time. ComputeResult errors out because a "corrupt
+	// keyper is not considered corrupt".
+	err := env.runMaybe(ctx, PhaseDealing)
+	assert.NilError(t, err)
+
+	err = env.runMaybe(ctx, PhaseFinalizing)
+	assert.NilError(t, err, "maybeFinalize must not surface ComputeResult errors")
+
+	coreQueries := corekeyperdb.New(env.dbpool)
+
+	// No submitSuccessVote was enqueued — only the submitDealing entry.
+	pending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(pending), "no submitSuccessVote when ComputeResult fails")
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionFinalizing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when ComputeResult fails")
+
+	// Second invocation: short-circuits on the existing dkg_sent_actions
+	// row, returns without error, and writes nothing new.
+	err = env.runMaybe(ctx, PhaseFinalizing)
+	assert.NilError(t, err)
+	pendingAfter, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(pending), len(pendingAfter), "no extra tx_outbox rows on idempotent compute-result-failed call")
+}
+
 // TestHandleDKGSuccessRetry1AfterRetry0Failed asserts the key correctness
 // property: a keyper that locally finalized retry 0 (sent a success vote) is
 // not blocked from participating in retry 1 when retry 0 fails on chain, and

@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -62,6 +63,18 @@ func (m *Manager) maybeFinalize(
 			Int64("keyper-config-index", keyperConfigIndex).
 			Int64("retry-counter", retryCounter).
 			Msg("cannot compute DKG result; skipping success vote")
+		// Mark the phase as resolved with a NULL tx_outbox_id row so the
+		// warning above runs at most once per DKG Instance. The local
+		// puredkg state is stable once all on-chain messages have been
+		// indexed; re-running ComputeResult on every block is redundant.
+		if insertErr := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
+			KeyperConfigIndex: keyperConfigIndex,
+			RetryCounter:      retryCounter,
+			Action:            ActionFinalizing,
+			TxOutboxID:        sql.NullInt64{},
+		}); insertErr != nil {
+			return errors.Wrap(insertErr, "store finalizing sent action marker (compute result failed)")
+		}
 		return nil
 	}
 
@@ -93,7 +106,7 @@ func (m *Manager) maybeFinalize(
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionFinalizing,
-		OutboxID:          outboxID,
+		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store finalizing sent action marker")
 	}

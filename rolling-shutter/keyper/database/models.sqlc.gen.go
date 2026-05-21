@@ -75,7 +75,7 @@ type DkgSentAction struct {
 	KeyperConfigIndex int64
 	RetryCounter      int64
 	Action            string
-	OutboxID          int64
+	TxOutboxID        sql.NullInt64
 }
 
 type EciesKey struct {

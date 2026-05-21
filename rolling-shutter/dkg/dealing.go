@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -141,7 +142,7 @@ func (m *Manager) maybeDeal(
 		KeyperConfigIndex: keyperConfigIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionDealing,
-		OutboxID:          outboxID,
+		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store dealing sent action marker")
 	}

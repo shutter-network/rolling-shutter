@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -257,7 +258,7 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 			KeyperConfigIndex: keyperConfigIndex,
 			RetryCounter:      retryCounter,
 			Action:            ActionDealing,
-			OutboxID:          id,
+			TxOutboxID:        sql.NullInt64{Int64: id, Valid: true},
 		})
 	})
 	assert.NilError(t, err)

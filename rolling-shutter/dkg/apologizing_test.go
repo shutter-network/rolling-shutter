@@ -62,9 +62,11 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	assert.Equal(t, 2, len(pending))
 }
 
-// TestMaybeApologizeNoopWhenNotAccused asserts that maybeApologize writes
-// nothing when no accusation against us is on file — the silent-success
-// path.
+// TestMaybeApologizeNoopWhenNotAccused asserts that maybeApologize enqueues
+// no submitApology tx when no accusation against us is on file but still
+// writes a `dkg_sent_actions` row so the reactor short-circuits on
+// subsequent blocks (no log spam, no repeated puredkg replay). A second
+// call is a no-op.
 func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -97,6 +99,22 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, 1, len(pending)) // only the submitDealing entry
+
+	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperConfigIndex: testKsi,
+		RetryCounter:      testRetry,
+		Action:            ActionApologizing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when no apologies are sent")
+
+	// Second invocation: short-circuits on the existing dkg_sent_actions
+	// row, returns without error, and writes nothing new.
+	err = env.runMaybe(ctx, PhaseApologizing)
+	assert.NilError(t, err)
+	pendingAfter, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(pending), len(pendingAfter), "no extra tx_outbox rows on idempotent no-apologies call")
 }
 
 // TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx asserts the
