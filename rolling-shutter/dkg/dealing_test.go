@@ -12,15 +12,18 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"gotest.tools/v3/assert"
 
+	"github.com/shutter-network/shutter/shlib/puredkg"
+
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// runMaybeDealLocal mirrors the dispatch HandleBlock performs: build the
-// puredkg in a transaction and invoke maybeDeal. Used by dealing_test.go
-// tests that wire a Manager by hand instead of going through dkgTestEnv.
+// runMaybeDealLocal mirrors the dispatch handleEon performs: look up the
+// keyper set, build the puredkg in a read tx, then call maybeDeal in a
+// separate write tx. Used by dealing_test.go tests that wire a Manager by
+// hand instead of going through dkgTestEnv.
 func runMaybeDealLocal(
 	ctx context.Context,
 	dbpool *pgxpool.Pool,
@@ -28,14 +31,37 @@ func runMaybeDealLocal(
 	dkgAddr common.Address,
 	keyperConfigIndex, retryCounter int64,
 ) error {
-	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, keypers, ownIndex, err := mgr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseDealing)
+	obsQueries := obskeyperdb.New(dbpool)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+	if err != nil {
+		return err
+	}
+	ownIndex, err := keyperSet.GetIndex(mgr.cfg.OwnAddress)
+	if err != nil {
+		return nil
+	}
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return err
+	}
+	threshold := uint64(keyperSet.Threshold)
+
+	var pure *puredkg.PureDKG
+	err = dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		p, err := mgr.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseDealing, keypers, ownIndex, threshold)
 		if err != nil {
 			return err
 		}
-		if pure == nil {
-			return nil
-		}
+		pure = p
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if pure == nil {
+		return nil
+	}
+	return dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		return mgr.maybeDeal(ctx, tx, dkgAddr, keyperConfigIndex, retryCounter, pure, keypers, ownIndex)
 	})
 }

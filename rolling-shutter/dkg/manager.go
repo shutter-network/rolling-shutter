@@ -11,9 +11,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/shutter-network/shutter/shlib/puredkg"
+
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
 // Config carries the dependencies needed to run a DKG Manager. The manager
@@ -65,9 +68,8 @@ func New(cfg Config) *Manager {
 
 // HandleBlock is called once per new block by the host keyper. For every eon
 // row in the database it computes the current DKG phase and dispatches to at
-// most one action function inside a single per-eon transaction. Errors from
-// individual eons are logged but do not abort the loop — a per-eon failure
-// must not stop the others.
+// most one action function. Errors from individual eons are logged but do
+// not abort the loop — a per-eon failure must not stop the others.
 func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
@@ -88,12 +90,21 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	return nil
 }
 
-// handleEon runs the per-eon dispatch logic inside a single database
-// transaction. Returns nil for "nothing to do" (not a member, eon already
-// succeeded, no active phase at this block, no initial state for non-Dealing
-// phases). Returns an error for missing per-eon configuration (NULL
-// `dkg_contract` or NULL `phase_length`/`lead_length`). The caller logs but
-// does not abort on error.
+// handleEon runs the per-eon dispatch logic. Pool queries (no transaction)
+// fire first: phase params, membership, and `ExistsDKGResultSuccess`.
+// Once dispatch is required, two narrow transactions are opened in
+// sequence: a read-only one for `buildPureDKG`, then a separate write one
+// for the maybe-function. Splitting the transactions keeps the read window
+// short and lets the write transaction commit independently. A new chain
+// event arriving between the two transactions is acceptable — the
+// maybe-function will see the stale snapshot for one block and pick up the
+// new state on the next dispatch.
+//
+// Returns nil for "nothing to do" (not a member, eon already succeeded,
+// no active phase at this block, no initial state for non-Dealing phases).
+// Returns an error for missing per-eon configuration (NULL `dkg_contract`
+// or NULL `phase_length`/`lead_length`). The caller logs but does not
+// abort on error.
 func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
 	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
 	if err != nil {
@@ -112,8 +123,17 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	if err != nil {
 		return errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
 	}
-	if _, err := keyperSet.GetIndex(m.cfg.OwnAddress); err != nil {
+	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
+	if err != nil {
 		return nil
+	}
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return errors.Wrap(err, "decode keyper addresses")
+	}
+	threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
+	if err != nil {
+		return errors.Wrap(err, "convert keyper set threshold")
 	}
 
 	// Early exit: a successful dkg_result row means either we already voted
@@ -138,14 +158,28 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 		return err
 	}
 
-	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		pure, keypers, ownIndex, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase)
+	// Read transaction: rebuild the puredkg snapshot. Reads only; commit and
+	// rollback are equivalent here, so we let BeginFunc commit on nil return.
+	var pure *puredkg.PureDKG
+	err = m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		p, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase, keypers, ownIndex, threshold)
 		if err != nil {
 			return errors.Wrap(err, "build puredkg")
 		}
-		if pure == nil {
-			return nil
-		}
+		pure = p
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if pure == nil {
+		return nil
+	}
+
+	// Write transaction: dispatch to the maybe-function. Scope is narrow —
+	// only the outbox row, idempotency rows, and `dkg_initial_states` /
+	// `dkg_result` writes happen here.
+	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		switch blockPhase {
 		case PhaseDealing:
 			return m.maybeDeal(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
