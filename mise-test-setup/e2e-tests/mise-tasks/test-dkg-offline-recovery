@@ -6,6 +6,7 @@ from e2e_utils import utils, wait_for_dkg_failure, wait_for_dkg_success
 
 
 utils.run(["mise", "run", "clean"])
+utils.run(["mise", "run", "fund-keypers"])
 
 # Bootstrap: 2-of-4 initial DKG succeeds. This also establishes a previous
 # keyper set with threshold 2, which gates the next config vote.
