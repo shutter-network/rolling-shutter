@@ -90,4 +90,5 @@ type TxOutbox struct {
 	Error     sql.NullString
 	CreatedAt time.Time
 	UpdatedAt sql.NullTime
+	Label     string
 }

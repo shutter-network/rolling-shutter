@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -137,7 +138,8 @@ func (m *Manager) startDealing(ctx context.Context, dkgAddr common.Address, keyp
 		if err != nil {
 			return errors.Wrap(err, "pack submitDealing calldata")
 		}
-		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		label := fmt.Sprintf("submitDealing ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue submitDealing tx")
 		}

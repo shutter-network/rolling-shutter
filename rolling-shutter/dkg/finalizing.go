@@ -3,6 +3,7 @@ package dkg
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jackc/pgx/v4"
@@ -109,7 +110,8 @@ func (m *Manager) startFinalizing(ctx context.Context, dkgAddr common.Address, k
 		if err != nil {
 			return errors.Wrap(err, "pack submitSuccessVote calldata")
 		}
-		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil)
+		label := fmt.Sprintf("submitSuccessVote ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+		outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue submitSuccessVote tx")
 		}
