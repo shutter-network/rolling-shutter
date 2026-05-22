@@ -94,7 +94,6 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithKeyperSetManager(kpr.config.Chain.Contracts.KeyperSetManager),
 		chainsync.WithKeyBroadcastContract(kpr.config.Chain.Contracts.KeyBroadcastContract),
 		chainsync.WithECIESKeyRegistry(kpr.config.Chain.Contracts.ECIESKeyRegistry),
-		chainsync.WithDKGContract(kpr.config.Chain.Contracts.DKGContract),
 		chainsync.WithSyncNewBlock(kpr.channelNewBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
 		chainsync.WithSyncECIESKey(kpr.processNewECIESKey),

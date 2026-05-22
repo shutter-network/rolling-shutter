@@ -150,7 +150,6 @@ type ContractsConfig struct {
 	ShutterEventTriggerRegistry common.Address
 	KeyBroadcastContract        common.Address `shconfig:",required"`
 	ECIESKeyRegistry            common.Address `shconfig:",required"`
-	DKGContract                 common.Address `shconfig:",required"`
 }
 
 func NewContractsConfig() *ContractsConfig {
@@ -159,7 +158,6 @@ func NewContractsConfig() *ContractsConfig {
 		ShutterRegistry:      common.Address{},
 		KeyBroadcastContract: common.Address{},
 		ECIESKeyRegistry:     common.Address{},
-		DKGContract:          common.Address{},
 	}
 }
 

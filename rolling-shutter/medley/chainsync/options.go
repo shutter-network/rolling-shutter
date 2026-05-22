@@ -25,7 +25,6 @@ type options struct {
 	keyperSetManagerAddress     *common.Address
 	keyBroadcastContractAddress *common.Address
 	eciesKeyRegistryAddress     *common.Address
-	dkgContractAddress          *common.Address
 	clientURL                   string
 	client                      syncclient.Client
 	logger                      log.Logger
@@ -157,13 +156,6 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	}
 
 	if o.handlerDKGEvent != nil {
-		if o.dkgContractAddress == nil {
-			return errors.New("DKG contract address must be set when a DKG event handler is registered")
-		}
-		c.DKGContract, err = contract.NewDKGContract(*o.dkgContractAddress, client)
-		if err != nil {
-			return err
-		}
 		c.dkgsync = &syncer.DKGEventSyncer{
 			Client:           client,
 			KeyperSetManager: c.KeyperSetManager,
@@ -287,13 +279,6 @@ func WithECIESKeyRegistry(address common.Address) Option {
 func WithSyncECIESKey(handler event.ECIESKeyHandler) Option {
 	return func(o *options) error {
 		o.handlerECIESKey = handler
-		return nil
-	}
-}
-
-func WithDKGContract(address common.Address) Option {
-	return func(o *options) error {
-		o.dkgContractAddress = &address
 		return nil
 	}
 }
