@@ -166,7 +166,6 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		}
 		c.dkgsync = &syncer.DKGEventSyncer{
 			Client:           client,
-			Contract:         c.DKGContract,
 			KeyperSetManager: c.KeyperSetManager,
 			Log:              c.log,
 			StartBlock:       o.syncStart,
