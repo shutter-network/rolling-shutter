@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # MISE description="E2E test: event-based decryption triggers without batching"
-# MISE depends=["wait-for-initial-dkg", "deploy"]
+# MISE depends=["wait-for-initial-dkg", "deploy-test-helper"]
 
 import json
 import os
@@ -106,16 +106,6 @@ def cast_send(*args: str) -> dict:
     )
     return json.loads(raw)
 
-
-def deploy_contract(bytecode_hex: str) -> str:
-    """Deploy a contract from hex bytecode; returns the checksummed contract address."""
-    receipt = cast_send("--create", bytecode_hex)
-    addr = receipt.get("contractAddress") or receipt.get("creates")
-    if not addr:
-        raise SystemExit(
-            f"Could not find contractAddress in receipt:\n{json.dumps(receipt, indent=2)}"
-        )
-    return addr
 
 
 def call_register(
@@ -252,17 +242,9 @@ def get_registry_address(data_dir: Path) -> str:
     return addr
 
 
-def get_helper_bytecode(data_dir: Path) -> str:
-    artifact = json.loads(
-        (
-            data_dir
-            / "contracts"
-            / "out"
-            / "EventTriggerTestHelper.sol"
-            / "EventTriggerTestHelper.json"
-        ).read_text()
-    )
-    return artifact["bytecode"]["object"].removeprefix("0x")
+def get_helper_address(data_dir: Path) -> str:
+    addr_path = data_dir / "test-helper-addr.json"
+    return json.loads(addr_path.read_text())["address"]
 
 
 def main() -> None:
@@ -293,11 +275,9 @@ def main() -> None:
 
     print(f"Using eon={eon_number}, keyper_config_index={keyper_config_index}")
 
-    # --- Deploy EventTriggerTestHelper ----------------------------------------
-    print("Deploying EventTriggerTestHelper…")
-    helper_bytecode = get_helper_bytecode(data_dir)
-    helper_addr = deploy_contract(helper_bytecode)
-    print(f"  EventTriggerTestHelper deployed at {helper_addr}")
+    # --- Read EventTriggerTestHelper address (deployed by deploy-test-helper) ---
+    helper_addr = get_helper_address(data_dir)
+    print(f"Using EventTriggerTestHelper at {helper_addr}")
 
     # --- Build the trigger definition -----------------------------------------
     # Match Trigger(…, topic2=trigger_topic, …) events emitted by helper_addr.
