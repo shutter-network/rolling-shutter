@@ -42,7 +42,7 @@ type Client struct {
 	uhsync    *syncer.UnsafeHeadSyncer
 	epksync   *syncer.EonPubKeySyncer
 	eciessync *syncer.ECIESKeySyncer
-	dkgsync   *syncer.DKGEventSyncer
+	dkgsync   *syncer.DKGSyncer
 
 	services []service.Service
 }

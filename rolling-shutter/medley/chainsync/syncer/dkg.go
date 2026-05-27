@@ -51,17 +51,17 @@ type dkgContractBackend interface {
 // substitute an in-memory fake.
 type dkgContractBinder func(addr common.Address) (dkgContractBackend, error)
 
-// DKGEventSyncer discovers DKG contract addresses autonomously by scanning
+// DKGSyncer discovers DKG contract addresses autonomously by scanning
 // every keyper set in KeyperSetManager and subscribing to KeyperSetAdded.
-// For each unique non-zero DKG contract address it spawns one independent
-// subscription goroutine that watches the five bulletin-board event types
-// (DealingSubmitted, AccusationSubmitted, ApologySubmitted, SuccessVoteSubmitted,
-// DKGSucceeded) and forwards them to the shared Handler.
+// For each unique non-zero DKG contract address it starts one DKGContractSyncer
+// that watches the five bulletin-board event types (DealingSubmitted,
+// AccusationSubmitted, ApologySubmitted, SuccessVoteSubmitted, DKGSucceeded) and
+// forwards them to the shared Handler.
 //
 // Discovery and subscription are deduplicated by DKG contract address, so
 // multiple keyper sets sharing one DKG contract result in exactly one
-// subscription goroutine and no double event delivery.
-type DKGEventSyncer struct {
+// DKGContractSyncer and no double event delivery.
+type DKGSyncer struct {
 	Client           client.Client
 	KeyperSetManager *bindings.KeyperSetManager
 	Log              log.Logger
@@ -94,7 +94,7 @@ type DKGEventSyncer struct {
 	knownKeyperSetCount uint64
 }
 
-func (s *DKGEventSyncer) Start(ctx context.Context, runner service.Runner) error {
+func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.Handler == nil {
 		return errors.New("no handler registered")
 	}
@@ -125,8 +125,8 @@ func (s *DKGEventSyncer) Start(ctx context.Context, runner service.Runner) error
 	}
 
 	for _, addr := range s.trackedDKGContractList() {
-		if err := s.startContractSubscription(ctx, runner, addr, startBlock); err != nil {
-			return errors.Wrapf(err, "start subscription for DKG contract %s", addr.Hex())
+		if err := s.startContractSyncer(ctx, runner, addr, startBlock); err != nil {
+			return errors.Wrapf(err, "start syncer for DKG contract %s", addr.Hex())
 		}
 	}
 
@@ -157,7 +157,7 @@ func (s *DKGEventSyncer) Start(ctx context.Context, runner service.Runner) error
 // are logged and skipped, mirroring the runtime behaviour for KeyperSetAdded.
 // As a side effect, knownKeyperSetCount is updated to the number of keyper
 // sets visited.
-func (s *DKGEventSyncer) scanInitialDKGContracts(
+func (s *DKGSyncer) scanInitialDKGContracts(
 	ctx context.Context,
 	opts *bind.CallOpts,
 	indexer keyperSetIndexer,
@@ -189,7 +189,7 @@ func (s *DKGEventSyncer) scanInitialDKGContracts(
 // A zero address is rejected with a warning; an already-tracked address is a
 // silent no-op (returns false). The keyper set index and address are included
 // in log lines so operators can correlate warnings with on-chain state.
-func (s *DKGEventSyncer) recordDKGContract(addr common.Address, keyperSetIndex uint64, keyperSetAddr common.Address) bool {
+func (s *DKGSyncer) recordDKGContract(addr common.Address, keyperSetIndex uint64, keyperSetAddr common.Address) bool {
 	if (addr == common.Address{}) {
 		s.Log.Warn(
 			"keyper set has no DKG contract configured; skipping",
@@ -213,7 +213,7 @@ func (s *DKGEventSyncer) recordDKGContract(addr common.Address, keyperSetIndex u
 // trackedDKGContractList returns a snapshot of the currently tracked DKG
 // contract addresses. Intended for tests and for Start() to iterate the set
 // when spawning per-contract subscription goroutines.
-func (s *DKGEventSyncer) trackedDKGContractList() []common.Address {
+func (s *DKGSyncer) trackedDKGContractList() []common.Address {
 	s.trackedMu.Lock()
 	defer s.trackedMu.Unlock()
 	out := make([]common.Address, 0, len(s.trackedDKGContracts))
@@ -226,7 +226,7 @@ func (s *DKGEventSyncer) trackedDKGContractList() []common.Address {
 // updateKnownKeyperSetCount raises knownKeyperSetCount to at least n. The
 // counter is monotonically non-decreasing because keyper set indices in
 // KeyperSetManager are append-only.
-func (s *DKGEventSyncer) updateKnownKeyperSetCount(n uint64) {
+func (s *DKGSyncer) updateKnownKeyperSetCount(n uint64) {
 	s.trackedMu.Lock()
 	defer s.trackedMu.Unlock()
 	if n > s.knownKeyperSetCount {
@@ -234,24 +234,26 @@ func (s *DKGEventSyncer) updateKnownKeyperSetCount(n uint64) {
 	}
 }
 
-func (s *DKGEventSyncer) getKnownKeyperSetCount() uint64 {
+func (s *DKGSyncer) getKnownKeyperSetCount() uint64 {
 	s.trackedMu.Lock()
 	defer s.trackedMu.Unlock()
 	return s.knownKeyperSetCount
 }
 
-// startContractSubscription wires up one independent subscription goroutine
-// for the given DKG contract address. It first queries Succeeded(ksi) for
-// every known keyper set index at startBlock, delivers synthetic SuccessEvents
-// for already-completed instances, then subscribes to the five bulletin-board
-// event types from startBlock and spawns a goroutine that forwards live events
-// to the shared Handler.
+// startContractSyncer delivers the initial success state for the given DKG
+// contract and then starts a DKGContractSyncer to watch it for live events.
+// It first queries Succeeded(ksi) for every known keyper set index at
+// startBlock and delivers synthetic SuccessEvents for already-completed
+// instances directly via the shared Handler. It then constructs a
+// DKGContractSyncer bound to the same backend and starts it via
+// runner.StartService, which sets up the five bulletin-board subscriptions from
+// startBlock and forwards live events to the same Handler.
 //
 // startBlock is the height from which live events are watched. At startup
 // it is the resolved StartBlock; at runtime it is the block of the triggering
 // KeyperSetAdded event so events fired between keyper set registration and
 // subscription startup are not missed.
-func (s *DKGEventSyncer) startContractSubscription(
+func (s *DKGSyncer) startContractSyncer(
 	ctx context.Context,
 	runner service.Runner,
 	addr common.Address,
@@ -276,65 +278,16 @@ func (s *DKGEventSyncer) startContractSubscription(
 		}
 	}
 
-	watchOpts := &bind.WatchOpts{
-		Start:   &startBlock,
-		Context: ctx,
+	contractSyncer := &DKGContractSyncer{
+		Addr:       addr,
+		Log:        s.Log,
+		Handler:    s.Handler,
+		StartBlock: number.NewBlockNumber(&startBlock),
+		backend:    backend,
 	}
-
-	dealingCh := make(chan *contract.DKGContractDealingSubmitted, channelSize)
-	accusationCh := make(chan *contract.DKGContractAccusationSubmitted, channelSize)
-	apologyCh := make(chan *contract.DKGContractApologySubmitted, channelSize)
-	successVoteCh := make(chan *contract.DKGContractSuccessVoteSubmitted, channelSize)
-	successCh := make(chan *contract.DKGContractDKGSucceeded, channelSize)
-
-	dealingSub, err := backend.WatchDealingSubmitted(watchOpts, dealingCh, nil, nil, nil)
-	if err != nil {
-		return errors.Wrap(err, "watch DealingSubmitted")
+	if err := runner.StartService(contractSyncer); err != nil {
+		return errors.Wrapf(err, "start DKG contract syncer %s", addr.Hex())
 	}
-	accusationSub, err := backend.WatchAccusationSubmitted(watchOpts, accusationCh, nil, nil, nil)
-	if err != nil {
-		dealingSub.Unsubscribe()
-		return errors.Wrap(err, "watch AccusationSubmitted")
-	}
-	apologySub, err := backend.WatchApologySubmitted(watchOpts, apologyCh, nil, nil, nil)
-	if err != nil {
-		dealingSub.Unsubscribe()
-		accusationSub.Unsubscribe()
-		return errors.Wrap(err, "watch ApologySubmitted")
-	}
-	successVoteSub, err := backend.WatchSuccessVoteSubmitted(watchOpts, successVoteCh, nil, nil, nil)
-	if err != nil {
-		dealingSub.Unsubscribe()
-		accusationSub.Unsubscribe()
-		apologySub.Unsubscribe()
-		return errors.Wrap(err, "watch SuccessVoteSubmitted")
-	}
-	successSub, err := backend.WatchDKGSucceeded(watchOpts, successCh, nil, nil)
-	if err != nil {
-		dealingSub.Unsubscribe()
-		accusationSub.Unsubscribe()
-		apologySub.Unsubscribe()
-		successVoteSub.Unsubscribe()
-		return errors.Wrap(err, "watch DKGSucceeded")
-	}
-
-	runner.Go(func() error {
-		err := s.watchContractEvents(
-			ctx,
-			addr,
-			dealingCh, accusationCh, apologyCh, successVoteCh, successCh,
-			dealingSub.Err(), accusationSub.Err(), apologySub.Err(), successVoteSub.Err(), successSub.Err(),
-		)
-		if err != nil {
-			s.Log.Error("error watching DKG events", "error", err.Error(), "dkg-contract", addr.Hex())
-		}
-		dealingSub.Unsubscribe()
-		accusationSub.Unsubscribe()
-		apologySub.Unsubscribe()
-		successVoteSub.Unsubscribe()
-		successSub.Unsubscribe()
-		return err
-	})
 	return nil
 }
 
@@ -342,7 +295,7 @@ func (s *DKGEventSyncer) startContractSubscription(
 // contract for each known keyper set index. Already-succeeded instances are
 // returned as synthetic SuccessEvents so the local cache (e.g. dkg_result)
 // can be populated before any live events for the same contract arrive.
-func (s *DKGEventSyncer) initialSuccessesForContract(
+func (s *DKGSyncer) initialSuccessesForContract(
 	ctx context.Context,
 	backend dkgContractBackend,
 	startBlock uint64,
@@ -372,113 +325,11 @@ func (s *DKGEventSyncer) initialSuccessesForContract(
 	return events, nil
 }
 
-// watchContractEvents is the per-contract subscription loop. It drains the
-// five event channels, forwards events to the shared Handler via deliver(),
-// and exits on context cancellation or subscription error.
-func (s *DKGEventSyncer) watchContractEvents(
-	ctx context.Context,
-	addr common.Address,
-	dealingCh <-chan *contract.DKGContractDealingSubmitted,
-	accusationCh <-chan *contract.DKGContractAccusationSubmitted,
-	apologyCh <-chan *contract.DKGContractApologySubmitted,
-	successVoteCh <-chan *contract.DKGContractSuccessVoteSubmitted,
-	successCh <-chan *contract.DKGContractDKGSucceeded,
-	dealingErr, accusationErr, apologyErr, successVoteErr, successErr <-chan error,
-) error {
-	for {
-		select {
-		case ev, ok := <-dealingCh:
-			if !ok {
-				return nil
-			}
-			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.DealingEvent{
-				KeyperSetIndex: ev.KeyperSetIndex,
-				RetryCounter:   ev.RetryCounter,
-				KeyperIndex:    ev.KeyperIndex,
-				Commitment:     ev.Commitment,
-				PolyEvals:      ev.PolyEvals,
-				AtBlockNumber:  number.NewBlockNumber(&bn),
-			})
-		case ev, ok := <-accusationCh:
-			if !ok {
-				return nil
-			}
-			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.AccusationEvent{
-				KeyperSetIndex: ev.KeyperSetIndex,
-				RetryCounter:   ev.RetryCounter,
-				KeyperIndex:    ev.KeyperIndex,
-				AccusedIndices: ev.AccusedIndices,
-				AtBlockNumber:  number.NewBlockNumber(&bn),
-			})
-		case ev, ok := <-apologyCh:
-			if !ok {
-				return nil
-			}
-			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.ApologyEvent{
-				KeyperSetIndex: ev.KeyperSetIndex,
-				RetryCounter:   ev.RetryCounter,
-				KeyperIndex:    ev.KeyperIndex,
-				AccuserIndices: ev.AccuserIndices,
-				PolyEvalData:   ev.PolyEvalData,
-				AtBlockNumber:  number.NewBlockNumber(&bn),
-			})
-		case ev, ok := <-successVoteCh:
-			if !ok {
-				return nil
-			}
-			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.SuccessVoteEvent{
-				KeyperSetIndex: ev.KeyperSetIndex,
-				RetryCounter:   ev.RetryCounter,
-				KeyperIndex:    ev.KeyperIndex,
-				EonPublicKey:   ev.EonPublicKey,
-				AtBlockNumber:  number.NewBlockNumber(&bn),
-			})
-		case ev, ok := <-successCh:
-			if !ok {
-				return nil
-			}
-			bn := ev.Raw.BlockNumber
-			s.deliver(ctx, &event.SuccessEvent{
-				KeyperSetIndex: ev.KeyperSetIndex,
-				RetryCounter:   ev.RetryCounter,
-				EonPublicKey:   ev.EonPublicKey,
-				AtBlockNumber:  number.NewBlockNumber(&bn),
-			})
-		case err := <-dealingErr:
-			if err != nil {
-				return errors.Wrapf(err, "DealingSubmitted subscription (%s)", addr.Hex())
-			}
-		case err := <-accusationErr:
-			if err != nil {
-				return errors.Wrapf(err, "AccusationSubmitted subscription (%s)", addr.Hex())
-			}
-		case err := <-apologyErr:
-			if err != nil {
-				return errors.Wrapf(err, "ApologySubmitted subscription (%s)", addr.Hex())
-			}
-		case err := <-successVoteErr:
-			if err != nil {
-				return errors.Wrapf(err, "SuccessVoteSubmitted subscription (%s)", addr.Hex())
-			}
-		case err := <-successErr:
-			if err != nil {
-				return errors.Wrapf(err, "DKGSucceeded subscription (%s)", addr.Hex())
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
 // watchKeyperSetAdded drains the KeyperSetAdded subscription channel and
 // dispatches each event to handleKeyperSetAdded for DKG contract discovery
 // and subscription spawning. RPC failures and zero addresses are tolerated;
 // a single bad keyper set must not bring down DKG event syncing for the rest.
-func (s *DKGEventSyncer) watchKeyperSetAdded(ctx context.Context, subErr <-chan error) error {
+func (s *DKGSyncer) watchKeyperSetAdded(ctx context.Context, subErr <-chan error) error {
 	for {
 		select {
 		case ev, ok := <-s.keyperSetAddedCh:
@@ -501,7 +352,7 @@ func (s *DKGEventSyncer) watchKeyperSetAdded(ctx context.Context, subErr <-chan 
 // added and a runner is available -- spawns a new per-contract subscription
 // goroutine starting from the block of the triggering event. RPC failures
 // and zero addresses are logged but do not abort the event loop.
-func (s *DKGEventSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.KeyperSetManagerKeyperSetAdded) {
+func (s *DKGSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.KeyperSetManagerKeyperSetAdded) {
 	s.updateKnownKeyperSetCount(ev.Eon + 1)
 
 	opts := logToCallOpts(ctx, &ev.Raw)
@@ -522,7 +373,7 @@ func (s *DKGEventSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.
 	if s.runner == nil || s.bindDKGContract == nil {
 		return
 	}
-	if err := s.startContractSubscription(ctx, s.runner, dkgAddr, ev.Raw.BlockNumber); err != nil {
+	if err := s.startContractSyncer(ctx, s.runner, dkgAddr, ev.Raw.BlockNumber); err != nil {
 		s.Log.Error(
 			"could not start DKG contract subscription for new keyper set",
 			"error", err.Error(),
@@ -533,19 +384,9 @@ func (s *DKGEventSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.
 	}
 }
 
-func (s *DKGEventSyncer) deliver(ctx context.Context, ev event.DKGEvent) {
-	if err := s.Handler(ctx, ev); err != nil {
-		s.Log.Error(
-			"handler for DKG event errored",
-			"error",
-			err.Error(),
-		)
-	}
-}
-
 // defaultDKGContractResolver binds the KeyperSet contract at keyperSetAddr and
 // calls its getDKGContract() view. This is the production resolver; tests
-// override DKGEventSyncer.resolveDKGContract with an in-memory stub.
+// override DKGSyncer.resolveDKGContract with an in-memory stub.
 func defaultDKGContractResolver(backend bind.ContractBackend) dkgContractResolver {
 	return func(_ context.Context, opts *bind.CallOpts, keyperSetAddr common.Address) (common.Address, error) {
 		ks, err := keypersetBindings.NewKeyperset(keyperSetAddr, backend)
@@ -557,7 +398,7 @@ func defaultDKGContractResolver(backend bind.ContractBackend) dkgContractResolve
 }
 
 // defaultDKGContractBinder binds a *contract.DKGContract at the given address.
-// This is the production binder; tests override DKGEventSyncer.bindDKGContract
+// This is the production binder; tests override DKGSyncer.bindDKGContract
 // with an in-memory fake that can emit canned events.
 func defaultDKGContractBinder(backend bind.ContractBackend) dkgContractBinder {
 	return func(addr common.Address) (dkgContractBackend, error) {

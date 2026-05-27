@@ -156,7 +156,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 	}
 
 	if o.handlerDKGEvent != nil {
-		c.dkgsync = &syncer.DKGEventSyncer{
+		c.dkgsync = &syncer.DKGSyncer{
 			Client:           client,
 			KeyperSetManager: c.KeyperSetManager,
 			Log:              c.log,
