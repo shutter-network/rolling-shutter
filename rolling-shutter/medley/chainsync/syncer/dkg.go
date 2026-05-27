@@ -92,6 +92,14 @@ type DKGSyncer struct {
 
 	keyperSetAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 
+	// eventCh is the fan-in channel through which every DKG event -- initial
+	// successes synthesised at startup and live bulletin-board events from all
+	// DKGContractSyncer goroutines -- is funnelled to a single consumer
+	// goroutine. The consumer calls the real Handler sequentially, so handler
+	// state needs no internal locking. It is created in Start() with the shared
+	// channelSize buffer.
+	eventCh chan event.DKGEvent
+
 	trackedMu           sync.Mutex
 	trackedDKGContracts map[common.Address]struct{}
 	// numKnownKeyperSets is the number of Keyper Set Indices the node has
@@ -125,6 +133,7 @@ func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 		s.getKeyperSetAddress = s.KeyperSetManager.GetKeyperSetAddress
 	}
 	s.runner = runner
+	s.startEventConsumer(ctx, runner)
 
 	startBlock := *s.StartBlock.ToUInt64Ptr()
 	callOpts := &bind.CallOpts{
@@ -160,6 +169,44 @@ func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 		return err
 	})
 	return nil
+}
+
+// startEventConsumer initialises the fan-in channel and starts the single
+// consumer goroutine that drains it, calling the real Handler sequentially.
+// Funnelling every DKG event through one consumer guarantees the Handler is
+// never invoked concurrently, so DKGEventHandler implementations need no
+// internal locking. Handler errors are logged and draining continues, matching
+// the deliver() behaviour DKGContractSyncer used before this fan-in existed.
+// The consumer exits on context cancellation; producers send via enqueueEvent,
+// whose send is context-aware, so shutdown never deadlocks.
+func (s *DKGSyncer) startEventConsumer(ctx context.Context, runner service.Runner) {
+	s.eventCh = make(chan event.DKGEvent, channelSize)
+	runner.Go(func() error {
+		for {
+			select {
+			case ev := <-s.eventCh:
+				if err := s.Handler(ctx, ev); err != nil {
+					s.Log.Error("handler for DKG event errored", "error", err.Error())
+				}
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+}
+
+// enqueueEvent hands a DKG event to the fan-in channel for serialised delivery
+// by the consumer goroutine. It is the Handler passed to every DKGContractSyncer
+// and the delivery path for initial-success events. The send is context-aware so
+// that a producer never blocks forever when the node is shutting down and the
+// consumer has already exited.
+func (s *DKGSyncer) enqueueEvent(ctx context.Context, ev event.DKGEvent) error {
+	select {
+	case s.eventCh <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // scanInitialDKGContracts iterates every keyper set known to the manager and
@@ -253,11 +300,14 @@ func (s *DKGSyncer) getNumKnownKeyperSets() uint64 {
 // startContractSyncer delivers the initial success state for the given DKG
 // contract and then starts a DKGContractSyncer to watch it for live events.
 // It first queries Succeeded(ksi) for every known keyper set index at
-// startBlock and delivers synthetic SuccessEvents for already-completed
-// instances directly via the shared Handler. It then constructs a
-// DKGContractSyncer bound to the same backend and starts it via
-// runner.StartService, which sets up the five bulletin-board subscriptions from
-// startBlock and forwards live events to the same Handler.
+// startBlock and enqueues synthetic SuccessEvents for already-completed
+// instances onto the fan-in channel. It then constructs a DKGContractSyncer
+// bound to the same backend -- whose Handler is the same fan-in send -- and
+// starts it via runner.StartService, which sets up the five bulletin-board
+// subscriptions from startBlock and forwards live events onto the fan-in
+// channel too. Because initial successes are enqueued before the live watcher
+// starts and a single consumer drains the channel in FIFO order, catch-up
+// state always reaches the real Handler before live events for the contract.
 //
 // startBlock is the height from which live events are watched. At startup
 // it is the resolved StartBlock; at runtime it is the block of the triggering
@@ -278,20 +328,19 @@ func (s *DKGSyncer) startContractSyncer(
 	if err != nil {
 		return errors.Wrapf(err, "initial successes for DKG contract %s", addr.Hex())
 	}
+	// Enqueue initial successes before starting the live watcher so that, with a
+	// single FIFO consumer, catch-up state for this contract is always handled
+	// before any live event from the same contract.
 	for _, ev := range initial {
-		if err := s.Handler(ctx, ev); err != nil {
-			s.Log.Error(
-				"handler for initial DKG success errored",
-				"error", err.Error(),
-				"dkg-contract", addr.Hex(),
-			)
+		if err := s.enqueueEvent(ctx, ev); err != nil {
+			return errors.Wrapf(err, "enqueue initial success for DKG contract %s", addr.Hex())
 		}
 	}
 
 	contractSyncer := &DKGContractSyncer{
 		Addr:       addr,
 		Log:        s.Log,
-		Handler:    s.Handler,
+		Handler:    s.enqueueEvent,
 		StartBlock: number.NewBlockNumber(&startBlock),
 		backend:    backend,
 	}
