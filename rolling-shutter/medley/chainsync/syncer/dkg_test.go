@@ -88,36 +88,41 @@ func newSyncer(t *testing.T, resolver dkgContractResolver) (*DKGSyncer, *recordi
 	return s, rec
 }
 
-func TestRecordDKGContractAddsNewAddress(t *testing.T) {
+func TestTryTrackAddsNewAddress(t *testing.T) {
 	s, rec := newSyncer(t, nil)
 	addr := common.HexToAddress("0x0000000000000000000000000000000000000001")
 
-	added := s.recordDKGContract(addr, 0, common.HexToAddress("0xaa"))
+	added := s.tryTrack(addr, 0)
 	assert.Equal(t, true, added, "first insertion should be reported as newly added")
 	assert.Equal(t, 0, rec.warnCount(), "non-zero address must not produce a warning")
 	assert.DeepEqual(t, []common.Address{addr}, s.trackedDKGContractList())
+	assert.Equal(t, uint64(1), s.getNumKnownKeyperSets(), "count must advance to ksi+1")
 }
 
-func TestRecordDKGContractDeduplicates(t *testing.T) {
+func TestTryTrackDeduplicatesButStillAdvancesCount(t *testing.T) {
 	s, _ := newSyncer(t, nil)
 	addr := common.HexToAddress("0x0000000000000000000000000000000000000001")
 
-	addedFirst := s.recordDKGContract(addr, 0, common.HexToAddress("0xaa"))
-	addedSecond := s.recordDKGContract(addr, 1, common.HexToAddress("0xbb"))
+	addedFirst := s.tryTrack(addr, 0)
+	addedSecond := s.tryTrack(addr, 1)
 
 	assert.Equal(t, true, addedFirst)
 	assert.Equal(t, false, addedSecond, "second insertion of the same address must be reported as not newly added")
 	assert.Equal(t, 1, len(s.trackedDKGContractList()), "tracked set must contain a single entry after dedup")
+	assert.Equal(t, uint64(2), s.getNumKnownKeyperSets(),
+		"count must advance past both keyper set indices even though the address is shared")
 }
 
-func TestRecordDKGContractZeroAddressWarnsAndSkips(t *testing.T) {
+func TestTryTrackZeroAddressWarnsSkipsAndAdvancesCount(t *testing.T) {
 	s, rec := newSyncer(t, nil)
 
-	added := s.recordDKGContract(common.Address{}, 7, common.HexToAddress("0xaa"))
+	added := s.tryTrack(common.Address{}, 7)
 
 	assert.Equal(t, false, added, "zero address must not be added")
 	assert.Equal(t, 0, len(s.trackedDKGContractList()))
 	assert.Equal(t, 1, rec.warnCount(), "zero address must produce exactly one warning")
+	assert.Equal(t, uint64(8), s.getNumKnownKeyperSets(),
+		"count must advance even when the DKG contract address is zero")
 }
 
 func TestScanInitialDKGContractsPopulatesSet(t *testing.T) {
@@ -582,7 +587,10 @@ func TestStartContractSubscriptionInitialSuccessesDeliveredBeforeLiveEvents(t *t
 	backend.succeeded[2] = true
 
 	s, handler := newSubscriptionSyncer(t, map[common.Address]*fakeDKGBackend{addr: backend})
-	s.updateKnownKeyperSetCount(3)
+	// tryTrack(addr, 2) advances numKnownKeyperSets to 3 so initialSuccessesForContract
+	// queries keyper set indices 0..2. Tracking addr itself is harmless here because
+	// the test calls startContractSyncer directly rather than via the tracked list.
+	s.tryTrack(addr, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := newFakeRunner(ctx)
@@ -621,8 +629,8 @@ func TestStartViaTrackedListDeliversEventsFromTwoDistinctContracts(t *testing.T)
 	// Both addresses are pre-tracked, simulating the outcome of the initial
 	// scan -- this is the same state Start() leaves the syncer in before it
 	// spawns per-contract subscriptions.
-	s.recordDKGContract(addr0, 0, common.HexToAddress("0xb0"))
-	s.recordDKGContract(addr1, 1, common.HexToAddress("0xb1"))
+	s.tryTrack(addr0, 0)
+	s.tryTrack(addr1, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := newFakeRunner(ctx)
@@ -655,9 +663,9 @@ func TestSharedContractIsSubscribedExactlyOnce(t *testing.T) {
 	shared := common.HexToAddress("0xa0")
 	backend := newFakeDKGBackend(shared)
 	s, handler := newSubscriptionSyncer(t, map[common.Address]*fakeDKGBackend{shared: backend})
-	s.recordDKGContract(shared, 0, common.HexToAddress("0xb0"))
-	s.recordDKGContract(shared, 1, common.HexToAddress("0xb1"))
-	s.recordDKGContract(shared, 2, common.HexToAddress("0xb2"))
+	s.tryTrack(shared, 0)
+	s.tryTrack(shared, 1)
+	s.tryTrack(shared, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := newFakeRunner(ctx)
@@ -768,6 +776,10 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 	assert.DeepEqual(t, []common.Address{dkgAddr}, s.trackedDKGContractList())
 	assert.Equal(t, firstStart, backend.dealingStart,
 		"second KeyperSetAdded for an already-tracked DKG contract must not re-subscribe")
+	// The count still advances past the second keyper set index even though no
+	// new syncer was started for the shared DKG contract.
+	assert.Equal(t, uint64(2), s.getNumKnownKeyperSets(),
+		"numKnownKeyperSets must advance past the second keyper set index")
 
 	// And there should be only one live subscription goroutine -- emitting
 	// once delivers once.

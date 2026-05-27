@@ -88,10 +88,12 @@ type DKGSyncer struct {
 
 	trackedMu           sync.Mutex
 	trackedDKGContracts map[common.Address]struct{}
-	// knownKeyperSetCount is the highest known number of keyper sets
-	// registered in KeyperSetManager. Used to bound the Succeeded(ksi)
-	// queries when a new DKG contract subscription is started.
-	knownKeyperSetCount uint64
+	// numKnownKeyperSets is the number of Keyper Set Indices the node has
+	// observed in KeyperSetManager: an exclusive upper bound used to iterate
+	// the Succeeded(ksi) queries when a new DKG contract subscription is
+	// started. It is monotonically non-decreasing because keyper set indices
+	// in KeyperSetManager are append-only.
+	numKnownKeyperSets uint64
 }
 
 func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -152,11 +154,12 @@ func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 }
 
 // scanInitialDKGContracts iterates every keyper set known to the manager and
-// records the DKG contract address each one points at. Failures to read an
-// individual keyper set's DKG contract (RPC error) are surfaced; zero addresses
-// are logged and skipped, mirroring the runtime behaviour for KeyperSetAdded.
-// As a side effect, knownKeyperSetCount is updated to the number of keyper
-// sets visited.
+// records the DKG contract address each one points at via tryTrack. Failures to
+// read an individual keyper set's DKG contract (RPC error) are surfaced; zero
+// addresses are logged and skipped inside tryTrack, mirroring the runtime
+// behaviour for KeyperSetAdded. As a side effect, numKnownKeyperSets advances to
+// the number of keyper sets visited. The tryTrack return value is ignored here;
+// Start() iterates trackedDKGContractList() afterwards to spawn syncers.
 func (s *DKGSyncer) scanInitialDKGContracts(
 	ctx context.Context,
 	opts *bind.CallOpts,
@@ -169,7 +172,6 @@ func (s *DKGSyncer) scanInitialDKGContracts(
 	if err != nil {
 		return errors.Wrap(err, "get num keyper sets")
 	}
-	s.updateKnownKeyperSetCount(numKS)
 	for i := uint64(0); i < numKS; i++ {
 		ksAddr, err := indexer.GetKeyperSetAddress(opts, i)
 		if err != nil {
@@ -179,27 +181,37 @@ func (s *DKGSyncer) scanInitialDKGContracts(
 		if err != nil {
 			return errors.Wrapf(err, "resolve DKG contract for keyper set %d (%s)", i, ksAddr.Hex())
 		}
-		s.recordDKGContract(dkgAddr, i, ksAddr)
+		s.tryTrack(dkgAddr, i)
 	}
 	return nil
 }
 
-// recordDKGContract inserts a discovered DKG contract address into the
-// internal tracked set. It returns true when the address was newly added.
-// A zero address is rejected with a warning; an already-tracked address is a
-// silent no-op (returns false). The keyper set index and address are included
-// in log lines so operators can correlate warnings with on-chain state.
-func (s *DKGSyncer) recordDKGContract(addr common.Address, keyperSetIndex uint64, keyperSetAddr common.Address) bool {
+// tryTrack is the single write path for both trackedDKGContracts and
+// numKnownKeyperSets, performing all mutation under one trackedMu acquisition so
+// that no observer ever sees the count advanced without the contract recorded or
+// vice versa. It always advances numKnownKeyperSets to max(current, ksi+1).
+//
+// It returns true only when addr is a new, non-zero DKG contract address (i.e. a
+// DKGContractSyncer should be started for it). A zero address logs a warning and
+// returns false; an already-tracked address returns false. In both of those
+// cases the count still advances, so shared-contract or unconfigured keyper sets
+// never leave a gap in numKnownKeyperSets.
+func (s *DKGSyncer) tryTrack(addr common.Address, ksi uint64) bool {
+	s.trackedMu.Lock()
+	defer s.trackedMu.Unlock()
+
+	if ksi+1 > s.numKnownKeyperSets {
+		s.numKnownKeyperSets = ksi + 1
+	}
+
 	if (addr == common.Address{}) {
 		s.Log.Warn(
 			"keyper set has no DKG contract configured; skipping",
-			"keyper-set-index", keyperSetIndex,
-			"keyper-set", keyperSetAddr.Hex(),
+			"keyper-set-index", ksi,
 		)
 		return false
 	}
-	s.trackedMu.Lock()
-	defer s.trackedMu.Unlock()
+
 	if s.trackedDKGContracts == nil {
 		s.trackedDKGContracts = map[common.Address]struct{}{}
 	}
@@ -223,21 +235,10 @@ func (s *DKGSyncer) trackedDKGContractList() []common.Address {
 	return out
 }
 
-// updateKnownKeyperSetCount raises knownKeyperSetCount to at least n. The
-// counter is monotonically non-decreasing because keyper set indices in
-// KeyperSetManager are append-only.
-func (s *DKGSyncer) updateKnownKeyperSetCount(n uint64) {
+func (s *DKGSyncer) getNumKnownKeyperSets() uint64 {
 	s.trackedMu.Lock()
 	defer s.trackedMu.Unlock()
-	if n > s.knownKeyperSetCount {
-		s.knownKeyperSetCount = n
-	}
-}
-
-func (s *DKGSyncer) getKnownKeyperSetCount() uint64 {
-	s.trackedMu.Lock()
-	defer s.trackedMu.Unlock()
-	return s.knownKeyperSetCount
+	return s.numKnownKeyperSets
 }
 
 // startContractSyncer delivers the initial success state for the given DKG
@@ -307,7 +308,7 @@ func (s *DKGSyncer) initialSuccessesForContract(
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	numKS := s.getKnownKeyperSetCount()
+	numKS := s.getNumKnownKeyperSets()
 	events := make([]event.DKGEvent, 0, numKS)
 	for i := uint64(0); i < numKS; i++ {
 		succeeded, err := backend.Succeeded(opts, i)
@@ -348,13 +349,13 @@ func (s *DKGSyncer) watchKeyperSetAdded(ctx context.Context, subErr <-chan error
 }
 
 // handleKeyperSetAdded resolves the DKG contract address for the newly-added
-// keyper set, records it in the tracked set, and -- if the address is newly
-// added and a runner is available -- spawns a new per-contract subscription
-// goroutine starting from the block of the triggering event. RPC failures
-// and zero addresses are logged but do not abort the event loop.
+// keyper set, records it via tryTrack, and -- if the address is newly added and
+// a runner is available -- spawns a new per-contract subscription goroutine
+// starting from the block of the triggering event. RPC failures and zero
+// addresses are logged but do not abort the event loop. On a resolve error the
+// state (including numKnownKeyperSets) is left untouched, trading partial-update
+// semantics for a single write path through tryTrack.
 func (s *DKGSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.KeyperSetManagerKeyperSetAdded) {
-	s.updateKnownKeyperSetCount(ev.Eon + 1)
-
 	opts := logToCallOpts(ctx, &ev.Raw)
 	dkgAddr, err := s.resolveDKGContract(ctx, opts, ev.KeyperSetContract)
 	if err != nil {
@@ -366,8 +367,7 @@ func (s *DKGSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.Keype
 		)
 		return
 	}
-	newlyAdded := s.recordDKGContract(dkgAddr, ev.Eon, ev.KeyperSetContract)
-	if !newlyAdded {
+	if !s.tryTrack(dkgAddr, ev.Eon) {
 		return
 	}
 	if s.runner == nil || s.bindDKGContract == nil {
