@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Wait for a decryption key generated from an event-based trigger"
 #USAGE flag "--keyper-config-index <keyper_config_index>" help="Keyper config index"
 #USAGE flag "--identity-prefix <identity_prefix>" help="32-byte identity prefix hex"
+# fmt: on
 
 import os
 import time

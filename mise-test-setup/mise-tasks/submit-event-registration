@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Register an event-based decryption trigger"
 #MISE depends=["deploy"]
 #USAGE flag "--keyper-config-index <keyper_config_index>" help="Keyper config index (auto-detected if omitted)"
@@ -7,6 +8,7 @@
 #USAGE flag "--topic-index <topic_index>" help="Topic index to match (default: 2)"
 #USAGE flag "--topic-value <topic_value>" help="32-byte topic value hex to match (random if omitted)"
 #USAGE flag "--ttl <ttl>" help="TTL in blocks (default: 10000)"
+# fmt: on
 
 import json
 import os
@@ -14,7 +16,6 @@ import secrets
 from pathlib import Path
 
 import utils
-
 
 # ---------------------------------------------------------------------------
 # RLP helpers
@@ -89,7 +90,9 @@ broadcast = json.loads(
 )
 registry_addr = utils.get_uups_proxy_address(broadcast, "ShutterEventTriggerRegistryV1")
 if not registry_addr:
-    raise SystemExit("ShutterEventTriggerRegistryV1 proxy not found in deployment artifacts")
+    raise SystemExit(
+        "ShutterEventTriggerRegistryV1 proxy not found in deployment artifacts"
+    )
 
 keyper_config_index_str = os.environ.get("usage_keyper_config_index", "").strip()
 if not keyper_config_index_str:

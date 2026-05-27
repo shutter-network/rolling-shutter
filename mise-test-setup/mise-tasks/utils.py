@@ -4,7 +4,6 @@ import subprocess
 import time
 from pathlib import Path
 
-
 DEPLOYMENT_SCRIPTS: dict[str, str] = {
     "gnosis": "Deploy.gnosh.s.sol",
     "service": "Deploy.service.s.sol",
@@ -24,9 +23,7 @@ def run(
 
 def run_subtask(command: list[str]) -> subprocess.CompletedProcess[str]:
     """Run a subtask capturing stdout for JSON parsing while letting stderr flow through."""
-    return subprocess.run(
-        command, check=True, text=True, stdout=subprocess.PIPE
-    )
+    return subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE)
 
 
 def wait_for_service_health(service: str, *, timeout_seconds: float = 30.0) -> None:
@@ -70,7 +67,12 @@ def set_toml_path(document, parts: list[str], value) -> None:
 
 
 def keyper_address(config_path: Path) -> str:
-    return config_path.read_text().splitlines()[0].removeprefix("# Ethereum address: ").strip()
+    return (
+        config_path.read_text()
+        .splitlines()[0]
+        .removeprefix("# Ethereum address: ")
+        .strip()
+    )
 
 
 def parse_indices(indices: str) -> list[int]:
@@ -151,9 +153,7 @@ def get_uups_proxy_address(
                 continue
             if candidate.get("contractName") != "ERC1967Proxy":
                 continue
-            input_data = (
-                candidate.get("transaction", {}).get("input") or ""
-            ).lower()
+            input_data = (candidate.get("transaction", {}).get("input") or "").lower()
             if impl_addr in input_data:
                 proxy_addr = candidate.get("contractAddress")
                 if isinstance(proxy_addr, str) and proxy_addr:

@@ -1,17 +1,18 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Initialize the shuttermint seed node"
 #MISE depends=["gen-compose"]
 #MISE outputs=["{{env.DATA_DIR}}/chain-seed/config/config.toml"]
 # /// script
 # dependencies = ["tomlkit"]
 # ///
+# fmt: on
 
 import os
 from pathlib import Path
 
 import tomlkit
 import utils
-
 
 data_dir = Path(os.environ["DATA_DIR"])
 config_path = data_dir / "chain-seed" / "config" / "config.toml"

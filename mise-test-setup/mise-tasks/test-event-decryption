@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="E2E test: event-based decryption triggers without batching"
 #MISE depends=["wait-for-initial-dkg"]
+# fmt: on
 
 import json
 import os
@@ -97,9 +99,7 @@ for reg in registrations:
     )
 
 # Assert that no batching occurred.
-print(
-    "Asserting no-batching (each trigger must produce a distinct identities_hash)…"
-)
+print("Asserting no-batching (each trigger must produce a distinct identities_hash)…")
 assert_no_batching(keyper_config_index, NUM_TRIGGERS, POLL_INTERVAL)
 
 print(

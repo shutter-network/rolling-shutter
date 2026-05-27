@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Patch and distribute the shuttermint genesis"
 #MISE depends=["init-chain-nodes"]
+# fmt: on
 
 import json
 import os
@@ -10,7 +12,9 @@ import utils
 
 data_dir = Path(os.environ["DATA_DIR"])
 num_keypers = int(os.environ["NUM_KEYPERS"])
-initial_keyper_set_indices = utils.parse_indices(os.environ["INITIAL_KEYPER_SET_INDICES"])
+initial_keyper_set_indices = utils.parse_indices(
+    os.environ["INITIAL_KEYPER_SET_INDICES"]
+)
 source_path = data_dir / "chain-seed" / "config" / "genesis.json"
 genesis = json.loads(source_path.read_text())
 
