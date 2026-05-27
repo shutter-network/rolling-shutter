@@ -288,6 +288,12 @@ type fakeDKGBackend struct {
 	addr      common.Address
 	succeeded map[uint64]bool
 
+	// watchErrs maps an event-type key ("dealing", "accusation", "apology",
+	// "successVote", "success") to an error the corresponding Watch* call should
+	// return, letting tests exercise subscription-setup failure. A missing key
+	// (the nil zero value) yields a working subscription.
+	watchErrs map[string]error
+
 	mu              sync.Mutex
 	dealingSink     chan<- *contract.DKGContractDealingSubmitted
 	accusationSink  chan<- *contract.DKGContractAccusationSubmitted
@@ -315,6 +321,9 @@ func (b *fakeDKGBackend) WatchDealingSubmitted(
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if err := b.watchErrs["dealing"]; err != nil {
+		return nil, err
+	}
 	b.dealingSink = sink
 	if opts != nil && opts.Start != nil {
 		b.dealingStart = *opts.Start
@@ -327,6 +336,9 @@ func (b *fakeDKGBackend) WatchAccusationSubmitted(
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if err := b.watchErrs["accusation"]; err != nil {
+		return nil, err
+	}
 	b.accusationSink = sink
 	if opts != nil && opts.Start != nil {
 		b.accusationStart = *opts.Start
@@ -339,6 +351,9 @@ func (b *fakeDKGBackend) WatchApologySubmitted(
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if err := b.watchErrs["apology"]; err != nil {
+		return nil, err
+	}
 	b.apologySink = sink
 	if opts != nil && opts.Start != nil {
 		b.apologyStart = *opts.Start
@@ -351,6 +366,9 @@ func (b *fakeDKGBackend) WatchSuccessVoteSubmitted(
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if err := b.watchErrs["successVote"]; err != nil {
+		return nil, err
+	}
 	b.successVoteSink = sink
 	if opts != nil && opts.Start != nil {
 		b.successVoteStart = *opts.Start
@@ -363,6 +381,9 @@ func (b *fakeDKGBackend) WatchDKGSucceeded(
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if err := b.watchErrs["success"]; err != nil {
+		return nil, err
+	}
 	b.successSink = sink
 	if opts != nil && opts.Start != nil {
 		b.successStart = *opts.Start
@@ -393,6 +414,45 @@ func (b *fakeDKGBackend) emitSuccess(t *testing.T, ev *contract.DKGContractDKGSu
 	case sink <- ev:
 	case <-time.After(time.Second):
 		t.Fatal("success channel blocked")
+	}
+}
+
+func (b *fakeDKGBackend) emitAccusation(t *testing.T, ev *contract.DKGContractAccusationSubmitted) {
+	t.Helper()
+	b.mu.Lock()
+	sink := b.accusationSink
+	b.mu.Unlock()
+	assert.Assert(t, sink != nil, "accusation subscription not set up yet")
+	select {
+	case sink <- ev:
+	case <-time.After(time.Second):
+		t.Fatal("accusation channel blocked")
+	}
+}
+
+func (b *fakeDKGBackend) emitApology(t *testing.T, ev *contract.DKGContractApologySubmitted) {
+	t.Helper()
+	b.mu.Lock()
+	sink := b.apologySink
+	b.mu.Unlock()
+	assert.Assert(t, sink != nil, "apology subscription not set up yet")
+	select {
+	case sink <- ev:
+	case <-time.After(time.Second):
+		t.Fatal("apology channel blocked")
+	}
+}
+
+func (b *fakeDKGBackend) emitSuccessVote(t *testing.T, ev *contract.DKGContractSuccessVoteSubmitted) {
+	t.Helper()
+	b.mu.Lock()
+	sink := b.successVoteSink
+	b.mu.Unlock()
+	assert.Assert(t, sink != nil, "success-vote subscription not set up yet")
+	select {
+	case sink <- ev:
+	case <-time.After(time.Second):
+		t.Fatal("success-vote channel blocked")
 	}
 }
 
