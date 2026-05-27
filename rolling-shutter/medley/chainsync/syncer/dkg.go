@@ -79,6 +79,12 @@ type DKGSyncer struct {
 	// binding-backed implementation when nil.
 	bindDKGContract dkgContractBinder
 
+	// getKeyperSetAddress reads the KeyperSet contract address for a given
+	// Keyper Set Index. It is the subset of KeyperSetManager the gap-backfill
+	// path needs; overridable so tests can inject canned addresses. Start()
+	// fills in s.KeyperSetManager.GetKeyperSetAddress when nil.
+	getKeyperSetAddress func(opts *bind.CallOpts, index uint64) (common.Address, error)
+
 	// runner is captured from Start() so that handleKeyperSetAdded can spawn
 	// new per-contract subscription goroutines as new DKG contract addresses
 	// are discovered at runtime.
@@ -114,6 +120,9 @@ func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 	}
 	if s.bindDKGContract == nil {
 		s.bindDKGContract = defaultDKGContractBinder(s.Client)
+	}
+	if s.getKeyperSetAddress == nil {
+		s.getKeyperSetAddress = s.KeyperSetManager.GetKeyperSetAddress
 	}
 	s.runner = runner
 
@@ -348,15 +357,50 @@ func (s *DKGSyncer) watchKeyperSetAdded(ctx context.Context, subErr <-chan error
 	}
 }
 
-// handleKeyperSetAdded resolves the DKG contract address for the newly-added
-// keyper set, records it via tryTrack, and -- if the address is newly added and
-// a runner is available -- spawns a new per-contract subscription goroutine
-// starting from the block of the triggering event. RPC failures and zero
-// addresses are logged but do not abort the event loop. On a resolve error the
-// state (including numKnownKeyperSets) is left untouched, trading partial-update
-// semantics for a single write path through tryTrack.
+// handleKeyperSetAdded processes a KeyperSetAdded event for DKG contract
+// discovery, detecting and repairing gaps in the event stream first.
+//
+// The incoming Keyper Set Index (ev.Eon) is compared against numKnownKeyperSets:
+//
+//   - smaller (already seen): the event is a duplicate or arrived out of order;
+//     a warning is logged and the event is ignored.
+//   - larger (gap): one or more KeyperSetAdded events were missed. A warning is
+//     logged and every missed index in [numKnownKeyperSets, ev.Eon) is
+//     backfilled -- read, resolved, tracked, and (if newly added) synced from
+//     the triggering event's block -- before the current event is processed.
+//   - equal (expected): the event is processed directly.
+//
+// Backfill runs synchronously in the watchKeyperSetAdded goroutine; gaps are
+// expected to be rare, so blocking the event loop for its duration is accepted.
+//
+// For the triggering event itself, the DKG contract address is resolved,
+// recorded via tryTrack, and -- if newly added and a runner is available -- a
+// per-contract subscription goroutine is spawned from the block of the event.
+// RPC failures and zero addresses are logged but do not abort the event loop.
+// On a resolve error the state (including numKnownKeyperSets) is left untouched,
+// trading partial-update semantics for a single write path through tryTrack.
 func (s *DKGSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.KeyperSetManagerKeyperSetAdded) {
 	opts := logToCallOpts(ctx, &ev.Raw)
+
+	switch known := s.getNumKnownKeyperSets(); {
+	case ev.Eon < known:
+		s.Log.Warn(
+			"received KeyperSetAdded for an already-seen keyper set index; ignoring",
+			"expected-keyper-set-index", known,
+			"received-keyper-set-index", ev.Eon,
+		)
+		return
+	case ev.Eon > known:
+		s.Log.Warn(
+			"gap in KeyperSetAdded event stream; backfilling missed keyper set indices",
+			"expected-keyper-set-index", known,
+			"received-keyper-set-index", ev.Eon,
+		)
+		for i := known; i < ev.Eon; i++ {
+			s.backfillKeyperSet(ctx, opts, i, ev.Raw.BlockNumber)
+		}
+	}
+
 	dkgAddr, err := s.resolveDKGContract(ctx, opts, ev.KeyperSetContract)
 	if err != nil {
 		s.Log.Error(
@@ -380,6 +424,50 @@ func (s *DKGSyncer) handleKeyperSetAdded(ctx context.Context, ev *bindings.Keype
 			"dkg-contract", dkgAddr.Hex(),
 			"keyper-set", ev.KeyperSetContract.Hex(),
 			"eon", ev.Eon,
+		)
+	}
+}
+
+// backfillKeyperSet recovers a single Keyper Set Index that was missing from the
+// KeyperSetAdded event stream: it reads the KeyperSet contract address, resolves
+// its DKG contract, records it via tryTrack, and -- if the address is newly
+// added and a runner is available -- starts a DKGContractSyncer from startBlock
+// (the block of the KeyperSetAdded event that revealed the gap). All RPC calls
+// use opts derived from that triggering event. RPC failures and zero addresses
+// are logged and tolerated so that one unreadable keyper set does not abort
+// backfill of the rest or processing of the triggering event.
+func (s *DKGSyncer) backfillKeyperSet(ctx context.Context, opts *bind.CallOpts, ksi, startBlock uint64) {
+	ksAddr, err := s.getKeyperSetAddress(opts, ksi)
+	if err != nil {
+		s.Log.Error(
+			"could not read keyper set address while backfilling gap",
+			"error", err.Error(),
+			"keyper-set-index", ksi,
+		)
+		return
+	}
+	dkgAddr, err := s.resolveDKGContract(ctx, opts, ksAddr)
+	if err != nil {
+		s.Log.Error(
+			"could not resolve DKG contract while backfilling gap",
+			"error", err.Error(),
+			"keyper-set", ksAddr.Hex(),
+			"keyper-set-index", ksi,
+		)
+		return
+	}
+	if !s.tryTrack(dkgAddr, ksi) {
+		return
+	}
+	if s.runner == nil || s.bindDKGContract == nil {
+		return
+	}
+	if err := s.startContractSyncer(ctx, s.runner, dkgAddr, startBlock); err != nil {
+		s.Log.Error(
+			"could not start DKG contract subscription while backfilling gap",
+			"error", err.Error(),
+			"dkg-contract", dkgAddr.Hex(),
+			"keyper-set-index", ksi,
 		)
 	}
 }
