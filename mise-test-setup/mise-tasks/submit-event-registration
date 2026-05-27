@@ -1,0 +1,171 @@
+#!/usr/bin/env -S uv run --script
+#MISE description="Register an event-based decryption trigger"
+#MISE depends=["deploy"]
+#USAGE flag "--keyper-config-index <keyper_config_index>" help="Keyper config index (auto-detected if omitted)"
+#USAGE flag "--identity-prefix <identity_prefix>" help="32-byte identity prefix hex (random if omitted)"
+#USAGE flag "--contract-addr <contract_addr>" help="Contract address to watch (defaults to EventTriggerTestHelper)"
+#USAGE flag "--topic-index <topic_index>" help="Topic index to match (default: 2)"
+#USAGE flag "--topic-value <topic_value>" help="32-byte topic value hex to match (random if omitted)"
+#USAGE flag "--ttl <ttl>" help="TTL in blocks (default: 10000)"
+
+import json
+import os
+import secrets
+from pathlib import Path
+
+import utils
+
+
+# ---------------------------------------------------------------------------
+# RLP helpers
+# ---------------------------------------------------------------------------
+
+
+def _rlp_bytes(data: bytes) -> bytes:
+    if len(data) == 1 and data[0] < 0x80:
+        return data
+    if len(data) == 0:
+        return b"\x80"
+    if len(data) <= 55:
+        return bytes([0x80 + len(data)]) + data
+    lb = len(data).to_bytes((len(data).bit_length() + 7) // 8, "big")
+    return bytes([0xB7 + len(lb)]) + lb + data
+
+
+def _rlp_uint(n: int) -> bytes:
+    if n == 0:
+        return b"\x80"
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    return _rlp_bytes(raw)
+
+
+def _rlp_list(items: list[bytes]) -> bytes:
+    payload = b"".join(items)
+    if len(payload) <= 55:
+        return bytes([0xC0 + len(payload)]) + payload
+    lb = len(payload).to_bytes((len(payload).bit_length() + 7) // 8, "big")
+    return bytes([0xF7 + len(lb)]) + lb + payload
+
+
+def encode_trigger_def(
+    contract_addr: bytes, topic_index: int, topic_value: bytes
+) -> bytes:
+    """
+    Encode an EventTriggerDefinition (version 0x02 + RLP).
+
+    Matches logs from contract_addr where topic[topic_index] == topic_value.
+    ValuePredicate uses a flat list [Op, *int_args, *byte_args].
+    For BytesEq (Op=5): [5, topic_value].
+    """
+    log_value_ref = _rlp_list([_rlp_uint(0), _rlp_uint(topic_index)])
+    value_predicate = _rlp_list([_rlp_uint(5), _rlp_bytes(topic_value)])
+    log_predicate = _rlp_list([log_value_ref, value_predicate])
+    definition = _rlp_list([_rlp_bytes(contract_addr), _rlp_list([log_predicate])])
+    return bytes([0x02]) + definition
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+RPC = "http://127.0.0.1:8545"
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+if deployment_type != "service":
+    raise SystemExit("submit-event-registration only supports DEPLOYMENT_TYPE=service")
+
+data_dir = Path(os.environ["DATA_DIR"])
+chain_id = os.environ["ETHEREUM_CHAIN_ID"]
+
+broadcast = json.loads(
+    (
+        data_dir
+        / "contracts"
+        / "broadcast"
+        / utils.DEPLOYMENT_SCRIPTS["service"]
+        / chain_id
+        / "run-latest.json"
+    ).read_text()
+)
+registry_addr = utils.get_uups_proxy_address(broadcast, "ShutterEventTriggerRegistryV1")
+if not registry_addr:
+    raise SystemExit("ShutterEventTriggerRegistryV1 proxy not found in deployment artifacts")
+
+keyper_config_index_str = os.environ.get("usage_keyper_config_index", "").strip()
+if not keyper_config_index_str:
+    eon_str = utils.query_keyper_db(0, "SELECT max(eon) FROM eons")
+    if not eon_str:
+        raise SystemExit("No eon found in keyper DB")
+    keyper_config_index_str = utils.query_keyper_db(
+        0, f"SELECT keyper_config_index FROM eons WHERE eon = {int(eon_str)} LIMIT 1"
+    )
+    if not keyper_config_index_str:
+        raise SystemExit(f"No keyper_config_index found for eon={eon_str}")
+keyper_config_index = int(keyper_config_index_str)
+
+identity_prefix = os.environ.get("usage_identity_prefix", "").strip()
+if not identity_prefix:
+    identity_prefix = secrets.token_hex(32)
+identity_prefix = identity_prefix.removeprefix("0x")
+
+contract_addr_str = os.environ.get("usage_contract_addr", "").strip()
+if not contract_addr_str:
+    addr_path = data_dir / "test-helper-addr.json"
+    if not addr_path.exists():
+        raise SystemExit(
+            "No --contract-addr given and EventTriggerTestHelper not deployed "
+            "(run: mise run deploy)"
+        )
+    contract_addr_str = json.loads(addr_path.read_text())["address"]
+
+topic_index_str = os.environ.get("usage_topic_index", "").strip()
+topic_index = int(topic_index_str) if topic_index_str else 2
+
+topic_value_str = os.environ.get("usage_topic_value", "").strip()
+if not topic_value_str:
+    topic_value_str = secrets.token_hex(32)
+topic_value_bytes = bytes.fromhex(topic_value_str.removeprefix("0x"))
+if len(topic_value_bytes) != 32:
+    raise SystemExit("--topic-value must be exactly 32 bytes (64 hex chars)")
+
+ttl_str = os.environ.get("usage_ttl", "").strip()
+ttl = int(ttl_str) if ttl_str else 10_000
+
+contract_addr_bytes = bytes.fromhex(contract_addr_str.removeprefix("0x").zfill(40))
+trigger_def = encode_trigger_def(contract_addr_bytes, topic_index, topic_value_bytes)
+trigger_def_hex = trigger_def.hex()
+
+utils.run(
+    [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "ethereum",
+        "cast",
+        "send",
+        "--rpc-url",
+        RPC,
+        "--private-key",
+        os.environ["DEPLOY_KEY"],
+        registry_addr,
+        "register(uint64,bytes32,bytes,uint64)",
+        str(keyper_config_index),
+        f"0x{identity_prefix}",
+        f"0x{trigger_def_hex}",
+        str(ttl),
+    ],
+)
+
+print(
+    json.dumps(
+        {
+            "keyper_config_index": keyper_config_index,
+            "identity_prefix": identity_prefix,
+            "contract_addr": contract_addr_str,
+            "topic_index": topic_index,
+            "topic_value": topic_value_str.removeprefix("0x"),
+            "ttl": ttl,
+        }
+    )
+)

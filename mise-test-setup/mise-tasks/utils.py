@@ -22,6 +22,13 @@ def run(
     return subprocess.run(command, check=True, text=True, capture_output=capture_output)
 
 
+def run_subtask(command: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run a subtask capturing stdout for JSON parsing while letting stderr flow through."""
+    return subprocess.run(
+        command, check=True, text=True, stdout=subprocess.PIPE
+    )
+
+
 def wait_for_service_health(service: str, *, timeout_seconds: float = 30.0) -> None:
     container_id = run(
         ["docker", "compose", "ps", "-q", service], capture_output=True
