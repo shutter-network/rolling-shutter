@@ -312,6 +312,7 @@ func TestHandleKeyperSetAddedBackfillsGap(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
+	s.startEventConsumer(ctx, runner)
 
 	// numKnownKeyperSets starts at 0; a KeyperSetAdded event for index 2 implies
 	// indices 0 and 1 were missed and must be backfilled before processing 2.
@@ -373,6 +374,7 @@ func TestHandleKeyperSetAddedAlreadySeenIndexLogsWarningAndSkips(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
+	s.startEventConsumer(ctx, runner)
 
 	// Simulate three keyper sets already seen (non-zero addresses, no warnings).
 	s.tryTrack(common.HexToAddress("0xc0"), 0)
@@ -684,6 +686,7 @@ func TestStartContractSubscriptionDeliversLiveDealingEvent(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
+	s.startEventConsumer(ctx, runner)
 	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 42))
 
 	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{
@@ -707,6 +710,7 @@ func TestStartContractSubscriptionWatchStartIsRequestedBlock(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
+	s.startEventConsumer(ctx, runner)
 	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 4242))
 
 	assert.Equal(t, uint64(4242), backend.dealingStart, "DealingSubmitted watch must start from requested block")
@@ -732,10 +736,12 @@ func TestStartContractSubscriptionInitialSuccessesDeliveredBeforeLiveEvents(t *t
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
+	s.startEventConsumer(ctx, runner)
 	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 
-	// Initial successes are delivered synchronously before startContractSyncer
-	// returns, so reading from the handler channel first must yield SuccessEvents.
+	// Initial successes are enqueued before the live watcher starts, so with a
+	// single FIFO consumer reading the handler channel first must yield the
+	// SuccessEvents.
 	ev1 := handler.expectNextEvent(t)
 	_, ok := ev1.(*event.SuccessEvent)
 	assert.Assert(t, ok, "first delivered event must be initial *SuccessEvent, got %T", ev1)
@@ -772,6 +778,7 @@ func TestStartViaTrackedListDeliversEventsFromTwoDistinctContracts(t *testing.T)
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
+	s.startEventConsumer(ctx, runner)
 	for _, addr := range s.trackedDKGContractList() {
 		assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 	}
@@ -807,6 +814,7 @@ func TestSharedContractIsSubscribedExactlyOnce(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
+	s.startEventConsumer(ctx, runner)
 	// trackedDKGContractList must contain exactly one entry after dedup.
 	tracked := s.trackedDKGContractList()
 	assert.Equal(t, 1, len(tracked), "shared DKG contract must appear in tracked list exactly once")
@@ -852,6 +860,7 @@ func TestHandleKeyperSetAddedSubscribesFromEventBlockNumber(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
+	s.startEventConsumer(ctx, runner)
 
 	// Eon 0 is the expected next index (numKnownKeyperSets starts at 0), so this
 	// exercises the normal no-gap path; only the subscription start block matters
@@ -897,6 +906,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
+	s.startEventConsumer(ctx, runner)
 
 	first := &bindings.KeyperSetManagerKeyperSetAdded{KeyperSetContract: ksAddr, Eon: 0}
 	first.Raw.BlockNumber = 100
@@ -929,4 +939,148 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 		t.Fatalf("unexpected duplicate event delivery: %T", extra)
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// serialisationProbe is a DKGEventHandler that detects whether the syncer ever
+// invokes it concurrently. On entry it increments an active-call counter and
+// records the maximum ever observed; the brief sleep widens the window during
+// which an overlapping call would be visible. With the fan-in channel funnelling
+// every event through a single consumer, maxActive must stay at 1.
+type serialisationProbe struct {
+	mu        sync.Mutex
+	active    int
+	maxActive int
+	delivered int
+	want      int
+	done      chan struct{}
+}
+
+func newSerialisationProbe(want int) *serialisationProbe {
+	return &serialisationProbe{want: want, done: make(chan struct{})}
+}
+
+func (p *serialisationProbe) Handle(_ context.Context, _ event.DKGEvent) error {
+	p.mu.Lock()
+	p.active++
+	if p.active > p.maxActive {
+		p.maxActive = p.active
+	}
+	p.mu.Unlock()
+
+	// Widen the window during which a concurrent invocation would be observed.
+	time.Sleep(2 * time.Millisecond)
+
+	p.mu.Lock()
+	p.active--
+	p.delivered++
+	if p.delivered == p.want {
+		close(p.done)
+	}
+	p.mu.Unlock()
+	return nil
+}
+
+// TestEventChannelSerialisesConcurrentHandlerCalls verifies that events produced
+// concurrently by two independent DKGContractSyncer backends reach the real
+// Handler one at a time: the fan-in channel and its single consumer goroutine
+// must serialise all delivery so handler state needs no internal locking.
+func TestEventChannelSerialisesConcurrentHandlerCalls(t *testing.T) {
+	addr0 := common.HexToAddress("0xa0")
+	addr1 := common.HexToAddress("0xa1")
+	backend0 := newFakeDKGBackend(addr0)
+	backend1 := newFakeDKGBackend(addr1)
+
+	const perBackend = 5
+	probe := newSerialisationProbe(2 * perBackend)
+	s := &DKGSyncer{
+		Log:     &logger.NoopLogger{},
+		Handler: probe.Handle,
+		bindDKGContract: func(addr common.Address) (dkgContractBackend, error) {
+			switch addr {
+			case addr0:
+				return backend0, nil
+			case addr1:
+				return backend1, nil
+			}
+			return nil, errors.Errorf("unknown DKG contract %s", addr.Hex())
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := newFakeRunner(ctx)
+	t.Cleanup(func() { cancel(); runner.Wait() })
+
+	s.startEventConsumer(ctx, runner)
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr0, 1))
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr1, 1))
+
+	// Pre-fill both backends' buffered subscription channels so their two
+	// DKGContractSyncer goroutines drain and forward events concurrently. Without
+	// the fan-in channel they would call the handler at the same time.
+	for i := 0; i < perBackend; i++ {
+		backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: uint64(i)})
+		backend1.emitSuccess(t, &contract.DKGContractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: uint64(i)})
+	}
+
+	select {
+	case <-probe.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler did not receive all events")
+	}
+
+	probe.mu.Lock()
+	defer probe.mu.Unlock()
+	assert.Equal(t, 2*perBackend, probe.delivered, "every emitted event must reach the handler")
+	assert.Equal(t, 1, probe.maxActive, "handler must never be invoked concurrently")
+}
+
+// TestEventChannelInitialSuccessesPrecedeLiveEvents verifies the ordering
+// guarantee the fan-in channel provides: a live event emitted while the initial
+// successes for the same contract are still queued is still handled after them.
+// The live event is emitted before any event is read from the handler, so only
+// the FIFO consumer -- not synchronous delivery -- can be ordering them.
+func TestEventChannelInitialSuccessesPrecedeLiveEvents(t *testing.T) {
+	addr := common.HexToAddress("0xaa")
+	backend := newFakeDKGBackend(addr)
+	backend.succeeded[0] = true
+	backend.succeeded[1] = true
+
+	handler := newRecordingHandler()
+	s := &DKGSyncer{
+		Log:     &logger.NoopLogger{},
+		Handler: handler.Handle,
+		bindDKGContract: func(a common.Address) (dkgContractBackend, error) {
+			if a != addr {
+				return nil, errors.Errorf("unknown DKG contract %s", a.Hex())
+			}
+			return backend, nil
+		},
+	}
+	// Two keyper set indices have succeeded, so initialSuccessesForContract
+	// synthesises two SuccessEvents to enqueue ahead of the live watcher.
+	s.tryTrack(addr, 1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := newFakeRunner(ctx)
+	t.Cleanup(func() { cancel(); runner.Wait() })
+
+	s.startEventConsumer(ctx, runner)
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
+
+	// Emit a live event before reading anything: the initial successes were
+	// enqueued during startContractSyncer (before the live watcher existed), so
+	// FIFO ordering on the single channel must still hand them over first.
+	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 9})
+
+	first := handler.expectNextEvent(t)
+	_, ok := first.(*event.SuccessEvent)
+	assert.Assert(t, ok, "first delivered event must be an initial *SuccessEvent, got %T", first)
+
+	second := handler.expectNextEvent(t)
+	_, ok = second.(*event.SuccessEvent)
+	assert.Assert(t, ok, "second delivered event must be an initial *SuccessEvent, got %T", second)
+
+	third := handler.expectNextEvent(t)
+	_, ok = third.(*event.DealingEvent)
+	assert.Assert(t, ok, "the live event must be delivered after the initial successes, got %T", third)
 }
