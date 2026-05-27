@@ -47,7 +47,7 @@ func TestDKGContractSyncerStartRequiresHandler(t *testing.T) {
 		StartBlock: blockNumber(1),
 		backend:    newFakeDKGBackend(common.HexToAddress("0xaa")),
 	}
-	runner := newFakeRunner()
+	runner := newFakeRunner(context.Background())
 	t.Cleanup(runner.Wait)
 	err := s.Start(context.Background(), runner)
 	assert.Assert(t, err != nil, "Start without a handler must error")
@@ -59,7 +59,7 @@ func TestDKGContractSyncerDeliversDealingEvent(t *testing.T) {
 	s, handler := newContractSyncer(addr, backend, 42)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -79,7 +79,7 @@ func TestDKGContractSyncerDeliversAccusationEvent(t *testing.T) {
 	s, handler := newContractSyncer(addr, backend, 42)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -99,7 +99,7 @@ func TestDKGContractSyncerDeliversApologyEvent(t *testing.T) {
 	s, handler := newContractSyncer(addr, backend, 42)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -119,7 +119,7 @@ func TestDKGContractSyncerDeliversSuccessVoteEvent(t *testing.T) {
 	s, handler := newContractSyncer(addr, backend, 42)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -139,7 +139,7 @@ func TestDKGContractSyncerDeliversSuccessEvent(t *testing.T) {
 	s, handler := newContractSyncer(addr, backend, 42)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -159,7 +159,7 @@ func TestDKGContractSyncerWatchStartIsRequestedBlock(t *testing.T) {
 	s, _ := newContractSyncer(addr, backend, 4242)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	assert.NilError(t, s.Start(ctx, runner))
@@ -179,7 +179,7 @@ func TestDKGContractSyncerSubscriptionSetupErrorPropagates(t *testing.T) {
 			backend.watchErrs = map[string]error{eventType: errors.New("simulated subscription failure")}
 			s, _ := newContractSyncer(addr, backend, 1)
 
-			runner := newFakeRunner()
+			runner := newFakeRunner(context.Background())
 			t.Cleanup(runner.Wait)
 
 			err := s.Start(context.Background(), runner)
@@ -194,7 +194,7 @@ func TestDKGContractSyncerContextCancellationExitsCleanly(t *testing.T) {
 	s, _ := newContractSyncer(addr, backend, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 
 	assert.NilError(t, s.Start(ctx, runner))
 

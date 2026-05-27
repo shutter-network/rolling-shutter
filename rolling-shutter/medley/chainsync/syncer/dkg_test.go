@@ -78,10 +78,10 @@ func stubResolver(mapping map[common.Address]common.Address) dkgContractResolver
 	}
 }
 
-func newSyncer(t *testing.T, resolver dkgContractResolver) (*DKGEventSyncer, *recordingLogger) {
+func newSyncer(t *testing.T, resolver dkgContractResolver) (*DKGSyncer, *recordingLogger) {
 	t.Helper()
 	rec := newRecordingLogger()
-	s := &DKGEventSyncer{
+	s := &DKGSyncer{
 		Log:                rec,
 		resolveDKGContract: resolver,
 	}
@@ -261,7 +261,7 @@ func TestHandleKeyperSetAddedResolverErrorIsToleratedWithoutTracking(t *testing.
 }
 
 // gethLoggerInterface compile-time assertion: recordingLogger must satisfy the
-// log.Logger interface so it can be wired into DKGEventSyncer.Log in real
+// log.Logger interface so it can be wired into DKGSyncer.Log in real
 // scenarios as well as in these tests.
 var _ gethlog.Logger = (*recordingLogger)(nil)
 
@@ -458,12 +458,15 @@ func (b *fakeDKGBackend) emitSuccessVote(t *testing.T, ev *contract.DKGContractS
 
 // fakeRunner implements service.Runner for tests. Goroutines spawned via Go
 // are tracked so the test can wait for them to drain after cancelling its
-// context.
+// context. StartService starts each service synchronously under the runner's
+// context, mirroring the real runner so that a DKGContractSyncer started by
+// DKGSyncer comes up and observes context cancellation.
 type fakeRunner struct {
-	wg sync.WaitGroup
+	ctx context.Context
+	wg  sync.WaitGroup
 }
 
-func newFakeRunner() *fakeRunner { return &fakeRunner{} }
+func newFakeRunner(ctx context.Context) *fakeRunner { return &fakeRunner{ctx: ctx} }
 
 func (r *fakeRunner) Go(f func() error) {
 	r.wg.Add(1)
@@ -473,7 +476,14 @@ func (r *fakeRunner) Go(f func() error) {
 	}()
 }
 
-func (r *fakeRunner) StartService(_ ...service.Service) error { return nil }
+func (r *fakeRunner) StartService(services ...service.Service) error {
+	for _, s := range services {
+		if err := s.Start(r.ctx, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (r *fakeRunner) Defer(_ func()) {}
 
@@ -506,7 +516,7 @@ func (h *recordingHandler) expectNextEvent(t *testing.T) event.DKGEvent {
 	}
 }
 
-func newSubscriptionSyncer(t *testing.T, backends map[common.Address]*fakeDKGBackend) (*DKGEventSyncer, *recordingHandler) {
+func newSubscriptionSyncer(t *testing.T, backends map[common.Address]*fakeDKGBackend) (*DKGSyncer, *recordingHandler) {
 	t.Helper()
 	handler := newRecordingHandler()
 	binder := func(addr common.Address) (dkgContractBackend, error) {
@@ -516,7 +526,7 @@ func newSubscriptionSyncer(t *testing.T, backends map[common.Address]*fakeDKGBac
 		}
 		return b, nil
 	}
-	s := &DKGEventSyncer{
+	s := &DKGSyncer{
 		Log:             &logger.NoopLogger{},
 		Handler:         handler.Handle,
 		bindDKGContract: binder,
@@ -530,10 +540,10 @@ func TestStartContractSubscriptionDeliversLiveDealingEvent(t *testing.T) {
 	s, handler := newSubscriptionSyncer(t, map[common.Address]*fakeDKGBackend{addr: backend})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
-	assert.NilError(t, s.startContractSubscription(ctx, runner, addr, 42))
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 42))
 
 	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{
 		KeyperSetIndex: 7,
@@ -553,10 +563,10 @@ func TestStartContractSubscriptionWatchStartIsRequestedBlock(t *testing.T) {
 	s, _ := newSubscriptionSyncer(t, map[common.Address]*fakeDKGBackend{addr: backend})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
-	assert.NilError(t, s.startContractSubscription(ctx, runner, addr, 4242))
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 4242))
 
 	assert.Equal(t, uint64(4242), backend.dealingStart, "DealingSubmitted watch must start from requested block")
 	assert.Equal(t, uint64(4242), backend.accusationStart)
@@ -575,12 +585,12 @@ func TestStartContractSubscriptionInitialSuccessesDeliveredBeforeLiveEvents(t *t
 	s.updateKnownKeyperSetCount(3)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
-	assert.NilError(t, s.startContractSubscription(ctx, runner, addr, 100))
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 
-	// Initial successes are delivered synchronously before startContractSubscription
+	// Initial successes are delivered synchronously before startContractSyncer
 	// returns, so reading from the handler channel first must yield SuccessEvents.
 	ev1 := handler.expectNextEvent(t)
 	_, ok := ev1.(*event.SuccessEvent)
@@ -615,11 +625,11 @@ func TestStartViaTrackedListDeliversEventsFromTwoDistinctContracts(t *testing.T)
 	s.recordDKGContract(addr1, 1, common.HexToAddress("0xb1"))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	for _, addr := range s.trackedDKGContractList() {
-		assert.NilError(t, s.startContractSubscription(ctx, runner, addr, 100))
+		assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 	}
 
 	backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 1})
@@ -650,14 +660,14 @@ func TestSharedContractIsSubscribedExactlyOnce(t *testing.T) {
 	s.recordDKGContract(shared, 2, common.HexToAddress("0xb2"))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 
 	// trackedDKGContractList must contain exactly one entry after dedup.
 	tracked := s.trackedDKGContractList()
 	assert.Equal(t, 1, len(tracked), "shared DKG contract must appear in tracked list exactly once")
 	for _, addr := range tracked {
-		assert.NilError(t, s.startContractSubscription(ctx, runner, addr, 100))
+		assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 	}
 
 	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 5})
@@ -682,7 +692,7 @@ func TestHandleKeyperSetAddedSubscribesFromEventBlockNumber(t *testing.T) {
 	resolver := stubResolver(map[common.Address]common.Address{ksAddr: dkgAddr})
 
 	handler := newRecordingHandler()
-	s := &DKGEventSyncer{
+	s := &DKGSyncer{
 		Log:                &logger.NoopLogger{},
 		Handler:            handler.Handle,
 		resolveDKGContract: resolver,
@@ -695,7 +705,7 @@ func TestHandleKeyperSetAddedSubscribesFromEventBlockNumber(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
 
@@ -727,7 +737,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 	resolver := stubResolver(map[common.Address]common.Address{ksAddr: dkgAddr, ksAddr2: dkgAddr})
 
 	handler := newRecordingHandler()
-	s := &DKGEventSyncer{
+	s := &DKGSyncer{
 		Log:                &logger.NoopLogger{},
 		Handler:            handler.Handle,
 		resolveDKGContract: resolver,
@@ -737,7 +747,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := newFakeRunner()
+	runner := newFakeRunner(ctx)
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
 
