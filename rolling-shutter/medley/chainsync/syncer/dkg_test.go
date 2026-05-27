@@ -201,9 +201,11 @@ func TestHandleKeyperSetAddedRecordsNewContract(t *testing.T) {
 	resolver := stubResolver(map[common.Address]common.Address{ksAddr: dkgAddr})
 	s, _ := newSyncer(t, resolver)
 
+	// Eon 0 is the expected next index given numKnownKeyperSets starts at 0, so
+	// this exercises the normal (no-gap) recording path.
 	ev := &bindings.KeyperSetManagerKeyperSetAdded{
 		KeyperSetContract: ksAddr,
-		Eon:               3,
+		Eon:               0,
 	}
 	ev.Raw.BlockNumber = 42
 
@@ -239,9 +241,11 @@ func TestHandleKeyperSetAddedZeroAddressLogsWarning(t *testing.T) {
 	resolver := stubResolver(map[common.Address]common.Address{ksAddr: {}})
 	s, rec := newSyncer(t, resolver)
 
+	// Eon 0 keeps this on the no-gap path; the single warning asserted below is
+	// the zero-address warning, not a gap warning.
 	ev := &bindings.KeyperSetManagerKeyperSetAdded{
 		KeyperSetContract: ksAddr,
-		Eon:               5,
+		Eon:               0,
 	}
 	s.handleKeyperSetAdded(context.Background(), ev)
 
@@ -255,14 +259,146 @@ func TestHandleKeyperSetAddedResolverErrorIsToleratedWithoutTracking(t *testing.
 	}
 	s, _ := newSyncer(t, resolver)
 
+	// Eon 0 keeps this on the no-gap path so the test isolates resolver-error
+	// tolerance for the triggering event.
 	ev := &bindings.KeyperSetManagerKeyperSetAdded{
 		KeyperSetContract: common.HexToAddress("0xaa"),
-		Eon:               9,
+		Eon:               0,
 	}
 	s.handleKeyperSetAdded(context.Background(), ev)
 
 	assert.Equal(t, 0, len(s.trackedDKGContractList()),
 		"a resolver error must not result in any DKG contract being tracked")
+}
+
+func TestHandleKeyperSetAddedBackfillsGap(t *testing.T) {
+	ks0 := common.HexToAddress("0xa0")
+	ks1 := common.HexToAddress("0xa1")
+	ks2 := common.HexToAddress("0xa2")
+	dkg0 := common.HexToAddress("0xb0")
+	dkg1 := common.HexToAddress("0xb1")
+	dkg2 := common.HexToAddress("0xb2")
+
+	keyperSets := map[uint64]common.Address{0: ks0, 1: ks1, 2: ks2}
+	resolver := stubResolver(map[common.Address]common.Address{ks0: dkg0, ks1: dkg1, ks2: dkg2})
+	backend0 := newFakeDKGBackend(dkg0)
+	backend1 := newFakeDKGBackend(dkg1)
+	backend2 := newFakeDKGBackend(dkg2)
+	backends := map[common.Address]*fakeDKGBackend{dkg0: backend0, dkg1: backend1, dkg2: backend2}
+
+	rec := newRecordingLogger()
+	handler := newRecordingHandler()
+	s := &DKGSyncer{
+		Log:                rec,
+		Handler:            handler.Handle,
+		resolveDKGContract: resolver,
+		bindDKGContract: func(addr common.Address) (dkgContractBackend, error) {
+			b, ok := backends[addr]
+			if !ok {
+				return nil, errors.Errorf("unknown DKG contract %s", addr.Hex())
+			}
+			return b, nil
+		},
+		getKeyperSetAddress: func(_ *bind.CallOpts, index uint64) (common.Address, error) {
+			addr, ok := keyperSets[index]
+			if !ok {
+				return common.Address{}, errors.Errorf("unknown keyper set index %d", index)
+			}
+			return addr, nil
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := newFakeRunner(ctx)
+	t.Cleanup(func() { cancel(); runner.Wait() })
+	s.runner = runner
+
+	// numKnownKeyperSets starts at 0; a KeyperSetAdded event for index 2 implies
+	// indices 0 and 1 were missed and must be backfilled before processing 2.
+	ev := &bindings.KeyperSetManagerKeyperSetAdded{KeyperSetContract: ks2, Eon: 2}
+	ev.Raw.BlockNumber = 500
+	s.handleKeyperSetAdded(ctx, ev)
+
+	// All three DKG contracts are tracked: the two backfilled plus the
+	// triggering event's own contract.
+	tracked := s.trackedDKGContractList()
+	assert.Equal(t, 3, len(tracked))
+	want := map[common.Address]struct{}{dkg0: {}, dkg1: {}, dkg2: {}}
+	for _, addr := range tracked {
+		_, ok := want[addr]
+		assert.Assert(t, ok, "unexpected tracked contract %s", addr.Hex())
+	}
+	assert.Equal(t, uint64(3), s.getNumKnownKeyperSets(),
+		"count must advance past the triggering keyper set index")
+
+	// Backfilled syncers and the triggering syncer all start from the event block.
+	assert.Equal(t, uint64(500), backend0.dealingStart, "backfilled syncer 0 must start at the triggering event block")
+	assert.Equal(t, uint64(500), backend1.dealingStart, "backfilled syncer 1 must start at the triggering event block")
+	assert.Equal(t, uint64(500), backend2.dealingStart, "triggering event syncer must start at its block")
+
+	// Exactly one warning identifies the gap.
+	assert.Equal(t, 1, rec.warnCount(), "exactly one gap warning expected")
+
+	// Each spawned syncer is live: an event from each backend reaches the handler.
+	backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0})
+	backend1.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 1})
+	backend2.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 2})
+	got := map[uint64]bool{}
+	for i := 0; i < 3; i++ {
+		de, ok := handler.expectNextEvent(t).(*event.DealingEvent)
+		assert.Assert(t, ok, "expected *DealingEvent")
+		got[de.KeyperSetIndex] = true
+	}
+	assert.Assert(t, got[0] && got[1] && got[2], "events from all three syncers must be delivered")
+}
+
+func TestHandleKeyperSetAddedAlreadySeenIndexLogsWarningAndSkips(t *testing.T) {
+	ksAddr := common.HexToAddress("0xaa")
+	dkgAddr := common.HexToAddress("0xbb")
+	backend := newFakeDKGBackend(dkgAddr)
+	resolver := stubResolver(map[common.Address]common.Address{ksAddr: dkgAddr})
+
+	rec := newRecordingLogger()
+	handler := newRecordingHandler()
+	s := &DKGSyncer{
+		Log:                rec,
+		Handler:            handler.Handle,
+		resolveDKGContract: resolver,
+		bindDKGContract: func(common.Address) (dkgContractBackend, error) {
+			return backend, nil
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := newFakeRunner(ctx)
+	t.Cleanup(func() { cancel(); runner.Wait() })
+	s.runner = runner
+
+	// Simulate three keyper sets already seen (non-zero addresses, no warnings).
+	s.tryTrack(common.HexToAddress("0xc0"), 0)
+	s.tryTrack(common.HexToAddress("0xc1"), 1)
+	s.tryTrack(common.HexToAddress("0xc2"), 2)
+	assert.Equal(t, uint64(3), s.getNumKnownKeyperSets())
+	assert.Equal(t, 0, rec.warnCount())
+
+	// An event for an already-seen index (1 < 3) is ignored with a warning.
+	ev := &bindings.KeyperSetManagerKeyperSetAdded{KeyperSetContract: ksAddr, Eon: 1}
+	ev.Raw.BlockNumber = 700
+	s.handleKeyperSetAdded(ctx, ev)
+
+	assert.Equal(t, 1, rec.warnCount(), "an already-seen index must log exactly one warning")
+	assert.Equal(t, uint64(3), s.getNumKnownKeyperSets(), "count must be unchanged")
+	assert.Equal(t, uint64(0), backend.dealingStart, "already-seen index must not start a syncer")
+	for _, addr := range s.trackedDKGContractList() {
+		assert.Assert(t, addr != dkgAddr, "ignored event must not track its DKG contract")
+	}
+
+	// No event is delivered for the ignored index.
+	select {
+	case ev := <-handler.ch:
+		t.Fatalf("already-seen index must not deliver any event, got %T", ev)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 // gethLoggerInterface compile-time assertion: recordingLogger must satisfy the
@@ -717,9 +853,12 @@ func TestHandleKeyperSetAddedSubscribesFromEventBlockNumber(t *testing.T) {
 	t.Cleanup(func() { cancel(); runner.Wait() })
 	s.runner = runner
 
+	// Eon 0 is the expected next index (numKnownKeyperSets starts at 0), so this
+	// exercises the normal no-gap path; only the subscription start block matters
+	// here.
 	ev := &bindings.KeyperSetManagerKeyperSetAdded{
 		KeyperSetContract: ksAddr,
-		Eon:               2,
+		Eon:               0,
 	}
 	ev.Raw.BlockNumber = 1234
 
