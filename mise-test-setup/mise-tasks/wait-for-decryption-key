@@ -1,13 +1,14 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Wait for a decryption key"
 #USAGE flag "--eon <eon>" help="Target eon"
 #USAGE flag "--identity-prefix <identity_prefix>" help="Identity prefix hex string"
+# fmt: on
 
 import os
 import time
 
 import utils
-
 
 requested_eon = os.environ.get("usage_eon", "").strip()
 identity_prefix = os.environ.get("usage_identity_prefix", "").strip()

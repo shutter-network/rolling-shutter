@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+# fmt: off
 #MISE description="Delete all generated files"
 #MISE depends=["down"]
+# fmt: on
 
 rm -rf "${DATA_DIR}"
 rm -rf "${GENERATED_DIR}"

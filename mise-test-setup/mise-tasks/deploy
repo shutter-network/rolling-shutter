@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Deploy contracts if not already deployed"
 #MISE depends=["up-ethereum"]
+# fmt: on
 
 import json
 import os
@@ -86,7 +88,9 @@ deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE"
 deploy_script = utils.DEPLOYMENT_SCRIPTS[deployment_type]
 data_dir = Path(os.environ["DATA_DIR"])
 chain_id = os.environ["ETHEREUM_CHAIN_ID"]
-run_path = data_dir / "contracts" / "broadcast" / deploy_script / chain_id / "run-latest.json"
+run_path = (
+    data_dir / "contracts" / "broadcast" / deploy_script / chain_id / "run-latest.json"
+)
 
 if deployment_is_complete(run_path, deployment_type):
     print(f"Deployment already present at {run_path}; skipping")

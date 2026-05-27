@@ -1,15 +1,16 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Render docker compose files based on DEPLOYMENT_TYPE"
 # /// script
 # dependencies = ["jinja2"]
 # ///
+# fmt: on
 
 import os
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
 import utils
-
+from jinja2 import Environment, FileSystemLoader
 
 deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
 generated_dir = Path(os.environ["GENERATED_DIR"])

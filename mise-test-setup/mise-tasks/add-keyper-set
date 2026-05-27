@@ -1,15 +1,16 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Add a keyper set on-chain"
 #MISE depends=["gen-keyper-configs"]
 #USAGE flag "--indices <indices>" help="Comma-separated keyper indices"
 #USAGE flag "--threshold <threshold>" help="Keyper set threshold"
+# fmt: on
 
 import json
 import os
 from pathlib import Path
 
 import utils
-
 
 deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
 data_dir = Path(os.environ["DATA_DIR"])
@@ -24,8 +25,12 @@ run_path = (
     / "run-latest.json"
 )
 deployment_run = json.loads(run_path.read_text())
-keyper_set_manager = utils.get_created_contract_address(deployment_run, "KeyperSetManager")
-key_broadcast_contract = utils.get_created_contract_address(deployment_run, "KeyBroadcastContract")
+keyper_set_manager = utils.get_created_contract_address(
+    deployment_run, "KeyperSetManager"
+)
+key_broadcast_contract = utils.get_created_contract_address(
+    deployment_run, "KeyBroadcastContract"
+)
 keyper_addresses = ",".join(
     utils.keyper_address(data_dir / f"keyper-{index}.toml") for index in indices
 )

@@ -1,8 +1,10 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Fire an EventTriggerTestHelper Trigger event on-chain"
 #MISE depends=["deploy"]
 #USAGE flag "--topic2 <topic2>" help="32-byte topic2 value hex (random if omitted)"
 #USAGE flag "--helper-addr <helper_addr>" help="EventTriggerTestHelper address (defaults to deployed address)"
+# fmt: on
 
 import json
 import os

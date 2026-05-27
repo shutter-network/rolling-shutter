@@ -1,10 +1,12 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Start the implemented docker3 stack"
 #MISE depends=["patch-genesis", "init-keyper-dbs"]
+# fmt: on
 
 import os
-import utils
 
+import utils
 
 utils.run(["docker", "compose", "up", "-d"])
 

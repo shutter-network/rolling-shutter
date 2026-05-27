@@ -1,13 +1,14 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Add the initial keyper set on-chain"
 #MISE depends=["gen-keyper-configs"]
+# fmt: on
 
 import json
 import os
 from pathlib import Path
 
 import utils
-
 
 deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
 data_dir = Path(os.environ["DATA_DIR"])
