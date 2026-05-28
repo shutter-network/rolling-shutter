@@ -1,0 +1,107 @@
+#!/usr/bin/env -S uv run --script
+# fmt: off
+#MISE description="E2E test: event-based decryption triggers without batching"
+#MISE depends=["wait-for-initial-dkg"]
+# fmt: on
+
+import json
+import os
+import secrets
+import time
+
+import utils
+
+NUM_TRIGGERS = 3
+POLL_INTERVAL = float(os.environ.get("DECRYPTION_KEY_POLL_INTERVAL", "1"))
+
+
+def assert_no_batching(
+    keyper_config_index: int,
+    num_triggers: int,
+    poll_interval: float = 1.0,
+    timeout: float = 30.0,
+) -> None:
+    """Assert each DecryptionTrigger carries exactly one identity (no batching)."""
+    deadline = time.time() + timeout
+    while True:
+        count_str = utils.query_keyper_db(
+            0,
+            f"SELECT COUNT(DISTINCT identities_hash) FROM decryption_signatures "
+            f"WHERE eon = {keyper_config_index}",
+        )
+        count = int(count_str) if count_str else 0
+        if count >= num_triggers:
+            print(
+                f"No-batching assertion passed: "
+                f"{count} distinct identities_hash for {num_triggers} triggers"
+            )
+            return
+        if time.time() > deadline:
+            raise SystemExit(
+                f"No-batching assertion failed: expected {num_triggers} distinct "
+                f"identities_hash in decryption_signatures for eon={keyper_config_index}, "
+                f"got {count}"
+            )
+        time.sleep(poll_interval)
+
+
+deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+if deployment_type != "service":
+    raise SystemExit("test-event-decryption only supports DEPLOYMENT_TYPE=service")
+
+# Shared topic value — all registrations match the same event when it fires.
+trigger_topic_hex = secrets.token_hex(32)
+print(f"Using shared topic2=0x{trigger_topic_hex[:8]}… for {NUM_TRIGGERS} triggers")
+
+# Register NUM_TRIGGERS event triggers, each with a distinct identity prefix.
+registrations: list[dict] = []
+for i in range(NUM_TRIGGERS):
+    result = utils.run_subtask(
+        [
+            "mise",
+            "run",
+            "submit-event-registration",
+            "--topic-value",
+            trigger_topic_hex,
+        ],
+    )
+    ctx = json.loads(result.stdout.strip().splitlines()[-1])
+    registrations.append(ctx)
+    print(
+        f"  [{i + 1}/{NUM_TRIGGERS}] Registered: "
+        f"identity_prefix=0x{ctx['identity_prefix'][:8]}…"
+    )
+
+keyper_config_index = registrations[0]["keyper_config_index"]
+
+# Give keypers time to sync the EventTriggerRegistered events before we fire.
+sync_wait = max(3, int(os.environ.get("ACTIVATION_DELTA", "10")))
+print(f"Waiting {sync_wait}s for keypers to sync trigger registrations…")
+time.sleep(sync_wait)
+
+# Fire one Trigger event — all NUM_TRIGGERS registered definitions will match.
+print(f"Firing Trigger event with topic2=0x{trigger_topic_hex[:8]}…")
+utils.run_subtask(["mise", "run", "trigger-event", "--topic2", trigger_topic_hex])
+
+# Wait for each decryption key.
+print("Waiting for decryption keys…")
+for reg in registrations:
+    utils.run_subtask(
+        [
+            "mise",
+            "run",
+            "wait-for-event-decryption-key",
+            "--keyper-config-index",
+            str(reg["keyper_config_index"]),
+            "--identity-prefix",
+            reg["identity_prefix"],
+        ]
+    )
+
+# Assert that no batching occurred.
+print("Asserting no-batching (each trigger must produce a distinct identities_hash)…")
+assert_no_batching(keyper_config_index, NUM_TRIGGERS, POLL_INTERVAL)
+
+print(
+    f"\nAll {NUM_TRIGGERS} event-based decryption triggers handled without batching. ✓"
+)

@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Wait for the initial DKG to succeed"
 #MISE depends=["up", "add-initial-keyper-set"]
+# fmt: on
 
 import utils
 

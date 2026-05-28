@@ -218,7 +218,8 @@ func (kpr *Keyper) createTriggersFromIdentityRegisteredEvents(
 		if identityPreimages[event.Eon] == nil {
 			identityPreimages[event.Eon] = make([]identitypreimage.IdentityPreimage, 0)
 		}
-		identityPreimages[event.Eon] = append(identityPreimages[event.Eon], identitypreimage.IdentityPreimage(event.Identity))
+		identityPreimages[event.Eon] = append(identityPreimages[event.Eon],
+			identitypreimage.IdentityPreimage(event.Identity))
 
 		if _, exists := lastEonBlock[event.Eon]; !exists {
 			lastEonBlock[event.Eon] = eon.ActivationBlockNumber
@@ -269,19 +270,15 @@ func (kpr *Keyper) prepareEventBasedTriggers(ctx context.Context) ([]epochkghand
 			continue
 		}
 
-		identities := []identitypreimage.IdentityPreimage{}
+		// issue 698: here we "unbatch" all event based decryption triggers and create one broker event per identity
 		for _, firedTrigger := range firedTriggers {
-			identities = append(identities, firedTrigger.Identity)
+			identityPreimage := []identitypreimage.IdentityPreimage{firedTrigger.Identity}
+			decryptionTrigger := epochkghandler.DecryptionTrigger{
+				BlockNumber:       uint64(eonStruct.ActivationBlockNumber), //nolint:gosec
+				IdentityPreimages: identityPreimage,
+			}
+			decryptionTriggers = append(decryptionTriggers, decryptionTrigger)
 		}
-
-		sortedIdentityPreimages := sortIdentityPreimages(identities)
-
-		decryptionTrigger := epochkghandler.DecryptionTrigger{
-			BlockNumber:       uint64(eonStruct.ActivationBlockNumber),
-			IdentityPreimages: sortedIdentityPreimages,
-		}
-
-		decryptionTriggers = append(decryptionTriggers, decryptionTrigger)
 	}
 	return decryptionTriggers, nil
 }

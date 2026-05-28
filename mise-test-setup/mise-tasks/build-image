@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
+# fmt: off
 #MISE description="Build the rolling-shutter image"
+# fmt: on
 
 docker build \
     -f ../docker/build-src/rolling-shutter/Dockerfile \

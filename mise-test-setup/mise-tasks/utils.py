@@ -4,7 +4,6 @@ import subprocess
 import time
 from pathlib import Path
 
-
 DEPLOYMENT_SCRIPTS: dict[str, str] = {
     "gnosis": "Deploy.gnosh.s.sol",
     "service": "Deploy.service.s.sol",
@@ -20,6 +19,11 @@ def run(
     command: list[str], *, capture_output: bool = False
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, check=True, text=True, capture_output=capture_output)
+
+
+def run_subtask(command: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run a subtask capturing stdout for JSON parsing while letting stderr flow through."""
+    return subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE)
 
 
 def wait_for_service_health(service: str, *, timeout_seconds: float = 30.0) -> None:
@@ -63,7 +67,12 @@ def set_toml_path(document, parts: list[str], value) -> None:
 
 
 def keyper_address(config_path: Path) -> str:
-    return config_path.read_text().splitlines()[0].removeprefix("# Ethereum address: ").strip()
+    return (
+        config_path.read_text()
+        .splitlines()[0]
+        .removeprefix("# Ethereum address: ")
+        .strip()
+    )
 
 
 def parse_indices(indices: str) -> list[int]:
@@ -114,4 +123,40 @@ def get_created_contract_address(
         address = tx.get("contractAddress")
         if isinstance(address, str) and address:
             return address
+    return None
+
+
+def get_uups_proxy_address(
+    deployment_run: dict[str, object], impl_contract_name: str
+) -> str | None:
+    """Return the ERC1967Proxy address deployed for the given UUPS implementation.
+
+    The deployment script deploys the implementation first, then an ERC1967Proxy
+    whose constructor input encodes the implementation address.  We identify the
+    correct proxy by searching for the ERC1967Proxy CREATE that immediately follows
+    the implementation and whose input data contains the implementation address.
+    """
+    transactions = deployment_run.get("transactions")
+    if not isinstance(transactions, list):
+        return None
+    for i, tx in enumerate(transactions):
+        if not isinstance(tx, dict):
+            continue
+        if tx.get("contractName") != impl_contract_name:
+            continue
+        impl_addr = (tx.get("contractAddress") or "").lower().replace("0x", "")
+        if not impl_addr:
+            continue
+        for j in range(i + 1, len(transactions)):
+            candidate = transactions[j]
+            if not isinstance(candidate, dict):
+                continue
+            if candidate.get("contractName") != "ERC1967Proxy":
+                continue
+            input_data = (candidate.get("transaction", {}).get("input") or "").lower()
+            if impl_addr in input_data:
+                proxy_addr = candidate.get("contractAddress")
+                if isinstance(proxy_addr, str) and proxy_addr:
+                    return proxy_addr
+        break
     return None

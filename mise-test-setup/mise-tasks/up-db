@@ -1,9 +1,10 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Run db and wait for healthcheck"
 #MISE depends=["gen-compose"]
+# fmt: on
 
 import utils
-
 
 utils.run(["docker", "compose", "up", "-d", "db"])
 utils.wait_for_service_health("db")

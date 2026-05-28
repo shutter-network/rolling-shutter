@@ -1,9 +1,11 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Submit an identity registration transaction"
 #MISE depends=["deploy"]
 #USAGE flag "--eon <eon>" help="Target eon"
 #USAGE flag "--identity-prefix <identity_prefix>" help="Identity prefix hex string"
 #USAGE flag "--timestamp <timestamp>" help="Trigger timestamp"
+# fmt: on
 
 import json
 import os
@@ -27,7 +29,9 @@ def deployment_run_path(data_dir: Path, deployment_type: str) -> Path:
 
 deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
 if deployment_type != "service":
-    raise SystemExit("submit-identity-registration only supports DEPLOYMENT_TYPE=service")
+    raise SystemExit(
+        "submit-identity-registration only supports DEPLOYMENT_TYPE=service"
+    )
 
 data_dir = Path(os.environ["DATA_DIR"])
 deployment_run = json.loads(deployment_run_path(data_dir, deployment_type).read_text())

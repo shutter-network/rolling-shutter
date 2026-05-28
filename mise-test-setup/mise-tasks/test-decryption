@@ -1,10 +1,11 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Submit a decryption trigger and wait for the key"
+# fmt: on
 
 import json
 
 import utils
-
 
 result = utils.run(
     ["mise", "run", "submit-identity-registration"],

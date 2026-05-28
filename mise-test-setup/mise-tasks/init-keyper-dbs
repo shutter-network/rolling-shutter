@@ -1,8 +1,11 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Initialize dbs for all keypers"
 #MISE depends=["up-db", "gen-keyper-configs"]
+# fmt: on
 
 import os
+from pathlib import Path
 
 import utils
 
@@ -47,39 +50,101 @@ def public_table_count(database_name: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
+def db_ethereum_address(database_name: str) -> str:
+    result = utils.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            database_name,
+            "-tAc",
+            "SELECT value FROM meta_inf WHERE key = 'ethereum address'",
+        ],
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def drop_db(database_name: str) -> None:
+    utils.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-U",
+            "postgres",
+            "-c",
+            f'DROP DATABASE IF EXISTS "{database_name}"',
+        ]
+    )
+
+
+def create_db(database_name: str) -> None:
+    utils.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "db",
+            "createdb",
+            "-U",
+            "postgres",
+            database_name,
+        ]
+    )
+
+
+def init_db(index: int) -> None:
+    utils.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "-T",
+            "--no-deps",
+            "--rm",
+            f"keyper-{index}",
+            utils.KEYPER_SUBCOMMANDS[deployment_type],
+            "initdb",
+            "--config",
+            "/config.toml",
+        ]
+    )
+
+
 deployment_type = utils.resolve_deployment_type(os.environ.get("DEPLOYMENT_TYPE", ""))
+data_dir = Path(os.environ["DATA_DIR"])
 
 for index in range(int(os.environ["NUM_KEYPERS"])):
     database_name = f"keyper-{index}"
+    config_path = data_dir / f"keyper-{index}.toml"
 
     if not db_exists(database_name):
-        utils.run(
-            [
-                "docker",
-                "compose",
-                "exec",
-                "-T",
-                "db",
-                "createdb",
-                "-U",
-                "postgres",
-                database_name,
-            ]
-        )
+        create_db(database_name)
+        init_db(index)
+        continue
 
     if public_table_count(database_name) == 0:
-        utils.run(
-            [
-                "docker",
-                "compose",
-                "run",
-                "-T",
-                "--no-deps",
-                "--rm",
-                f"keyper-{index}",
-                utils.KEYPER_SUBCOMMANDS[deployment_type],
-                "initdb",
-                "--config",
-                "/config.toml",
-            ]
+        init_db(index)
+        continue
+
+    # DB exists with tables. Re-initialize if the stored address doesn't match the config.
+    config_addr = utils.keyper_address(config_path)
+    db_addr = db_ethereum_address(database_name)
+    if db_addr.lower() != config_addr.lower():
+        print(
+            f"keyper-{index}: DB address {db_addr} != config address {config_addr}; re-initializing"
         )
+        drop_db(database_name)
+        create_db(database_name)
+        init_db(index)

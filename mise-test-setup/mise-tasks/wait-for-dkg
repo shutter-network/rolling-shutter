@@ -1,13 +1,14 @@
 #!/usr/bin/env -S uv run --script
+# fmt: off
 #MISE description="Wait for DKG completion"
 #USAGE flag "--keyper-set-index <keyper_set_index>" help="Wait for a successful DKG for this keyper set index"
 #USAGE flag "--eon <eon>" help="Wait for completion of this eon"
+# fmt: on
 
 import os
 import time
 
 import utils
-
 
 keyper_set_index = os.environ.get("usage_keyper_set_index", "").strip()
 eon = os.environ.get("usage_eon", "").strip()
