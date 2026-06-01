@@ -43,6 +43,31 @@ func (q *Queries) GetKeyperSetByKeyperConfigIndex(ctx context.Context, keyperCon
 	return i, err
 }
 
+const getKeyperSetIndices = `-- name: GetKeyperSetIndices :many
+SELECT keyper_config_index FROM keyper_set
+ORDER BY keyper_config_index ASC
+`
+
+func (q *Queries) GetKeyperSetIndices(ctx context.Context) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getKeyperSetIndices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var keyper_config_index int64
+		if err := rows.Scan(&keyper_config_index); err != nil {
+			return nil, err
+		}
+		items = append(items, keyper_config_index)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getKeyperSets = `-- name: GetKeyperSets :many
 SELECT keyper_config_index, activation_block_number, keypers, threshold FROM keyper_set
 ORDER BY activation_block_number ASC

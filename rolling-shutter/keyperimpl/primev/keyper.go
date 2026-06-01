@@ -11,6 +11,7 @@ import (
 	providerregistry "github.com/primev/mev-commit/contracts-abi/clients/ProviderRegistry"
 	"github.com/rs/zerolog/log"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -19,6 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
+	chainsyncer "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/p2p"
@@ -77,6 +79,10 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
 
+	ksIndices, err := obskeyper.New(k.dbpool).GetKeyperSetIndices(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to load keyper set indices")
+	}
 	k.chainSyncClient, err = chainsync.NewClient(
 		ctx,
 		chainsync.WithClientURL(k.config.Chain.Node.EthereumURL),
@@ -86,6 +92,7 @@ func (k *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithSyncNewBlock(k.channelNewBlock),
 		chainsync.WithPrivateKey(k.config.Chain.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
+		chainsync.WithKeyperSetKnownRanges(chainsyncer.IndicesToRanges(ksIndices)),
 	)
 	if err != nil {
 		return err

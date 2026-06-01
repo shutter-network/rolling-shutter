@@ -19,3 +19,7 @@ ORDER BY activation_block_number DESC LIMIT 1;
 -- name: GetKeyperSets :many
 SELECT * FROM keyper_set
 ORDER BY activation_block_number ASC;
+
+-- name: GetKeyperSetIndices :many
+SELECT keyper_config_index FROM keyper_set
+ORDER BY keyper_config_index ASC;

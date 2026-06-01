@@ -22,11 +22,12 @@ func makeCallError(attrName string, err error) error {
 const channelSize = 10
 
 type KeyperSetSyncer struct {
-	Client     client.Client
-	Contract   *bindings.KeyperSetManager
-	Log        log.Logger
-	StartBlock *number.BlockNumber
-	Handler    event.KeyperSetHandler
+	Client      client.Client
+	Contract    *bindings.KeyperSetManager
+	Log         log.Logger
+	StartBlock  *number.BlockNumber
+	Handler     event.KeyperSetHandler
+	KnownRanges []IndexRange
 
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 }
@@ -89,34 +90,22 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	bn := s.StartBlock.ToUInt64Ptr()
-	if bn == nil {
-		// this should not be the case
-		return nil, errors.New("start block is 'latest'")
-	}
-
-	initialKeyperSets := []*event.KeyperSet{}
-	// this blocknumber specifies the argument to the contract
-	// getter
-	ks, err := s.GetKeyperSetForBlock(ctx, opts, s.StartBlock)
-	if err != nil {
-		return nil, err
-	}
-	initialKeyperSets = append(initialKeyperSets, ks)
 
 	numKS, err := s.Contract.GetNumKeyperSets(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := ks.Eon + 1; i < numKS; i++ {
-		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
-		if err != nil {
-			return nil, err
+	var initialKeyperSets []*event.KeyperSet
+	for _, r := range complementRanges(s.KnownRanges, numKS) {
+		for i := r.Start; i <= r.End; i++ {
+			ks, err := s.GetKeyperSetByIndex(ctx, opts, i)
+			if err != nil {
+				return nil, err
+			}
+			initialKeyperSets = append(initialKeyperSets, ks)
 		}
-		initialKeyperSets = append(initialKeyperSets, ks)
 	}
-
 	return initialKeyperSets, nil
 }
 
