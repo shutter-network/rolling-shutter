@@ -22,12 +22,12 @@ func makeCallError(attrName string, err error) error {
 const channelSize = 10
 
 type KeyperSetSyncer struct {
-	Client      client.Client
-	Contract    *bindings.KeyperSetManager
-	Log         log.Logger
-	StartBlock  *number.BlockNumber
-	Handler     event.KeyperSetHandler
-	KnownRanges []IndexRange
+	Client       client.Client
+	Contract     *bindings.KeyperSetManager
+	Log          log.Logger
+	StartBlock   *number.BlockNumber
+	Handler      event.KeyperSetHandler
+	KnownIndices []int64
 
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 }
@@ -82,6 +82,20 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	return nil
 }
 
+func missingIndices(known []int64, total uint64) []uint64 {
+	knownSet := make(map[uint64]struct{}, len(known))
+	for _, k := range known {
+		knownSet[uint64(k)] = struct{}{} //nolint:gosec
+	}
+	var result []uint64
+	for i := uint64(0); i < total; i++ {
+		if _, ok := knownSet[i]; !ok {
+			result = append(result, i)
+		}
+	}
+	return result
+}
+
 func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
 	opts := &bind.CallOpts{
 		Context:     ctx,
@@ -97,14 +111,12 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 	}
 
 	var initialKeyperSets []*event.KeyperSet
-	for _, r := range complementRanges(s.KnownRanges, numKS) {
-		for i := r.Start; i <= r.End; i++ {
-			ks, err := s.GetKeyperSetByIndex(ctx, opts, i)
-			if err != nil {
-				return nil, err
-			}
-			initialKeyperSets = append(initialKeyperSets, ks)
+	for _, i := range missingIndices(s.KnownIndices, numKS) {
+		ks, err := s.GetKeyperSetByIndex(ctx, opts, i)
+		if err != nil {
+			return nil, err
 		}
+		initialKeyperSets = append(initialKeyperSets, ks)
 	}
 	return initialKeyperSets, nil
 }

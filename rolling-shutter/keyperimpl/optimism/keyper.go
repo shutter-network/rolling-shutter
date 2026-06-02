@@ -19,7 +19,6 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/broker"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
-	chainsyncer "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/configuration"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/identitypreimage"
@@ -90,7 +89,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithSyncNewBlock(kpr.newBlock),
 		chainsync.WithSyncNewKeyperSet(kpr.newKeyperSet),
 		chainsync.WithPrivateKey(kpr.config.Optimism.PrivateKey.Key),
-		chainsync.WithKeyperSetKnownRanges(chainsyncer.IndicesToRanges(ksIndices)),
+		chainsync.WithKnownKeyperSetIndices(ksIndices),
 	)
 	if err != nil {
 		return err
