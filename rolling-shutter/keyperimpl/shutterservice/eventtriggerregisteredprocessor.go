@@ -85,6 +85,13 @@ func (p *EventTriggerRegisteredEventProcessor) ProcessEvents(ctx context.Context
 		}
 
 		triggerDefinition := EventTriggerDefinition{}
+		if len(registryEvent.TriggerDefinition) > 0 &&
+			registryEvent.TriggerDefinition[0] != Version {
+			evLog.Log().Int64("version", int64(
+				registryEvent.TriggerDefinition[0])).Msg(
+				"skipping trigger definition with outdated version")
+			continue
+		}
 		err := triggerDefinition.UnmarshalBytes(registryEvent.TriggerDefinition)
 		if err != nil {
 			evLog.Info().Err(err).Msg("skipping invalid trigger definition")

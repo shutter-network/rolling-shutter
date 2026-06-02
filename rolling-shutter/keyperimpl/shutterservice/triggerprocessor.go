@@ -63,6 +63,13 @@ func (tp *TriggerProcessor) FetchEvents(ctx context.Context, start, end uint64) 
 			Logger()
 
 		trigger := EventTriggerDefinition{}
+		if len(triggerRegisteredEvent.Definition) > 0 &&
+			triggerRegisteredEvent.Definition[0] != Version {
+			triggerLog.Log().Int64("version", int64(
+				triggerRegisteredEvent.Definition[0])).Msg(
+				"ignoring trigger definition with outdated version in database")
+			continue
+		}
 		err := trigger.UnmarshalBytes(triggerRegisteredEvent.Definition)
 		if err != nil {
 			// This is not supposed to happen as only valid triggers are inserted into the database.
