@@ -114,7 +114,8 @@ var MetricsKeyperBatchConfigInfo = prometheus.NewGaugeVec(
 		Name:      "batch_config_info",
 		Help:      "Information about the batch configuration in use",
 	},
-	[]string{"batch_config_index", "keyper_addresses"})
+	[]string{"batch_config_index", "keyper_addresses", "keyper_count", "threshold"},
+)
 
 var MetricsKeyperDKGStatus = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -228,7 +229,12 @@ func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 
 			// Join keyper addresses for the label
 			keyperAddresses := strings.Join(batchConfig.Keypers, ",")
-			MetricsKeyperBatchConfigInfo.WithLabelValues(batchConfigIndexStr, keyperAddresses).Set(1)
+
+			keyperCount := strconv.Itoa(len(batchConfig.Keypers))
+
+			threshold := strconv.FormatInt(int64(batchConfig.Threshold), 10)
+
+			MetricsKeyperBatchConfigInfo.WithLabelValues(batchConfigIndexStr, keyperAddresses, keyperCount, threshold).Set(1)
 
 			// Check if current node is a keyper in this batch config
 			isKeyper := false
