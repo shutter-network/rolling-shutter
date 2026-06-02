@@ -22,11 +22,12 @@ func makeCallError(attrName string, err error) error {
 const channelSize = 10
 
 type KeyperSetSyncer struct {
-	Client     client.Client
-	Contract   *bindings.KeyperSetManager
-	Log        log.Logger
-	StartBlock *number.BlockNumber
-	Handler    event.KeyperSetHandler
+	Client       client.Client
+	Contract     *bindings.KeyperSetManager
+	Log          log.Logger
+	StartBlock   *number.BlockNumber
+	Handler      event.KeyperSetHandler
+	KnownIndices []int64
 
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 }
@@ -81,6 +82,20 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	return nil
 }
 
+func missingIndices(known []int64, total uint64) []uint64 {
+	knownSet := make(map[uint64]struct{}, len(known))
+	for _, k := range known {
+		knownSet[uint64(k)] = struct{}{} //nolint:gosec
+	}
+	var result []uint64
+	for i := uint64(0); i < total; i++ {
+		if _, ok := knownSet[i]; !ok {
+			result = append(result, i)
+		}
+	}
+	return result
+}
+
 func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
 	opts := &bind.CallOpts{
 		Context:     ctx,
@@ -89,34 +104,20 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	bn := s.StartBlock.ToUInt64Ptr()
-	if bn == nil {
-		// this should not be the case
-		return nil, errors.New("start block is 'latest'")
-	}
-
-	initialKeyperSets := []*event.KeyperSet{}
-	// this blocknumber specifies the argument to the contract
-	// getter
-	ks, err := s.GetKeyperSetForBlock(ctx, opts, s.StartBlock)
-	if err != nil {
-		return nil, err
-	}
-	initialKeyperSets = append(initialKeyperSets, ks)
 
 	numKS, err := s.Contract.GetNumKeyperSets(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := ks.Eon + 1; i < numKS; i++ {
-		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
+	var initialKeyperSets []*event.KeyperSet
+	for _, i := range missingIndices(s.KnownIndices, numKS) {
+		ks, err := s.GetKeyperSetByIndex(ctx, opts, i)
 		if err != nil {
 			return nil, err
 		}
 		initialKeyperSets = append(initialKeyperSets, ks)
 	}
-
 	return initialKeyperSets, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	triggerRegistryV1Bindings "github.com/shutter-network/contracts/v2/bindings/shuttereventtriggerregistryv1"
 	registryBindings "github.com/shutter-network/contracts/v2/bindings/shutterregistry"
 
+	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/eonkeypublisher"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/epochkghandler"
@@ -83,6 +84,10 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	if err != nil {
 		return errors.Wrap(err, "can't instantiate keyper core")
 	}
+	ksIndices, err := obskeyper.New(kpr.dbpool).GetKeyperSetIndices(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to load keyper set indices")
+	}
 	kpr.chainSyncClient, err = chainsync.NewClient(
 		ctx,
 		chainsync.WithClientURL(kpr.config.Chain.Node.EthereumURL),
@@ -92,6 +97,7 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 		chainsync.WithSyncNewKeyperSet(kpr.channelNewKeyperSet),
 		chainsync.WithPrivateKey(kpr.config.Chain.Node.PrivateKey.Key),
 		chainsync.WithLogger(gethLog.NewLogger(slog.Default().Handler())),
+		chainsync.WithKnownKeyperSetIndices(ksIndices),
 	)
 	if err != nil {
 		return err

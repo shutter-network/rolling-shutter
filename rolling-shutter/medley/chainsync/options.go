@@ -30,10 +30,11 @@ type options struct {
 	syncStart                   *number.BlockNumber
 	privKey                     *ecdsa.PrivateKey
 
-	handlerShutterState event.ShutterStateHandler
-	handlerKeyperSet    event.KeyperSetHandler
-	handlerEonPublicKey event.EonPublicKeyHandler
-	handlerBlock        event.BlockHandler
+	handlerShutterState   event.ShutterStateHandler
+	handlerKeyperSet      event.KeyperSetHandler
+	handlerEonPublicKey   event.EonPublicKeyHandler
+	handlerBlock          event.BlockHandler
+	knownKeyperSetIndices []int64
 }
 
 func (o *options) verify() error {
@@ -85,11 +86,12 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		return err
 	}
 	c.kssync = &syncer.KeyperSetSyncer{
-		Client:     client,
-		Contract:   c.KeyperSetManager,
-		Log:        c.log,
-		StartBlock: o.syncStart,
-		Handler:    o.handlerKeyperSet,
+		Client:       client,
+		Contract:     c.KeyperSetManager,
+		Log:          c.log,
+		StartBlock:   o.syncStart,
+		Handler:      o.handlerKeyperSet,
+		KnownIndices: o.knownKeyperSetIndices,
 	}
 	if o.handlerKeyperSet != nil {
 		c.services = append(c.services, c.kssync)
@@ -210,6 +212,13 @@ func WithPrivateKey(key *ecdsa.PrivateKey) Option {
 func WithSyncNewKeyperSet(handler event.KeyperSetHandler) Option {
 	return func(o *options) error {
 		o.handlerKeyperSet = handler
+		return nil
+	}
+}
+
+func WithKnownKeyperSetIndices(indices []int64) Option {
+	return func(o *options) error {
+		o.knownKeyperSetIndices = indices
 		return nil
 	}
 }
