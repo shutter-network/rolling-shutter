@@ -31,7 +31,7 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	// to emit one apology addressed back to keyper 0.
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      0,
 		AccusedIndex:      1,
@@ -42,14 +42,14 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies — chain syncer owns it")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionApologizing,
 	})
@@ -79,7 +79,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	// Accusation against another keyper (0 → 2), not us.
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      0,
 		AccusedIndex:      2,
@@ -90,7 +90,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
@@ -101,7 +101,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	assert.Equal(t, 1, len(pending)) // only the submitDealing entry
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionApologizing,
 	})
@@ -136,7 +136,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	// Keyper 0's accusation is the row the read tx will see.
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      0,
 		AccusedIndex:      1,
@@ -159,7 +159,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	// will see this row in the DB but maybeApologize works off the stale
 	// puredkg snapshot returned above — it must not error.
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      2,
 		AccusedIndex:      1,
@@ -173,7 +173,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	assert.NilError(t, err, "maybeApologize must tolerate a late accusation arriving between read tx and write tx")
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
@@ -186,7 +186,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionApologizing,
 	})
@@ -211,7 +211,7 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      0,
 		AccusedIndex:      1,
@@ -224,7 +224,7 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionApologizing,
 	})
@@ -235,7 +235,7 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
@@ -257,7 +257,7 @@ func TestMaybeApologizeNoopWithoutInitialState(t *testing.T) {
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err := coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		AccuserIndex:      0,
 		AccusedIndex:      1,
@@ -268,7 +268,7 @@ func TestMaybeApologizeNoopWithoutInitialState(t *testing.T) {
 	assert.NilError(t, err)
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)

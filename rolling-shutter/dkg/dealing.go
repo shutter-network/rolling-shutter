@@ -20,7 +20,7 @@ import (
 
 // maybeDeal is the per-block reactor for the Dealing phase. Idempotency is
 // keyed on the presence of a `dkg_sent_actions` row for
-// `(keyperConfigIndex, retryCounter, "dealing")`; if one exists the call is a
+// `(keyperSetIndex, retryCounter, "dealing")`; if one exists the call is a
 // no-op. Otherwise we sample a polynomial via `puredkg.StartPhase1Dealing`,
 // persist the resulting puredkg state (so accusations/apologies can be
 // produced on later blocks even after a process restart), enqueue a
@@ -40,14 +40,14 @@ func (m *Manager) maybeDeal(
 	ctx context.Context,
 	tx pgx.Tx,
 	dkgAddr common.Address,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 	pure *puredkg.PureDKG,
 	keypers []common.Address,
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionDealing,
 	})
@@ -72,7 +72,7 @@ func (m *Manager) maybeDeal(
 		return errors.Wrap(err, "encode initial puredkg state")
 	}
 	if err := queries.InsertDKGInitialState(ctx, corekeyperdb.InsertDKGInitialStateParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		PuredkgBytes:      pureBytes,
 	}); err != nil {
@@ -104,7 +104,7 @@ func (m *Manager) maybeDeal(
 			// and accuse us through the normal Accusation flow.
 			if errors.Is(err, pgx.ErrNoRows) {
 				log.Warn().
-					Int64("keyper-config-index", keyperConfigIndex).
+					Int64("keyper-set-index", keyperSetIndex).
 					Int64("retry-counter", retryCounter).
 					Uint64("receiver-index", recvIdx).
 					Str("receiver-address", recvAddr.Hex()).
@@ -124,7 +124,7 @@ func (m *Manager) maybeDeal(
 	}
 	data, err := abi.Pack(
 		"submitDealing",
-		uint64(keyperConfigIndex),
+		uint64(keyperSetIndex),
 		uint64(retryCounter),
 		ownIndex,
 		commitmentBytes,
@@ -133,13 +133,13 @@ func (m *Manager) maybeDeal(
 	if err != nil {
 		return errors.Wrap(err, "pack submitDealing calldata")
 	}
-	label := fmt.Sprintf("submitDealing ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+	label := fmt.Sprintf("submitDealing ksi=%d retry=%d", keyperSetIndex, retryCounter)
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitDealing tx")
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionDealing,
 		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
@@ -147,7 +147,7 @@ func (m *Manager) maybeDeal(
 		return errors.Wrap(err, "store dealing sent action marker")
 	}
 	log.Info().
-		Int64("keyper-config-index", keyperConfigIndex).
+		Int64("keyper-set-index", keyperSetIndex).
 		Int64("retry-counter", retryCounter).
 		Uint64("keyper-index", ownIndex).
 		Int("keyper-count", len(keypers)).

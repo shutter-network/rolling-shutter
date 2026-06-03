@@ -36,7 +36,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		Bool("is-member", isMember).
 		Msg("new keyper set added")
 
-	keyperConfigIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
+	keyperSetIndex, err := medley.Uint64ToInt64Safe(ev.Eon)
 	if err != nil {
 		return errors.Wrap(err, ErrParseKeyperSet.Error())
 	}
@@ -55,7 +55,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		}
 
 		if err := obskeyperdb.InsertKeyperSet(ctx, obskeyper.InsertKeyperSetParams{
-			KeyperConfigIndex:     keyperConfigIndex,
+			KeyperConfigIndex:     keyperSetIndex,
 			ActivationBlockNumber: activationBlockNumber,
 			Keypers:               shdb.EncodeAddresses(ev.Members),
 			Threshold:             int32(threshold),
@@ -68,16 +68,16 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			// somewhere to anchor when the activation block approaches.
 			// Existing rows are tolerated because the chainsync initial poll
 			// can re-deliver KeyperSetAdded events that were already processed.
-			if _, err := coredb.GetEon(ctx, keyperConfigIndex); err == nil {
+			if _, err := coredb.GetEon(ctx, keyperSetIndex); err == nil {
 				return nil
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return errors.Wrap(err, "check existing eon row")
 			}
 			dkgContract, phaseLength, leadLength := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
 			if err := coredb.InsertEon(ctx, corekeyperdb.InsertEonParams{
-				Eon:                   keyperConfigIndex,
+				Eon:                   keyperSetIndex,
 				ActivationBlockNumber: activationBlockNumber,
-				KeyperConfigIndex:     keyperConfigIndex,
+				KeyperConfigIndex:     keyperSetIndex,
 				DkgContract:           dkgContract,
 				PhaseLength:           phaseLength,
 				LeadLength:            leadLength,
@@ -94,7 +94,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 	// HandleBlock — once per discovered keyper set, after the keyper set
 	// row is committed (MaybeRegisterECIESKey reads it). It is idempotent
 	// and a no-op for non-members.
-	return kpr.dkgMgr.MaybeRegisterECIESKey(ctx, keyperConfigIndex)
+	return kpr.dkgMgr.MaybeRegisterECIESKey(ctx, keyperSetIndex)
 }
 
 // fetchDKGParamsForKeyperSet asks the keyper set contract for its DKG contract

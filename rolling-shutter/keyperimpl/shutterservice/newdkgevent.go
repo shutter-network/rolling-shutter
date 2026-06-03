@@ -16,12 +16,12 @@ import (
 
 // processNewDKGEvent stores a DKG Contract event in the appropriate per-type
 // table and writes a `dkg_result` row when the event is a success notification.
-// Events for a `keyper_config_index` whose DKG already succeeded locally are
+// Events for a `keyper_set_index` whose DKG already succeeded locally are
 // silently ignored so re-emitted or retried-and-superseded messages do not
 // pollute the message tables.
 func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent) error {
 	keyperSetIndex, retryCounter := dkgEventKeys(ev)
-	keyperConfigIndex, err := medley.Uint64ToInt64Safe(keyperSetIndex)
+	keyperSetIndexInt, err := medley.Uint64ToInt64Safe(keyperSetIndex)
 	if err != nil {
 		return errors.Wrap(err, "convert keyper set index")
 	}
@@ -34,7 +34,7 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 		queries := corekeyperdb.New(tx)
 		obsQueries := obskeyper.New(tx)
 
-		exists, err := queries.ExistsDKGResultSuccess(ctx, keyperConfigIndex)
+		exists, err := queries.ExistsDKGResultSuccess(ctx, keyperSetIndexInt)
 		if err != nil {
 			return errors.Wrap(err, "check existing dkg_result success")
 		}
@@ -48,11 +48,11 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 
 		switch e := ev.(type) {
 		case *syncevent.DealingEvent:
-			return storeDealing(ctx, queries, obsQueries, e, keyperConfigIndex, retryCounterInt)
+			return storeDealing(ctx, queries, obsQueries, e, keyperSetIndexInt, retryCounterInt)
 		case *syncevent.AccusationEvent:
-			return storeAccusation(ctx, queries, e, keyperConfigIndex, retryCounterInt)
+			return storeAccusation(ctx, queries, e, keyperSetIndexInt, retryCounterInt)
 		case *syncevent.ApologyEvent:
-			return storeApology(ctx, queries, e, keyperConfigIndex, retryCounterInt)
+			return storeApology(ctx, queries, e, keyperSetIndexInt, retryCounterInt)
 		case *syncevent.SuccessVoteEvent:
 			log.Debug().
 				Uint64("keyper-set-index", e.KeyperSetIndex).
@@ -61,7 +61,7 @@ func (kpr *Keyper) processNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 				Msg("observed DKG success vote")
 			return nil
 		case *syncevent.SuccessEvent:
-			return kpr.dkgMgr.HandleDKGSuccess(ctx, tx, keyperConfigIndex, retryCounterInt)
+			return kpr.dkgMgr.HandleDKGSuccess(ctx, tx, keyperSetIndexInt, retryCounterInt)
 		default:
 			return errors.Errorf("unknown DKG event type %T", ev)
 		}
@@ -91,7 +91,7 @@ func storeDealing(
 	queries *corekeyperdb.Queries,
 	obsQueries *obskeyper.Queries,
 	ev *syncevent.DealingEvent,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
 	senderIndex, err := medley.Uint64ToInt64Safe(ev.KeyperIndex)
 	if err != nil {
@@ -99,7 +99,7 @@ func storeDealing(
 	}
 
 	if err := queries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		KeyperIndex:       senderIndex,
 		Commitment:        ev.Commitment,
@@ -109,16 +109,16 @@ func storeDealing(
 
 	evals := ev.PolyEvals
 
-	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperSetIndex)
 	if err != nil {
-		return errors.Wrapf(err, "load keyper set %d for polyEval split", keyperConfigIndex)
+		return errors.Wrapf(err, "load keyper set %d for polyEval split", keyperSetIndex)
 	}
 	n := uint64(len(keyperSet.Keypers))
 	receivers := dkg.ReceiverIndicesForSender(n, ev.KeyperIndex)
 	if uint64(len(evals)) != uint64(len(receivers)) {
 		return errors.Errorf(
 			"polyEval count %d does not match expected receiver count %d for keyper set %d",
-			len(evals), len(receivers), keyperConfigIndex,
+			len(evals), len(receivers), keyperSetIndex,
 		)
 	}
 
@@ -128,7 +128,7 @@ func storeDealing(
 			return errors.Wrap(err, "convert receiver index")
 		}
 		if err := queries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 			SenderIndex:       senderIndex,
 			ReceiverIndex:     receiverIndex,
@@ -144,7 +144,7 @@ func storeAccusation(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	ev *syncevent.AccusationEvent,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
 	accuserIndex, err := medley.Uint64ToInt64Safe(ev.KeyperIndex)
 	if err != nil {
@@ -156,7 +156,7 @@ func storeAccusation(
 			return errors.Wrap(err, "convert accused index")
 		}
 		if err := queries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 			AccuserIndex:      accuserIndex,
 			AccusedIndex:      accusedIndex,
@@ -171,7 +171,7 @@ func storeApology(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	ev *syncevent.ApologyEvent,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
 	if len(ev.AccuserIndices) != len(ev.PolyEvalData) {
 		return errors.Errorf(
@@ -189,7 +189,7 @@ func storeApology(
 			return errors.Wrap(err, "convert accuser index")
 		}
 		if err := queries.InsertDKGApology(ctx, corekeyperdb.InsertDKGApologyParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 			ApologizerIndex:   apologizerIndex,
 			AccuserIndex:      accuserIndex,

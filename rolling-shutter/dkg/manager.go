@@ -97,7 +97,7 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	for _, eon := range eons {
 		if err := m.handleEon(ctx, eon, blockNumber); err != nil {
 			log.Error().Err(err).
-				Int64("keyper-config-index", eon.KeyperConfigIndex).
+				Int64("keyper-set-index", eon.KeyperConfigIndex).
 				Uint64("block-number", blockNumber).
 				Msg("DKG manager: per-eon handler failed")
 		}
@@ -246,9 +246,9 @@ func (m *Manager) dkgContractAddrForEon(eon corekeyperdb.Eon) (common.Address, e
 // If this keyper participated in `retryCounter` it rebuilds the puredkg state
 // and stores the computed result in `pure_result`; otherwise `pure_result` is
 // nil. Both outcomes produce a `dkg_result` row with `success=true`.
-func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigIndex, retryCounter int64) error {
+func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperSetIndex, retryCounter int64) error {
 	queries := corekeyperdb.New(tx)
-	exists, err := queries.ExistsDKGResultSuccess(ctx, keyperConfigIndex)
+	exists, err := queries.ExistsDKGResultSuccess(ctx, keyperSetIndex)
 	if err != nil {
 		return errors.Wrap(err, "check existing dkg_result")
 	}
@@ -257,9 +257,9 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 	}
 
 	obsQueries := obskeyper.New(tx)
-	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperSetIndex)
 	if err != nil {
-		return errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
+		return errors.Wrapf(err, "fetch keyper set %d", keyperSetIndex)
 	}
 
 	var pureBytes []byte
@@ -277,7 +277,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 		if err != nil {
 			return errors.Wrap(err, "convert threshold")
 		}
-		pure, err := m.buildPureDKG(ctx, tx, keyperConfigIndex, retryCounter, PhaseFinalizing, keypers, ownIndex, threshold)
+		pure, err := m.buildPureDKG(ctx, tx, keyperSetIndex, retryCounter, PhaseFinalizing, keypers, ownIndex, threshold)
 		if err != nil {
 			return errors.Wrap(err, "rebuild puredkg for success")
 		}
@@ -286,7 +286,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 			result, err := pure.ComputeResult()
 			if err != nil {
 				log.Warn().Err(err).
-					Int64("keyper-config-index", keyperConfigIndex).
+					Int64("keyper-set-index", keyperSetIndex).
 					Int64("retry-counter", retryCounter).
 					Msg("cannot compute DKG result on success event; storing nil")
 			} else {
@@ -304,7 +304,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 	}
 
 	event := log.Info().
-		Int64("keyper-config-index", keyperConfigIndex).
+		Int64("keyper-set-index", keyperSetIndex).
 		Int64("retry-counter", retryCounter)
 	if hasResult {
 		event = event.
@@ -315,7 +315,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperConfigI
 	}
 	event.Msg("DKG succeeded")
 	return queries.InsertDKGResult(ctx, corekeyperdb.InsertDKGResultParams{
-		Eon:        keyperConfigIndex,
+		Eon:        keyperSetIndex,
 		Success:    true,
 		Error:      sql.NullString{},
 		PureResult: pureBytes,

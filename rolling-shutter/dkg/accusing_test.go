@@ -203,7 +203,7 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      retry,
 		KeyperIndex:       int64(dealerIdx),
 		Commitment:        commit.Gammas.Marshal(),
@@ -217,7 +217,7 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 		ciphertext, err := ecies.Encrypt(rand.Reader, &env.ownECIES.PublicKey, ev.Eval.Bytes(), nil, nil)
 		assert.NilError(t, err)
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
-			KeyperConfigIndex: testKsi,
+			KeyperSetIndex: testKsi,
 			RetryCounter:      retry,
 			SenderIndex:       int64(dealerIdx),
 			ReceiverIndex:     1,
@@ -239,7 +239,7 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		KeyperIndex:       int64(dealerIdx),
 		Commitment:        commit.Gammas.Marshal(),
@@ -253,7 +253,7 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 		ciphertext, err := ecies.Encrypt(rand.Reader, &env.ownECIES.PublicKey, ev.Eval.Bytes(), nil, nil)
 		assert.NilError(t, err)
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
-			KeyperConfigIndex: testKsi,
+			KeyperSetIndex: testKsi,
 			RetryCounter:      testRetry,
 			SenderIndex:       int64(dealerIdx),
 			ReceiverIndex:     1,
@@ -286,14 +286,14 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(accusations), "maybeAccuse must not write to dkg_accusations — chain syncer owns it")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionAccusing,
 	})
@@ -328,7 +328,7 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 
 	coreQueries := corekeyperdb.New(env.dbpool)
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)
@@ -340,7 +340,7 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	assert.Equal(t, 1, len(pending))
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionAccusing,
 	})
@@ -374,7 +374,7 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	firstPending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionAccusing,
 	})
@@ -385,7 +385,7 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.NilError(t, err)

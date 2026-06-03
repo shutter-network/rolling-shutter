@@ -45,7 +45,7 @@ func TestMaybeFinalizeWritesSentActionNotDKGResult(t *testing.T) {
 	assert.Equal(t, 2, len(firstPending))
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionFinalizing,
 	})
@@ -92,7 +92,7 @@ func TestMaybeFinalizeWritesSentActionOnComputeResultFailure(t *testing.T) {
 	assert.Equal(t, 1, len(pending), "no submitSuccessVote when ComputeResult fails")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 		Action:            ActionFinalizing,
 	})
@@ -152,7 +152,7 @@ func TestHandleDKGSuccessRetry1AfterRetry0Failed(t *testing.T) {
 	assert.NilError(t, err)
 
 	sentAction1, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      retry1,
 		Action:            ActionFinalizing,
 	})

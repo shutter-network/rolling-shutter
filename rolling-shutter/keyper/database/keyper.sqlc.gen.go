@@ -46,18 +46,18 @@ func (q *Queries) ExistsDKGResultSuccess(ctx context.Context, eon int64) (bool, 
 const existsDKGSentAction = `-- name: ExistsDKGSentAction :one
 SELECT EXISTS (
     SELECT 1 FROM dkg_sent_actions
-    WHERE keyper_config_index = $1 AND retry_counter = $2 AND action = $3
+    WHERE keyper_set_index = $1 AND retry_counter = $2 AND action = $3
 )
 `
 
 type ExistsDKGSentActionParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	Action            string
+	KeyperSetIndex int64
+	RetryCounter   int64
+	Action         string
 }
 
 func (q *Queries) ExistsDKGSentAction(ctx context.Context, arg ExistsDKGSentActionParams) (bool, error) {
-	row := q.db.QueryRow(ctx, existsDKGSentAction, arg.KeyperConfigIndex, arg.RetryCounter, arg.Action)
+	row := q.db.QueryRow(ctx, existsDKGSentAction, arg.KeyperSetIndex, arg.RetryCounter, arg.Action)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -179,18 +179,18 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 }
 
 const getDKGAccusations = `-- name: GetDKGAccusations :many
-SELECT keyper_config_index, retry_counter, accuser_index, accused_index FROM dkg_accusations
-WHERE keyper_config_index = $1 AND retry_counter = $2
+SELECT keyper_set_index, retry_counter, accuser_index, accused_index FROM dkg_accusations
+WHERE keyper_set_index = $1 AND retry_counter = $2
 ORDER BY accuser_index, accused_index
 `
 
 type GetDKGAccusationsParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
 }
 
 func (q *Queries) GetDKGAccusations(ctx context.Context, arg GetDKGAccusationsParams) ([]DkgAccusation, error) {
-	rows, err := q.db.Query(ctx, getDKGAccusations, arg.KeyperConfigIndex, arg.RetryCounter)
+	rows, err := q.db.Query(ctx, getDKGAccusations, arg.KeyperSetIndex, arg.RetryCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (q *Queries) GetDKGAccusations(ctx context.Context, arg GetDKGAccusationsPa
 	for rows.Next() {
 		var i DkgAccusation
 		if err := rows.Scan(
-			&i.KeyperConfigIndex,
+			&i.KeyperSetIndex,
 			&i.RetryCounter,
 			&i.AccuserIndex,
 			&i.AccusedIndex,
@@ -215,18 +215,18 @@ func (q *Queries) GetDKGAccusations(ctx context.Context, arg GetDKGAccusationsPa
 }
 
 const getDKGApologies = `-- name: GetDKGApologies :many
-SELECT keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval FROM dkg_apologies
-WHERE keyper_config_index = $1 AND retry_counter = $2
+SELECT keyper_set_index, retry_counter, apologizer_index, accuser_index, poly_eval FROM dkg_apologies
+WHERE keyper_set_index = $1 AND retry_counter = $2
 ORDER BY apologizer_index, accuser_index
 `
 
 type GetDKGApologiesParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
 }
 
 func (q *Queries) GetDKGApologies(ctx context.Context, arg GetDKGApologiesParams) ([]DkgApology, error) {
-	rows, err := q.db.Query(ctx, getDKGApologies, arg.KeyperConfigIndex, arg.RetryCounter)
+	rows, err := q.db.Query(ctx, getDKGApologies, arg.KeyperSetIndex, arg.RetryCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (q *Queries) GetDKGApologies(ctx context.Context, arg GetDKGApologiesParams
 	for rows.Next() {
 		var i DkgApology
 		if err := rows.Scan(
-			&i.KeyperConfigIndex,
+			&i.KeyperSetIndex,
 			&i.RetryCounter,
 			&i.ApologizerIndex,
 			&i.AccuserIndex,
@@ -252,35 +252,35 @@ func (q *Queries) GetDKGApologies(ctx context.Context, arg GetDKGApologiesParams
 }
 
 const getDKGInitialState = `-- name: GetDKGInitialState :one
-SELECT keyper_config_index, retry_counter, puredkg_bytes FROM dkg_initial_states
-WHERE keyper_config_index = $1 AND retry_counter = $2
+SELECT keyper_set_index, retry_counter, puredkg_bytes FROM dkg_initial_states
+WHERE keyper_set_index = $1 AND retry_counter = $2
 `
 
 type GetDKGInitialStateParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
 }
 
 func (q *Queries) GetDKGInitialState(ctx context.Context, arg GetDKGInitialStateParams) (DkgInitialState, error) {
-	row := q.db.QueryRow(ctx, getDKGInitialState, arg.KeyperConfigIndex, arg.RetryCounter)
+	row := q.db.QueryRow(ctx, getDKGInitialState, arg.KeyperSetIndex, arg.RetryCounter)
 	var i DkgInitialState
-	err := row.Scan(&i.KeyperConfigIndex, &i.RetryCounter, &i.PuredkgBytes)
+	err := row.Scan(&i.KeyperSetIndex, &i.RetryCounter, &i.PuredkgBytes)
 	return i, err
 }
 
 const getDKGPolyCommitments = `-- name: GetDKGPolyCommitments :many
-SELECT keyper_config_index, retry_counter, keyper_index, commitment FROM dkg_poly_commitments
-WHERE keyper_config_index = $1 AND retry_counter = $2
+SELECT keyper_set_index, retry_counter, keyper_index, commitment FROM dkg_poly_commitments
+WHERE keyper_set_index = $1 AND retry_counter = $2
 ORDER BY keyper_index
 `
 
 type GetDKGPolyCommitmentsParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
 }
 
 func (q *Queries) GetDKGPolyCommitments(ctx context.Context, arg GetDKGPolyCommitmentsParams) ([]DkgPolyCommitment, error) {
-	rows, err := q.db.Query(ctx, getDKGPolyCommitments, arg.KeyperConfigIndex, arg.RetryCounter)
+	rows, err := q.db.Query(ctx, getDKGPolyCommitments, arg.KeyperSetIndex, arg.RetryCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (q *Queries) GetDKGPolyCommitments(ctx context.Context, arg GetDKGPolyCommi
 	for rows.Next() {
 		var i DkgPolyCommitment
 		if err := rows.Scan(
-			&i.KeyperConfigIndex,
+			&i.KeyperSetIndex,
 			&i.RetryCounter,
 			&i.KeyperIndex,
 			&i.Commitment,
@@ -305,18 +305,18 @@ func (q *Queries) GetDKGPolyCommitments(ctx context.Context, arg GetDKGPolyCommi
 }
 
 const getDKGPolyEvals = `-- name: GetDKGPolyEvals :many
-SELECT keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval FROM dkg_poly_evals
-WHERE keyper_config_index = $1 AND retry_counter = $2
+SELECT keyper_set_index, retry_counter, sender_index, receiver_index, encrypted_eval FROM dkg_poly_evals
+WHERE keyper_set_index = $1 AND retry_counter = $2
 ORDER BY sender_index, receiver_index
 `
 
 type GetDKGPolyEvalsParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
 }
 
 func (q *Queries) GetDKGPolyEvals(ctx context.Context, arg GetDKGPolyEvalsParams) ([]DkgPolyEval, error) {
-	rows, err := q.db.Query(ctx, getDKGPolyEvals, arg.KeyperConfigIndex, arg.RetryCounter)
+	rows, err := q.db.Query(ctx, getDKGPolyEvals, arg.KeyperSetIndex, arg.RetryCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (q *Queries) GetDKGPolyEvals(ctx context.Context, arg GetDKGPolyEvalsParams
 	for rows.Next() {
 		var i DkgPolyEval
 		if err := rows.Scan(
-			&i.KeyperConfigIndex,
+			&i.KeyperSetIndex,
 			&i.RetryCounter,
 			&i.SenderIndex,
 			&i.ReceiverIndex,
@@ -619,21 +619,21 @@ func (q *Queries) GetTxOutboxByID(ctx context.Context, id int64) (TxOutbox, erro
 }
 
 const insertDKGAccusation = `-- name: InsertDKGAccusation :exec
-INSERT INTO dkg_accusations (keyper_config_index, retry_counter, accuser_index, accused_index)
+INSERT INTO dkg_accusations (keyper_set_index, retry_counter, accuser_index, accused_index)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDKGAccusationParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	AccuserIndex      int64
-	AccusedIndex      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
+	AccuserIndex   int64
+	AccusedIndex   int64
 }
 
 func (q *Queries) InsertDKGAccusation(ctx context.Context, arg InsertDKGAccusationParams) error {
 	_, err := q.db.Exec(ctx, insertDKGAccusation,
-		arg.KeyperConfigIndex,
+		arg.KeyperSetIndex,
 		arg.RetryCounter,
 		arg.AccuserIndex,
 		arg.AccusedIndex,
@@ -642,22 +642,22 @@ func (q *Queries) InsertDKGAccusation(ctx context.Context, arg InsertDKGAccusati
 }
 
 const insertDKGApology = `-- name: InsertDKGApology :exec
-INSERT INTO dkg_apologies (keyper_config_index, retry_counter, apologizer_index, accuser_index, poly_eval)
+INSERT INTO dkg_apologies (keyper_set_index, retry_counter, apologizer_index, accuser_index, poly_eval)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDKGApologyParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	ApologizerIndex   int64
-	AccuserIndex      int64
-	PolyEval          []byte
+	KeyperSetIndex  int64
+	RetryCounter    int64
+	ApologizerIndex int64
+	AccuserIndex    int64
+	PolyEval        []byte
 }
 
 func (q *Queries) InsertDKGApology(ctx context.Context, arg InsertDKGApologyParams) error {
 	_, err := q.db.Exec(ctx, insertDKGApology,
-		arg.KeyperConfigIndex,
+		arg.KeyperSetIndex,
 		arg.RetryCounter,
 		arg.ApologizerIndex,
 		arg.AccuserIndex,
@@ -667,38 +667,38 @@ func (q *Queries) InsertDKGApology(ctx context.Context, arg InsertDKGApologyPara
 }
 
 const insertDKGInitialState = `-- name: InsertDKGInitialState :exec
-INSERT INTO dkg_initial_states (keyper_config_index, retry_counter, puredkg_bytes)
+INSERT INTO dkg_initial_states (keyper_set_index, retry_counter, puredkg_bytes)
 VALUES ($1, $2, $3)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDKGInitialStateParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	PuredkgBytes      []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	PuredkgBytes   []byte
 }
 
 func (q *Queries) InsertDKGInitialState(ctx context.Context, arg InsertDKGInitialStateParams) error {
-	_, err := q.db.Exec(ctx, insertDKGInitialState, arg.KeyperConfigIndex, arg.RetryCounter, arg.PuredkgBytes)
+	_, err := q.db.Exec(ctx, insertDKGInitialState, arg.KeyperSetIndex, arg.RetryCounter, arg.PuredkgBytes)
 	return err
 }
 
 const insertDKGPolyCommitment = `-- name: InsertDKGPolyCommitment :exec
-INSERT INTO dkg_poly_commitments (keyper_config_index, retry_counter, keyper_index, commitment)
+INSERT INTO dkg_poly_commitments (keyper_set_index, retry_counter, keyper_index, commitment)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDKGPolyCommitmentParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	KeyperIndex       int64
-	Commitment        []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	KeyperIndex    int64
+	Commitment     []byte
 }
 
 func (q *Queries) InsertDKGPolyCommitment(ctx context.Context, arg InsertDKGPolyCommitmentParams) error {
 	_, err := q.db.Exec(ctx, insertDKGPolyCommitment,
-		arg.KeyperConfigIndex,
+		arg.KeyperSetIndex,
 		arg.RetryCounter,
 		arg.KeyperIndex,
 		arg.Commitment,
@@ -707,22 +707,22 @@ func (q *Queries) InsertDKGPolyCommitment(ctx context.Context, arg InsertDKGPoly
 }
 
 const insertDKGPolyEval = `-- name: InsertDKGPolyEval :exec
-INSERT INTO dkg_poly_evals (keyper_config_index, retry_counter, sender_index, receiver_index, encrypted_eval)
+INSERT INTO dkg_poly_evals (keyper_set_index, retry_counter, sender_index, receiver_index, encrypted_eval)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
 `
 
 type InsertDKGPolyEvalParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	SenderIndex       int64
-	ReceiverIndex     int64
-	EncryptedEval     []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	SenderIndex    int64
+	ReceiverIndex  int64
+	EncryptedEval  []byte
 }
 
 func (q *Queries) InsertDKGPolyEval(ctx context.Context, arg InsertDKGPolyEvalParams) error {
 	_, err := q.db.Exec(ctx, insertDKGPolyEval,
-		arg.KeyperConfigIndex,
+		arg.KeyperSetIndex,
 		arg.RetryCounter,
 		arg.SenderIndex,
 		arg.ReceiverIndex,
@@ -754,20 +754,20 @@ func (q *Queries) InsertDKGResult(ctx context.Context, arg InsertDKGResultParams
 }
 
 const insertDKGSentAction = `-- name: InsertDKGSentAction :exec
-INSERT INTO dkg_sent_actions (keyper_config_index, retry_counter, action, tx_outbox_id)
+INSERT INTO dkg_sent_actions (keyper_set_index, retry_counter, action, tx_outbox_id)
 VALUES ($1, $2, $3, $4)
 `
 
 type InsertDKGSentActionParams struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	Action            string
-	TxOutboxID        sql.NullInt64
+	KeyperSetIndex int64
+	RetryCounter   int64
+	Action         string
+	TxOutboxID     sql.NullInt64
 }
 
 func (q *Queries) InsertDKGSentAction(ctx context.Context, arg InsertDKGSentActionParams) error {
 	_, err := q.db.Exec(ctx, insertDKGSentAction,
-		arg.KeyperConfigIndex,
+		arg.KeyperSetIndex,
 		arg.RetryCounter,
 		arg.Action,
 		arg.TxOutboxID,
