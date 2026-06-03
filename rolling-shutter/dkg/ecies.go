@@ -31,14 +31,14 @@ import (
 // (a single registry serves all keyper sets). This is intended to be called
 // by the host keyper's Keyper Set Syncer handler once per discovered keyper
 // set, at the same architectural level as `HandleBlock`.
-func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperConfigIndex int64) error {
+func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperSetIndex int64) error {
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obsQueries := obskeyper.New(tx)
 		coreQueries := corekeyperdb.New(tx)
 
-		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
+		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperSetIndex)
 		if err != nil {
-			return errors.Wrapf(err, "fetch keyper set %d", keyperConfigIndex)
+			return errors.Wrapf(err, "fetch keyper set %d", keyperSetIndex)
 		}
 		ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
 		if err != nil {
@@ -52,7 +52,7 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperConfigIndex i
 		}
 		if exists {
 			log.Debug().
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Uint64("keyper-index", ownIndex).
 				Msg("ECIES key already registered for keyper set, skipping")
 			return nil
@@ -70,20 +70,20 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperConfigIndex i
 		}
 		data, err := abi.Pack(
 			"registerKey",
-			uint64(keyperConfigIndex),
+			uint64(keyperSetIndex),
 			ownIndex,
 			pubKey,
 		)
 		if err != nil {
 			return errors.Wrap(err, "pack registerKey calldata")
 		}
-		label := fmt.Sprintf("registerKey ksi=%d", keyperConfigIndex)
+		label := fmt.Sprintf("registerKey ksi=%d", keyperSetIndex)
 		outboxID, err := txsender.EnqueueTx(ctx, tx, m.cfg.ECIESRegistryAddr, data, nil, label)
 		if err != nil {
 			return errors.Wrap(err, "enqueue registerKey tx")
 		}
 		log.Info().
-			Int64("keyper-config-index", keyperConfigIndex).
+			Int64("keyper-set-index", keyperSetIndex).
 			Uint64("keyper-index", ownIndex).
 			Int64("tx-outbox-id", outboxID).
 			Msg("enqueued ECIES key registration")

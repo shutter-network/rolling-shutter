@@ -73,7 +73,7 @@ func ReceiverIndicesForSender(n, senderIndex uint64) []uint64 {
 func (m *Manager) buildPureDKG(
 	ctx context.Context,
 	tx pgx.Tx,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 	blockPhase Phase,
 	keypers []common.Address,
 	ownIndex uint64,
@@ -85,7 +85,7 @@ func (m *Manager) buildPureDKG(
 	switch blockPhase {
 	case PhaseDealing:
 		p := puredkg.NewPureDKG(
-			uint64(keyperConfigIndex),
+			uint64(keyperSetIndex),
 			uint64(len(keypers)),
 			threshold,
 			ownIndex,
@@ -93,7 +93,7 @@ func (m *Manager) buildPureDKG(
 		pure = &p
 	case PhaseAccusing, PhaseApologizing, PhaseFinalizing:
 		row, err := queries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 		})
 		if err != nil {
@@ -122,7 +122,7 @@ func (m *Manager) buildPureDKG(
 		return nil, nil
 	}
 
-	if err := m.replayCommitmentsAndEvals(ctx, queries, pure, ownIndex, keyperConfigIndex, retryCounter); err != nil {
+	if err := m.replayCommitmentsAndEvals(ctx, queries, pure, ownIndex, keyperSetIndex, retryCounter); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (m *Manager) buildPureDKG(
 	// rows. The output is discarded — the on-chain accusations are the
 	// authoritative copy.
 	_ = pure.StartPhase2Accusing()
-	if err := m.replayAccusations(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
+	if err := m.replayAccusations(ctx, queries, pure, keyperSetIndex, retryCounter); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func (m *Manager) buildPureDKG(
 	// StartPhase3Apologizing reads pure.Polynomial — which is alive because
 	// it was loaded from dkg_initial_states.
 	_ = pure.StartPhase3Apologizing()
-	if err := m.replayApologies(ctx, queries, pure, keyperConfigIndex, retryCounter); err != nil {
+	if err := m.replayApologies(ctx, queries, pure, keyperSetIndex, retryCounter); err != nil {
 		return nil, err
 	}
 	return pure, nil
@@ -165,12 +165,12 @@ func (m *Manager) replayCommitmentsAndEvals(
 	queries *corekeyperdb.Queries,
 	pure *puredkg.PureDKG,
 	ownIndex uint64,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperConfigIndex)
+	eonForMsg := uint64(keyperSetIndex)
 
 	commitments, err := queries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 	})
 	if err != nil {
@@ -188,7 +188,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		})
 		if err != nil {
 			log.Debug().Err(err).
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Int64("retry-counter", retryCounter).
 				Int64("sender", c.KeyperIndex).
 				Msg("ignoring stored commitment on replay")
@@ -196,7 +196,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 	}
 
 	polyEvals, err := queries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 	})
 	if err != nil {
@@ -209,7 +209,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		eval, err := m.decryptPolyEval(ev.EncryptedEval)
 		if err != nil {
 			log.Debug().Err(err).
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Int64("retry-counter", retryCounter).
 				Int64("sender", ev.SenderIndex).
 				Msg("ignoring undecryptable poly eval on replay")
@@ -223,7 +223,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		})
 		if err != nil {
 			log.Debug().Err(err).
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Int64("retry-counter", retryCounter).
 				Int64("sender", ev.SenderIndex).
 				Msg("ignoring poly eval on replay")
@@ -236,11 +236,11 @@ func (m *Manager) replayAccusations(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	pure *puredkg.PureDKG,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperConfigIndex)
+	eonForMsg := uint64(keyperSetIndex)
 	accusations, err := queries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 	})
 	if err != nil {
@@ -254,7 +254,7 @@ func (m *Manager) replayAccusations(
 		})
 		if err != nil {
 			log.Debug().Err(err).
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Int64("retry-counter", retryCounter).
 				Int64("accuser", a.AccuserIndex).
 				Int64("accused", a.AccusedIndex).
@@ -268,11 +268,11 @@ func (m *Manager) replayApologies(
 	ctx context.Context,
 	queries *corekeyperdb.Queries,
 	pure *puredkg.PureDKG,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperConfigIndex)
+	eonForMsg := uint64(keyperSetIndex)
 	apologies, err := queries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 	})
 	if err != nil {
@@ -288,7 +288,7 @@ func (m *Manager) replayApologies(
 		})
 		if err != nil {
 			log.Debug().Err(err).
-				Int64("keyper-config-index", keyperConfigIndex).
+				Int64("keyper-set-index", keyperSetIndex).
 				Int64("retry-counter", retryCounter).
 				Int64("apologizer", ap.ApologizerIndex).
 				Int64("accuser", ap.AccuserIndex).

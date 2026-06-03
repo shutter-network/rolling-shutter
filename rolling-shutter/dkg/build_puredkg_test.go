@@ -110,7 +110,7 @@ func TestBuildPureDKGDealingDoesNotRequireInitialState(t *testing.T) {
 	// Sanity: no initial state row exists yet.
 	coreQueries := corekeyperdb.New(env.dbpool)
 	_, err := coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
-		KeyperConfigIndex: testKsi,
+		KeyperSetIndex: testKsi,
 		RetryCounter:      testRetry,
 	})
 	assert.Assert(t, err != nil)

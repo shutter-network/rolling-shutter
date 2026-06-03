@@ -37,14 +37,14 @@ func (m *Manager) maybeAccuse(
 	ctx context.Context,
 	tx pgx.Tx,
 	dkgAddr common.Address,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 	pure *puredkg.PureDKG,
 	keypers []common.Address,
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionAccusing,
 	})
@@ -58,7 +58,7 @@ func (m *Manager) maybeAccuse(
 	accusations := pure.StartPhase2Accusing()
 	if len(accusations) == 0 {
 		log.Info().
-			Int64("keyper-config-index", keyperConfigIndex).
+			Int64("keyper-set-index", keyperSetIndex).
 			Int64("retry-counter", retryCounter).
 			Msg("Not sending accusations, no misbehavior detected")
 		// Mark the phase as resolved with a NULL tx_outbox_id row so the
@@ -66,7 +66,7 @@ func (m *Manager) maybeAccuse(
 		// accusations is fixed before the Apologizing phase begins, so
 		// re-evaluating on every block is redundant work.
 		if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 			Action:            ActionAccusing,
 			TxOutboxID:        sql.NullInt64{},
@@ -89,7 +89,7 @@ func (m *Manager) maybeAccuse(
 	}
 	data, err := abi.Pack(
 		"submitAccusation",
-		uint64(keyperConfigIndex),
+		uint64(keyperSetIndex),
 		uint64(retryCounter),
 		ownIndex,
 		accusedIndices,
@@ -97,13 +97,13 @@ func (m *Manager) maybeAccuse(
 	if err != nil {
 		return errors.Wrap(err, "pack submitAccusation calldata")
 	}
-	label := fmt.Sprintf("submitAccusation ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+	label := fmt.Sprintf("submitAccusation ksi=%d retry=%d", keyperSetIndex, retryCounter)
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitAccusation tx")
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionAccusing,
 		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
@@ -111,7 +111,7 @@ func (m *Manager) maybeAccuse(
 		return errors.Wrap(err, "store accusing sent action marker")
 	}
 	log.Info().
-		Int64("keyper-config-index", keyperConfigIndex).
+		Int64("keyper-set-index", keyperSetIndex).
 		Int64("retry-counter", retryCounter).
 		Int("count", len(accusedIndices)).
 		Strs("accused", accusedDescriptions).

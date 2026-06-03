@@ -29,39 +29,39 @@ type DecryptionTrigger struct {
 }
 
 type DkgAccusation struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	AccuserIndex      int64
-	AccusedIndex      int64
+	KeyperSetIndex int64
+	RetryCounter   int64
+	AccuserIndex   int64
+	AccusedIndex   int64
 }
 
 type DkgApology struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	ApologizerIndex   int64
-	AccuserIndex      int64
-	PolyEval          []byte
+	KeyperSetIndex  int64
+	RetryCounter    int64
+	ApologizerIndex int64
+	AccuserIndex    int64
+	PolyEval        []byte
 }
 
 type DkgInitialState struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	PuredkgBytes      []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	PuredkgBytes   []byte
 }
 
 type DkgPolyCommitment struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	KeyperIndex       int64
-	Commitment        []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	KeyperIndex    int64
+	Commitment     []byte
 }
 
 type DkgPolyEval struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	SenderIndex       int64
-	ReceiverIndex     int64
-	EncryptedEval     []byte
+	KeyperSetIndex int64
+	RetryCounter   int64
+	SenderIndex    int64
+	ReceiverIndex  int64
+	EncryptedEval  []byte
 }
 
 type DkgResult struct {
@@ -72,10 +72,10 @@ type DkgResult struct {
 }
 
 type DkgSentAction struct {
-	KeyperConfigIndex int64
-	RetryCounter      int64
-	Action            string
-	TxOutboxID        sql.NullInt64
+	KeyperSetIndex int64
+	RetryCounter   int64
+	Action         string
+	TxOutboxID     sql.NullInt64
 }
 
 type EciesKey struct {

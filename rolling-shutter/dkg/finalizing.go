@@ -20,7 +20,7 @@ import (
 // maybeFinalize is the per-block reactor for the Finalizing phase. It
 // enqueues a `submitSuccessVote` tx with the locally-computed eon public key.
 //
-// Idempotency uses `ExistsDKGSentAction` keyed on (keyperConfigIndex,
+// Idempotency uses `ExistsDKGSentAction` keyed on (keyperSetIndex,
 // retryCounter, ActionFinalizing). Using the retry-scoped sent-actions row
 // rather than `ExistsDKGResultSuccess` means a keyper that voted for retry 0
 // is not blocked from voting again when retry 1 starts: a different
@@ -36,13 +36,13 @@ func (m *Manager) maybeFinalize(
 	ctx context.Context,
 	tx pgx.Tx,
 	dkgAddr common.Address,
-	keyperConfigIndex, retryCounter int64,
+	keyperSetIndex, retryCounter int64,
 	pure *puredkg.PureDKG,
 	ownIndex uint64,
 ) error {
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionFinalizing,
 	})
@@ -60,7 +60,7 @@ func (m *Manager) maybeFinalize(
 	result, err := pure.ComputeResult()
 	if err != nil {
 		log.Warn().Err(err).
-			Int64("keyper-config-index", keyperConfigIndex).
+			Int64("keyper-set-index", keyperSetIndex).
 			Int64("retry-counter", retryCounter).
 			Msg("cannot compute DKG result; skipping success vote")
 		// Mark the phase as resolved with a NULL tx_outbox_id row so the
@@ -68,7 +68,7 @@ func (m *Manager) maybeFinalize(
 		// puredkg state is stable once all on-chain messages have been
 		// indexed; re-running ComputeResult on every block is redundant.
 		if insertErr := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
-			KeyperConfigIndex: keyperConfigIndex,
+			KeyperSetIndex: keyperSetIndex,
 			RetryCounter:      retryCounter,
 			Action:            ActionFinalizing,
 			TxOutboxID:        sql.NullInt64{},
@@ -89,7 +89,7 @@ func (m *Manager) maybeFinalize(
 	}
 	data, err := abi.Pack(
 		"submitSuccessVote",
-		uint64(keyperConfigIndex),
+		uint64(keyperSetIndex),
 		uint64(retryCounter),
 		ownIndex,
 		eonPubKeyBytes,
@@ -97,13 +97,13 @@ func (m *Manager) maybeFinalize(
 	if err != nil {
 		return errors.Wrap(err, "pack submitSuccessVote calldata")
 	}
-	label := fmt.Sprintf("submitSuccessVote ksi=%d retry=%d", keyperConfigIndex, retryCounter)
+	label := fmt.Sprintf("submitSuccessVote ksi=%d retry=%d", keyperSetIndex, retryCounter)
 	outboxID, err := txsender.EnqueueTx(ctx, tx, dkgAddr, data, nil, label)
 	if err != nil {
 		return errors.Wrap(err, "enqueue submitSuccessVote tx")
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
-		KeyperConfigIndex: keyperConfigIndex,
+		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:      retryCounter,
 		Action:            ActionFinalizing,
 		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
@@ -111,7 +111,7 @@ func (m *Manager) maybeFinalize(
 		return errors.Wrap(err, "store finalizing sent action marker")
 	}
 	log.Info().
-		Int64("keyper-config-index", keyperConfigIndex).
+		Int64("keyper-set-index", keyperSetIndex).
 		Int64("retry-counter", retryCounter).
 		Int64("tx-outbox-id", outboxID).
 		Msg("enqueued DKG success vote")
