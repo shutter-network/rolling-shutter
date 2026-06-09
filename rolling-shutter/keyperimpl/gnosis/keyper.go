@@ -192,7 +192,7 @@ func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.K
 	return core, err
 }
 
-// initSequencerSycer initializes the sequencer syncer if the keyper is known to be a member of a
+// initSequencerSyncer initializes the sequencer syncer if the keyper is known to be a member of a
 // keyper set. Otherwise, the syncer will only be initialized once such a keyper set is observed to
 // be added, as only then we will know which eon(s) we are responsible for.
 func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
