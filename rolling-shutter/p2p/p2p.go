@@ -43,7 +43,7 @@ func init() {
 
 const (
 	// messagesBufSize is the number of incoming messages to buffer for all of the rooms.
-	messagesBufSize = 128
+	messagesBufSize = 512
 	protocolVersion = "/shutter/0.1.0"
 )
 
