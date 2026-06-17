@@ -9,3 +9,5 @@
 /godoc.idx
 /go.work
 /go.work.sum
+/build.ninja
+/.ninja_*
