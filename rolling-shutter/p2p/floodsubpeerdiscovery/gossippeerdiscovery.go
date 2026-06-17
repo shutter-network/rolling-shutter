@@ -125,7 +125,7 @@ func (pd *FloodsubPeerDiscovery) broadcast() error {
 	}
 
 	for _, topic := range pd.Topics {
-		log.Info().Msgf("broadcasting our peer data on topic %s", topic)
+		log.Debug().Msgf("broadcasting our peer data on topic %s", topic)
 
 		if err := topic.Publish(context.Background(), pbPeer); err != nil {
 			return fmt.Errorf("failed to publish to topic | err %w", err)
@@ -173,7 +173,7 @@ func (pd *FloodsubPeerDiscovery) ReadLoop(ctx context.Context, subs *pubsub.Subs
 			multiAddresses = append(multiAddresses, mulAddr.String())
 		}
 
-		log.Info().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]",
+		log.Debug().Msgf("found a floodsub discovery message | peer id: %s | multi addresses: [%s]",
 			pID.String(), strings.Join(multiAddresses, ", "))
 	}
 }
