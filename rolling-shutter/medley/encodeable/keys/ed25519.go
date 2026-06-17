@@ -8,6 +8,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/hex"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/tee"
 )
 
 type nullReader struct{}
@@ -69,7 +70,7 @@ func (k *Ed25519Private) Equal(b *Ed25519Private) bool {
 }
 
 func (k *Ed25519Private) UnmarshalText(b []byte) error {
-	seed, err := hex.DecodeHex(b)
+	seed, err := tee.UnsealSecretFromHex(string(b))
 	if err != nil {
 		return err
 	}
@@ -85,7 +86,8 @@ func (k *Ed25519Private) UnmarshalText(b []byte) error {
 }
 
 func (k *Ed25519Private) MarshalText() ([]byte, error) {
-	return hex.EncodeHex(k.Key.Seed()), nil
+	str, err := tee.SealSecretAsHex(k.Key.Seed())
+	return []byte(str), err
 }
 
 func (k *Ed25519Private) String() string {
