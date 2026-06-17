@@ -104,6 +104,7 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 		return err
 	}
 	if kpr.opts.dbpool == nil {
+		log.Info().Str("name", database.Definition.Name()).Msg("FOO: initOptions Connect")
 		// connect, but don't validate any database version.
 		// If that is desired, it should be done in the keyper-implementation
 		kpr.dbpool, err = db.Connect(ctx, runner, kpr.config.DatabaseURL, database.Definition.Name())
@@ -128,15 +129,18 @@ func (kpr *KeyperCore) initOptions(ctx context.Context, runner service.Runner) e
 
 func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 	config := kpr.config
+	log.Info().Str("name", database.Definition.Name()).Msg("FOO: Core Start called")
 	err := kpr.initOptions(ctx, runner)
 	if err != nil {
 		return err
 	}
 
+	log.Info().Str("name", database.Definition.Name()).Msg("FOO: calling beginFunc")
 	err = kpr.dbpool.BeginFunc(db.WrapContext(ctx, database.Definition.Validate))
 	if err != nil {
 		return err
 	}
+	log.Info().Str("name", database.Definition.Name()).Msg("FOO: calling LinkConfigToDB")
 	err = LinkConfigToDB(ctx, config, kpr.dbpool)
 	if err != nil {
 		return err
@@ -165,6 +169,7 @@ func (kpr *KeyperCore) Start(ctx context.Context, runner service.Runner) error {
 		epochkghandler.NewEonPublicKeyHandler(kpr.config, kpr.dbpool),
 	)
 	kpr.messaging.AddMessageHandler(kpr.opts.messageHandler...)
+	log.Info().Str("name", database.Definition.Name()).Msg("FOO: calling StartService")
 	return runner.StartService(kpr.getServices()...)
 }
 

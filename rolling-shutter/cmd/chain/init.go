@@ -156,7 +156,7 @@ func initFiles(_ *cobra.Command, config *Config, _ []string) error {
 	case ISOLATEDVALIDATOR: // validator mode behind a sentry node
 		tendermintCfg.P2P.PexReactor = false
 		tendermintCfg.P2P.AddrBookStrict = false
-	case SENTRY:
+	case SENTRY: // even though "sentry" nodes are documented, there is no special mode
 		tendermintCfg.P2P.PexReactor = true
 		tendermintCfg.P2P.AddrBookStrict = false
 	case SEED:

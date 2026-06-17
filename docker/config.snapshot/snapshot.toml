@@ -1,0 +1,40 @@
+
+# Peer identity: /p2p/12D3KooWGFa3hxTrzU27tgCNE94NP2Wb5my6iS2ty19M3yW24Jeq
+# Ethereum address: 0x2E135FE171fB6351026B75aF688a7F9689B66B87
+
+
+InstanceID = 0
+DatabaseURL     = "postgres://postgres@db:5432/snapshot"
+SnapshotHubURL       = "http://dummyserver:5000"
+JSONRPCHost = ''
+JSONRPCPort = 8754
+
+[P2P]
+P2PKey = 'CAESQIL98WGKWUdyzp8mznCV8jJv5Lqsbz2jDNqaY7BXrjCJX5sSskzcPC6U25ZRn98qyvXrunN9DT8AkS1T5PcD/Z4='
+ListenAddresses	= ["/ip4/0.0.0.0/tcp/23000"]
+# Overwrite p2p boostrap nodes
+CustomBootstrapAddresses  = [
+    "/dns4/bootnode-0/tcp/23000/p2p/12D3KooWJN7262vmnEQHkYG7VrZDwz9fMyJtHyvGp4XSenuUYfeJ",
+    "/dns4/bootnode-1/tcp/23000/p2p/12D3KooWSayB2PEYpXtdk2dEqFaagoy8kDzmWpoD9DieuuzYdcBo"
+]
+DiscoveryNamespace = 'shutter-local'
+
+[P2P.FloodSubDiscovery]
+Enabled = false
+Interval = 10
+Topics = []
+
+[Ethereum]
+# Ethereum Private keyh (we reuse the collator EthereumKey, so snapshot can be authorized against collator contract)
+PrivateKey     = "215ddd19b91c54252bb956c7f88e42122a61bd45a562d5bae38bc2328a9b52d0"
+# The JSON RPC endpoint where the contracts are accessible
+ContractsURL = 'http://127.0.0.1:8555/'
+# Contract source directory
+DeploymentDir = '/deployments/localhost/'
+# The layer 1 JSON RPC endpoint
+EthereumURL     = "http://geth:8545/"
+
+[Metrics]
+Enabled  = true
+Host     = "[::]"
+Port     = 9100

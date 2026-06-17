@@ -1,0 +1,8 @@
+InstanceID = 42
+# The op-geth JSON RPC endpoint
+JSONRPCURL = 'http://geth:8545'
+KeyperSetManager = "0x0000000000000000000000000000000000000000"
+ByIndex = 1
+KeyperSetFilePath = '/config/keyperset.json'
+ShuttermintURL = 'http://chain:26657'
+SigningKey = "0000000000000000000000000000000000000000000000000000000000000000"
