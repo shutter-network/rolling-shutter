@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -84,6 +82,13 @@ type EventSyncUpdate struct {
 	LogIndex    uint64
 }
 
+// dispatchKey identifies an EventType by its contract address and the first
+// topic of the matching log.
+type dispatchKey struct {
+	address common.Address
+	topic   common.Hash
+}
+
 // EventSyncer watches the blockchain for events of given types and yields them in order.
 type EventSyncer struct {
 	Client         *ethclient.Client
@@ -93,6 +98,10 @@ type EventSyncer struct {
 	FromBlock    uint64
 	FromLogIndex uint64
 
+	addresses []common.Address
+	topics    []common.Hash
+	dispatch  map[dispatchKey]*EventType
+
 	started    bool
 	logChannel chan logChannelItem
 }
@@ -101,6 +110,24 @@ type EventSyncer struct {
 // log index. The types of events to filter for are specified as a set of EventTypes. The finality
 // offset is the number of blocks we trail behind the current block to be safe from reorgs.
 func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, fromBlock uint64, fromLogIndex uint64) *EventSyncer {
+	addressSet := map[common.Address]struct{}{}
+	topicSet := map[common.Hash]struct{}{}
+	dispatch := map[dispatchKey]*EventType{}
+	for _, ev := range events {
+		topic := ev.ABI.Events[ev.Name].ID
+		addressSet[ev.Address] = struct{}{}
+		topicSet[topic] = struct{}{}
+		dispatch[dispatchKey{address: ev.Address, topic: topic}] = ev
+	}
+	addresses := make([]common.Address, 0, len(addressSet))
+	for a := range addressSet {
+		addresses = append(addresses, a)
+	}
+	topics := make([]common.Hash, 0, len(topicSet))
+	for t := range topicSet {
+		topics = append(topics, t)
+	}
+
 	return &EventSyncer{
 		Client:         client,
 		FinalityOffset: finalityOffset,
@@ -108,6 +135,10 @@ func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, f
 		Events:       events,
 		FromBlock:    fromBlock,
 		FromLogIndex: fromLogIndex,
+
+		addresses: addresses,
+		topics:    topics,
+		dispatch:  dispatch,
 
 		started:    false,
 		logChannel: make(chan logChannelItem, outputChannelCapacity),
@@ -208,73 +239,56 @@ func (s *EventSyncer) sync(ctx context.Context) error {
 	}
 }
 
-// syncAllInRange returns all events found in the given block range.
+// syncAllInRange returns all events found in the given block range. It issues
+// a single FilterLogs query covering every registered address and topic, then
+// dispatches each returned log to its matching EventType.
 func (s *EventSyncer) syncAllInRange(ctx context.Context, fromBlock uint64, toBlock uint64) ([]logChannelItem, error) {
-	logs := []logChannelItem{}
-	mu := sync.Mutex{}
-
-	errorgroup, errorctx := errgroup.WithContext(ctx)
-	for _, event := range s.Events {
-		ev := event
-		errorgroup.Go(func() error {
-			logsSingle, err := s.syncSingleInRange(errorctx, ev, fromBlock, toBlock)
-			if err != nil {
-				return err
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			logs = append(logs, logsSingle...)
-			return nil
-		})
+	if len(s.Events) == 0 {
+		return nil, nil
 	}
-	if err := errorgroup.Wait(); err != nil {
-		return nil, err
-	}
-
-	sort.Slice(logs, func(i, j int) bool {
-		bi := logs[i].log.BlockNumber
-		bj := logs[j].log.BlockNumber
-		if bi < bj {
-			return true
-		}
-		if bi == bj {
-			li := logs[i].log.Index
-			lj := logs[j].log.Index
-			return li < lj
-		}
-		return false
-	})
-
-	return logs, nil
-}
-
-// syncSingleInRange returns the events matching the given type in the given block range.
-func (s *EventSyncer) syncSingleInRange(ctx context.Context, event *EventType, fromBlock uint64, toBlock uint64) ([]logChannelItem, error) {
-	topic := event.ABI.Events[event.Name].ID
 	query := ethereum.FilterQuery{
-		BlockHash: nil,
 		FromBlock: new(big.Int).SetUint64(fromBlock),
 		ToBlock:   new(big.Int).SetUint64(toBlock),
-		Addresses: []common.Address{event.Address},
-		Topics:    [][]common.Hash{{topic}},
+		Addresses: s.addresses,
+		Topics:    [][]common.Hash{s.topics},
 	}
 
 	logs, err := retry.FunctionCall(ctx, func(ctx context.Context) ([]types.Log, error) {
 		return s.Client.FilterLogs(ctx, query)
 	})
 	if err != nil {
-		return nil, errors.New("failed to filter event logs")
+		return nil, errors.Wrap(err, "failed to filter event logs")
 	}
 
-	items := []logChannelItem{}
+	items := make([]logChannelItem, 0, len(logs))
 	for i := range logs {
+		l := &logs[i]
+		if len(l.Topics) == 0 {
+			continue
+		}
+		ev, ok := s.dispatch[dispatchKey{address: l.Address, topic: l.Topics[0]}]
+		if !ok {
+			// The (address, topic) combination has no registered handler. This
+			// can happen when an address listed for one event type also emits a
+			// topic that belongs to another address; we simply skip it.
+			continue
+		}
 		items = append(items, logChannelItem{
-			log:         &logs[i],
-			blockNumber: logs[i].BlockNumber,
-			eventType:   event,
+			log:         l,
+			blockNumber: l.BlockNumber,
+			eventType:   ev,
 		})
 	}
+
+	sort.Slice(items, func(i, j int) bool {
+		bi := items[i].log.BlockNumber
+		bj := items[j].log.BlockNumber
+		if bi != bj {
+			return bi < bj
+		}
+		return items[i].log.Index < items[j].log.Index
+	})
+
 	return items, nil
 }
 
