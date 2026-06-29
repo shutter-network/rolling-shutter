@@ -5,6 +5,8 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
@@ -102,37 +104,67 @@ func (s *MultiEventSyncer) Sync(ctx context.Context, header *types.Header) error
 	return nil
 }
 
+// processorScope holds the per-processor address/topic filter so we can route
+// the unified FilterLogs response back to each processor without re-checking
+// criteria.
+type processorScope struct {
+	processor EventProcessor
+	addresses map[common.Address]struct{}
+	topics0   map[common.Hash]struct{}
+	anyTopic  bool
+}
+
 func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) (int, error) {
 	header, err := s.ExecutionClient.HeaderByNumber(ctx, new(big.Int).SetUint64(end))
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get execution block header")
 	}
 
+	scopes, addressUnion, topicUnion, anyTopic, err := s.gatherFilterCriteria(ctx, start, end)
+	if err != nil {
+		return 0, err
+	}
+
+	var logs []types.Log
+	if len(addressUnion) > 0 {
+		query := ethereum.FilterQuery{
+			FromBlock: new(big.Int).SetUint64(start),
+			ToBlock:   new(big.Int).SetUint64(end),
+			Addresses: addressUnion,
+		}
+		if !anyTopic && len(topicUnion) > 0 {
+			query.Topics = [][]common.Hash{topicUnion}
+		}
+		logs, err = s.ExecutionClient.FilterLogs(ctx, query)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to fetch logs for combined event query")
+		}
+	}
+
 	allEvents := make(map[string][]Event)
 	numEvents := 0
-	for name, processor := range s.Processors {
-		events, err := processor.FetchEvents(ctx, start, end)
+	for _, scope := range scopes {
+		scoped := filterLogsForScope(logs, scope)
+		events, err := scope.processor.ParseEvents(ctx, start, end, scoped)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to fetch events for processor %s in range [%d, %d]", name, start, end)
+			return 0, errors.Wrapf(err, "failed to parse events for processor %s in range [%d, %d]",
+				scope.processor.GetProcessorName(), start, end)
 		}
-		allEvents[name] = events
+		allEvents[scope.processor.GetProcessorName()] = events
 		numEvents += len(events)
 	}
 
 	err = s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		for name, processor := range s.Processors {
-			events := allEvents[name]
-			err := processor.ProcessEvents(ctx, tx, events)
-			if err != nil {
-				return errors.Wrapf(err, "failed to process events for processor %s", name)
+		for _, scope := range scopes {
+			events := allEvents[scope.processor.GetProcessorName()]
+			if err := scope.processor.ProcessEvents(ctx, tx, events); err != nil {
+				return errors.Wrapf(err, "failed to process events for processor %s",
+					scope.processor.GetProcessorName())
 			}
 		}
-
-		err := s.setSyncStatus(ctx, tx, int64(end), header.Hash().Bytes())
-		if err != nil {
+		if err := s.setSyncStatus(ctx, tx, int64(end), header.Hash().Bytes()); err != nil {
 			return errors.Wrap(err, "failed to update global sync status")
 		}
-
 		return nil
 	})
 	if err != nil {
@@ -140,6 +172,82 @@ func (s *MultiEventSyncer) syncRange(ctx context.Context, start, end uint64) (in
 	}
 
 	return numEvents, nil
+}
+
+// gatherFilterCriteria asks each processor for its filter criteria and
+// returns:
+//   - per-processor scopes used to route logs back after the combined fetch,
+//   - the deduplicated union of addresses for the FilterQuery,
+//   - the deduplicated union of topic[0] hashes, and
+//   - anyTopic=true if any processor declined to constrain topic[0] (in which
+//     case the combined query must not filter on topics).
+func (s *MultiEventSyncer) gatherFilterCriteria(
+	ctx context.Context, start, end uint64,
+) ([]processorScope, []common.Address, []common.Hash, bool, error) {
+	scopes := make([]processorScope, 0, len(s.Processors))
+	addressSet := map[common.Address]struct{}{}
+	topicSet := map[common.Hash]struct{}{}
+	anyTopic := false
+	for name, processor := range s.Processors {
+		crit, err := processor.FilterCriteria(ctx, start, end)
+		if err != nil {
+			return nil, nil, nil, false, errors.Wrapf(err,
+				"failed to gather filter criteria for processor %s", name)
+		}
+		scope := processorScope{
+			processor: processor,
+			addresses: map[common.Address]struct{}{},
+			topics0:   map[common.Hash]struct{}{},
+			anyTopic:  len(crit.Topics0) == 0,
+		}
+		for _, addr := range crit.Addresses {
+			scope.addresses[addr] = struct{}{}
+			addressSet[addr] = struct{}{}
+		}
+		for _, topic := range crit.Topics0 {
+			scope.topics0[topic] = struct{}{}
+			topicSet[topic] = struct{}{}
+		}
+		if scope.anyTopic && len(crit.Addresses) > 0 {
+			anyTopic = true
+		}
+		scopes = append(scopes, scope)
+	}
+
+	addresses := make([]common.Address, 0, len(addressSet))
+	for a := range addressSet {
+		addresses = append(addresses, a)
+	}
+	topics := make([]common.Hash, 0, len(topicSet))
+	for t := range topicSet {
+		topics = append(topics, t)
+	}
+	return scopes, addresses, topics, anyTopic, nil
+}
+
+// filterLogsForScope returns the subset of logs that fall within a processor's
+// (address, topic[0]) criteria.
+func filterLogsForScope(logs []types.Log, scope processorScope) []types.Log {
+	if len(scope.addresses) == 0 {
+		return nil
+	}
+	filtered := make([]types.Log, 0, len(logs))
+	for i := range logs {
+		l := &logs[i]
+		if _, ok := scope.addresses[l.Address]; !ok {
+			continue
+		}
+		if !scope.anyTopic {
+			if len(l.Topics) == 0 {
+				continue
+			}
+			if _, ok := scope.topics0[l.Topics[0]]; !ok {
+				continue
+			}
+		}
+		filtered = append(filtered, *l)
+	}
+	return filtered
 }
 
 func (s *MultiEventSyncer) getSyncStatus(ctx context.Context) (*SyncStatus, error) {

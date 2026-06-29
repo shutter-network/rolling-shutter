@@ -5,7 +5,8 @@ import (
 	"context"
 	"math"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -21,40 +22,53 @@ import (
 // in the ShutterRegistry contract.
 type EventTriggerRegisteredEventProcessor struct {
 	Contract *triggerRegistryV1Bindings.Shuttereventtriggerregistryv1
+	Address  common.Address
 	DBPool   *pgxpool.Pool
+
+	topic common.Hash
 }
 
 func NewEventTriggerRegisteredEventProcessor(
 	contract *triggerRegistryV1Bindings.Shuttereventtriggerregistryv1,
+	address common.Address,
 	dbPool *pgxpool.Pool,
-) *EventTriggerRegisteredEventProcessor {
+) (*EventTriggerRegisteredEventProcessor, error) {
+	parsedABI, err := triggerRegistryV1Bindings.Shuttereventtriggerregistryv1MetaData.GetAbi()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse trigger registry ABI")
+	}
+	ev, ok := parsedABI.Events["EventTriggerRegistered"]
+	if !ok {
+		return nil, errors.New("EventTriggerRegistered event not present in trigger registry ABI")
+	}
 	return &EventTriggerRegisteredEventProcessor{
 		Contract: contract,
+		Address:  address,
 		DBPool:   dbPool,
-	}
+		topic:    ev.ID,
+	}, nil
 }
 
 func (p *EventTriggerRegisteredEventProcessor) GetProcessorName() string {
 	return "event_trigger_registered"
 }
 
-func (p *EventTriggerRegisteredEventProcessor) FetchEvents(ctx context.Context, start, end uint64) ([]Event, error) {
-	opts := bind.FilterOpts{
-		Start:   start,
-		End:     &end,
-		Context: ctx,
-	}
-	it, err := p.Contract.FilterEventTriggerRegistered(&opts, []uint64{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query identity registered events")
-	}
+func (p *EventTriggerRegisteredEventProcessor) FilterCriteria(_ context.Context, _, _ uint64) (FilterCriteria, error) {
+	return FilterCriteria{
+		Addresses: []common.Address{p.Address},
+		Topics0:   []common.Hash{p.topic},
+	}, nil
+}
 
-	var events []Event
-	for it.Next() {
-		events = append(events, it.Event)
-	}
-	if it.Error() != nil {
-		return nil, errors.Wrap(it.Error(), "failed to iterate identity registered events")
+func (p *EventTriggerRegisteredEventProcessor) ParseEvents(_ context.Context, _, _ uint64, logs []types.Log) ([]Event, error) {
+	events := make([]Event, 0, len(logs))
+	for i := range logs {
+		l := logs[i]
+		ev, err := p.Contract.ParseEventTriggerRegistered(l)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse EventTriggerRegistered log")
+		}
+		events = append(events, ev)
 	}
 	return events, nil
 }
