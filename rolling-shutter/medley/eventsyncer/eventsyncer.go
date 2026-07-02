@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -196,47 +197,113 @@ func (s *EventSyncer) Start(ctx context.Context, runner service.Runner) error {
 	return nil
 }
 
-// sync continuously searches for events.
+// sync continuously searches for events. It prefers a new-head subscription
+// (one eth_subscribe at startup) over the periodic eth_blockNumber poll and
+// falls back to polling when the transport does not support subscriptions
+// (typically HTTP-only ethclients).
 func (s *EventSyncer) sync(ctx context.Context) error {
 	fromBlock := s.FromBlock
+
+	headCh := make(chan *types.Header, 1)
+	sub, err := s.Client.SubscribeNewHead(ctx, headCh)
+	if err != nil {
+		log.Debug().Err(err).Msg("SubscribeNewHead unavailable, falling back to polling")
+		return s.syncByPolling(ctx, fromBlock)
+	}
+	defer sub.Unsubscribe()
+
+	return s.syncBySubscription(ctx, fromBlock, headCh, sub)
+}
+
+// syncBySubscription drives the sync loop off a SubscribeNewHead
+// subscription instead of polling BlockNumber. On startup it also queries
+// HeaderByNumber(nil) once so the initial historical range can be drained
+// before the first live head arrives; from then on the subscription is the
+// only signal for new work.
+func (s *EventSyncer) syncBySubscription(
+	ctx context.Context,
+	fromBlock uint64,
+	headCh <-chan *types.Header,
+	sub ethereum.Subscription,
+) error {
+	// Kick off with the current tip so we cover the historical gap between
+	// FromBlock and the head, without waiting for a new block to arrive.
+	tip, err := retry.FunctionCall(ctx, func(ctx context.Context) (*types.Header, error) {
+		return s.Client.HeaderByNumber(ctx, nil)
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to query current head")
+	}
+	fromBlock, err = s.advanceUpTo(ctx, fromBlock, tip.Number.Uint64())
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case head, ok := <-headCh:
+			if !ok {
+				return errors.New("event syncer head channel closed")
+			}
+			fromBlock, err = s.advanceUpTo(ctx, fromBlock, head.Number.Uint64())
+			if err != nil {
+				return err
+			}
+		case err := <-sub.Err():
+			return errors.Wrap(err, "event syncer new-head subscription failed")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// syncByPolling is the pre-subscription loop, retained for transports that
+// cannot subscribe (HTTP ethclient).
+func (s *EventSyncer) syncByPolling(ctx context.Context, fromBlock uint64) error {
 	for {
 		currentBlock, err := retry.FunctionCall(ctx, s.Client.BlockNumber)
 		if err != nil {
 			return errors.Wrap(err, "failed to query current block number")
 		}
 
-		toBlock := fromBlock + pageSizeBlocks - 1
-		var maxToBlock uint64
-		if currentBlock >= s.FinalityOffset {
-			maxToBlock = currentBlock - s.FinalityOffset
-		} else {
-			maxToBlock = 0
+		fromBlock, err = s.advanceUpTo(ctx, fromBlock, currentBlock)
+		if err != nil {
+			return err
 		}
+
+		select {
+		case <-time.After(blockPollInterval):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// advanceUpTo advances the syncer up to (currentBlock - FinalityOffset),
+// consuming as many pageSizeBlocks-wide ranges as fit. Returns the new
+// fromBlock. When the current chain is not yet ahead of the finality offset,
+// nothing is fetched.
+func (s *EventSyncer) advanceUpTo(ctx context.Context, fromBlock, currentBlock uint64) (uint64, error) {
+	var maxToBlock uint64
+	if currentBlock >= s.FinalityOffset {
+		maxToBlock = currentBlock - s.FinalityOffset
+	}
+	for fromBlock <= maxToBlock {
+		toBlock := fromBlock + pageSizeBlocks - 1
 		if toBlock > maxToBlock {
 			toBlock = maxToBlock
 		}
-
-		// if there's no new blocks, wait some time and try again
-		if toBlock < fromBlock {
-			select {
-			case <-time.After(blockPollInterval):
-				continue
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-
 		logItems, err := s.syncAllInRange(ctx, fromBlock, toBlock)
 		if err != nil {
-			return err
+			return fromBlock, err
 		}
-		err = s.sendLogItemsToChannel(ctx, logItems, toBlock)
-		if err != nil {
-			return err
+		if err := s.sendLogItemsToChannel(ctx, logItems, toBlock); err != nil {
+			return fromBlock, err
 		}
-
 		fromBlock = toBlock + 1
 	}
+	return fromBlock, nil
 }
 
 // syncAllInRange returns all events found in the given block range. It issues
