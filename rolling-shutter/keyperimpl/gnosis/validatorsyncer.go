@@ -21,6 +21,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/beaconapiclient"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/validatorregistry"
 )
 
@@ -38,6 +39,91 @@ type ValidatorSyncer struct {
 	EnableAggregateValidatorRegistrationV1 bool
 }
 
+// Start implements service.Service. It performs a one-off historical catch-up
+// via Sync and then switches to a WatchUpdated subscription for live events,
+// avoiding the per-new-block eth_getLogs poll the old Sync-per-block pattern
+// issued.
+func (v *ValidatorSyncer) Start(ctx context.Context, runner service.Runner) error {
+	latestHeader, err := v.ExecutionClient.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block header for validator catchup")
+	}
+	if err := v.Sync(ctx, latestHeader); err != nil {
+		return errors.Wrap(err, "validator syncer catchup failed")
+	}
+
+	startBlock := latestHeader.Number.Uint64() + 1
+	sink := make(chan *validatorRegistryBindings.ValidatorregistryUpdated, 64)
+	sub, err := v.Contract.WatchUpdated(&bind.WatchOpts{
+		Context: ctx,
+		Start:   &startBlock,
+	}, sink)
+	if err != nil {
+		return errors.Wrap(err, "failed to subscribe to validator registry Updated events")
+	}
+
+	runner.Go(func() error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case ev := <-sink:
+				if err := v.handleWatchedEvent(ctx, ev); err != nil {
+					return errors.Wrap(err, "failed to handle watched validator event")
+				}
+			case err := <-sub.Err():
+				if err == nil {
+					return nil
+				}
+				return errors.Wrap(err, "validator Updated subscription ended")
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+	return nil
+}
+
+// handleWatchedEvent persists a single event delivered by the live Updated
+// subscription. Reorged (Removed) events are logged; validator registrations
+// have no schema-level delete-from-block yet, so a proper reorg pathway is
+// left for a follow-up alongside a matching sqlc query.
+func (v *ValidatorSyncer) handleWatchedEvent(ctx context.Context, ev *validatorRegistryBindings.ValidatorregistryUpdated) error {
+	if ev.Raw.Removed {
+		log.Warn().
+			Uint64("block-number", ev.Raw.BlockNumber).
+			Hex("block-hash", ev.Raw.BlockHash.Bytes()).
+			Msg("validator registry event marked Removed by subscription; not yet implemented")
+		return nil
+	}
+
+	filtered, err := v.filterEvents(ctx, []*validatorRegistryBindings.ValidatorregistryUpdated{ev})
+	if err != nil {
+		return err
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	header, err := v.ExecutionClient.HeaderByHash(ctx, ev.Raw.BlockHash)
+	if err != nil {
+		return errors.Wrap(err, "failed to get block header for watched validator event")
+	}
+	db := database.New(v.DBPool)
+	return v.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		if err := v.insertEvents(ctx, tx, filtered); err != nil {
+			return err
+		}
+		return db.SetValidatorRegistrationsSyncedUntil(ctx, database.SetValidatorRegistrationsSyncedUntilParams{
+			BlockNumber: int64(ev.Raw.BlockNumber),
+			BlockHash:   header.Hash().Bytes(),
+		})
+	})
+}
+
+// Sync catches up validator registration events for a range. Retained for the
+// initial startup catchup (invoked from Start) and for tests; the per-new-block
+// polling call site has been replaced by the WatchUpdated subscription.
+//
+// Deprecated: use Start for lifetime-managed subscription-based syncing.
 func (v *ValidatorSyncer) Sync(ctx context.Context, header *types.Header) error {
 	db := database.New(v.DBPool)
 	syncedUntil, err := db.GetValidatorRegistrationsSyncedUntil(ctx)

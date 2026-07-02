@@ -18,6 +18,7 @@ import (
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyperimpl/gnosis/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
@@ -113,9 +114,87 @@ func (s *SequencerSyncer) handlePotentialReorg(ctx context.Context, header *type
 	return nil
 }
 
+// Start implements service.Service. It performs a one-off historical catch-up
+// via Sync and then switches to a WatchTransactionSubmitted subscription for
+// live events, avoiding the per-new-block eth_getLogs poll the old
+// Sync-per-block pattern issued.
+func (s *SequencerSyncer) Start(ctx context.Context, runner service.Runner) error {
+	latestHeader, err := s.ExecutionClient.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get latest block header for sequencer catchup")
+	}
+	if err := s.Sync(ctx, latestHeader); err != nil {
+		return errors.Wrap(err, "sequencer syncer catchup failed")
+	}
+
+	startBlock := latestHeader.Number.Uint64() + 1
+	sink := make(chan *sequencerBindings.SequencerTransactionSubmitted, 64)
+	sub, err := s.Contract.WatchTransactionSubmitted(&bind.WatchOpts{
+		Context: ctx,
+		Start:   &startBlock,
+	}, sink)
+	if err != nil {
+		return errors.Wrap(err, "failed to subscribe to TransactionSubmitted events")
+	}
+
+	runner.Go(func() error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case ev := <-sink:
+				if err := s.handleWatchedEvent(ctx, ev); err != nil {
+					return errors.Wrap(err, "failed to handle watched sequencer event")
+				}
+			case err := <-sub.Err():
+				if err == nil {
+					return nil
+				}
+				return errors.Wrap(err, "sequencer TransactionSubmitted subscription ended")
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+	return nil
+}
+
+// handleWatchedEvent persists a single event delivered by the live
+// TransactionSubmitted subscription. For reorged (Removed) events it deletes
+// the previously inserted row.
+func (s *SequencerSyncer) handleWatchedEvent(ctx context.Context, ev *sequencerBindings.SequencerTransactionSubmitted) error {
+	if ev.Raw.Removed {
+		queries := database.New(s.DBPool)
+		return queries.DeleteTransactionSubmittedEventsFromBlockNumber(ctx, int64(ev.Raw.BlockNumber))
+	}
+
+	filtered := s.filterEvents([]*sequencerBindings.SequencerTransactionSubmitted{ev})
+	if len(filtered) == 0 {
+		return nil
+	}
+	header, err := s.ExecutionClient.HeaderByHash(ctx, ev.Raw.BlockHash)
+	if err != nil {
+		return errors.Wrap(err, "failed to get block header for watched sequencer event")
+	}
+	return s.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		if err := s.insertTransactionSubmittedEvents(ctx, tx, filtered); err != nil {
+			return err
+		}
+		slot := medley.BlockTimestampToSlot(header.Time, s.GenesisSlotTimestamp, s.SecondsPerSlot)
+		return database.New(tx).SetTransactionSubmittedEventsSyncedUntil(ctx, database.SetTransactionSubmittedEventsSyncedUntilParams{
+			BlockNumber: int64(ev.Raw.BlockNumber),
+			BlockHash:   ev.Raw.BlockHash.Bytes(),
+			Slot:        int64(slot),
+		})
+	})
+}
+
 // Sync fetches transaction submitted events from the sequencer contract and inserts them into the
 // database. It starts at the end point of the previous call to sync (or 0 if it is the first call)
 // and ends at the given block number.
+//
+// Deprecated: Sync is retained for historical catchup and tests; per-new-block
+// invocation from processNewBlock has been replaced by the subscription set up
+// by Start.
 func (s *SequencerSyncer) Sync(ctx context.Context, header *types.Header) error {
 	if err := s.handlePotentialReorg(ctx, header); err != nil {
 		return err
