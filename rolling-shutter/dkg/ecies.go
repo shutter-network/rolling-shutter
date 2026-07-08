@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/contracts/v2/bindings/ecieskeyregistry"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
@@ -64,7 +64,7 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperSetIndex int6
 		ecdsaPub := m.cfg.ECIESPrivateKey.ExportECDSA().PublicKey
 		pubKey := ethcrypto.FromECDSAPub(&ecdsaPub)
 
-		abi, err := contract.ECIESKeyRegistryMetaData.GetAbi()
+		abi, err := ecieskeyregistry.EcieskeyregistryMetaData.GetAbi()
 		if err != nil {
 			return errors.Wrap(err, "load ECIESKeyRegistry ABI")
 		}

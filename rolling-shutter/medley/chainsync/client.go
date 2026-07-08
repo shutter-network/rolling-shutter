@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/ecieskeyregistry"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
@@ -35,7 +35,7 @@ type Client struct {
 
 	KeyperSetManager *bindings.KeyperSetManager
 	KeyBroadcast     *bindings.KeyBroadcastContract
-	ECIESKeyRegistry *contract.ECIESKeyRegistry
+	ECIESKeyRegistry *ecieskeyregistry.Ecieskeyregistry
 
 	sssync    *syncer.ShutterStateSyncer
 	kssync    *syncer.KeyperSetSyncer

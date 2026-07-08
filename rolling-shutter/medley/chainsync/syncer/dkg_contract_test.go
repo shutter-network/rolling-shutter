@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/logger"
@@ -64,7 +64,7 @@ func TestDKGContractSyncerDeliversDealingEvent(t *testing.T) {
 
 	assert.NilError(t, s.Start(ctx, runner))
 
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 7, KeyperIndex: 3})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 7, KeyperIndex: 3})
 
 	ev := handler.expectNextEvent(t)
 	de, ok := ev.(*event.DealingEvent)
@@ -84,7 +84,7 @@ func TestDKGContractSyncerDeliversAccusationEvent(t *testing.T) {
 
 	assert.NilError(t, s.Start(ctx, runner))
 
-	backend.emitAccusation(t, &contract.DKGContractAccusationSubmitted{KeyperSetIndex: 1, KeyperIndex: 2})
+	backend.emitAccusation(t, &dkgcontract.DkgcontractAccusationSubmitted{KeyperSetIndex: 1, KeyperIndex: 2})
 
 	ev := handler.expectNextEvent(t)
 	ae, ok := ev.(*event.AccusationEvent)
@@ -104,7 +104,7 @@ func TestDKGContractSyncerDeliversApologyEvent(t *testing.T) {
 
 	assert.NilError(t, s.Start(ctx, runner))
 
-	backend.emitApology(t, &contract.DKGContractApologySubmitted{KeyperSetIndex: 4, KeyperIndex: 5})
+	backend.emitApology(t, &dkgcontract.DkgcontractApologySubmitted{KeyperSetIndex: 4, KeyperIndex: 5})
 
 	ev := handler.expectNextEvent(t)
 	ae, ok := ev.(*event.ApologyEvent)
@@ -124,7 +124,7 @@ func TestDKGContractSyncerDeliversSuccessVoteEvent(t *testing.T) {
 
 	assert.NilError(t, s.Start(ctx, runner))
 
-	backend.emitSuccessVote(t, &contract.DKGContractSuccessVoteSubmitted{KeyperSetIndex: 8, KeyperIndex: 9})
+	backend.emitSuccessVote(t, &dkgcontract.DkgcontractSuccessVoteSubmitted{KeyperSetIndex: 8, KeyperIndex: 9})
 
 	ev := handler.expectNextEvent(t)
 	sve, ok := ev.(*event.SuccessVoteEvent)
@@ -144,7 +144,7 @@ func TestDKGContractSyncerDeliversSuccessEvent(t *testing.T) {
 
 	assert.NilError(t, s.Start(ctx, runner))
 
-	backend.emitSuccess(t, &contract.DKGContractDKGSucceeded{KeyperSetIndex: 6, RetryCounter: 2})
+	backend.emitSuccess(t, &dkgcontract.DkgcontractDKGSucceeded{KeyperSetIndex: 6, RetryCounter: 2})
 
 	ev := handler.expectNextEvent(t)
 	se, ok := ev.(*event.SuccessEvent)
