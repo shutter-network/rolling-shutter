@@ -43,8 +43,8 @@ func (m *Manager) maybeApologize(
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionApologizing,
+		RetryCounter:   retryCounter,
+		Action:         ActionApologizing,
 	})
 	if err != nil {
 		return errors.Wrap(err, "check dkg sent action existence")
@@ -65,9 +65,9 @@ func (m *Manager) maybeApologize(
 		// phase begins, so re-evaluating on every block is redundant work.
 		if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			Action:            ActionApologizing,
-			TxOutboxID:        sql.NullInt64{},
+			RetryCounter:   retryCounter,
+			Action:         ActionApologizing,
+			TxOutboxID:     sql.NullInt64{},
 		}); err != nil {
 			return errors.Wrap(err, "store apologizing sent action marker (no apologies)")
 		}
@@ -106,9 +106,9 @@ func (m *Manager) maybeApologize(
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionApologizing,
-		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
+		RetryCounter:   retryCounter,
+		Action:         ActionApologizing,
+		TxOutboxID:     sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store apologizing sent action marker")
 	}

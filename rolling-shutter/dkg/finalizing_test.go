@@ -46,8 +46,8 @@ func TestMaybeFinalizeWritesSentActionNotDKGResult(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionFinalizing,
+		RetryCounter:   testRetry,
+		Action:         ActionFinalizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the finalizing action")
@@ -93,8 +93,8 @@ func TestMaybeFinalizeWritesSentActionOnComputeResultFailure(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionFinalizing,
+		RetryCounter:   testRetry,
+		Action:         ActionFinalizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when ComputeResult fails")
@@ -153,8 +153,8 @@ func TestHandleDKGSuccessRetry1AfterRetry0Failed(t *testing.T) {
 
 	sentAction1, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      retry1,
-		Action:            ActionFinalizing,
+		RetryCounter:   retry1,
+		Action:         ActionFinalizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction1, "dkg_sent_actions row should exist for retry 1 finalizing")

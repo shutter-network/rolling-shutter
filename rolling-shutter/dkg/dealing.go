@@ -48,8 +48,8 @@ func (m *Manager) maybeDeal(
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionDealing,
+		RetryCounter:   retryCounter,
+		Action:         ActionDealing,
 	})
 	if err != nil {
 		return errors.Wrap(err, "check dkg sent action existence")
@@ -73,8 +73,8 @@ func (m *Manager) maybeDeal(
 	}
 	if err := queries.InsertDKGInitialState(ctx, corekeyperdb.InsertDKGInitialStateParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		PuredkgBytes:      pureBytes,
+		RetryCounter:   retryCounter,
+		PuredkgBytes:   pureBytes,
 	}); err != nil {
 		return errors.Wrap(err, "store initial puredkg state")
 	}
@@ -140,9 +140,9 @@ func (m *Manager) maybeDeal(
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionDealing,
-		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
+		RetryCounter:   retryCounter,
+		Action:         ActionDealing,
+		TxOutboxID:     sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store dealing sent action marker")
 	}

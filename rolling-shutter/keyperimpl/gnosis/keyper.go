@@ -324,4 +324,3 @@ func (kpr *Keyper) channelNewDKGEvent(ctx context.Context, ev syncevent.DKGEvent
 		return ctx.Err()
 	}
 }
-

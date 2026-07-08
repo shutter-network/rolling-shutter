@@ -94,7 +94,7 @@ func (m *Manager) buildPureDKG(
 	case PhaseAccusing, PhaseApologizing, PhaseFinalizing:
 		row, err := queries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
+			RetryCounter:   retryCounter,
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -171,7 +171,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 
 	commitments, err := queries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	if err != nil {
 		return errors.Wrap(err, "load stored poly commitments")
@@ -197,7 +197,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 
 	polyEvals, err := queries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	if err != nil {
 		return errors.Wrap(err, "load stored poly evals")
@@ -241,7 +241,7 @@ func (m *Manager) replayAccusations(
 	eonForMsg := uint64(keyperSetIndex)
 	accusations, err := queries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	if err != nil {
 		return errors.Wrap(err, "load stored accusations")
@@ -273,7 +273,7 @@ func (m *Manager) replayApologies(
 	eonForMsg := uint64(keyperSetIndex)
 	apologies, err := queries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	if err != nil {
 		return errors.Wrap(err, "load stored apologies")
