@@ -67,7 +67,7 @@ func TestPhaseAtAcrossRetries(t *testing.T) {
 	assert.Equal(t, PhaseDealing, PhaseAt(activationBlock, dkgLeadLength, phaseLength, r, 1040))
 
 	assert.Equal(t,
-		DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)+2*int64(cycle),
+		DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)+2*int64(cycle), //nolint:gosec // G115: cycle length fits well within int64
 		DKGStart(activationBlock, dkgLeadLength, phaseLength, 2),
 	)
 }

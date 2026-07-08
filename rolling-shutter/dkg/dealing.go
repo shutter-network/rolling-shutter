@@ -36,6 +36,8 @@ import (
 // The caller owns the (write) transaction and is responsible for committing
 // or rolling back. `pure`, `keypers`, and `ownIndex` come from a prior read
 // transaction's `buildPureDKG` call at the `handleEon` level.
+//
+//nolint:gocyclo,funlen // linear flow: check idempotency, deal, encrypt per receiver, enqueue.
 func (m *Manager) maybeDeal(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -124,8 +126,8 @@ func (m *Manager) maybeDeal(
 	}
 	data, err := abi.Pack(
 		"submitDealing",
-		uint64(keyperSetIndex),
-		uint64(retryCounter),
+		uint64(keyperSetIndex), //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
+		uint64(retryCounter),   //nolint:gosec // G115: retry counter is bounded by the on-chain contract
 		ownIndex,
 		commitmentBytes,
 		encryptedEvals,

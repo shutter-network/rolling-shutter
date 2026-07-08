@@ -600,7 +600,7 @@ func (b *fakeDKGBackend) emitSuccessVote(t *testing.T, ev *dkgcontract.Dkgcontra
 }
 
 // fakeRunner implements service.Runner for tests. Goroutines spawned via Go
-// are tracked so the test can wait for them to drain after cancelling its
+// are tracked so the test can wait for them to drain after canceling its
 // context. StartService starts each service synchronously under the runner's
 // context, mirroring the real runner so that a DKGContractSyncer started by
 // DKGSyncer comes up and observes context cancellation.
@@ -897,7 +897,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 		Log:                &logger.NoopLogger{},
 		Handler:            handler.Handle,
 		resolveDKGContract: resolver,
-		bindDKGContract: func(addr common.Address) (dkgContractBackend, error) {
+		bindDKGContract: func(_ common.Address) (dkgContractBackend, error) {
 			return backend, nil
 		},
 	}
@@ -944,7 +944,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 // serialisationProbe is a DKGEventHandler that detects whether the syncer ever
 // invokes it concurrently. On entry it increments an active-call counter and
 // records the maximum ever observed; the brief sleep widens the window during
-// which an overlapping call would be visible. With the fan-in channel funnelling
+// which an overlapping call would be visible. With the fan-in channel funneling
 // every event through a single consumer, maxActive must stay at 1.
 type serialisationProbe struct {
 	mu        sync.Mutex
@@ -983,7 +983,7 @@ func (p *serialisationProbe) Handle(_ context.Context, _ event.DKGEvent) error {
 // TestEventChannelSerialisesConcurrentHandlerCalls verifies that events produced
 // concurrently by two independent DKGContractSyncer backends reach the real
 // Handler one at a time: the fan-in channel and its single consumer goroutine
-// must serialise all delivery so handler state needs no internal locking.
+// must serialize all delivery so handler state needs no internal locking.
 func TestEventChannelSerialisesConcurrentHandlerCalls(t *testing.T) {
 	addr0 := common.HexToAddress("0xa0")
 	addr1 := common.HexToAddress("0xa1")
@@ -1018,7 +1018,9 @@ func TestEventChannelSerialisesConcurrentHandlerCalls(t *testing.T) {
 	// DKGContractSyncer goroutines drain and forward events concurrently. Without
 	// the fan-in channel they would call the handler at the same time.
 	for i := 0; i < perBackend; i++ {
+		//nolint:gosec // G115: loop counter is bounded by perBackend
 		backend0.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: uint64(i)})
+		//nolint:gosec // G115: loop counter is bounded by perBackend
 		backend1.emitSuccess(t, &dkgcontract.DkgcontractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: uint64(i)})
 	}
 
@@ -1057,7 +1059,7 @@ func TestEventChannelInitialSuccessesPrecedeLiveEvents(t *testing.T) {
 		},
 	}
 	// Two keyper set indices have succeeded, so initialSuccessesForContract
-	// synthesises two SuccessEvents to enqueue ahead of the live watcher.
+	// synthesizes two SuccessEvents to enqueue ahead of the live watcher.
 	s.tryTrack(addr, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())

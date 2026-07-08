@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"bytes"
 	"crypto/rand"
 	"math/big"
 	"testing"
@@ -35,6 +36,8 @@ func TestReceiverIndicesForSender(t *testing.T) {
 // state as applying the same set to the same DKG that drove the messages
 // (the "live" path). This is the property the rebuild-from-DB logic depends
 // on for restart recovery.
+//
+//nolint:gocyclo // narrative test: live path, replay path, then side-by-side comparison. Splitting would fragment the scenario.
 func TestPureDKGReplayMatchesLive(t *testing.T) {
 	const (
 		eon        uint64 = 17
@@ -144,7 +147,7 @@ func TestComputeResultAfterReplayWithSelfEval(t *testing.T) {
 	)
 
 	// Drive a full live DKG: each keyper deals, cross-delivers messages,
-	// and finalises in-process.
+	// and finalizes in-process.
 	live := make([]*puredkg.PureDKG, numKeypers)
 	commitments := make([]puredkg.PolyCommitmentMsg, numKeypers)
 	evalsBySender := make([][]puredkg.PolyEvalMsg, numKeypers)
@@ -178,7 +181,7 @@ func TestComputeResultAfterReplayWithSelfEval(t *testing.T) {
 		assert.NilError(t, live[i].HandlePolyCommitmentMsg(commitments[i]))
 	}
 	for i := uint64(0); i < numKeypers; i++ {
-		assert.NilError(t, advanceLiveToFinalized(live[i]))
+		advanceLiveToFinalized(live[i])
 	}
 	liveResult, err := live[0].ComputeResult()
 	assert.NilError(t, err)
@@ -216,11 +219,10 @@ func TestComputeResultAfterReplayWithSelfEval(t *testing.T) {
 	assert.Equal(t, string(livePK), string(recoveredPK))
 }
 
-func advanceLiveToFinalized(p *puredkg.PureDKG) error {
+func advanceLiveToFinalized(p *puredkg.PureDKG) {
 	p.StartPhase2Accusing()
 	p.StartPhase3Apologizing()
 	p.Finalize()
-	return nil
 }
 
 func liveCommitmentEqualsReplay(a, b interface{}) bool {
@@ -234,5 +236,5 @@ func liveCommitmentEqualsReplay(a, b interface{}) bool {
 	}
 	at, _ := am.MarshalText()
 	bt, _ := bm.MarshalText()
-	return string(at) == string(bt)
+	return bytes.Equal(at, bt)
 }

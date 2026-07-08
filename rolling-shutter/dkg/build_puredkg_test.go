@@ -28,7 +28,7 @@ func loadKeyperSetParams(ctx context.Context, t *testing.T, env *dkgTestEnv) ([]
 	assert.NilError(t, err)
 	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
 	assert.NilError(t, err)
-	return keypers, ownIndex, uint64(keyperSet.Threshold)
+	return keypers, ownIndex, uint64(keyperSet.Threshold) //nolint:gosec // G115: threshold is a small positive integer
 }
 
 // TestBuildPureDKGReturnsExpectedPhasePerBlockPhase asserts the per-phase

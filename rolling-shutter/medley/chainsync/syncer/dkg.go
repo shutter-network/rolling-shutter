@@ -39,11 +39,40 @@ type dkgContractResolver func(ctx context.Context, opts *bind.CallOpts, keyperSe
 // canned events without touching a simulated chain.
 type dkgContractBackend interface {
 	Succeeded(opts *bind.CallOpts, keyperSetIndex uint64) (bool, error)
-	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
+	WatchDealingSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractDealingSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchAccusationSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractAccusationSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchApologySubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractApologySubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchSuccessVoteSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchDKGSucceeded(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractDKGSucceeded,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+	) (gethevent.Subscription, error)
 }
 
 // dkgContractBinder constructs a dkgContractBackend for a given DKG contract
@@ -93,8 +122,8 @@ type DKGSyncer struct {
 	keyperSetAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
 
 	// eventCh is the fan-in channel through which every DKG event -- initial
-	// successes synthesised at startup and live bulletin-board events from all
-	// DKGContractSyncer goroutines -- is funnelled to a single consumer
+	// successes synthesized at startup and live bulletin-board events from all
+	// DKGContractSyncer goroutines -- is funneled to a single consumer
 	// goroutine. The consumer calls the real Handler sequentially, so handler
 	// state needs no internal locking. It is created in Start() with the shared
 	// channelSize buffer.
@@ -171,12 +200,12 @@ func (s *DKGSyncer) Start(ctx context.Context, runner service.Runner) error {
 	return nil
 }
 
-// startEventConsumer initialises the fan-in channel and starts the single
+// startEventConsumer initializes the fan-in channel and starts the single
 // consumer goroutine that drains it, calling the real Handler sequentially.
-// Funnelling every DKG event through one consumer guarantees the Handler is
+// Funneling every DKG event through one consumer guarantees the Handler is
 // never invoked concurrently, so DKGEventHandler implementations need no
 // internal locking. Handler errors are logged and draining continues, matching
-// the deliver() behaviour DKGContractSyncer used before this fan-in existed.
+// the deliver() behavior DKGContractSyncer used before this fan-in existed.
 // The consumer exits on context cancellation; producers send via enqueueEvent,
 // whose send is context-aware, so shutdown never deadlocks.
 func (s *DKGSyncer) startEventConsumer(ctx context.Context, runner service.Runner) {
@@ -195,7 +224,7 @@ func (s *DKGSyncer) startEventConsumer(ctx context.Context, runner service.Runne
 	})
 }
 
-// enqueueEvent hands a DKG event to the fan-in channel for serialised delivery
+// enqueueEvent hands a DKG event to the fan-in channel for serialized delivery
 // by the consumer goroutine. It is the Handler passed to every DKGContractSyncer
 // and the delivery path for initial-success events. The send is context-aware so
 // that a producer never blocks forever when the node is shutting down and the
@@ -213,7 +242,7 @@ func (s *DKGSyncer) enqueueEvent(ctx context.Context, ev event.DKGEvent) error {
 // records the DKG contract address each one points at via tryTrack. Failures to
 // read an individual keyper set's DKG contract (RPC error) are surfaced; zero
 // addresses are logged and skipped inside tryTrack, mirroring the runtime
-// behaviour for KeyperSetAdded. As a side effect, numKnownKeyperSets advances to
+// behavior for KeyperSetAdded. As a side effect, numKnownKeyperSets advances to
 // the number of keyper sets visited. The tryTrack return value is ignored here;
 // Start() iterates trackedDKGContractList() afterwards to spawn syncers.
 func (s *DKGSyncer) scanInitialDKGContracts(

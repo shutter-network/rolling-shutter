@@ -43,6 +43,7 @@ func (p Phase) String() string {
 // the lead length (which the on-chain contract handles via int256).
 func DKGStart(activationBlock, dkgLeadLength, phaseLength uint64, retryCounter uint64) int64 {
 	cycle := CycleLength(phaseLength)
+	//nolint:gosec // G115: block numbers and DKG params fit well within int64
 	return int64(activationBlock) - int64(dkgLeadLength) + int64(retryCounter)*int64(cycle)
 }
 
@@ -61,11 +62,11 @@ func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentB
 		return PhaseNone
 	}
 	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, retryCounter)
-	offset := int64(currentBlock) - start
+	offset := int64(currentBlock) - start //nolint:gosec // G115: block number fits well within int64
 	if offset < 0 {
 		return PhaseNone
 	}
-	pl := int64(phaseLength)
+	pl := int64(phaseLength) //nolint:gosec // G115: phase length fits well within int64
 	switch {
 	case offset < pl:
 		return PhaseDealing
@@ -83,7 +84,7 @@ func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentB
 // CurrentRetryCounter derives the active retry counter from block arithmetic.
 // Each failed cycle advances the counter by one; the counter is never stored
 // in the database. A block before `DKGStart(..., 0)` returns 0 since the
-// loop has not begun yet (matching the contract's behaviour of treating early
+// loop has not begun yet (matching the contract's behavior of treating early
 // blocks as "Phase.None" within retry 0).
 func CurrentRetryCounter(activationBlock, dkgLeadLength, phaseLength, currentBlock uint64) uint64 {
 	cycle := CycleLength(phaseLength)
@@ -91,7 +92,7 @@ func CurrentRetryCounter(activationBlock, dkgLeadLength, phaseLength, currentBlo
 		return 0
 	}
 	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, 0)
-	offset := int64(currentBlock) - start
+	offset := int64(currentBlock) - start //nolint:gosec // G115: block number fits well within int64
 	if offset < 0 {
 		return 0
 	}

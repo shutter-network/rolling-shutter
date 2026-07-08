@@ -20,11 +20,40 @@ import (
 // interface lets tests substitute a fake backend that emits canned events
 // without touching a simulated chain.
 type dkgEventWatcher interface {
-	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
+	WatchDealingSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractDealingSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchAccusationSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractAccusationSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchApologySubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractApologySubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchSuccessVoteSubmitted(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+		keyperIndex []uint64,
+	) (gethevent.Subscription, error)
+	WatchDKGSucceeded(
+		opts *bind.WatchOpts,
+		sink chan<- *dkgcontract.DkgcontractDKGSucceeded,
+		keyperSetIndex []uint64,
+		retryCounter []uint64,
+	) (gethevent.Subscription, error)
 }
 
 // DKGContractSyncer watches exactly one DKG contract for the five bulletin-board
@@ -120,6 +149,8 @@ func (s *DKGContractSyncer) Start(ctx context.Context, runner service.Runner) er
 // watchContractEvents is the per-contract subscription loop. It drains the five
 // event channels, forwards events to the shared Handler via deliver(), and exits
 // on context cancellation or subscription error.
+//
+//nolint:gocyclo // fan-in select over five event channels and five error channels; splitting the branches would obscure the dispatch.
 func (s *DKGContractSyncer) watchContractEvents(
 	ctx context.Context,
 	dealingCh <-chan *dkgcontract.DkgcontractDealingSubmitted,

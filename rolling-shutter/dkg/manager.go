@@ -120,6 +120,8 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 // Returns an error for missing per-eon configuration (NULL `dkg_contract`
 // or NULL `phase_length`/`lead_length`). The caller logs but does not
 // abort on error.
+//
+//nolint:gocyclo // linear orchestration: load, filter, build, dispatch. Complexity is mostly per-step error handling.
 func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
 	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
 	if err != nil {
@@ -163,7 +165,7 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	}
 
 	retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
-	retryInt64 := int64(retry)
+	retryInt64 := int64(retry) //nolint:gosec // G115: retry counter is bounded by the on-chain contract
 	blockPhase := PhaseAt(activationBlock, leadLength, phaseLength, retry, blockNumber)
 	if blockPhase == PhaseNone {
 		return nil
@@ -204,6 +206,8 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return m.maybeFinalize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+		case PhaseNone:
+			return nil
 		default:
 			return nil
 		}
@@ -222,6 +226,7 @@ func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLeng
 			eon.KeyperConfigIndex,
 		)
 	}
+	//nolint:gosec // G115: phase and lead lengths come from the on-chain contract and are non-negative
 	return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), nil
 }
 
