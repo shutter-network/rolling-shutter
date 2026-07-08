@@ -205,10 +205,14 @@ func (kpr *Keyper) initMultiEventSyncer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create ShutterRegistry contract instance: %w", err)
 	}
-	eventTriggerRegisteredProcessor := NewEventTriggerRegisteredEventProcessor(
+	eventTriggerRegisteredProcessor, err := NewEventTriggerRegisteredEventProcessor(
 		eventTriggerRegistryContract,
+		kpr.config.Chain.Contracts.ShutterEventTriggerRegistry,
 		kpr.dbpool,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize event trigger registered processor: %w", err)
+	}
 
 	triggerClient, err := ethclient.DialContext(ctx, kpr.config.Chain.Node.EthereumURL)
 	if err != nil {

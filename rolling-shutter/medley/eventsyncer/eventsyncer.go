@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"github.com/rs/zerolog/log"
 
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/db"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/retry"
@@ -84,6 +83,13 @@ type EventSyncUpdate struct {
 	LogIndex    uint64
 }
 
+// dispatchKey identifies an EventType by its contract address and the first
+// topic of the matching log.
+type dispatchKey struct {
+	address common.Address
+	topic   common.Hash
+}
+
 // EventSyncer watches the blockchain for events of given types and yields them in order.
 type EventSyncer struct {
 	Client         *ethclient.Client
@@ -93,6 +99,10 @@ type EventSyncer struct {
 	FromBlock    uint64
 	FromLogIndex uint64
 
+	addresses []common.Address
+	topics    []common.Hash
+	dispatch  map[dispatchKey]*EventType
+
 	started    bool
 	logChannel chan logChannelItem
 }
@@ -101,6 +111,24 @@ type EventSyncer struct {
 // log index. The types of events to filter for are specified as a set of EventTypes. The finality
 // offset is the number of blocks we trail behind the current block to be safe from reorgs.
 func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, fromBlock uint64, fromLogIndex uint64) *EventSyncer {
+	addressSet := map[common.Address]struct{}{}
+	topicSet := map[common.Hash]struct{}{}
+	dispatch := map[dispatchKey]*EventType{}
+	for _, ev := range events {
+		topic := ev.ABI.Events[ev.Name].ID
+		addressSet[ev.Address] = struct{}{}
+		topicSet[topic] = struct{}{}
+		dispatch[dispatchKey{address: ev.Address, topic: topic}] = ev
+	}
+	addresses := make([]common.Address, 0, len(addressSet))
+	for a := range addressSet {
+		addresses = append(addresses, a)
+	}
+	topics := make([]common.Hash, 0, len(topicSet))
+	for t := range topicSet {
+		topics = append(topics, t)
+	}
+
 	return &EventSyncer{
 		Client:         client,
 		FinalityOffset: finalityOffset,
@@ -108,6 +136,10 @@ func New(client *ethclient.Client, finalityOffset uint64, events []*EventType, f
 		Events:       events,
 		FromBlock:    fromBlock,
 		FromLogIndex: fromLogIndex,
+
+		addresses: addresses,
+		topics:    topics,
+		dispatch:  dispatch,
 
 		started:    false,
 		logChannel: make(chan logChannelItem, outputChannelCapacity),
@@ -165,116 +197,165 @@ func (s *EventSyncer) Start(ctx context.Context, runner service.Runner) error {
 	return nil
 }
 
-// sync continuously searches for events.
+// sync continuously searches for events. It prefers a new-head subscription
+// (one eth_subscribe at startup) over the periodic eth_blockNumber poll and
+// falls back to polling when the transport does not support subscriptions
+// (typically HTTP-only ethclients).
 func (s *EventSyncer) sync(ctx context.Context) error {
 	fromBlock := s.FromBlock
+
+	headCh := make(chan *types.Header, 1)
+	sub, err := s.Client.SubscribeNewHead(ctx, headCh)
+	if err != nil {
+		log.Debug().Err(err).Msg("SubscribeNewHead unavailable, falling back to polling")
+		return s.syncByPolling(ctx, fromBlock)
+	}
+	defer sub.Unsubscribe()
+
+	return s.syncBySubscription(ctx, fromBlock, headCh, sub)
+}
+
+// syncBySubscription drives the sync loop off a SubscribeNewHead
+// subscription instead of polling BlockNumber. On startup it also queries
+// HeaderByNumber(nil) once so the initial historical range can be drained
+// before the first live head arrives; from then on the subscription is the
+// only signal for new work.
+func (s *EventSyncer) syncBySubscription(
+	ctx context.Context,
+	fromBlock uint64,
+	headCh <-chan *types.Header,
+	sub ethereum.Subscription,
+) error {
+	// Kick off with the current tip so we cover the historical gap between
+	// FromBlock and the head, without waiting for a new block to arrive.
+	tip, err := retry.FunctionCall(ctx, func(ctx context.Context) (*types.Header, error) {
+		return s.Client.HeaderByNumber(ctx, nil)
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to query current head")
+	}
+	fromBlock, err = s.advanceUpTo(ctx, fromBlock, tip.Number.Uint64())
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case head, ok := <-headCh:
+			if !ok {
+				return errors.New("event syncer head channel closed")
+			}
+			fromBlock, err = s.advanceUpTo(ctx, fromBlock, head.Number.Uint64())
+			if err != nil {
+				return err
+			}
+		case err := <-sub.Err():
+			return errors.Wrap(err, "event syncer new-head subscription failed")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// syncByPolling is the pre-subscription loop, retained for transports that
+// cannot subscribe (HTTP ethclient).
+func (s *EventSyncer) syncByPolling(ctx context.Context, fromBlock uint64) error {
 	for {
 		currentBlock, err := retry.FunctionCall(ctx, s.Client.BlockNumber)
 		if err != nil {
 			return errors.Wrap(err, "failed to query current block number")
 		}
 
-		toBlock := fromBlock + pageSizeBlocks - 1
-		var maxToBlock uint64
-		if currentBlock >= s.FinalityOffset {
-			maxToBlock = currentBlock - s.FinalityOffset
-		} else {
-			maxToBlock = 0
+		fromBlock, err = s.advanceUpTo(ctx, fromBlock, currentBlock)
+		if err != nil {
+			return err
 		}
+
+		select {
+		case <-time.After(blockPollInterval):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// advanceUpTo advances the syncer up to (currentBlock - FinalityOffset),
+// consuming as many pageSizeBlocks-wide ranges as fit. Returns the new
+// fromBlock. When the current chain is not yet ahead of the finality offset,
+// nothing is fetched.
+func (s *EventSyncer) advanceUpTo(ctx context.Context, fromBlock, currentBlock uint64) (uint64, error) {
+	var maxToBlock uint64
+	if currentBlock >= s.FinalityOffset {
+		maxToBlock = currentBlock - s.FinalityOffset
+	}
+	for fromBlock <= maxToBlock {
+		toBlock := fromBlock + pageSizeBlocks - 1
 		if toBlock > maxToBlock {
 			toBlock = maxToBlock
 		}
-
-		// if there's no new blocks, wait some time and try again
-		if toBlock < fromBlock {
-			select {
-			case <-time.After(blockPollInterval):
-				continue
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-
 		logItems, err := s.syncAllInRange(ctx, fromBlock, toBlock)
 		if err != nil {
-			return err
+			return fromBlock, err
 		}
-		err = s.sendLogItemsToChannel(ctx, logItems, toBlock)
-		if err != nil {
-			return err
+		if err := s.sendLogItemsToChannel(ctx, logItems, toBlock); err != nil {
+			return fromBlock, err
 		}
-
 		fromBlock = toBlock + 1
 	}
+	return fromBlock, nil
 }
 
-// syncAllInRange returns all events found in the given block range.
+// syncAllInRange returns all events found in the given block range. It issues
+// a single FilterLogs query covering every registered address and topic, then
+// dispatches each returned log to its matching EventType.
 func (s *EventSyncer) syncAllInRange(ctx context.Context, fromBlock uint64, toBlock uint64) ([]logChannelItem, error) {
-	logs := []logChannelItem{}
-	mu := sync.Mutex{}
-
-	errorgroup, errorctx := errgroup.WithContext(ctx)
-	for _, event := range s.Events {
-		ev := event
-		errorgroup.Go(func() error {
-			logsSingle, err := s.syncSingleInRange(errorctx, ev, fromBlock, toBlock)
-			if err != nil {
-				return err
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			logs = append(logs, logsSingle...)
-			return nil
-		})
+	if len(s.Events) == 0 {
+		return nil, nil
 	}
-	if err := errorgroup.Wait(); err != nil {
-		return nil, err
-	}
-
-	sort.Slice(logs, func(i, j int) bool {
-		bi := logs[i].log.BlockNumber
-		bj := logs[j].log.BlockNumber
-		if bi < bj {
-			return true
-		}
-		if bi == bj {
-			li := logs[i].log.Index
-			lj := logs[j].log.Index
-			return li < lj
-		}
-		return false
-	})
-
-	return logs, nil
-}
-
-// syncSingleInRange returns the events matching the given type in the given block range.
-func (s *EventSyncer) syncSingleInRange(ctx context.Context, event *EventType, fromBlock uint64, toBlock uint64) ([]logChannelItem, error) {
-	topic := event.ABI.Events[event.Name].ID
 	query := ethereum.FilterQuery{
-		BlockHash: nil,
 		FromBlock: new(big.Int).SetUint64(fromBlock),
 		ToBlock:   new(big.Int).SetUint64(toBlock),
-		Addresses: []common.Address{event.Address},
-		Topics:    [][]common.Hash{{topic}},
+		Addresses: s.addresses,
+		Topics:    [][]common.Hash{s.topics},
 	}
 
 	logs, err := retry.FunctionCall(ctx, func(ctx context.Context) ([]types.Log, error) {
 		return s.Client.FilterLogs(ctx, query)
 	})
 	if err != nil {
-		return nil, errors.New("failed to filter event logs")
+		return nil, errors.Wrap(err, "failed to filter event logs")
 	}
 
-	items := []logChannelItem{}
+	items := make([]logChannelItem, 0, len(logs))
 	for i := range logs {
+		l := &logs[i]
+		if len(l.Topics) == 0 {
+			continue
+		}
+		ev, ok := s.dispatch[dispatchKey{address: l.Address, topic: l.Topics[0]}]
+		if !ok {
+			// The (address, topic) combination has no registered handler. This
+			// can happen when an address listed for one event type also emits a
+			// topic that belongs to another address; we simply skip it.
+			continue
+		}
 		items = append(items, logChannelItem{
-			log:         &logs[i],
-			blockNumber: logs[i].BlockNumber,
-			eventType:   event,
+			log:         l,
+			blockNumber: l.BlockNumber,
+			eventType:   ev,
 		})
 	}
+
+	sort.Slice(items, func(i, j int) bool {
+		bi := items[i].log.BlockNumber
+		bj := items[j].log.BlockNumber
+		if bi != bj {
+			return bi < bj
+		}
+		return items[i].log.Index < items[j].log.Index
+	})
+
 	return items, nil
 }
 

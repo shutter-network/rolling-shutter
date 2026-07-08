@@ -166,7 +166,17 @@ func (kpr *Keyper) Start(ctx context.Context, runner service.Runner) error {
 	}
 
 	runner.Go(func() error { return kpr.processInputs(ctx) })
-	return runner.StartService(kpr.core, kpr.chainSyncClient, kpr.slotTicker, kpr.eonKeyPublisher)
+	services := []service.Service{
+		kpr.core,
+		kpr.chainSyncClient,
+		kpr.slotTicker,
+		kpr.eonKeyPublisher,
+		kpr.validatorSyncer,
+	}
+	if kpr.sequencerSyncer != nil {
+		services = append(services, kpr.sequencerSyncer)
+	}
+	return runner.StartService(services...)
 }
 
 func NewKeyper(kpr *Keyper, messagingMiddleware *MessagingMiddleware) (*keyper.KeyperCore, error) {
@@ -217,17 +227,8 @@ func (kpr *Keyper) initSequencerSyncer(ctx context.Context) error {
 		SyncStartBlockNumber: kpr.config.Gnosis.SyncStartBlockNumber,
 	}
 
-	// Perform an initial sync now because it might take some time and doing so during regular
-	// slot processing might hold up things
-	latestHeader, err := client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get latest block header")
-	}
-	err = kpr.sequencerSyncer.Sync(ctx, latestHeader)
-	if err != nil {
-		return err
-	}
-
+	// Catchup + live subscription lifecycle is owned by SequencerSyncer.Start
+	// (see runner.StartService call in Keyper.Start).
 	return nil
 }
 
@@ -257,16 +258,7 @@ func (kpr *Keyper) initValidatorSyncer(ctx context.Context) error {
 		EnableAggregateValidatorRegistrationV1: kpr.config.Gnosis.EnableAggregateValidatorRegistrationV1,
 	}
 
-	// Perform an initial sync now because it might take some time and doing so during regular
-	// slot processing might hold up things
-	latestHeader, err := validatorSyncerClient.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get latest block header")
-	}
-	err = kpr.validatorSyncer.Sync(ctx, latestHeader)
-	if err != nil {
-		return err
-	}
+	// Catchup + live subscription lifecycle is owned by ValidatorSyncer.Start.
 	return nil
 }
 
