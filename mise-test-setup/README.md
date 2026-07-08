@@ -24,10 +24,10 @@ mise run test-decryption
 - `mise run wait-for-dkg --ksi 2 --success`
 
   - Wait until the DKG for a given Keyper Set Index succeeds on-chain. Without
-    `--ksi`, defaults to the latest registered keyper set. Without `--success`
-    / `--failure`, exits 0 on any completion. With `--retry N`, pins the watch
-    to a specific retry counter; with `--success`/`--failure`, asserts that
-    retry's outcome.
+    `--ksi`, defaults to the latest registered keyper set. Without `--success` /
+    `--failure`, exits 0 on any completion. With `--retry N`, pins the watch to
+    a specific retry counter; with `--success`/`--failure`, asserts that retry's
+    outcome.
 
 - `mise run test-decryption`
 
