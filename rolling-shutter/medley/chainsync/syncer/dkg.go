@@ -10,10 +10,10 @@ import (
 	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 	keypersetBindings "github.com/shutter-network/contracts/v2/bindings/keyperset"
 	"github.com/shutter-network/shop-contracts/bindings"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
@@ -32,22 +32,22 @@ type keyperSetIndexer interface {
 // address it points at (via KeyperSet.getDKGContract()).
 type dkgContractResolver func(ctx context.Context, opts *bind.CallOpts, keyperSetAddr common.Address) (common.Address, error)
 
-// dkgContractBackend is the subset of *contract.DKGContract used by the
+// dkgContractBackend is the subset of *dkgcontract.Dkgcontract used by the
 // per-contract subscription goroutine: the Succeeded(ksi) read for initial
 // success synthesis and the five bulletin-board event subscriptions. Pulling
 // it out as an interface lets tests substitute a fake backend that emits
 // canned events without touching a simulated chain.
 type dkgContractBackend interface {
 	Succeeded(opts *bind.CallOpts, keyperSetIndex uint64) (bool, error)
-	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *contract.DKGContractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
+	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
 }
 
 // dkgContractBinder constructs a dkgContractBackend for a given DKG contract
-// address. The production implementation binds a *contract.DKGContract; tests
+// address. The production implementation binds a *dkgcontract.Dkgcontract; tests
 // substitute an in-memory fake.
 type dkgContractBinder func(addr common.Address) (dkgContractBackend, error)
 
@@ -534,11 +534,11 @@ func defaultDKGContractResolver(backend bind.ContractBackend) dkgContractResolve
 	}
 }
 
-// defaultDKGContractBinder binds a *contract.DKGContract at the given address.
+// defaultDKGContractBinder binds a *dkgcontract.Dkgcontract at the given address.
 // This is the production binder; tests override DKGSyncer.bindDKGContract
 // with an in-memory fake that can emit canned events.
 func defaultDKGContractBinder(backend bind.ContractBackend) dkgContractBinder {
 	return func(addr common.Address) (dkgContractBackend, error) {
-		return contract.NewDKGContract(addr, backend)
+		return dkgcontract.NewDkgcontract(addr, backend)
 	}
 }

@@ -10,12 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 	"gotest.tools/v3/assert"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/testsetup"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
@@ -385,7 +385,7 @@ func TestMaybeDealSubstitutesEmptyEvalForMissingECIESKey(t *testing.T) {
 
 	// Decode the submitDealing calldata to inspect the polyEvals payload.
 	// Calldata layout is [4-byte selector][ABI-encoded args].
-	abi, err := contract.DKGContractMetaData.GetAbi()
+	abi, err := dkgcontract.DkgcontractMetaData.GetAbi()
 	assert.NilError(t, err)
 	method, ok := abi.Methods["submitDealing"]
 	assert.Assert(t, ok, "submitDealing method must be present on the ABI")

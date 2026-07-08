@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 	keypersetBindings "github.com/shutter-network/contracts/v2/bindings/keyperset"
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	syncevent "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
@@ -134,7 +134,7 @@ func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 			Msg("keyper set has no DKG contract configured; storing NULL phase params")
 		return nullStr, nullInt, nullInt
 	}
-	dkg, err := contract.NewDKGContract(dkgAddr, kpr.chainSyncClient.Client)
+	dkg, err := dkgcontract.NewDkgcontract(dkgAddr, kpr.chainSyncClient.Client)
 	if err != nil {
 		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
 			Msg("bind DKG contract; storing NULL phase params")

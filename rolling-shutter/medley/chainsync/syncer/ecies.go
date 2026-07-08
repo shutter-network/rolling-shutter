@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/ecieskeyregistry"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
@@ -17,12 +17,12 @@ import (
 
 type ECIESKeySyncer struct {
 	Client     client.Client
-	Contract   *contract.ECIESKeyRegistry
+	Contract   *ecieskeyregistry.Ecieskeyregistry
 	Log        log.Logger
 	StartBlock *number.BlockNumber
 	Handler    event.ECIESKeyHandler
 
-	keyRegisteredCh chan *contract.ECIESKeyRegistryKeyRegistered
+	keyRegisteredCh chan *ecieskeyregistry.EcieskeyregistryKeyRegistered
 }
 
 func (s *ECIESKeySyncer) Start(ctx context.Context, runner service.Runner) error {
@@ -60,7 +60,7 @@ func (s *ECIESKeySyncer) Start(ctx context.Context, runner service.Runner) error
 		}
 	}
 
-	s.keyRegisteredCh = make(chan *contract.ECIESKeyRegistryKeyRegistered, channelSize)
+	s.keyRegisteredCh = make(chan *ecieskeyregistry.EcieskeyregistryKeyRegistered, channelSize)
 	subs, err := s.Contract.WatchKeyRegistered(watchOpts, s.keyRegisteredCh, nil)
 	if err != nil {
 		return err

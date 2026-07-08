@@ -12,10 +12,10 @@ import (
 	gethevent "github.com/ethereum/go-ethereum/event"
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 	"github.com/shutter-network/shop-contracts/bindings"
 	"gotest.tools/assert"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/logger"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
@@ -341,9 +341,9 @@ func TestHandleKeyperSetAddedBackfillsGap(t *testing.T) {
 	assert.Equal(t, 1, rec.warnCount(), "exactly one gap warning expected")
 
 	// Each spawned syncer is live: an event from each backend reaches the handler.
-	backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0})
-	backend1.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 1})
-	backend2.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 2})
+	backend0.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0})
+	backend1.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 1})
+	backend2.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 2})
 	got := map[uint64]bool{}
 	for i := 0; i < 3; i++ {
 		de, ok := handler.expectNextEvent(t).(*event.DealingEvent)
@@ -438,11 +438,11 @@ type fakeDKGBackend struct {
 	watchErrs map[string]error
 
 	mu              sync.Mutex
-	dealingSink     chan<- *contract.DKGContractDealingSubmitted
-	accusationSink  chan<- *contract.DKGContractAccusationSubmitted
-	apologySink     chan<- *contract.DKGContractApologySubmitted
-	successVoteSink chan<- *contract.DKGContractSuccessVoteSubmitted
-	successSink     chan<- *contract.DKGContractDKGSucceeded
+	dealingSink     chan<- *dkgcontract.DkgcontractDealingSubmitted
+	accusationSink  chan<- *dkgcontract.DkgcontractAccusationSubmitted
+	apologySink     chan<- *dkgcontract.DkgcontractApologySubmitted
+	successVoteSink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted
+	successSink     chan<- *dkgcontract.DkgcontractDKGSucceeded
 
 	dealingStart     uint64
 	accusationStart  uint64
@@ -460,7 +460,7 @@ func (b *fakeDKGBackend) Succeeded(_ *bind.CallOpts, ksi uint64) (bool, error) {
 }
 
 func (b *fakeDKGBackend) WatchDealingSubmitted(
-	opts *bind.WatchOpts, sink chan<- *contract.DKGContractDealingSubmitted, _, _, _ []uint64,
+	opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDealingSubmitted, _, _, _ []uint64,
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -475,7 +475,7 @@ func (b *fakeDKGBackend) WatchDealingSubmitted(
 }
 
 func (b *fakeDKGBackend) WatchAccusationSubmitted(
-	opts *bind.WatchOpts, sink chan<- *contract.DKGContractAccusationSubmitted, _, _, _ []uint64,
+	opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractAccusationSubmitted, _, _, _ []uint64,
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -490,7 +490,7 @@ func (b *fakeDKGBackend) WatchAccusationSubmitted(
 }
 
 func (b *fakeDKGBackend) WatchApologySubmitted(
-	opts *bind.WatchOpts, sink chan<- *contract.DKGContractApologySubmitted, _, _, _ []uint64,
+	opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractApologySubmitted, _, _, _ []uint64,
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -505,7 +505,7 @@ func (b *fakeDKGBackend) WatchApologySubmitted(
 }
 
 func (b *fakeDKGBackend) WatchSuccessVoteSubmitted(
-	opts *bind.WatchOpts, sink chan<- *contract.DKGContractSuccessVoteSubmitted, _, _, _ []uint64,
+	opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted, _, _, _ []uint64,
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -520,7 +520,7 @@ func (b *fakeDKGBackend) WatchSuccessVoteSubmitted(
 }
 
 func (b *fakeDKGBackend) WatchDKGSucceeded(
-	opts *bind.WatchOpts, sink chan<- *contract.DKGContractDKGSucceeded, _, _ []uint64,
+	opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDKGSucceeded, _, _ []uint64,
 ) (gethevent.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -534,7 +534,7 @@ func (b *fakeDKGBackend) WatchDKGSucceeded(
 	return newFakeSubscription(), nil
 }
 
-func (b *fakeDKGBackend) emitDealing(t *testing.T, ev *contract.DKGContractDealingSubmitted) {
+func (b *fakeDKGBackend) emitDealing(t *testing.T, ev *dkgcontract.DkgcontractDealingSubmitted) {
 	t.Helper()
 	b.mu.Lock()
 	sink := b.dealingSink
@@ -547,7 +547,7 @@ func (b *fakeDKGBackend) emitDealing(t *testing.T, ev *contract.DKGContractDeali
 	}
 }
 
-func (b *fakeDKGBackend) emitSuccess(t *testing.T, ev *contract.DKGContractDKGSucceeded) {
+func (b *fakeDKGBackend) emitSuccess(t *testing.T, ev *dkgcontract.DkgcontractDKGSucceeded) {
 	t.Helper()
 	b.mu.Lock()
 	sink := b.successSink
@@ -560,7 +560,7 @@ func (b *fakeDKGBackend) emitSuccess(t *testing.T, ev *contract.DKGContractDKGSu
 	}
 }
 
-func (b *fakeDKGBackend) emitAccusation(t *testing.T, ev *contract.DKGContractAccusationSubmitted) {
+func (b *fakeDKGBackend) emitAccusation(t *testing.T, ev *dkgcontract.DkgcontractAccusationSubmitted) {
 	t.Helper()
 	b.mu.Lock()
 	sink := b.accusationSink
@@ -573,7 +573,7 @@ func (b *fakeDKGBackend) emitAccusation(t *testing.T, ev *contract.DKGContractAc
 	}
 }
 
-func (b *fakeDKGBackend) emitApology(t *testing.T, ev *contract.DKGContractApologySubmitted) {
+func (b *fakeDKGBackend) emitApology(t *testing.T, ev *dkgcontract.DkgcontractApologySubmitted) {
 	t.Helper()
 	b.mu.Lock()
 	sink := b.apologySink
@@ -586,7 +586,7 @@ func (b *fakeDKGBackend) emitApology(t *testing.T, ev *contract.DKGContractApolo
 	}
 }
 
-func (b *fakeDKGBackend) emitSuccessVote(t *testing.T, ev *contract.DKGContractSuccessVoteSubmitted) {
+func (b *fakeDKGBackend) emitSuccessVote(t *testing.T, ev *dkgcontract.DkgcontractSuccessVoteSubmitted) {
 	t.Helper()
 	b.mu.Lock()
 	sink := b.successVoteSink
@@ -689,7 +689,7 @@ func TestStartContractSubscriptionDeliversLiveDealingEvent(t *testing.T) {
 	s.startEventConsumer(ctx, runner)
 	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 42))
 
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{
 		KeyperSetIndex: 7,
 		KeyperIndex:    3,
 	})
@@ -752,7 +752,7 @@ func TestStartContractSubscriptionInitialSuccessesDeliveredBeforeLiveEvents(t *t
 
 	// Only after both initial successes is the live event emitted; it must
 	// arrive after them on the same channel.
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 1})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 1})
 	ev3 := handler.expectNextEvent(t)
 	_, ok = ev3.(*event.DealingEvent)
 	assert.Assert(t, ok, "live event after initial successes must be *DealingEvent, got %T", ev3)
@@ -783,8 +783,8 @@ func TestStartViaTrackedListDeliversEventsFromTwoDistinctContracts(t *testing.T)
 		assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 	}
 
-	backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 1})
-	backend1.emitSuccess(t, &contract.DKGContractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: 4})
+	backend0.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 1})
+	backend1.emitSuccess(t, &dkgcontract.DkgcontractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: 4})
 
 	got := map[uint64]bool{}
 	for i := 0; i < 2; i++ {
@@ -822,7 +822,7 @@ func TestSharedContractIsSubscribedExactlyOnce(t *testing.T) {
 		assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
 	}
 
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 5})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 5})
 
 	// First delivery is captured.
 	ev := handler.expectNextEvent(t)
@@ -879,7 +879,7 @@ func TestHandleKeyperSetAddedSubscribesFromEventBlockNumber(t *testing.T) {
 
 	// And the spawned goroutine should be live: delivering an event from the
 	// fake backend must reach the handler.
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 2, KeyperIndex: 0})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 2, KeyperIndex: 0})
 	got := handler.expectNextEvent(t)
 	_, ok := got.(*event.DealingEvent)
 	assert.Assert(t, ok, "expected *DealingEvent from runtime-spawned subscription, got %T", got)
@@ -932,7 +932,7 @@ func TestHandleKeyperSetAddedSkipsSubscriptionForExistingAddress(t *testing.T) {
 
 	// And there should be only one live subscription goroutine -- emitting
 	// once delivers once.
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 0})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 0})
 	_ = handler.expectNextEvent(t)
 	select {
 	case extra := <-handler.ch:
@@ -1018,8 +1018,8 @@ func TestEventChannelSerialisesConcurrentHandlerCalls(t *testing.T) {
 	// DKGContractSyncer goroutines drain and forward events concurrently. Without
 	// the fan-in channel they would call the handler at the same time.
 	for i := 0; i < perBackend; i++ {
-		backend0.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: uint64(i)})
-		backend1.emitSuccess(t, &contract.DKGContractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: uint64(i)})
+		backend0.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: uint64(i)})
+		backend1.emitSuccess(t, &dkgcontract.DkgcontractDKGSucceeded{KeyperSetIndex: 1, RetryCounter: uint64(i)})
 	}
 
 	select {
@@ -1070,7 +1070,7 @@ func TestEventChannelInitialSuccessesPrecedeLiveEvents(t *testing.T) {
 	// Emit a live event before reading anything: the initial successes were
 	// enqueued during startContractSyncer (before the live watcher existed), so
 	// FIFO ordering on the single channel must still hand them over first.
-	backend.emitDealing(t, &contract.DKGContractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 9})
+	backend.emitDealing(t, &dkgcontract.DkgcontractDealingSubmitted{KeyperSetIndex: 0, KeyperIndex: 9})
 
 	first := handler.expectNextEvent(t)
 	_, ok := first.(*event.SuccessEvent)

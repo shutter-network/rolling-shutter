@@ -8,23 +8,23 @@ import (
 	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/encodeable/number"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/service"
 )
 
-// dkgEventWatcher is the subset of *contract.DKGContract that DKGContractSyncer
+// dkgEventWatcher is the subset of *dkgcontract.Dkgcontract that DKGContractSyncer
 // uses: the five bulletin-board event subscriptions. Pulling it out as an
 // interface lets tests substitute a fake backend that emits canned events
 // without touching a simulated chain.
 type dkgEventWatcher interface {
-	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *contract.DKGContractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
-	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *contract.DKGContractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
+	WatchDealingSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDealingSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchAccusationSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractAccusationSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchApologySubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractApologySubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchSuccessVoteSubmitted(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractSuccessVoteSubmitted, keyperSetIndex []uint64, retryCounter []uint64, keyperIndex []uint64) (gethevent.Subscription, error)
+	WatchDKGSucceeded(opts *bind.WatchOpts, sink chan<- *dkgcontract.DkgcontractDKGSucceeded, keyperSetIndex []uint64, retryCounter []uint64) (gethevent.Subscription, error)
 }
 
 // DKGContractSyncer watches exactly one DKG contract for the five bulletin-board
@@ -34,7 +34,7 @@ type dkgEventWatcher interface {
 // it is constructed and started by DKGSyncer once per unique DKG contract
 // address.
 type DKGContractSyncer struct {
-	Contract   *contract.DKGContract
+	Contract   *dkgcontract.Dkgcontract
 	Addr       common.Address
 	Log        log.Logger
 	Handler    event.DKGEventHandler
@@ -61,11 +61,11 @@ func (s *DKGContractSyncer) Start(ctx context.Context, runner service.Runner) er
 		Context: ctx,
 	}
 
-	dealingCh := make(chan *contract.DKGContractDealingSubmitted, channelSize)
-	accusationCh := make(chan *contract.DKGContractAccusationSubmitted, channelSize)
-	apologyCh := make(chan *contract.DKGContractApologySubmitted, channelSize)
-	successVoteCh := make(chan *contract.DKGContractSuccessVoteSubmitted, channelSize)
-	successCh := make(chan *contract.DKGContractDKGSucceeded, channelSize)
+	dealingCh := make(chan *dkgcontract.DkgcontractDealingSubmitted, channelSize)
+	accusationCh := make(chan *dkgcontract.DkgcontractAccusationSubmitted, channelSize)
+	apologyCh := make(chan *dkgcontract.DkgcontractApologySubmitted, channelSize)
+	successVoteCh := make(chan *dkgcontract.DkgcontractSuccessVoteSubmitted, channelSize)
+	successCh := make(chan *dkgcontract.DkgcontractDKGSucceeded, channelSize)
 
 	dealingSub, err := backend.WatchDealingSubmitted(watchOpts, dealingCh, nil, nil, nil)
 	if err != nil {
@@ -122,11 +122,11 @@ func (s *DKGContractSyncer) Start(ctx context.Context, runner service.Runner) er
 // on context cancellation or subscription error.
 func (s *DKGContractSyncer) watchContractEvents(
 	ctx context.Context,
-	dealingCh <-chan *contract.DKGContractDealingSubmitted,
-	accusationCh <-chan *contract.DKGContractAccusationSubmitted,
-	apologyCh <-chan *contract.DKGContractApologySubmitted,
-	successVoteCh <-chan *contract.DKGContractSuccessVoteSubmitted,
-	successCh <-chan *contract.DKGContractDKGSucceeded,
+	dealingCh <-chan *dkgcontract.DkgcontractDealingSubmitted,
+	accusationCh <-chan *dkgcontract.DkgcontractAccusationSubmitted,
+	apologyCh <-chan *dkgcontract.DkgcontractApologySubmitted,
+	successVoteCh <-chan *dkgcontract.DkgcontractSuccessVoteSubmitted,
+	successCh <-chan *dkgcontract.DkgcontractDKGSucceeded,
 	dealingErr, accusationErr, apologyErr, successVoteErr, successErr <-chan error,
 ) error {
 	for {

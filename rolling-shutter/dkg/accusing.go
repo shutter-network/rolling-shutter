@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/shutter-network/contracts/v2/bindings/dkgcontract"
 
 	"github.com/shutter-network/shutter/shlib/puredkg"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
@@ -83,7 +83,7 @@ func (m *Manager) maybeAccuse(
 		accusedDescriptions = append(accusedDescriptions, fmt.Sprintf("%d (%s)", a.Accused, keypers[a.Accused].Hex()))
 	}
 
-	abi, err := contract.DKGContractMetaData.GetAbi()
+	abi, err := dkgcontract.DkgcontractMetaData.GetAbi()
 	if err != nil {
 		return errors.Wrap(err, "load DKG contract ABI")
 	}

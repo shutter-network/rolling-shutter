@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/shutter-network/contracts/v2/bindings/ecieskeyregistry"
 	"github.com/shutter-network/shop-contracts/bindings"
 	"github.com/shutter-network/shop-contracts/predeploy"
 
-	"github.com/shutter-network/rolling-shutter/rolling-shutter/contract"
 	syncclient "github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/client"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/event"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley/chainsync/syncer"
@@ -141,7 +141,7 @@ func (o *options) apply(ctx context.Context, c *Client) error {
 		if o.eciesKeyRegistryAddress == nil {
 			return errors.New("ECIES key registry address must be set when an ECIES key handler is registered")
 		}
-		c.ECIESKeyRegistry, err = contract.NewECIESKeyRegistry(*o.eciesKeyRegistryAddress, client)
+		c.ECIESKeyRegistry, err = ecieskeyregistry.NewEcieskeyregistry(*o.eciesKeyRegistryAddress, client)
 		if err != nil {
 			return err
 		}
