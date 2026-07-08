@@ -86,7 +86,7 @@ func InitializeEon(
 		KeyperConfigIndex:     1,
 		ActivationBlockNumber: 0,
 		Keypers:               keypers,
-		Threshold:             int32(eonKeys.Threshold),
+		Threshold:             int32(eonKeys.Threshold), //nolint:gosec // G115: threshold is a small positive integer
 	})
 	assert.NilError(tb, err)
 	err = keyperDB.InsertEon(ctx, database.InsertEonParams{

@@ -208,7 +208,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	if err := queries.MarkTxSubmitted(ctx, corekeyperdb.MarkTxSubmittedParams{
 		ID:     row.ID,
 		TxHash: sql.NullString{String: signed.Hash().Hex(), Valid: true},
-		Nonce:  sql.NullInt64{Int64: int64(nonce), Valid: true},
+		Nonce:  sql.NullInt64{Int64: int64(nonce), Valid: true}, //nolint:gosec // G115: Ethereum nonces fit well within int64
 	}); err != nil {
 		log.Error().Err(err).
 			Int64("id", row.ID).

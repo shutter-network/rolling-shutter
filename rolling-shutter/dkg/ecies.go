@@ -70,7 +70,7 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperSetIndex int6
 		}
 		data, err := abi.Pack(
 			"registerKey",
-			uint64(keyperSetIndex),
+			uint64(keyperSetIndex), //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
 			ownIndex,
 			pubKey,
 		)

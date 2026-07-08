@@ -85,7 +85,7 @@ func (m *Manager) buildPureDKG(
 	switch blockPhase {
 	case PhaseDealing:
 		p := puredkg.NewPureDKG(
-			uint64(keyperSetIndex),
+			uint64(keyperSetIndex), //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
 			uint64(len(keypers)),
 			threshold,
 			ownIndex,
@@ -116,8 +116,11 @@ func (m *Manager) buildPureDKG(
 		// our own submitDealing event to populate these slots.
 		pure.Commitments = make([]*shcrypto.Gammas, pure.NumKeypers)
 		pure.Evals = make([]*big.Int, pure.NumKeypers)
+		//nolint:gosec // G115: keyper index is bounded by the keyper set size
 		pure.Evals[pure.Keyper] = pure.Polynomial.EvalForKeyper(int(pure.Keyper))
 		pure.Commitments[pure.Keyper] = pure.Polynomial.Gammas()
+	case PhaseNone:
+		return nil, nil
 	default:
 		return nil, nil
 	}
@@ -167,7 +170,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 	ownIndex uint64,
 	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperSetIndex)
+	eonForMsg := uint64(keyperSetIndex) //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
 
 	commitments, err := queries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
 		KeyperSetIndex: keyperSetIndex,
@@ -183,7 +186,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		}
 		err := pure.HandlePolyCommitmentMsg(puredkg.PolyCommitmentMsg{
 			Eon:    eonForMsg,
-			Sender: uint64(c.KeyperIndex),
+			Sender: uint64(c.KeyperIndex), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			Gammas: gammas,
 		})
 		if err != nil {
@@ -203,7 +206,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		return errors.Wrap(err, "load stored poly evals")
 	}
 	for _, ev := range polyEvals {
-		if uint64(ev.ReceiverIndex) != ownIndex {
+		if uint64(ev.ReceiverIndex) != ownIndex { //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			continue
 		}
 		eval, err := m.decryptPolyEval(ev.EncryptedEval)
@@ -217,7 +220,7 @@ func (m *Manager) replayCommitmentsAndEvals(
 		}
 		err = pure.HandlePolyEvalMsg(puredkg.PolyEvalMsg{
 			Eon:      eonForMsg,
-			Sender:   uint64(ev.SenderIndex),
+			Sender:   uint64(ev.SenderIndex), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			Receiver: ownIndex,
 			Eval:     eval,
 		})
@@ -238,7 +241,7 @@ func (m *Manager) replayAccusations(
 	pure *puredkg.PureDKG,
 	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperSetIndex)
+	eonForMsg := uint64(keyperSetIndex) //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
 	accusations, err := queries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:   retryCounter,
@@ -249,8 +252,8 @@ func (m *Manager) replayAccusations(
 	for _, a := range accusations {
 		err := pure.HandleAccusationMsg(puredkg.AccusationMsg{
 			Eon:     eonForMsg,
-			Accuser: uint64(a.AccuserIndex),
-			Accused: uint64(a.AccusedIndex),
+			Accuser: uint64(a.AccuserIndex), //nolint:gosec // G115: keyper index is bounded by the keyper set size
+			Accused: uint64(a.AccusedIndex), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 		})
 		if err != nil {
 			log.Debug().Err(err).
@@ -270,7 +273,7 @@ func (m *Manager) replayApologies(
 	pure *puredkg.PureDKG,
 	keyperSetIndex, retryCounter int64,
 ) error {
-	eonForMsg := uint64(keyperSetIndex)
+	eonForMsg := uint64(keyperSetIndex) //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
 	apologies, err := queries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: keyperSetIndex,
 		RetryCounter:   retryCounter,
@@ -282,8 +285,8 @@ func (m *Manager) replayApologies(
 		eval := new(big.Int).SetBytes(ap.PolyEval)
 		err := pure.HandleApologyMsg(puredkg.ApologyMsg{
 			Eon:     eonForMsg,
-			Accuser: uint64(ap.AccuserIndex),
-			Accused: uint64(ap.ApologizerIndex),
+			Accuser: uint64(ap.AccuserIndex),    //nolint:gosec // G115: keyper index is bounded by the keyper set size
+			Accused: uint64(ap.ApologizerIndex), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			Eval:    eval,
 		})
 		if err != nil {

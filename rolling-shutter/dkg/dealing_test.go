@@ -31,8 +31,9 @@ func runMaybeDealLocal(
 	dbpool *pgxpool.Pool,
 	mgr *Manager,
 	dkgAddr common.Address,
-	keyperConfigIndex, retryCounter int64,
+	keyperConfigIndex int64,
 ) error {
+	const retryCounter int64 = 0
 	obsQueries := obskeyperdb.New(dbpool)
 	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, keyperConfigIndex)
 	if err != nil {
@@ -46,7 +47,7 @@ func runMaybeDealLocal(
 	if err != nil {
 		return err
 	}
-	threshold := uint64(keyperSet.Threshold)
+	threshold := uint64(keyperSet.Threshold) //nolint:gosec // G115: threshold is a small positive integer
 
 	var pure *puredkg.PureDKG
 	err = dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
@@ -78,6 +79,8 @@ func runMaybeDealLocal(
 //     chain syncer from indexed events.
 //  2. Second invocation is a no-op — no new rows are inserted in any of those
 //     tables, because the dkg_sent_actions row already exists.
+//
+//nolint:funlen // fixture-heavy integration test; the "first-call writes, second is no-op" narrative is clearer inline.
 func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -147,7 +150,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	assert.Assert(t, err != nil, "no initial state row expected before maybeDeal")
 
 	// First invocation: writes rows.
-	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex)
 	assert.NilError(t, err)
 
 	initial, err := coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
@@ -191,7 +194,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the dealing action")
 
 	// Second invocation: idempotent — no new rows in any tracked table.
-	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex)
 	assert.NilError(t, err)
 
 	commitmentsAfter, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
@@ -271,7 +274,7 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 
-	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex)
 	assert.NilError(t, err)
 
 	commitments, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
@@ -359,7 +362,7 @@ func TestMaybeDealSubstitutesEmptyEvalForMissingECIESKey(t *testing.T) {
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 
-	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex, retryCounter)
+	err = runMaybeDealLocal(ctx, dbpool, mgr, dkgAddr, keyperConfigIndex)
 	assert.NilError(t, err, "missing ECIES key for one receiver must not abort dealing")
 
 	// Dealing was enqueued — initial state, sent-action marker, and tx_outbox

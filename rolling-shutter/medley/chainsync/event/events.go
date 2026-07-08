@@ -44,7 +44,7 @@ type (
 	}
 )
 
-// DKGEvent is any event observed from the DKG Contract (live or synthesised
+// DKGEvent is any event observed from the DKG Contract (live or synthesized
 // at startup). Consumers type-switch on the concrete event types below.
 type DKGEvent interface {
 	isDKGEvent()

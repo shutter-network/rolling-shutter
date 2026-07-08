@@ -90,8 +90,8 @@ func (m *Manager) maybeApologize(
 	}
 	data, err := abi.Pack(
 		"submitApology",
-		uint64(keyperSetIndex),
-		uint64(retryCounter),
+		uint64(keyperSetIndex), //nolint:gosec // G115: keyper set index is bounded by the on-chain contract
+		uint64(retryCounter),   //nolint:gosec // G115: retry counter is bounded by the on-chain contract
 		ownIndex,
 		accuserIndices,
 		polyEvalData,

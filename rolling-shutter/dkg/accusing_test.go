@@ -20,7 +20,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// dkgTestEnv bundles the artefacts a maybeAccuse / maybeApologize test
+// dkgTestEnv bundles the artifacts a maybeAccuse / maybeApologize test
 // needs: a three-keyper set with the local Manager at index 1, all three
 // ECIES keys registered, and a ready-to-call `mgr.maybeDeal` /
 // `mgr.maybeAccuse` etc.
@@ -112,7 +112,7 @@ func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
 	if err != nil {
 		return err
 	}
-	threshold := uint64(keyperSet.Threshold)
+	threshold := uint64(keyperSet.Threshold) //nolint:gosec // G115: threshold is a small positive integer
 
 	var pure *puredkg.PureDKG
 	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
@@ -139,6 +139,8 @@ func (env *dkgTestEnv) runMaybe(ctx context.Context, phase Phase) error {
 			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, testRetry, pure, ownIndex)
+		case PhaseNone:
+			return nil
 		}
 		return nil
 	})
@@ -160,7 +162,7 @@ func (env *dkgTestEnv) runMaybeRetry(ctx context.Context, phase Phase, retry int
 	if err != nil {
 		return err
 	}
-	threshold := uint64(keyperSet.Threshold)
+	threshold := uint64(keyperSet.Threshold) //nolint:gosec // G115: threshold is a small positive integer
 
 	var pure *puredkg.PureDKG
 	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
@@ -187,6 +189,8 @@ func (env *dkgTestEnv) runMaybeRetry(ctx context.Context, phase Phase, retry int
 			return env.mgr.maybeApologize(ctx, tx, env.dkgAddr, testKsi, retry, pure, keypers, ownIndex)
 		case PhaseFinalizing:
 			return env.mgr.maybeFinalize(ctx, tx, env.dkgAddr, testKsi, retry, pure, ownIndex)
+		case PhaseNone:
+			return nil
 		}
 		return nil
 	})
@@ -205,7 +209,7 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 		KeyperSetIndex: testKsi,
 		RetryCounter:   retry,
-		KeyperIndex:    int64(dealerIdx),
+		KeyperIndex:    int64(dealerIdx), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 		Commitment:     commit.Gammas.Marshal(),
 	})
 	assert.NilError(t, err)
@@ -219,7 +223,7 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 			KeyperSetIndex: testKsi,
 			RetryCounter:   retry,
-			SenderIndex:    int64(dealerIdx),
+			SenderIndex:    int64(dealerIdx), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			ReceiverIndex:  1,
 			EncryptedEval:  ciphertext,
 		})
@@ -241,7 +245,7 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 		KeyperSetIndex: testKsi,
 		RetryCounter:   testRetry,
-		KeyperIndex:    int64(dealerIdx),
+		KeyperIndex:    int64(dealerIdx), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 		Commitment:     commit.Gammas.Marshal(),
 	})
 	assert.NilError(t, err)
@@ -255,7 +259,7 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 			KeyperSetIndex: testKsi,
 			RetryCounter:   testRetry,
-			SenderIndex:    int64(dealerIdx),
+			SenderIndex:    int64(dealerIdx), //nolint:gosec // G115: keyper index is bounded by the keyper set size
 			ReceiverIndex:  1,
 			EncryptedEval:  ciphertext,
 		})

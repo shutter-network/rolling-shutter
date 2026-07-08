@@ -157,6 +157,7 @@ func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 		Uint64("phase-length", phaseLength).
 		Uint64("lead-length", leadLength).
 		Msg("resolved per-keyper-set DKG contract params")
+	//nolint:gosec // G115: phase and lead lengths come from the on-chain contract and fit well within int64
 	return sql.NullString{String: dkgAddr.Hex(), Valid: true},
 		sql.NullInt64{Int64: int64(phaseLength), Valid: true},
 		sql.NullInt64{Int64: int64(leadLength), Valid: true}
