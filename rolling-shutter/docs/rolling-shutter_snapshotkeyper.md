@@ -4,8 +4,7 @@ Run a Shutter snapshotkeyper node
 
 ### Synopsis
 
-This command runs a keyper node. It will connect to both an Ethereum and a
-Shuttermint node which have to be started separately in advance.
+This command runs a keyper node. It will connect to an Ethereum execution node which has to be started separately in advance.
 
 ```
 rolling-shutter snapshotkeyper [flags]

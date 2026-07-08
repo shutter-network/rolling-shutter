@@ -4,8 +4,7 @@ Run a Shutter keyper for Shutter Service
 
 ### Synopsis
 
-This command runs a keyper node. It will connect to both a Shutter service and a
-Shuttermint node which have to be started separately in advance.
+This command runs a keyper node. It will connect to a Shutter service execution node which has to be started separately in advance.
 
 ```
 rolling-shutter shutterservicekeyper [flags]
