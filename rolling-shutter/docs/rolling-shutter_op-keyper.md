@@ -4,8 +4,7 @@ Run a Shutter optimism keyper node
 
 ### Synopsis
 
-This command runs a keyper node. It will connect to both an Optimism and a
-Shuttermint node which have to be started separately in advance.
+This command runs a keyper node. It will connect to an Optimism execution node which has to be started separately in advance.
 
 ```
 rolling-shutter op-keyper [flags]
