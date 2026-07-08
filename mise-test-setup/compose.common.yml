@@ -46,7 +46,7 @@ services:
 
   contracts:
     build:
-      context: https://github.com/shutter-network/contracts.git#docker
+      context: https://github.com/shutter-network/contracts.git#dkg-contract
     profiles:
       - tools
     environment:

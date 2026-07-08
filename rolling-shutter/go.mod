@@ -19,6 +19,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-log/v2 v2.6.0
 	github.com/jackc/pgconn v1.14.1
+	github.com/jackc/pgtype v1.14.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-kad-dht v0.33.0
@@ -31,7 +32,7 @@ require (
 	github.com/primev/mev-commit/contracts-abi v0.0.0-20250922193515-6d402958637d
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/zerolog v1.28.0
-	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20250908105003-7e53b1579b04
+	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20260603212033-c768ee984f9f
 	github.com/shutter-network/gnosh-contracts v0.4.0
 	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
 	github.com/shutter-network/shutter/shlib v0.1.19
@@ -125,7 +126,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
-	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/puddle v1.3.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
@@ -244,8 +244,3 @@ require (
 )
 
 replace github.com/bitwurx/jrpc2 => github.com/ulope/jrpc2 v0.0.0-20230706135348-a95cf3d96bd2
-
-// Point at the local contracts/ source so the regenerated KeyperSet binding
-// (which exposes `GetDKGContract`) is picked up. The upstream module tag has
-// not been published yet.
-replace github.com/shutter-network/contracts/v2 => ../../contracts
