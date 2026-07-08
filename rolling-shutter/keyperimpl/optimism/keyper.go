@@ -136,4 +136,3 @@ func (kpr *Keyper) newKeyperSet(ctx context.Context, ev *syncevent.KeyperSet) er
 		})
 	})
 }
-

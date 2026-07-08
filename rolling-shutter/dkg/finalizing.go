@@ -43,8 +43,8 @@ func (m *Manager) maybeFinalize(
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionFinalizing,
+		RetryCounter:   retryCounter,
+		Action:         ActionFinalizing,
 	})
 	if err != nil {
 		return errors.Wrap(err, "check finalizing sent action")
@@ -69,9 +69,9 @@ func (m *Manager) maybeFinalize(
 		// indexed; re-running ComputeResult on every block is redundant.
 		if insertErr := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			Action:            ActionFinalizing,
-			TxOutboxID:        sql.NullInt64{},
+			RetryCounter:   retryCounter,
+			Action:         ActionFinalizing,
+			TxOutboxID:     sql.NullInt64{},
 		}); insertErr != nil {
 			return errors.Wrap(insertErr, "store finalizing sent action marker (compute result failed)")
 		}
@@ -104,9 +104,9 @@ func (m *Manager) maybeFinalize(
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionFinalizing,
-		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
+		RetryCounter:   retryCounter,
+		Action:         ActionFinalizing,
+		TxOutboxID:     sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store finalizing sent action marker")
 	}

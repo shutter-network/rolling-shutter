@@ -106,9 +106,9 @@ func storeDealing(
 
 	if err := queries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		KeyperIndex:       senderIndex,
-		Commitment:        ev.Commitment,
+		RetryCounter:   retryCounter,
+		KeyperIndex:    senderIndex,
+		Commitment:     ev.Commitment,
 	}); err != nil {
 		return errors.Wrap(err, "insert dkg_poly_commitment")
 	}
@@ -135,10 +135,10 @@ func storeDealing(
 		}
 		if err := queries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			SenderIndex:       senderIndex,
-			ReceiverIndex:     receiverIndex,
-			EncryptedEval:     encryptedEval,
+			RetryCounter:   retryCounter,
+			SenderIndex:    senderIndex,
+			ReceiverIndex:  receiverIndex,
+			EncryptedEval:  encryptedEval,
 		}); err != nil {
 			return errors.Wrap(err, "insert dkg_poly_eval")
 		}
@@ -163,9 +163,9 @@ func storeAccusation(
 		}
 		if err := queries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			AccuserIndex:      accuserIndex,
-			AccusedIndex:      accusedIndex,
+			RetryCounter:   retryCounter,
+			AccuserIndex:   accuserIndex,
+			AccusedIndex:   accusedIndex,
 		}); err != nil {
 			return errors.Wrap(err, "insert dkg_accusation")
 		}
@@ -195,15 +195,14 @@ func storeApology(
 			return errors.Wrap(err, "convert accuser index")
 		}
 		if err := queries.InsertDKGApology(ctx, corekeyperdb.InsertDKGApologyParams{
-			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			ApologizerIndex:   apologizerIndex,
-			AccuserIndex:      accuserIndex,
-			PolyEval:          ev.PolyEvalData[i],
+			KeyperSetIndex:  keyperSetIndex,
+			RetryCounter:    retryCounter,
+			ApologizerIndex: apologizerIndex,
+			AccuserIndex:    accuserIndex,
+			PolyEval:        ev.PolyEvalData[i],
 		}); err != nil {
 			return errors.Wrap(err, "insert dkg_apology")
 		}
 	}
 	return nil
 }
-

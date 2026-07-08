@@ -142,7 +142,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 	// Sanity: nothing exists yet.
 	_, err = coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.Assert(t, err != nil, "no initial state row expected before maybeDeal")
 
@@ -152,7 +152,7 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 
 	initial, err := coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(initial.PuredkgBytes) > 0, "initial state blob should not be empty")
@@ -164,14 +164,14 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 
 	commitments, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(commitments), "maybeDeal must not write to dkg_poly_commitments — chain syncer owns it")
 
 	evals, err := coreQueries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(evals), "maybeDeal must not write to dkg_poly_evals — chain syncer owns it")
@@ -184,8 +184,8 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionDealing,
+		RetryCounter:   retryCounter,
+		Action:         ActionDealing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the dealing action")
@@ -196,14 +196,14 @@ func TestMaybeDealPersistsInitialStateAndIsIdempotent(t *testing.T) {
 
 	commitmentsAfter, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(commitmentsAfter), "dkg_poly_commitments still empty on idempotent call")
 
 	evalsAfter, err := coreQueries.GetDKGPolyEvals(ctx, corekeyperdb.GetDKGPolyEvalsParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(evalsAfter), "dkg_poly_evals still empty on idempotent call")
@@ -256,9 +256,9 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 		outboxID = id
 		return corekeyperdb.New(tx).InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 			KeyperSetIndex: keyperConfigIndex,
-			RetryCounter:      retryCounter,
-			Action:            ActionDealing,
-			TxOutboxID:        sql.NullInt64{Int64: id, Valid: true},
+			RetryCounter:   retryCounter,
+			Action:         ActionDealing,
+			TxOutboxID:     sql.NullInt64{Int64: id, Valid: true},
 		})
 	})
 	assert.NilError(t, err)
@@ -276,7 +276,7 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 
 	commitments, err := coreQueries.GetDKGPolyCommitments(ctx, corekeyperdb.GetDKGPolyCommitmentsParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(commitments), "no commitment row should be written when sent action exists")
@@ -287,7 +287,7 @@ func TestMaybeDealNoopWhenSentActionExists(t *testing.T) {
 	assert.Equal(t, outboxID, pending[0].ID)
 	_, err = coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.Assert(t, err != nil, "no initial state row should be written when sent action exists")
 }
@@ -366,14 +366,14 @@ func TestMaybeDealSubstitutesEmptyEvalForMissingECIESKey(t *testing.T) {
 	// row must all be present.
 	_, err = coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
+		RetryCounter:   retryCounter,
 	})
 	assert.NilError(t, err, "initial state row should be written despite missing ECIES key")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperConfigIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionDealing,
+		RetryCounter:   retryCounter,
+		Action:         ActionDealing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should be written for the dealing action")

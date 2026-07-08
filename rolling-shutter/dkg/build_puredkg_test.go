@@ -111,7 +111,7 @@ func TestBuildPureDKGDealingDoesNotRequireInitialState(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	_, err := coreQueries.GetDKGInitialState(ctx, corekeyperdb.GetDKGInitialStateParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.Assert(t, err != nil)
 

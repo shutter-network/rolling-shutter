@@ -204,9 +204,9 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      retry,
-		KeyperIndex:       int64(dealerIdx),
-		Commitment:        commit.Gammas.Marshal(),
+		RetryCounter:   retry,
+		KeyperIndex:    int64(dealerIdx),
+		Commitment:     commit.Gammas.Marshal(),
 	})
 	assert.NilError(t, err)
 
@@ -218,10 +218,10 @@ func (env *dkgTestEnv) insertForeignDealingRetry(ctx context.Context, t *testing
 		assert.NilError(t, err)
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 			KeyperSetIndex: testKsi,
-			RetryCounter:      retry,
-			SenderIndex:       int64(dealerIdx),
-			ReceiverIndex:     1,
-			EncryptedEval:     ciphertext,
+			RetryCounter:   retry,
+			SenderIndex:    int64(dealerIdx),
+			ReceiverIndex:  1,
+			EncryptedEval:  ciphertext,
 		})
 		assert.NilError(t, err)
 	}
@@ -240,9 +240,9 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGPolyCommitment(ctx, corekeyperdb.InsertDKGPolyCommitmentParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		KeyperIndex:       int64(dealerIdx),
-		Commitment:        commit.Gammas.Marshal(),
+		RetryCounter:   testRetry,
+		KeyperIndex:    int64(dealerIdx),
+		Commitment:     commit.Gammas.Marshal(),
 	})
 	assert.NilError(t, err)
 
@@ -254,10 +254,10 @@ func (env *dkgTestEnv) insertForeignDealing(ctx context.Context, t *testing.T, d
 		assert.NilError(t, err)
 		err = coreQueries.InsertDKGPolyEval(ctx, corekeyperdb.InsertDKGPolyEvalParams{
 			KeyperSetIndex: testKsi,
-			RetryCounter:      testRetry,
-			SenderIndex:       int64(dealerIdx),
-			ReceiverIndex:     1,
-			EncryptedEval:     ciphertext,
+			RetryCounter:   testRetry,
+			SenderIndex:    int64(dealerIdx),
+			ReceiverIndex:  1,
+			EncryptedEval:  ciphertext,
 		})
 		assert.NilError(t, err)
 	}
@@ -287,15 +287,15 @@ func TestMaybeAccuseEnqueuesAccusationForMissingDealing(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(accusations), "maybeAccuse must not write to dkg_accusations — chain syncer owns it")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionAccusing,
+		RetryCounter:   testRetry,
+		Action:         ActionAccusing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the accusing action as enqueued")
@@ -329,7 +329,7 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(accusations))
@@ -341,8 +341,8 @@ func TestMaybeAccuseNoopWhenAllDealersHonest(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionAccusing,
+		RetryCounter:   testRetry,
+		Action:         ActionAccusing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when no accusations are sent")
@@ -375,8 +375,8 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionAccusing,
+		RetryCounter:   testRetry,
+		Action:         ActionAccusing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the accusing action")
@@ -386,7 +386,7 @@ func TestMaybeAccuseIdempotent(t *testing.T) {
 
 	accusations, err := coreQueries.GetDKGAccusations(ctx, corekeyperdb.GetDKGAccusationsParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(accusations), "maybeAccuse must not write to dkg_accusations on any invocation")

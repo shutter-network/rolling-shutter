@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/shutter-network/shutter/shlib/puredkg"
-
 	"gotest.tools/v3/assert"
+
+	"github.com/shutter-network/shutter/shlib/puredkg"
 )
 
 func TestReceiverIndicesForSender(t *testing.T) {

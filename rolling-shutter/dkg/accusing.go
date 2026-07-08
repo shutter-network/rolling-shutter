@@ -45,8 +45,8 @@ func (m *Manager) maybeAccuse(
 	queries := corekeyperdb.New(tx)
 	alreadySent, err := queries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionAccusing,
+		RetryCounter:   retryCounter,
+		Action:         ActionAccusing,
 	})
 	if err != nil {
 		return errors.Wrap(err, "check dkg sent action existence")
@@ -67,9 +67,9 @@ func (m *Manager) maybeAccuse(
 		// re-evaluating on every block is redundant work.
 		if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 			KeyperSetIndex: keyperSetIndex,
-			RetryCounter:      retryCounter,
-			Action:            ActionAccusing,
-			TxOutboxID:        sql.NullInt64{},
+			RetryCounter:   retryCounter,
+			Action:         ActionAccusing,
+			TxOutboxID:     sql.NullInt64{},
 		}); err != nil {
 			return errors.Wrap(err, "store accusing sent action marker (no accusations)")
 		}
@@ -104,9 +104,9 @@ func (m *Manager) maybeAccuse(
 	}
 	if err := queries.InsertDKGSentAction(ctx, corekeyperdb.InsertDKGSentActionParams{
 		KeyperSetIndex: keyperSetIndex,
-		RetryCounter:      retryCounter,
-		Action:            ActionAccusing,
-		TxOutboxID:        sql.NullInt64{Int64: outboxID, Valid: true},
+		RetryCounter:   retryCounter,
+		Action:         ActionAccusing,
+		TxOutboxID:     sql.NullInt64{Int64: outboxID, Valid: true},
 	}); err != nil {
 		return errors.Wrap(err, "store accusing sent action marker")
 	}

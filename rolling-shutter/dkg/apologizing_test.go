@@ -32,9 +32,9 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      0,
-		AccusedIndex:      1,
+		RetryCounter:   testRetry,
+		AccuserIndex:   0,
+		AccusedIndex:   1,
 	})
 	assert.NilError(t, err)
 
@@ -43,15 +43,15 @@ func TestMaybeApologizeEnqueuesApologyWhenAccused(t *testing.T) {
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies — chain syncer owns it")
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionApologizing,
+		RetryCounter:   testRetry,
+		Action:         ActionApologizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the apologizing action as enqueued")
@@ -80,9 +80,9 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      0,
-		AccusedIndex:      2,
+		RetryCounter:   testRetry,
+		AccuserIndex:   0,
+		AccusedIndex:   2,
 	})
 	assert.NilError(t, err)
 
@@ -91,7 +91,7 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(apologies))
@@ -102,8 +102,8 @@ func TestMaybeApologizeNoopWhenNotAccused(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionApologizing,
+		RetryCounter:   testRetry,
+		Action:         ActionApologizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should be written even when no apologies are sent")
@@ -137,9 +137,9 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      0,
-		AccusedIndex:      1,
+		RetryCounter:   testRetry,
+		AccuserIndex:   0,
+		AccusedIndex:   1,
 	})
 	assert.NilError(t, err)
 
@@ -160,9 +160,9 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 	// puredkg snapshot returned above — it must not error.
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      2,
-		AccusedIndex:      1,
+		RetryCounter:   testRetry,
+		AccuserIndex:   2,
+		AccusedIndex:   1,
 	})
 	assert.NilError(t, err)
 
@@ -174,7 +174,7 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	// maybeApologize no longer writes its own apology row — the chain
@@ -187,8 +187,8 @@ func TestMaybeApologizeToleratesAccusationBetweenReadAndWriteTx(t *testing.T) {
 
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionApologizing,
+		RetryCounter:   testRetry,
+		Action:         ActionApologizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should mark the apologizing action as enqueued")
@@ -212,9 +212,9 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err = coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      0,
-		AccusedIndex:      1,
+		RetryCounter:   testRetry,
+		AccuserIndex:   0,
+		AccusedIndex:   1,
 	})
 	assert.NilError(t, err)
 
@@ -225,8 +225,8 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 	assert.NilError(t, err)
 	sentAction, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		Action:            ActionApologizing,
+		RetryCounter:   testRetry,
+		Action:         ActionApologizing,
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, sentAction, "dkg_sent_actions row should exist for the apologizing action")
@@ -236,7 +236,7 @@ func TestMaybeApologizeIdempotent(t *testing.T) {
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(apologies), "maybeApologize must not write to dkg_apologies on any invocation")
@@ -258,9 +258,9 @@ func TestMaybeApologizeNoopWithoutInitialState(t *testing.T) {
 	coreQueries := corekeyperdb.New(env.dbpool)
 	err := coreQueries.InsertDKGAccusation(ctx, corekeyperdb.InsertDKGAccusationParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
-		AccuserIndex:      0,
-		AccusedIndex:      1,
+		RetryCounter:   testRetry,
+		AccuserIndex:   0,
+		AccusedIndex:   1,
 	})
 	assert.NilError(t, err)
 
@@ -269,7 +269,7 @@ func TestMaybeApologizeNoopWithoutInitialState(t *testing.T) {
 
 	apologies, err := coreQueries.GetDKGApologies(ctx, corekeyperdb.GetDKGApologiesParams{
 		KeyperSetIndex: testKsi,
-		RetryCounter:      testRetry,
+		RetryCounter:   testRetry,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(apologies))
