@@ -33,11 +33,13 @@ Where `{keyper_name}` represents the specific keyper implementation (e.g.,
 V{version_number}_{migration_description}.sql
 ```
 
+The version number must be zero-padded to 3 digits.
+
 #### Examples:
 
-- `V2_validatorRegistrations.sql`
-- `V3_addUserTable.sql`
-- `V4_updateIndexes.sql`
+- `V002_validatorRegistrations.sql`
+- `V003_addUserTable.sql`
+- `V004_updateIndexes.sql`
 
 #### Version Number Rules:
 
