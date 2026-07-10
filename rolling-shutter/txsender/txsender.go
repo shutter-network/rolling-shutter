@@ -152,7 +152,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: read nonce")
 		return
 	}
-	gasLimit, err := s.cfg.Client.EstimateGas(ctx, ethereum.CallMsg{
+	gasEstimate, err := s.cfg.Client.EstimateGas(ctx, ethereum.CallMsg{
 		From:  s.address,
 		To:    &to,
 		Value: value,
@@ -164,6 +164,10 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
 		return
 	}
+	// Multiply gas estimate to provide headroom for state changing between now
+	// and execution. If customization is needed in the future, the multiplier
+	// could become a optional column in TxOutbox
+	gasLimit := gasEstimate * 2
 	tipCap, err := s.cfg.Client.SuggestGasTipCap(ctx)
 	if err != nil {
 		log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).Msg("tx outbox: suggest gas tip cap")
