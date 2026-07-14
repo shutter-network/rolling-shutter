@@ -39,8 +39,8 @@ SELECT count(*) FROM decryption_key_share
 WHERE eon = $1 AND epoch_id = $2;
 
 -- name: InsertEon :exec
-INSERT INTO eons (eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length)
-VALUES ($1, $2, $3, $4, $5, $6);
+INSERT INTO eons (eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries)
+VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: GetEon :one
 SELECT * FROM eons WHERE eon=$1;

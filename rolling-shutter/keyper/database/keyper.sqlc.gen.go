@@ -148,7 +148,7 @@ func (q *Queries) GetAllDKGResults(ctx context.Context) ([]DkgResult, error) {
 }
 
 const getAllEons = `-- name: GetAllEons :many
-SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons ORDER BY eon
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries FROM eons ORDER BY eon
 `
 
 func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
@@ -167,6 +167,7 @@ func (q *Queries) GetAllEons(ctx context.Context) ([]Eon, error) {
 			&i.DkgContract,
 			&i.PhaseLength,
 			&i.LeadLength,
+			&i.MaxRetries,
 		); err != nil {
 			return nil, err
 		}
@@ -446,7 +447,7 @@ func (q *Queries) GetECIESKey(ctx context.Context, keyperAddress string) (EciesK
 }
 
 const getEon = `-- name: GetEon :one
-SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons WHERE eon=$1
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries FROM eons WHERE eon=$1
 `
 
 func (q *Queries) GetEon(ctx context.Context, eon int64) (Eon, error) {
@@ -459,12 +460,13 @@ func (q *Queries) GetEon(ctx context.Context, eon int64) (Eon, error) {
 		&i.DkgContract,
 		&i.PhaseLength,
 		&i.LeadLength,
+		&i.MaxRetries,
 	)
 	return i, err
 }
 
 const getEonForBlockNumber = `-- name: GetEonForBlockNumber :one
-SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length FROM eons
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries FROM eons
 WHERE activation_block_number <= $1
 ORDER BY activation_block_number DESC
 LIMIT 1
@@ -480,6 +482,7 @@ func (q *Queries) GetEonForBlockNumber(ctx context.Context, blockNumber int64) (
 		&i.DkgContract,
 		&i.PhaseLength,
 		&i.LeadLength,
+		&i.MaxRetries,
 	)
 	return i, err
 }
@@ -498,7 +501,7 @@ func (q *Queries) GetLatestEonForKeyperConfig(ctx context.Context, keyperConfigI
 }
 
 const getLatestStartedEonByKeyperConfigIndex = `-- name: GetLatestStartedEonByKeyperConfigIndex :one
-SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length
+SELECT eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries
 FROM eons
 WHERE keyper_config_index = $1
 ORDER BY eon DESC
@@ -515,6 +518,7 @@ func (q *Queries) GetLatestStartedEonByKeyperConfigIndex(ctx context.Context, ke
 		&i.DkgContract,
 		&i.PhaseLength,
 		&i.LeadLength,
+		&i.MaxRetries,
 	)
 	return i, err
 }
@@ -815,8 +819,8 @@ func (q *Queries) InsertDecryptionKeyShare(ctx context.Context, arg InsertDecryp
 }
 
 const insertEon = `-- name: InsertEon :exec
-INSERT INTO eons (eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO eons (eon, activation_block_number, keyper_config_index, dkg_contract, phase_length, lead_length, max_retries)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type InsertEonParams struct {
@@ -826,6 +830,7 @@ type InsertEonParams struct {
 	DkgContract           sql.NullString
 	PhaseLength           sql.NullInt64
 	LeadLength            sql.NullInt64
+	MaxRetries            int64
 }
 
 func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
@@ -836,6 +841,7 @@ func (q *Queries) InsertEon(ctx context.Context, arg InsertEonParams) error {
 		arg.DkgContract,
 		arg.PhaseLength,
 		arg.LeadLength,
+		arg.MaxRetries,
 	)
 	return err
 }

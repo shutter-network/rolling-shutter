@@ -127,7 +127,7 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	if err != nil {
 		return errors.Wrap(err, "convert activation block")
 	}
-	phaseLength, leadLength, err := m.phaseParamsForEon(eon)
+	phaseLength, leadLength, maxRetries, err := m.phaseParamsForEon(eon)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 
 	retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
 	retryInt64 := int64(retry) //nolint:gosec // G115: retry counter is bounded by the on-chain contract
-	blockPhase := PhaseAt(activationBlock, leadLength, phaseLength, retry, blockNumber)
+	blockPhase := PhaseAt(activationBlock, leadLength, phaseLength, maxRetries, retry, blockNumber)
 	if blockPhase == PhaseNone {
 		return nil
 	}
@@ -214,20 +214,22 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	})
 }
 
-// phaseParamsForEon returns the DKG phase length and lead length for the
-// given eon. Rows populated by `processNewKeyperSet` carry the values read
-// from the keyper-set-specific DKG contract; rows with NULL columns are a
-// fatal configuration error — the module owns no chain client and there is
-// no fallback to fetch them from.
-func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength uint64, err error) {
+// phaseParamsForEon returns the DKG phase length, lead length, and retry
+// ceiling (max_retries) for the given eon. Rows populated by
+// `processNewKeyperSet` carry the values read from the keyper-set-specific
+// DKG contract; rows with NULL phase_length or lead_length are a fatal
+// configuration error — the module owns no chain client and there is no
+// fallback to fetch them from. `max_retries` is a NOT NULL column, so it is
+// always present; see the `MAX_RETRIES` glossary entry for its semantics.
+func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength, maxRetries uint64, err error) {
 	if !eon.PhaseLength.Valid || !eon.LeadLength.Valid {
-		return 0, 0, errors.Errorf(
+		return 0, 0, 0, errors.Errorf(
 			"eons row %d missing DKG phase params (phase_length and/or lead_length is NULL)",
 			eon.KeyperConfigIndex,
 		)
 	}
-	//nolint:gosec // G115: phase and lead lengths come from the on-chain contract and are non-negative
-	return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), nil
+	//nolint:gosec // G115: phase length, lead length, and max retries come from the on-chain contract and are non-negative
+	return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), uint64(eon.MaxRetries), nil
 }
 
 // dkgContractAddrForEon returns the on-chain DKG contract address responsible
