@@ -90,6 +90,7 @@ type Eon struct {
 	DkgContract           sql.NullString
 	PhaseLength           sql.NullInt64
 	LeadLength            sql.NullInt64
+	MaxRetries            int64
 }
 
 type TxOutbox struct {

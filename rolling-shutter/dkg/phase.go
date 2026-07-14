@@ -57,7 +57,16 @@ func CycleLength(phaseLength uint64) uint64 {
 // at the given block number. Blocks before the dealing window or past the
 // finalizing window return PhaseNone. The boundaries are half-open: a phase
 // covers `[start + n*phaseLength, start + (n+1)*phaseLength)` for n = 0..3.
-func PhaseAt(activationBlock, dkgLeadLength, phaseLength, retryCounter, currentBlock uint64) Phase {
+//
+// `maxRetries` is the on-chain retry ceiling for this keyper set (see the
+// `MAX_RETRIES` glossary entry): the valid retry-counter range is
+// `{0, ..., maxRetries - 1}`. Any `retryCounter >= maxRetries` returns
+// PhaseNone before any window arithmetic. `maxRetries` is positioned before
+// `retryCounter` to mirror the DKG contract's argument ordering.
+func PhaseAt(activationBlock, dkgLeadLength, phaseLength, maxRetries, retryCounter, currentBlock uint64) Phase {
+	if retryCounter >= maxRetries {
+		return PhaseNone
+	}
 	if phaseLength == 0 {
 		return PhaseNone
 	}

@@ -73,7 +73,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return errors.Wrap(err, "check existing eon row")
 			}
-			dkgContract, phaseLength, leadLength := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
+			dkgContract, phaseLength, leadLength, maxRetries := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
 			if err := coredb.InsertEon(ctx, corekeyperdb.InsertEonParams{
 				Eon:                   keyperSetIndex,
 				ActivationBlockNumber: activationBlockNumber,
@@ -81,6 +81,7 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 				DkgContract:           dkgContract,
 				PhaseLength:           phaseLength,
 				LeadLength:            leadLength,
+				MaxRetries:            maxRetries,
 			}); err != nil {
 				return errors.Wrap(err, "insert eon row for new keyper set")
 			}
@@ -106,59 +107,67 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 	ctx context.Context,
 	keyperSetAddr common.Address,
-) (sql.NullString, sql.NullInt64, sql.NullInt64) {
+) (sql.NullString, sql.NullInt64, sql.NullInt64, int64) {
 	var (
 		nullStr sql.NullString
 		nullInt sql.NullInt64
 	)
 	if (keyperSetAddr == common.Address{}) {
 		log.Warn().Msg("keyper set event missing contract address; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	ks, err := keypersetBindings.NewKeyperset(keyperSetAddr, kpr.chainSyncClient.Client)
 	if err != nil {
 		log.Warn().Err(err).Str("keyper-set", keyperSetAddr.Hex()).
 			Msg("bind keyper set contract for DKG lookup; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	callOpts := &bind.CallOpts{Context: ctx}
 	dkgAddr, err := ks.GetDKGContract(callOpts)
 	if err != nil {
 		log.Warn().Err(err).Str("keyper-set", keyperSetAddr.Hex()).
 			Msg("call getDKGContract; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	if (dkgAddr == common.Address{}) {
 		log.Warn().Str("keyper-set", keyperSetAddr.Hex()).
 			Msg("keyper set has no DKG contract configured; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	dkg, err := dkgcontract.NewDkgcontract(dkgAddr, kpr.chainSyncClient.Client)
 	if err != nil {
 		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
 			Msg("bind DKG contract; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	phaseLength, err := dkg.PHASELENGTH(callOpts)
 	if err != nil {
 		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
 			Msg("read PHASE_LENGTH; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
 	}
 	leadLength, err := dkg.DKGLEADLENGTH(callOpts)
 	if err != nil {
 		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
 			Msg("read DKG_LEAD_LENGTH; storing NULL phase params")
-		return nullStr, nullInt, nullInt
+		return nullStr, nullInt, nullInt, 0
+	}
+	maxRetries, err := dkg.MAXRETRIES(callOpts)
+	if err != nil {
+		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
+			Msg("read MAX_RETRIES; storing NULL phase params")
+		return nullStr, nullInt, nullInt, 0
 	}
 	log.Info().
 		Str("keyper-set", keyperSetAddr.Hex()).
 		Str("dkg-contract", dkgAddr.Hex()).
 		Uint64("phase-length", phaseLength).
 		Uint64("lead-length", leadLength).
+		Uint64("max-retries", maxRetries).
 		Msg("resolved per-keyper-set DKG contract params")
-	//nolint:gosec // G115: phase and lead lengths come from the on-chain contract and fit well within int64
+	//nolint:gosec // G115: phase length, lead length, and max retries come from the on-chain contract and fit well within int64
 	return sql.NullString{String: dkgAddr.Hex(), Valid: true},
 		sql.NullInt64{Int64: int64(phaseLength), Valid: true},
-		sql.NullInt64{Int64: int64(leadLength), Valid: true}
+		sql.NullInt64{Int64: int64(leadLength), Valid: true},
+		int64(maxRetries)
 }

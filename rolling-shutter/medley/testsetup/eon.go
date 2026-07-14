@@ -93,6 +93,7 @@ func InitializeEon(
 		Eon:                   int64(config.GetEon()),
 		ActivationBlockNumber: 0,
 		KeyperConfigIndex:     1,
+		MaxRetries:            10,
 	})
 	assert.NilError(tb, err)
 	err = keyperDB.InsertDKGResult(ctx, database.InsertDKGResultParams{

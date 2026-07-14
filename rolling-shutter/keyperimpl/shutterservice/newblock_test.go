@@ -596,6 +596,7 @@ func insertEon(
 		Eon:                   eon,
 		ActivationBlockNumber: activationBlockNumber,
 		KeyperConfigIndex:     testKeyperConfigIndex,
+		MaxRetries:            10,
 	})
 	assert.NilError(t, err)
 }
