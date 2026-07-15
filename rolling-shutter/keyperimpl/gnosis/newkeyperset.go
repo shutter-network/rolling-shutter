@@ -41,6 +41,23 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		return errors.Wrap(err, ErrParseKeyperSet.Error())
 	}
 
+	// Fetch DKG phase params before opening the DB transaction: the RPC calls
+	// can be slow and we do not want to hold row locks across them. On event
+	// replay this is a wasted round-trip because the existing-row check inside
+	// the transaction will short-circuit, but replays are rare.
+	var (
+		dkgContract sql.NullString
+		phaseLength sql.NullInt64
+		leadLength  sql.NullInt64
+		maxRetries  int64
+	)
+	if isMember {
+		dkgContract, phaseLength, leadLength, maxRetries, err = kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
+		if err != nil {
+			return errors.Wrap(err, "fetch DKG params for new keyper set")
+		}
+	}
+
 	if err := kpr.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		obskeyperdb := obskeyper.New(tx)
 		coredb := corekeyperdb.New(tx)
@@ -72,10 +89,6 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 				return nil
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return errors.Wrap(err, "check existing eon row")
-			}
-			dkgContract, phaseLength, leadLength, maxRetries, err := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
-			if err != nil {
-				return errors.Wrap(err, "fetch DKG params for new keyper set")
 			}
 			if err := coredb.InsertEon(ctx, corekeyperdb.InsertEonParams{
 				Eon:                   keyperSetIndex,
