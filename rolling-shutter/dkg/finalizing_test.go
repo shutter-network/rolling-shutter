@@ -170,6 +170,7 @@ func TestHandleDKGSuccessRetry1AfterRetry0Failed(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Assert(t, result.Success, "dkg_result row must mark success")
 	assert.Assert(t, len(result.PureResult) > 0, "pure_result must be populated for a participating keyper")
+	assert.Assert(t, !result.Error.Valid, "error must be NULL when result was computed successfully")
 
 	// Idempotency: second HandleDKGSuccess call is a no-op.
 	err = env.dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {

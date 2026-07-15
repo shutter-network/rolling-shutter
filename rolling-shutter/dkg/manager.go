@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -273,6 +274,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperSetInde
 	var resultNumKeypers, resultThreshold uint64
 	var accusationCount, apologyCount int
 	var hasResult bool
+	var localErr sql.NullString
 
 	ownIndex, memberErr := keyperSet.GetIndex(m.cfg.OwnAddress)
 	if memberErr == nil {
@@ -288,10 +290,13 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperSetInde
 		if err != nil {
 			return errors.Wrap(err, "rebuild puredkg for success")
 		}
-		if pure != nil {
+		if pure == nil {
+			localErr = sql.NullString{String: "local: buildPureDKG returned nil", Valid: true}
+		} else {
 			pure.Finalize()
 			result, err := pure.ComputeResult()
 			if err != nil {
+				localErr = sql.NullString{String: fmt.Sprintf("local: compute result failed: %s", err), Valid: true}
 				log.Warn().Err(err).
 					Int64("keyper-set-index", keyperSetIndex).
 					Int64("retry-counter", retryCounter).
@@ -324,7 +329,7 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperSetInde
 	return queries.InsertDKGResult(ctx, corekeyperdb.InsertDKGResultParams{
 		Eon:        keyperSetIndex,
 		Success:    true,
-		Error:      sql.NullString{},
+		Error:      localErr,
 		PureResult: pureBytes,
 	})
 }
