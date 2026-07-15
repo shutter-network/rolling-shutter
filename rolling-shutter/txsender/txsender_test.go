@@ -3,9 +3,13 @@ package txsender
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
+	"io"
 	"math/big"
+	"net"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
@@ -15,6 +19,7 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	"gotest.tools/assert"
 
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
@@ -343,3 +348,44 @@ func TestSubmitRowBuildsDynamicFeeTx(t *testing.T) {
 type stubError string
 
 func (e stubError) Error() string { return string(e) }
+
+// stubRPCError mimics the shape of a JSON-RPC application error returned by
+// go-ethereum's rpc package (see rpc.Error). isTransient must NOT treat these
+// as transient: they represent deliberate rejections from the node.
+type stubRPCError struct {
+	msg  string
+	code int
+}
+
+func (e *stubRPCError) Error() string  { return e.msg }
+func (e *stubRPCError) ErrorCode() int { return e.code }
+
+func TestIsTransient(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"context canceled", context.Canceled, true},
+		{"context deadline exceeded", context.DeadlineExceeded, true},
+		{"wrapped context canceled", errors.Wrap(context.Canceled, "outer"), true},
+		{"syscall ECONNREFUSED", syscall.ECONNREFUSED, true},
+		{"syscall ECONNRESET", syscall.ECONNRESET, true},
+		{"wrapped syscall errno", errors.Wrap(syscall.ETIMEDOUT, "dial"), true},
+		{"io.EOF", io.EOF, true},
+		{"io.ErrUnexpectedEOF", io.ErrUnexpectedEOF, true},
+		{"net.OpError wrapping syscall", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}, true},
+		{"net.DNSError timeout", &net.DNSError{Err: "i/o timeout", Name: "example", IsTimeout: true}, true},
+		{"plain error", stderrors.New("boom"), false},
+		{"wrapped plain error", errors.Wrap(stderrors.New("boom"), "outer"), false},
+		{"rpc application error", &stubRPCError{msg: "already known", code: -32000}, false},
+		{"wrapped rpc application error", errors.Wrap(&stubRPCError{msg: "nonce too low", code: -32000}, "send transaction"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isTransient(tc.err))
+		})
+	}
+}
+

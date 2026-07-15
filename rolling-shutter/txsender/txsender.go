@@ -13,7 +13,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"io"
 	"math/big"
+	"net"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -159,9 +162,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		Data:  row.Data,
 	})
 	if err != nil {
-		// Gas estimation failures usually mean the transaction would revert;
-		// record it as failed so an operator can inspect the calldata.
-		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
+		s.markFailedUnlessTransient(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
 		return
 	}
 	// Multiply gas estimate to provide headroom for state changing between now
@@ -223,12 +224,7 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	}
 
 	if err := s.cfg.Client.SendTransaction(ctx, signed); err != nil {
-		// SendTransaction can fail for transient (RPC) or terminal (already
-		// known, replacement underpriced) reasons. Mark the row failed in all
-		// cases — MarkTxFailed has no precondition on the current status so
-		// the submitted -> failed transition is valid. Re-broadcast logic for
-		// stuck submitted rows (without on-chain inclusion) is out of scope.
-		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "send transaction"))
+		s.markFailedUnlessTransient(ctx, row.ID, row.Label, errors.Wrap(err, "send transaction"))
 		return
 	}
 
@@ -286,6 +282,48 @@ func (s *TxSender) checkReceipt(ctx context.Context, row corekeyperdb.TxOutbox) 
 	}
 
 	s.markFailed(ctx, row.ID, row.Label, errors.Errorf("tx receipt status %d", receipt.Status))
+}
+
+// isTransient reports whether err is a known transient chain-client failure
+// that warrants leaving the outbox row for the next tick rather than terminally
+// failing it. It is intentionally a positive allowlist: unknown errors fall
+// through and are treated as terminal by callers. Other transient failures
+// (e.g. HTTP 5xx from the RPC endpoint) may exist and are not covered here;
+// extend the list if a class of transient error is observed terminally failing
+// rows in production.
+func isTransient(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	return false
+}
+
+// markFailedUnlessTransient records the row as failed unless cause is a known
+// transient error, in which case it is logged and the row is left in its
+// current state for the next tick. Use this at chain-call sites where the
+// default disposition is to mark failed; sites that already retry on all
+// errors keep their own warn-and-return pattern.
+func (s *TxSender) markFailedUnlessTransient(ctx context.Context, id int64, label string, cause error) {
+	if isTransient(cause) {
+		log.Warn().Err(cause).Int64("id", id).Str("label", label).
+			Msg("tx outbox: transient chain-client error, will retry")
+		return
+	}
+	s.markFailed(ctx, id, label, cause)
 }
 
 func (s *TxSender) markFailed(ctx context.Context, id int64, label string, cause error) {
