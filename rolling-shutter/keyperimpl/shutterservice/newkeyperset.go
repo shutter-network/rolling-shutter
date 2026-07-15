@@ -74,7 +74,10 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return errors.Wrap(err, "check existing eon row")
 			}
-			dkgContract, phaseLength, leadLength, maxRetries := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
+			dkgContract, phaseLength, leadLength, maxRetries, err := kpr.fetchDKGParamsForKeyperSet(ctx, ev.Contract)
+			if err != nil {
+				return errors.Wrap(err, "fetch DKG params for new keyper set")
+			}
 			if err := coredb.InsertEon(ctx, corekeyperdb.InsertEonParams{
 				Eon:                   keyperSetIndex,
 				ActivationBlockNumber: activationBlockNumber,
@@ -102,62 +105,48 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 // fetchDKGParamsForKeyperSet asks the keyper set contract for its DKG contract
 // address and then reads the immutable phase parameters from that DKG contract.
 // Any failure (zero address, RPC error, missing methods on an old contract) is
-// logged and surfaced as NULL columns; downstream callers fall back to the
-// config-supplied DKG contract address. This is a best-effort enrichment, not
-// a precondition for joining the keyper set.
+// returned as an error. The DKG manager treats NULL phase params in the eons
+// row as a fatal configuration error and has no chain-client fallback, so we
+// must not insert the eon row without these values; propagating the error lets
+// the outer event loop log and retry on the next chainsync re-delivery.
 func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 	ctx context.Context,
 	keyperSetAddr common.Address,
-) (sql.NullString, sql.NullInt64, sql.NullInt64, int64) {
+) (sql.NullString, sql.NullInt64, sql.NullInt64, int64, error) {
 	var (
 		nullStr sql.NullString
 		nullInt sql.NullInt64
 	)
 	if (keyperSetAddr == common.Address{}) {
-		log.Warn().Msg("keyper set event missing contract address; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.New("keyper set event missing contract address")
 	}
 	ks, err := keypersetBindings.NewKeyperset(keyperSetAddr, kpr.chainSyncClient.Client)
 	if err != nil {
-		log.Warn().Err(err).Str("keyper-set", keyperSetAddr.Hex()).
-			Msg("bind keyper set contract for DKG lookup; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "bind keyper set contract %s", keyperSetAddr.Hex())
 	}
 	callOpts := &bind.CallOpts{Context: ctx}
 	dkgAddr, err := ks.GetDKGContract(callOpts)
 	if err != nil {
-		log.Warn().Err(err).Str("keyper-set", keyperSetAddr.Hex()).
-			Msg("call getDKGContract; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "call getDKGContract on keyper set %s", keyperSetAddr.Hex())
 	}
 	if (dkgAddr == common.Address{}) {
-		log.Warn().Str("keyper-set", keyperSetAddr.Hex()).
-			Msg("keyper set has no DKG contract configured; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Errorf("keyper set %s has no DKG contract configured", keyperSetAddr.Hex())
 	}
 	dkg, err := dkgcontract.NewDkgcontract(dkgAddr, kpr.chainSyncClient.Client)
 	if err != nil {
-		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
-			Msg("bind DKG contract; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "bind DKG contract %s", dkgAddr.Hex())
 	}
 	phaseLength, err := dkg.PHASELENGTH(callOpts)
 	if err != nil {
-		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
-			Msg("read PHASE_LENGTH; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "read PHASE_LENGTH from %s", dkgAddr.Hex())
 	}
 	leadLength, err := dkg.DKGLEADLENGTH(callOpts)
 	if err != nil {
-		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
-			Msg("read DKG_LEAD_LENGTH; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "read DKG_LEAD_LENGTH from %s", dkgAddr.Hex())
 	}
 	maxRetries, err := dkg.MAXRETRIES(callOpts)
 	if err != nil {
-		log.Warn().Err(err).Str("dkg-contract", dkgAddr.Hex()).
-			Msg("read MAX_RETRIES; storing NULL phase params")
-		return nullStr, nullInt, nullInt, 0
+		return nullStr, nullInt, nullInt, 0, errors.Wrapf(err, "read MAX_RETRIES from %s", dkgAddr.Hex())
 	}
 	log.Info().
 		Str("keyper-set", keyperSetAddr.Hex()).
@@ -170,5 +159,6 @@ func (kpr *Keyper) fetchDKGParamsForKeyperSet(
 	return sql.NullString{String: dkgAddr.Hex(), Valid: true},
 		sql.NullInt64{Int64: int64(phaseLength), Valid: true},
 		sql.NullInt64{Int64: int64(leadLength), Valid: true},
-		int64(maxRetries)
+		int64(maxRetries),
+		nil
 }
