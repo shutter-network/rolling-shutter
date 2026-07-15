@@ -32,7 +32,7 @@ require (
 	github.com/primev/mev-commit/contracts-abi v0.0.0-20250922193515-6d402958637d
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/zerolog v1.28.0
-	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20260714174936-929d7e1043cc
+	github.com/shutter-network/contracts/v2 v2.0.0-beta.2.0.20260715224904-80d0dd0f354d
 	github.com/shutter-network/gnosh-contracts v0.4.0
 	github.com/shutter-network/shop-contracts v0.0.0-20240407151512-08ef5d8355b6
 	github.com/shutter-network/shutter/shlib v0.1.19

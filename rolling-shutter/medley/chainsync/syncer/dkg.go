@@ -33,12 +33,13 @@ type keyperSetIndexer interface {
 type dkgContractResolver func(ctx context.Context, opts *bind.CallOpts, keyperSetAddr common.Address) (common.Address, error)
 
 // dkgContractBackend is the subset of *dkgcontract.Dkgcontract used by the
-// per-contract subscription goroutine: the Succeeded(ksi) read for initial
-// success synthesis and the five bulletin-board event subscriptions. Pulling
-// it out as an interface lets tests substitute a fake backend that emits
-// canned events without touching a simulated chain.
+// per-contract subscription goroutine: the Succeeded(ksi) / SucceededAtRetry(ksi)
+// reads for initial success synthesis and the five bulletin-board event
+// subscriptions. Pulling it out as an interface lets tests substitute a fake
+// backend that emits canned events without touching a simulated chain.
 type dkgContractBackend interface {
 	Succeeded(opts *bind.CallOpts, keyperSetIndex uint64) (bool, error)
+	SucceededAtRetry(opts *bind.CallOpts, keyperSetIndex uint64) (uint64, error)
 	WatchDealingSubmitted(
 		opts *bind.WatchOpts,
 		sink chan<- *dkgcontract.DkgcontractDealingSubmitted,
@@ -405,8 +406,13 @@ func (s *DKGSyncer) initialSuccessesForContract(
 		if !succeeded {
 			continue
 		}
+		retry, err := backend.SucceededAtRetry(opts, i)
+		if err != nil {
+			return nil, errors.Wrapf(err, "query succeededAtRetry for keyper set %d", i)
+		}
 		events = append(events, &event.SuccessEvent{
 			KeyperSetIndex: i,
+			RetryCounter:   retry,
 			AtBlockNumber:  number.BigToBlockNumber(opts.BlockNumber),
 		})
 	}

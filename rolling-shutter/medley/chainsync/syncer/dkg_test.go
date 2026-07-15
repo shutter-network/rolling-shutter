@@ -428,8 +428,11 @@ func (f *fakeSubscription) Unsubscribe()      { f.once.Do(func() { close(f.errCh
 // emit* helpers. Subscription channels are captured on the first Watch call;
 // tests should set up the syncer before emitting events.
 type fakeDKGBackend struct {
-	addr      common.Address
-	succeeded map[uint64]bool
+	addr common.Address
+	// succeededRetry may be nil; tests that do not care about the retry value
+	// leave it unset and every success reports retry 0.
+	succeeded      map[uint64]bool
+	succeededRetry map[uint64]uint64
 
 	// watchErrs maps an event-type key ("dealing", "accusation", "apology",
 	// "successVote", "success") to an error the corresponding Watch* call should
@@ -457,6 +460,18 @@ func newFakeDKGBackend(addr common.Address) *fakeDKGBackend {
 
 func (b *fakeDKGBackend) Succeeded(_ *bind.CallOpts, ksi uint64) (bool, error) {
 	return b.succeeded[ksi], nil
+}
+
+// SucceededAtRetry errors for keyper sets whose DKG did not succeed, matching
+// the require(v != 0, "not succeeded") revert on chain.
+func (b *fakeDKGBackend) SucceededAtRetry(_ *bind.CallOpts, ksi uint64) (uint64, error) {
+	if !b.succeeded[ksi] {
+		return 0, errors.New("not succeeded")
+	}
+	if b.succeededRetry == nil {
+		return 0, nil
+	}
+	return b.succeededRetry[ksi], nil
 }
 
 func (b *fakeDKGBackend) WatchDealingSubmitted(
@@ -756,6 +771,40 @@ func TestStartContractSubscriptionInitialSuccessesDeliveredBeforeLiveEvents(t *t
 	ev3 := handler.expectNextEvent(t)
 	_, ok = ev3.(*event.DealingEvent)
 	assert.Assert(t, ok, "live event after initial successes must be *DealingEvent, got %T", ev3)
+}
+
+// TestInitialSuccessesCarryRetryCounterFromSucceededAtRetry asserts that
+// synthetic SuccessEvents emitted for already-completed DKGs at startup carry
+// the RetryCounter the DKG actually succeeded at.
+func TestInitialSuccessesCarryRetryCounterFromSucceededAtRetry(t *testing.T) {
+	addr := common.HexToAddress("0xaa")
+	backend := newFakeDKGBackend(addr)
+	backend.succeeded[0] = true
+	backend.succeeded[2] = true
+	backend.succeededRetry = map[uint64]uint64{
+		0: 0,
+		2: 3,
+	}
+
+	s, handler := newSubscriptionSyncer(t, map[common.Address]*fakeDKGBackend{addr: backend})
+	s.tryTrack(addr, 2)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := newFakeRunner(ctx)
+	t.Cleanup(func() { cancel(); runner.Wait() })
+
+	s.startEventConsumer(ctx, runner)
+	assert.NilError(t, s.startContractSyncer(ctx, runner, addr, 100))
+
+	got := map[uint64]uint64{}
+	for i := 0; i < 2; i++ {
+		ev := handler.expectNextEvent(t)
+		se, ok := ev.(*event.SuccessEvent)
+		assert.Assert(t, ok, "delivered event %d must be *SuccessEvent, got %T", i, ev)
+		got[se.KeyperSetIndex] = se.RetryCounter
+	}
+	assert.Equal(t, uint64(0), got[0], "ksi 0 succeeded at retry 0")
+	assert.Equal(t, uint64(3), got[2], "ksi 2 succeeded at retry 3")
 }
 
 func TestStartViaTrackedListDeliversEventsFromTwoDistinctContracts(t *testing.T) {
