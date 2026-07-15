@@ -3,11 +3,14 @@ package dkg
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/jackc/pgx/v4"
 	"gotest.tools/v3/assert"
 
 	obskeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
@@ -289,5 +292,221 @@ func TestProcessDKGWritesNothingPastMaxRetries(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Assert(t, !sentAction,
 			"no dkg_sent_actions row may be written for action=%s once past max_retries", action)
+	}
+}
+
+// TestHandleBlockSkipsSupersededKeyperSet is the end-to-end wire-through for
+// the supersession filter (Seam 2 case a): two Keyper Sets with activation
+// blocks 100 and 120; advancing to a block past the successor's activation
+// must leave the older set silent — no `tx_outbox` row and no
+// `dkg_sent_actions` row for any of the four phases.
+func TestHandleBlockSkipsSupersededKeyperSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	const (
+		olderIndex      int64 = 1
+		newerIndex      int64 = 2
+		olderActivation int64 = 100
+		newerActivation int64 = 120
+		phaseLength     int64 = 10
+		leadLength      int64 = 2
+		maxRetries      int64 = 10
+		// blockNumber lands in what would be the older set's retry-1 Dealing
+		// window (retry 0 dealing at [98, 108), retry 1 dealing at [138, 148)).
+		// 130 is past the successor's activation (120), so supersession must
+		// keep the older set silent even though a naive read of the phase
+		// arithmetic would place the older set outside PhaseNone at 138+.
+		blockNumber uint64 = 138
+	)
+
+	ownECDSA, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	ownAddr := crypto.PubkeyToAddress(ownECDSA.PublicKey)
+
+	coreQueries := corekeyperdb.New(dbpool)
+	for _, e := range []struct {
+		idx        int64
+		activation int64
+	}{
+		{olderIndex, olderActivation},
+		{newerIndex, newerActivation},
+	} {
+		err = coreQueries.InsertEon(ctx, corekeyperdb.InsertEonParams{
+			Eon:                   e.idx,
+			ActivationBlockNumber: e.activation,
+			KeyperConfigIndex:     e.idx,
+			DkgContract:           sql.NullString{String: "0xd0000000000000000000000000000000000000aa", Valid: true},
+			PhaseLength:           sql.NullInt64{Int64: phaseLength, Valid: true},
+			LeadLength:            sql.NullInt64{Int64: leadLength, Valid: true},
+			MaxRetries:            maxRetries,
+		})
+		assert.NilError(t, err)
+	}
+
+	obsQueries := obskeyperdb.New(dbpool)
+	for _, e := range []struct {
+		idx        int64
+		activation int64
+	}{
+		{olderIndex, olderActivation},
+		{newerIndex, newerActivation},
+	} {
+		err = obsQueries.InsertKeyperSet(ctx, obskeyperdb.InsertKeyperSetParams{
+			KeyperConfigIndex:     e.idx,
+			ActivationBlockNumber: e.activation,
+			Keypers:               shdb.EncodeAddresses([]common.Address{ownAddr}),
+			Threshold:             1,
+		})
+		assert.NilError(t, err)
+	}
+
+	mgr := New(Config{
+		DBPool:            dbpool,
+		OwnAddress:        ownAddr,
+		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
+		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
+	})
+
+	err = mgr.HandleBlock(ctx, blockNumber)
+	assert.NilError(t, err)
+
+	pending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	olderLabelMarker := fmt.Sprintf("ksi=%d ", olderIndex)
+	for _, tx := range pending {
+		assert.Assert(t, !strings.Contains(tx.Label, olderLabelMarker),
+			"no tx_outbox row may be written for the superseded older set (label=%q)", tx.Label)
+	}
+
+	for retry := int64(0); retry < maxRetries; retry++ {
+		for _, action := range []string{ActionDealing, ActionAccusing, ActionApologizing, ActionFinalizing} {
+			sent, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+				KeyperSetIndex: olderIndex,
+				RetryCounter:   retry,
+				Action:         action,
+			})
+			assert.NilError(t, err)
+			assert.Assert(t, !sent,
+				"no dkg_sent_actions row may be written for superseded set (retry=%d, action=%s)", retry, action)
+		}
+	}
+}
+
+// TestHandleDKGSuccessOnSupersededSetStillWritesResult is the end-to-end
+// wire-through for the peer-driven success case (Seam 2 case b): after the
+// successor has activated, a `DKGSucceeded` event arriving for the older
+// (superseded) set must still write the `dkg_result` row exactly as it does
+// today, and the next HandleBlock must still produce no submissions for the
+// older set.
+func TestHandleDKGSuccessOnSupersededSetStillWritesResult(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	const (
+		olderIndex      int64  = 1
+		newerIndex      int64  = 2
+		olderActivation int64  = 100
+		newerActivation int64  = 120
+		phaseLength     int64  = 10
+		leadLength      int64  = 2
+		maxRetries      int64  = 10
+		blockNumber     uint64 = 138
+		retryCounter    int64  = 0
+	)
+
+	ownECDSA, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	ownAddr := crypto.PubkeyToAddress(ownECDSA.PublicKey)
+
+	coreQueries := corekeyperdb.New(dbpool)
+	for _, e := range []struct {
+		idx        int64
+		activation int64
+	}{
+		{olderIndex, olderActivation},
+		{newerIndex, newerActivation},
+	} {
+		err = coreQueries.InsertEon(ctx, corekeyperdb.InsertEonParams{
+			Eon:                   e.idx,
+			ActivationBlockNumber: e.activation,
+			KeyperConfigIndex:     e.idx,
+			DkgContract:           sql.NullString{String: "0xd0000000000000000000000000000000000000aa", Valid: true},
+			PhaseLength:           sql.NullInt64{Int64: phaseLength, Valid: true},
+			LeadLength:            sql.NullInt64{Int64: leadLength, Valid: true},
+			MaxRetries:            maxRetries,
+		})
+		assert.NilError(t, err)
+	}
+
+	obsQueries := obskeyperdb.New(dbpool)
+	for _, e := range []struct {
+		idx        int64
+		activation int64
+	}{
+		{olderIndex, olderActivation},
+		{newerIndex, newerActivation},
+	} {
+		err = obsQueries.InsertKeyperSet(ctx, obskeyperdb.InsertKeyperSetParams{
+			KeyperConfigIndex:     e.idx,
+			ActivationBlockNumber: e.activation,
+			Keypers:               shdb.EncodeAddresses([]common.Address{ownAddr}),
+			Threshold:             1,
+		})
+		assert.NilError(t, err)
+	}
+
+	mgr := New(Config{
+		DBPool:            dbpool,
+		OwnAddress:        ownAddr,
+		ECIESPrivateKey:   ecies.ImportECDSA(ownECDSA),
+		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
+	})
+
+	// Peer-driven success on the (already superseded) older set.
+	err = dbpool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		return mgr.HandleDKGSuccess(ctx, tx, olderIndex, retryCounter)
+	})
+	assert.NilError(t, err)
+
+	succeeded, err := coreQueries.ExistsDKGResultSuccess(ctx, olderIndex)
+	assert.NilError(t, err)
+	assert.Assert(t, succeeded, "HandleDKGSuccess must write dkg_result row even for a superseded set")
+
+	// Next HandleBlock must still be a no-op for the older set: the
+	// "already-succeeded" filter now also excludes it, but the supersession
+	// filter alone was already enough.
+	err = mgr.HandleBlock(ctx, blockNumber)
+	assert.NilError(t, err)
+
+	pending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	olderLabelMarker := fmt.Sprintf("ksi=%d ", olderIndex)
+	for _, tx := range pending {
+		assert.Assert(t, !strings.Contains(tx.Label, olderLabelMarker),
+			"no tx_outbox row may be written for the superseded older set after peer-driven success (label=%q)", tx.Label)
+	}
+
+	for retry := int64(0); retry < maxRetries; retry++ {
+		for _, action := range []string{ActionDealing, ActionAccusing, ActionApologizing, ActionFinalizing} {
+			sent, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+				KeyperSetIndex: olderIndex,
+				RetryCounter:   retry,
+				Action:         action,
+			})
+			assert.NilError(t, err)
+			assert.Assert(t, !sent,
+				"no dkg_sent_actions row may be written for superseded set (retry=%d, action=%s)", retry, action)
+		}
 	}
 }

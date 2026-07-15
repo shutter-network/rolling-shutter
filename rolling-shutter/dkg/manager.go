@@ -86,10 +86,18 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
 	}
-	eons, err := m.activeDKGs(ctx, blockNumber)
+	eons, summary, err := m.activeDKGs(ctx, blockNumber)
 	if err != nil {
 		return errors.Wrap(err, "list active DKGs")
 	}
+	log.Debug().
+		Uint64("block-number", blockNumber).
+		Int("active", len(eons)).
+		Int("filtered-not-member", summary.notMember).
+		Int("filtered-succeeded", summary.succeeded).
+		Int("filtered-superseded", summary.superseded).
+		Int("filtered-retries-exhausted", summary.retriesExhausted).
+		Msg("DKG manager: active DKGs")
 	for _, eon := range eons {
 		if err := m.processDKG(ctx, eon, blockNumber); err != nil {
 			log.Error().Err(err).
@@ -101,58 +109,107 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	return nil
 }
 
+// activeDKGsSummary counts how many eons were filtered out by each reason.
+// Populated by `activeDKGs` and logged by `HandleBlock` as a single per-block
+// summary line — there is no per-skip log line.
+type activeDKGsSummary struct {
+	notMember        int
+	succeeded        int
+	superseded       int
+	retriesExhausted int
+}
+
 // activeDKGs returns the eons this keyper must still consider at `blockNumber`.
 // It applies the "over or not mine" filters in one place so per-eon processing
 // can focus on phase math. Filters, in the order applied — membership first
-// because it is the most selective, then prior success, then the retry ceiling:
+// because it is the most selective, then prior success, then supersession,
+// then the retry ceiling:
 //
 //  1. Local keyper is a member of the eon's Keyper Set.
 //  2. No `dkg_result` success row exists for the Keyper Set Index.
-//  3. The current retry counter is below `MAX_RETRIES`.
+//  3. The Keyper Set is not superseded at this block (i.e. no later Keyper
+//     Set has already activated). See CONTEXT.md#superseded-keyper-set.
+//  4. The current retry counter is below `MAX_RETRIES`.
+//
+// The supersession predicate reuses the observer's existing "latest keyper
+// set with activation block <= N" query (`GetKeyperSet`). `pgx.ErrNoRows` from
+// that query means "no Keyper Set is live yet" and no set is considered
+// superseded — future scheduled sets remain active.
 //
 // Eons whose configuration is too incomplete to evaluate a filter (e.g. NULL
 // `phase_length`) are passed through: `processDKG` will surface the config
 // error, HandleBlock will log it. A single query joining eons + keyper sets +
 // dkg_result would be more efficient, but keyper sets live in the observer
 // schema (separate connection pool) so cross-schema joins are not possible.
-func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekeyperdb.Eon, error) {
+//
+// The returned summary counts, one per filter, are populated so HandleBlock
+// can emit a single per-block Debug summary line without any per-skip log
+// entries. On error the returned summary is zero-valued.
+func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekeyperdb.Eon, activeDKGsSummary, error) {
 	queries := corekeyperdb.New(m.cfg.DBPool)
 	obsQueries := obskeyper.New(m.cfg.DBPool)
 	allEons, err := queries.GetAllEons(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "list eons")
+		return nil, activeDKGsSummary{}, errors.Wrap(err, "list eons")
 	}
+
+	// Resolve the "latest keyper set at this block" once. Its index is the
+	// supersession threshold: any Keyper Set with a strictly smaller index is
+	// superseded. `pgx.ErrNoRows` means no set is live yet, so nothing is
+	// superseded (future scheduled sets stay active).
+	var latestActiveIndex int64
+	haveLatestActive := false
+	//nolint:gosec // G115: block numbers fit in int64 in practice.
+	latestActive, err := obsQueries.GetKeyperSet(ctx, int64(blockNumber))
+	switch {
+	case err == nil:
+		latestActiveIndex = latestActive.KeyperConfigIndex
+		haveLatestActive = true
+	case errors.Is(err, pgx.ErrNoRows):
+		// No Keyper Set is live yet — no supersession possible.
+	default:
+		return nil, activeDKGsSummary{}, errors.Wrap(err, "fetch latest active keyper set")
+	}
+
+	summary := activeDKGsSummary{}
 	active := make([]corekeyperdb.Eon, 0, len(allEons))
 	for _, eon := range allEons {
 		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
 		if err != nil {
-			return nil, errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
+			return nil, activeDKGsSummary{}, errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
 		}
 		if _, err := keyperSet.GetIndex(m.cfg.OwnAddress); err != nil {
+			summary.notMember++
 			continue
 		}
 		alreadySucceeded, err := queries.ExistsDKGResultSuccess(ctx, eon.KeyperConfigIndex)
 		if err != nil {
-			return nil, errors.Wrap(err, "check existing dkg_result")
+			return nil, activeDKGsSummary{}, errors.Wrap(err, "check existing dkg_result")
 		}
 		if alreadySucceeded {
+			summary.succeeded++
+			continue
+		}
+		if haveLatestActive && eon.KeyperConfigIndex < latestActiveIndex {
+			summary.superseded++
 			continue
 		}
 		if eon.PhaseLength.Valid && eon.LeadLength.Valid {
 			activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
 			if err != nil {
-				return nil, errors.Wrap(err, "convert activation block")
+				return nil, activeDKGsSummary{}, errors.Wrap(err, "convert activation block")
 			}
 			//nolint:gosec // G115: phase params come from the on-chain contract and are non-negative
 			phaseLength, leadLength, maxRetries := uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), uint64(eon.MaxRetries)
 			retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
 			if retry >= maxRetries {
+				summary.retriesExhausted++
 				continue
 			}
 		}
 		active = append(active, eon)
 	}
-	return active, nil
+	return active, summary, nil
 }
 
 // processDKG runs the per-block phase math and dispatches at most one action
