@@ -35,7 +35,7 @@ import (
 //
 // The caller owns the (write) transaction and is responsible for committing
 // or rolling back. `pure`, `keypers`, and `ownIndex` come from a prior read
-// transaction's `buildPureDKG` call at the `handleEon` level.
+// transaction's `buildPureDKG` call at the `processDKG` level.
 //
 //nolint:gocyclo,funlen // linear flow: check idempotency, deal, encrypt per receiver, enqueue.
 func (m *Manager) maybeDeal(

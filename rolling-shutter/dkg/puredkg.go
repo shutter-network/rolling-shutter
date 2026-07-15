@@ -38,7 +38,7 @@ func ReceiverIndicesForSender(n, senderIndex uint64) []uint64 {
 // in. The DB is the source of truth; nothing is cached between invocations.
 //
 // The caller is responsible for the keyper-set lookup and membership check
-// (both run as pool queries inside `handleEon` before this function is
+// (both run as pool queries inside `processDKG` before this function is
 // entered). `keypers`, `ownIndex`, and `threshold` are passed in as
 // parameters so this function performs no observer-db reads.
 //

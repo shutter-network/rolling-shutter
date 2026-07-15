@@ -93,7 +93,7 @@ func setupDKGTestEnv(ctx context.Context, t *testing.T) *dkgTestEnv {
 	}
 }
 
-// runMaybe wraps a single dispatch the way `handleEon` does: look up the
+// runMaybe wraps a single dispatch the way `processDKG` does: look up the
 // keyper set, open a read transaction for `buildPureDKG`, then open a
 // separate write transaction for the matching maybe-function. Returns nil
 // silently if the manager would not participate (non-member or no initial

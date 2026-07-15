@@ -78,25 +78,20 @@ func New(cfg Config) *Manager {
 	return &Manager{cfg: cfg}
 }
 
-// HandleBlock is called once per new block by the host keyper. For every eon
-// row in the database it computes the current DKG phase and dispatches to at
-// most one action function. Errors from individual eons are logged but do
-// not abort the loop — a per-eon failure must not stop the others.
+// HandleBlock is called once per new block by the host keyper. It asks
+// `activeDKGs` which eons this keyper must still consider at this block, then
+// dispatches each one to `processDKG`. Errors from individual eons are logged
+// but do not abort the loop — a per-eon failure must not stop the others.
 func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
 	}
-	// Fetches all eons then filters per-eon (membership, dkg_result). A single
-	// query joining eons + keyper sets + dkg_result would be more efficient,
-	// but keyper sets live in the observer schema (separate connection pool),
-	// so cross-schema joins are not possible here.
-	queries := corekeyperdb.New(m.cfg.DBPool)
-	eons, err := queries.GetAllEons(ctx)
+	eons, err := m.activeDKGs(ctx, blockNumber)
 	if err != nil {
-		return errors.Wrap(err, "list eons")
+		return errors.Wrap(err, "list active DKGs")
 	}
 	for _, eon := range eons {
-		if err := m.handleEon(ctx, eon, blockNumber); err != nil {
+		if err := m.processDKG(ctx, eon, blockNumber); err != nil {
 			log.Error().Err(err).
 				Int64("keyper-set-index", eon.KeyperConfigIndex).
 				Uint64("block-number", blockNumber).
@@ -106,24 +101,79 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	return nil
 }
 
-// handleEon runs the per-eon dispatch logic. Pool queries (no transaction)
-// fire first: phase params, membership, and `ExistsDKGResultSuccess`.
-// Once dispatch is required, two narrow transactions are opened in
-// sequence: a read-only one for `buildPureDKG`, then a separate write one
-// for the maybe-function. Splitting the transactions keeps the read window
-// short and lets the write transaction commit independently. A new chain
-// event arriving between the two transactions is acceptable — the
-// maybe-function will see the stale snapshot for one block and pick up the
-// new state on the next dispatch.
+// activeDKGs returns the eons this keyper must still consider at `blockNumber`.
+// It applies the "over or not mine" filters in one place so per-eon processing
+// can focus on phase math. Filters, in the order applied — membership first
+// because it is the most selective, then prior success, then the retry ceiling:
 //
-// Returns nil for "nothing to do" (not a member, eon already succeeded,
-// no active phase at this block, no initial state for non-Dealing phases).
-// Returns an error for missing per-eon configuration (NULL `dkg_contract`
-// or NULL `phase_length`/`lead_length`). The caller logs but does not
-// abort on error.
+//  1. Local keyper is a member of the eon's Keyper Set.
+//  2. No `dkg_result` success row exists for the Keyper Set Index.
+//  3. The current retry counter is below `MAX_RETRIES`.
 //
-//nolint:gocyclo // linear orchestration: load, filter, build, dispatch. Complexity is mostly per-step error handling.
-func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
+// Eons whose configuration is too incomplete to evaluate a filter (e.g. NULL
+// `phase_length`) are passed through: `processDKG` will surface the config
+// error, HandleBlock will log it. A single query joining eons + keyper sets +
+// dkg_result would be more efficient, but keyper sets live in the observer
+// schema (separate connection pool) so cross-schema joins are not possible.
+func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekeyperdb.Eon, error) {
+	queries := corekeyperdb.New(m.cfg.DBPool)
+	obsQueries := obskeyper.New(m.cfg.DBPool)
+	allEons, err := queries.GetAllEons(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "list eons")
+	}
+	active := make([]corekeyperdb.Eon, 0, len(allEons))
+	for _, eon := range allEons {
+		keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
+		if err != nil {
+			return nil, errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
+		}
+		if _, err := keyperSet.GetIndex(m.cfg.OwnAddress); err != nil {
+			continue
+		}
+		alreadySucceeded, err := queries.ExistsDKGResultSuccess(ctx, eon.KeyperConfigIndex)
+		if err != nil {
+			return nil, errors.Wrap(err, "check existing dkg_result")
+		}
+		if alreadySucceeded {
+			continue
+		}
+		if eon.PhaseLength.Valid && eon.LeadLength.Valid {
+			activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
+			if err != nil {
+				return nil, errors.Wrap(err, "convert activation block")
+			}
+			//nolint:gosec // G115: phase params come from the on-chain contract and are non-negative
+			phaseLength, leadLength, maxRetries := uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), uint64(eon.MaxRetries)
+			retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
+			if retry >= maxRetries {
+				continue
+			}
+		}
+		active = append(active, eon)
+	}
+	return active, nil
+}
+
+// processDKG runs the per-block phase math and dispatches at most one action
+// for a single eon. It assumes `activeDKGs` has already filtered out eons
+// that this keyper is not a member of, that have already succeeded, or whose
+// retry counter has reached MAX_RETRIES.
+//
+// Pool queries (no transaction) fire first: phase params and the keyper-set
+// lookup needed for `ownIndex`. Once dispatch is required, two narrow
+// transactions are opened in sequence: a read-only one for `buildPureDKG`,
+// then a separate write one for the maybe-function. Splitting the transactions
+// keeps the read window short and lets the write transaction commit
+// independently. A new chain event arriving between the two transactions is
+// acceptable — the maybe-function will see the stale snapshot for one block
+// and pick up the new state on the next dispatch.
+//
+// Returns nil for "nothing to do" (no active phase at this block, no initial
+// state for non-Dealing phases). Returns an error for missing per-eon
+// configuration (NULL `dkg_contract` or NULL `phase_length`/`lead_length`).
+// The caller logs but does not abort on error.
+func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
 	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
 	if err != nil {
 		return errors.Wrap(err, "convert activation block")
@@ -133,9 +183,6 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 		return err
 	}
 
-	// Early exit: skip eons whose keyper set does not include this keyper.
-	// Membership is the most selective filter — fire it before any other
-	// DB work so we do not query dkg_result for unrelated sets.
 	obsQueries := obskeyper.New(m.cfg.DBPool)
 	keyperSet, err := obsQueries.GetKeyperSetByKeyperConfigIndex(ctx, eon.KeyperConfigIndex)
 	if err != nil {
@@ -143,6 +190,9 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	}
 	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
 	if err != nil {
+		// Belt-and-braces: activeDKGs already filters non-members, but if a
+		// caller invokes processDKG directly (tests, future diagnostics) we
+		// exit silently rather than surface a misleading error.
 		return nil
 	}
 	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
@@ -152,17 +202,6 @@ func (m *Manager) handleEon(ctx context.Context, eon corekeyperdb.Eon, blockNumb
 	threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
 	if err != nil {
 		return errors.Wrap(err, "convert keyper set threshold")
-	}
-
-	// Early exit: a successful dkg_result row means either we already voted
-	// or the chain has concluded the DKG. Nothing more to do for this eon.
-	queries := corekeyperdb.New(m.cfg.DBPool)
-	alreadySucceeded, err := queries.ExistsDKGResultSuccess(ctx, eon.KeyperConfigIndex)
-	if err != nil {
-		return errors.Wrap(err, "check existing dkg_result")
-	}
-	if alreadySucceeded {
-		return nil
 	}
 
 	retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
