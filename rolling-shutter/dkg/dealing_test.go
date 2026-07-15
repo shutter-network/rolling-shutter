@@ -22,7 +22,7 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/txsender"
 )
 
-// runMaybeDealLocal mirrors the dispatch handleEon performs: look up the
+// runMaybeDealLocal mirrors the dispatch processDKG performs: look up the
 // keyper set, build the puredkg in a read tx, then call maybeDeal in a
 // separate write tx. Used by dealing_test.go tests that wire a Manager by
 // hand instead of going through dkgTestEnv.

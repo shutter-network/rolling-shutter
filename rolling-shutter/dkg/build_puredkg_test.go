@@ -16,7 +16,7 @@ import (
 )
 
 // loadKeyperSetParams looks up keypers/ownIndex/threshold for testKsi via the
-// observer-db, matching the pool query handleEon runs before opening the
+// observer-db, matching the pool query processDKG runs before opening the
 // buildPureDKG read tx. Tests call this once and pass the values into
 // buildPureDKG so the function itself performs no observer-db reads.
 func loadKeyperSetParams(ctx context.Context, t *testing.T, env *dkgTestEnv) ([]common.Address, uint64, uint64) {

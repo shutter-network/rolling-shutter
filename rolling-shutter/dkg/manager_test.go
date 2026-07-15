@@ -16,10 +16,10 @@ import (
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
 
-// TestHandleEonReturnsErrorWhenDkgContractIsNull asserts the strict-config
+// TestProcessDKGReturnsErrorWhenDkgContractIsNull asserts the strict-config
 // acceptance criterion: an eons row with NULL `dkg_contract` causes
-// handleEon to return a non-nil error and write no tx_outbox row.
-func TestHandleEonReturnsErrorWhenDkgContractIsNull(t *testing.T) {
+// processDKG to return a non-nil error and write no tx_outbox row.
+func TestProcessDKGReturnsErrorWhenDkgContractIsNull(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -72,7 +72,7 @@ func TestHandleEonReturnsErrorWhenDkgContractIsNull(t *testing.T) {
 	eon, err := coreQueries.GetEon(ctx, keyperConfigIndex)
 	assert.NilError(t, err)
 
-	err = mgr.handleEon(ctx, eon, blockNumber)
+	err = mgr.processDKG(ctx, eon, blockNumber)
 	assert.Assert(t, err != nil, "expected error when dkg_contract is NULL")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
@@ -80,11 +80,11 @@ func TestHandleEonReturnsErrorWhenDkgContractIsNull(t *testing.T) {
 	assert.Equal(t, 0, len(pending), "no tx_outbox row may be written when dkg_contract is NULL")
 }
 
-// TestHandleEonReturnsErrorWhenPhaseParamsAreNull asserts the strict-config
+// TestProcessDKGReturnsErrorWhenPhaseParamsAreNull asserts the strict-config
 // acceptance criterion: an eons row with NULL `phase_length` and/or NULL
-// `lead_length` causes handleEon to return a non-nil error and write no
+// `lead_length` causes processDKG to return a non-nil error and write no
 // tx_outbox row.
-func TestHandleEonReturnsErrorWhenPhaseParamsAreNull(t *testing.T) {
+func TestProcessDKGReturnsErrorWhenPhaseParamsAreNull(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -123,7 +123,7 @@ func TestHandleEonReturnsErrorWhenPhaseParamsAreNull(t *testing.T) {
 	eon, err := coreQueries.GetEon(ctx, keyperConfigIndex)
 	assert.NilError(t, err)
 
-	err = mgr.handleEon(ctx, eon, blockNumber)
+	err = mgr.processDKG(ctx, eon, blockNumber)
 	assert.Assert(t, err != nil, "expected error when phase_length/lead_length is NULL")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
@@ -131,12 +131,13 @@ func TestHandleEonReturnsErrorWhenPhaseParamsAreNull(t *testing.T) {
 	assert.Equal(t, 0, len(pending), "no tx_outbox row may be written when phase params are NULL")
 }
 
-// TestHandleEonReturnsNilWhenNotAMember asserts the membership-ordering
-// acceptance criterion: handleEon returns nil and writes no tx_outbox row
+// TestHandleBlockSkipsEonWhenNotAMember asserts the membership-filter
+// acceptance criterion: HandleBlock returns nil and writes no tx_outbox row
 // when the manager's address is not present in the keyper set, even though
 // the eon row is otherwise fully configured (dkg_contract + phase params
-// set) and the block falls inside the Dealing phase.
-func TestHandleEonReturnsNilWhenNotAMember(t *testing.T) {
+// set) and the block falls inside the Dealing phase. The filter now lives in
+// `activeDKGs`, so we exercise the full `HandleBlock` path.
+func TestHandleBlockSkipsEonWhenNotAMember(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -192,25 +193,23 @@ func TestHandleEonReturnsNilWhenNotAMember(t *testing.T) {
 		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
 	})
 
-	eon, err := coreQueries.GetEon(ctx, keyperConfigIndex)
-	assert.NilError(t, err)
-
-	err = mgr.handleEon(ctx, eon, blockNumber)
-	assert.NilError(t, err, "handleEon must return nil when not a member")
+	err = mgr.HandleBlock(ctx, blockNumber)
+	assert.NilError(t, err, "HandleBlock must return nil when the keyper is filtered out")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, 0, len(pending), "no tx_outbox row may be written when not a member")
 }
 
-// TestHandleEonWritesNothingPastMaxRetries is the end-to-end wire-through
-// acceptance test for ticket 02: an eons row with `max_retries = 2` plus a
-// block advanced into what would be retry 3's Dealing window must produce
-// zero `tx_outbox` and zero `dkg_sent_actions` rows. This proves that the
-// `max_retries` column threads through `phaseParamsForEon` into `PhaseAt`
-// and that the existing `PhaseNone` early-return is the single gate for the
-// ceiling — no new branches added to `handleEon`.
-func TestHandleEonWritesNothingPastMaxRetries(t *testing.T) {
+// TestProcessDKGWritesNothingPastMaxRetries is the end-to-end wire-through
+// acceptance test for the MAX_RETRIES ceiling: an eons row with
+// `max_retries = 2` plus a block advanced into what would be retry 3's
+// Dealing window must produce zero `tx_outbox` and zero `dkg_sent_actions`
+// rows. The retry-ceiling filter now lives in `activeDKGs`, and `PhaseAt`
+// retains its `retryCounter >= maxRetries` guard as belt-and-braces — either
+// gate suffices on its own, so exercising `processDKG` directly still yields
+// a no-op.
+func TestProcessDKGWritesNothingPastMaxRetries(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -228,7 +227,7 @@ func TestHandleEonWritesNothingPastMaxRetries(t *testing.T) {
 		// Cycle length = 4 * phaseLength = 40. DKG start for retry 0 is
 		// activationBlock - leadLength = 60. Block 185 lands in retry 3's
 		// Dealing window ([180, 190)) — retry counter 3 >= maxRetries 2, so
-		// PhaseAt must return PhaseNone and handleEon must be a no-op.
+		// PhaseAt must return PhaseNone and processDKG must be a no-op.
 		blockNumber uint64 = 185
 	)
 
@@ -273,8 +272,8 @@ func TestHandleEonWritesNothingPastMaxRetries(t *testing.T) {
 	retry := CurrentRetryCounter(uint64(activationBlock), uint64(leadLength), uint64(phaseLength), blockNumber)
 	assert.Equal(t, uint64(3), retry, "test setup expects retry counter 3 at this block")
 
-	err = mgr.handleEon(ctx, eon, blockNumber)
-	assert.NilError(t, err, "handleEon must return nil (no error) once past max_retries")
+	err = mgr.processDKG(ctx, eon, blockNumber)
+	assert.NilError(t, err, "processDKG must return nil (no error) once past max_retries")
 
 	pending, err := coreQueries.GetPendingTxs(ctx)
 	assert.NilError(t, err)
