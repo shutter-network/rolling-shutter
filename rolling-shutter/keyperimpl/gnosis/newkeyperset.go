@@ -107,10 +107,15 @@ func (kpr *Keyper) processNewKeyperSet(ctx context.Context, ev *syncevent.Keyper
 		return err
 	}
 
-	// ECIES key registration runs at the same architectural level as
-	// HandleBlock — once per discovered keyper set, after the keyper set
-	// row is committed (MaybeRegisterECIESKey reads it). It is idempotent
-	// and a no-op for non-members.
+	// Must run after the transaction commits: MaybeRegisterECIESKey reads
+	// the keyper set row inserted above.
+	//
+	// This can still land too late. If DKG starts immediately (the
+	// KeyperSetAdded tx was mined inside the lead-time window), peers
+	// dispatch dealings before our ECIES registration is on chain and
+	// encrypt without our key. Returning keypers already have a key from
+	// a previous set, so this only bites new members. Mitigation: give
+	// keyper sets enough lead time.
 	return kpr.dkgMgr.MaybeRegisterECIESKey(ctx, keyperSetIndex)
 }
 
