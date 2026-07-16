@@ -40,11 +40,14 @@ func (m *Manager) MaybeRegisterECIESKey(ctx context.Context, keyperSetIndex int6
 		if err != nil {
 			return errors.Wrapf(err, "fetch keyper set %d", keyperSetIndex)
 		}
-		ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
+		member, err := m.resolveMembership(keyperSet)
 		if err != nil {
-			// Not a member.
-			return nil
+			if errors.Is(err, errNotMember) {
+				return nil
+			}
+			return err
 		}
+		ownIndex := member.ownIndex
 
 		exists, err := coreQueries.ExistsECIESKey(ctx, shdb.EncodeAddress(m.cfg.OwnAddress))
 		if err != nil {

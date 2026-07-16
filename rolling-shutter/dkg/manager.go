@@ -109,6 +109,82 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	return nil
 }
 
+// errNotMember is returned by `resolveMembership` when the manager's address
+// is not present in the keyper set. Callers translate this sentinel into a
+// silent no-op (matching the pre-refactor behavior of returning nil from
+// `processDKG`).
+var errNotMember = errors.New("not a member of keyper set")
+
+// phaseParams bundles the eon fields required for DKG phase math. It is
+// populated by `Manager.resolvePhaseParams` from the corresponding `eons`
+// columns.
+type phaseParams struct {
+	activationBlock uint64
+	phaseLength     uint64
+	leadLength      uint64
+	maxRetries      uint64
+}
+
+// keyperMembership bundles the keyper-set fields required to interact with
+// `puredkg` on behalf of this keyper. It is populated by
+// `Manager.resolveMembership` from a fetched `KeyperSet`.
+type keyperMembership struct {
+	keypers   []common.Address
+	ownIndex  uint64
+	threshold uint64
+}
+
+// resolvePhaseParams reads the DKG phase timing fields off an `eons` row and
+// converts them to unsigned block-arithmetic types. Rows populated by
+// `processNewKeyperSet` carry the values read from the keyper-set-specific
+// DKG contract; rows with NULL `phase_length` or `lead_length` are a fatal
+// configuration error — the module owns no chain client and there is no
+// fallback. `max_retries` is a NOT NULL column so is always present; see the
+// `MAX_RETRIES` glossary entry for its semantics.
+func (m *Manager) resolvePhaseParams(eon corekeyperdb.Eon) (phaseParams, error) {
+	if !eon.PhaseLength.Valid || !eon.LeadLength.Valid {
+		return phaseParams{}, errors.Errorf(
+			"eons row %d missing DKG phase params (phase_length and/or lead_length is NULL)",
+			eon.KeyperConfigIndex,
+		)
+	}
+	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
+	if err != nil {
+		return phaseParams{}, errors.Wrap(err, "convert activation block")
+	}
+	//nolint:gosec // G115: phase length, lead length, and max retries come from the on-chain contract and are non-negative
+	return phaseParams{
+		activationBlock: activationBlock,
+		phaseLength:     uint64(eon.PhaseLength.Int64),
+		leadLength:      uint64(eon.LeadLength.Int64),
+		maxRetries:      uint64(eon.MaxRetries),
+	}, nil
+}
+
+// resolveMembership derives this keyper's position in `keyperSet`. If the
+// manager's address is not a member it returns `errNotMember`; callers turn
+// that into a silent no-op. Any other error (address decoding, threshold
+// conversion) is surfaced.
+func (m *Manager) resolveMembership(keyperSet obskeyper.KeyperSet) (keyperMembership, error) {
+	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
+	if err != nil {
+		return keyperMembership{}, errNotMember
+	}
+	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
+	if err != nil {
+		return keyperMembership{}, errors.Wrap(err, "decode keyper addresses")
+	}
+	threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
+	if err != nil {
+		return keyperMembership{}, errors.Wrap(err, "convert keyper set threshold")
+	}
+	return keyperMembership{
+		keypers:   keypers,
+		ownIndex:  ownIndex,
+		threshold: threshold,
+	}, nil
+}
+
 // activeDKGsSummary counts how many eons were filtered out by each reason.
 // Populated by `activeDKGs` and logged by `HandleBlock` as a single per-block
 // summary line — there is no per-skip log line.
@@ -178,9 +254,12 @@ func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekey
 		if err != nil {
 			return nil, activeDKGsSummary{}, errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
 		}
-		if _, err := keyperSet.GetIndex(m.cfg.OwnAddress); err != nil {
-			summary.notMember++
-			continue
+		if _, err := m.resolveMembership(keyperSet); err != nil {
+			if errors.Is(err, errNotMember) {
+				summary.notMember++
+				continue
+			}
+			return nil, activeDKGsSummary{}, err
 		}
 		alreadySucceeded, err := queries.ExistsDKGResultSuccess(ctx, eon.KeyperConfigIndex)
 		if err != nil {
@@ -194,15 +273,12 @@ func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekey
 			summary.superseded++
 			continue
 		}
-		if eon.PhaseLength.Valid && eon.LeadLength.Valid {
-			activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
-			if err != nil {
-				return nil, activeDKGsSummary{}, errors.Wrap(err, "convert activation block")
-			}
-			//nolint:gosec // G115: phase params come from the on-chain contract and are non-negative
-			phaseLength, leadLength, maxRetries := uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), uint64(eon.MaxRetries)
-			retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
-			if retry >= maxRetries {
+		// Eons missing phase params are passed through so that processDKG
+		// surfaces the config error; the retry-ceiling check simply doesn't
+		// apply in that case.
+		if params, err := m.resolvePhaseParams(eon); err == nil {
+			retry := CurrentRetryCounter(params.activationBlock, params.leadLength, params.phaseLength, blockNumber)
+			if retry >= params.maxRetries {
 				summary.retriesExhausted++
 				continue
 			}
@@ -231,11 +307,7 @@ func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekey
 // configuration (NULL `dkg_contract` or NULL `phase_length`/`lead_length`).
 // The caller logs but does not abort on error.
 func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
-	activationBlock, err := medley.Int64ToUint64Safe(eon.ActivationBlockNumber)
-	if err != nil {
-		return errors.Wrap(err, "convert activation block")
-	}
-	phaseLength, leadLength, maxRetries, err := m.phaseParamsForEon(eon)
+	params, err := m.resolvePhaseParams(eon)
 	if err != nil {
 		return err
 	}
@@ -245,25 +317,20 @@ func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNum
 	if err != nil {
 		return errors.Wrapf(err, "fetch keyper set %d", eon.KeyperConfigIndex)
 	}
-	ownIndex, err := keyperSet.GetIndex(m.cfg.OwnAddress)
+	member, err := m.resolveMembership(keyperSet)
 	if err != nil {
-		// Belt-and-braces: activeDKGs already filters non-members, but if a
-		// caller invokes processDKG directly (tests, future diagnostics) we
-		// exit silently rather than surface a misleading error.
-		return nil
-	}
-	keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
-	if err != nil {
-		return errors.Wrap(err, "decode keyper addresses")
-	}
-	threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
-	if err != nil {
-		return errors.Wrap(err, "convert keyper set threshold")
+		if errors.Is(err, errNotMember) {
+			// Belt-and-braces: activeDKGs already filters non-members, but if
+			// a caller invokes processDKG directly (tests, future diagnostics)
+			// we exit silently rather than surface a misleading error.
+			return nil
+		}
+		return err
 	}
 
-	retry := CurrentRetryCounter(activationBlock, leadLength, phaseLength, blockNumber)
+	retry := CurrentRetryCounter(params.activationBlock, params.leadLength, params.phaseLength, blockNumber)
 	retryInt64 := int64(retry) //nolint:gosec // G115: retry counter is bounded by the on-chain contract
-	blockPhase := PhaseAt(activationBlock, leadLength, phaseLength, maxRetries, retry, blockNumber)
+	blockPhase := PhaseAt(params.activationBlock, params.leadLength, params.phaseLength, params.maxRetries, retry, blockNumber)
 	if blockPhase == PhaseNone {
 		return nil
 	}
@@ -276,7 +343,7 @@ func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNum
 	// rollback are equivalent here, so we let BeginFunc commit on nil return.
 	var pure *puredkg.PureDKG
 	err = m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		p, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase, keypers, ownIndex, threshold)
+		p, err := m.buildPureDKG(ctx, tx, eon.KeyperConfigIndex, retryInt64, blockPhase, member.keypers, member.ownIndex, member.threshold)
 		if err != nil {
 			return errors.Wrap(err, "build puredkg")
 		}
@@ -296,37 +363,19 @@ func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNum
 	return m.cfg.DBPool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		switch blockPhase {
 		case PhaseDealing:
-			return m.maybeDeal(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
+			return m.maybeDeal(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, member.keypers, member.ownIndex)
 		case PhaseAccusing:
-			return m.maybeAccuse(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
+			return m.maybeAccuse(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, member.keypers, member.ownIndex)
 		case PhaseApologizing:
-			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, keypers, ownIndex)
+			return m.maybeApologize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, member.keypers, member.ownIndex)
 		case PhaseFinalizing:
-			return m.maybeFinalize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, ownIndex)
+			return m.maybeFinalize(ctx, tx, dkgAddr, eon.KeyperConfigIndex, retryInt64, pure, member.ownIndex)
 		case PhaseNone:
 			return nil
 		default:
 			return nil
 		}
 	})
-}
-
-// phaseParamsForEon returns the DKG phase length, lead length, and retry
-// ceiling (max_retries) for the given eon. Rows populated by
-// `processNewKeyperSet` carry the values read from the keyper-set-specific
-// DKG contract; rows with NULL phase_length or lead_length are a fatal
-// configuration error — the module owns no chain client and there is no
-// fallback to fetch them from. `max_retries` is a NOT NULL column, so it is
-// always present; see the `MAX_RETRIES` glossary entry for its semantics.
-func (m *Manager) phaseParamsForEon(eon corekeyperdb.Eon) (phaseLength, leadLength, maxRetries uint64, err error) {
-	if !eon.PhaseLength.Valid || !eon.LeadLength.Valid {
-		return 0, 0, 0, errors.Errorf(
-			"eons row %d missing DKG phase params (phase_length and/or lead_length is NULL)",
-			eon.KeyperConfigIndex,
-		)
-	}
-	//nolint:gosec // G115: phase length, lead length, and max retries come from the on-chain contract and are non-negative
-	return uint64(eon.PhaseLength.Int64), uint64(eon.LeadLength.Int64), uint64(eon.MaxRetries), nil
 }
 
 // dkgContractAddrForEon returns the on-chain DKG contract address responsible
@@ -372,17 +421,12 @@ func (m *Manager) HandleDKGSuccess(ctx context.Context, tx pgx.Tx, keyperSetInde
 	var hasResult bool
 	var localErr sql.NullString
 
-	ownIndex, memberErr := keyperSet.GetIndex(m.cfg.OwnAddress)
+	member, memberErr := m.resolveMembership(keyperSet)
+	if memberErr != nil && !errors.Is(memberErr, errNotMember) {
+		return memberErr
+	}
 	if memberErr == nil {
-		keypers, err := shdb.DecodeAddresses(keyperSet.Keypers)
-		if err != nil {
-			return errors.Wrap(err, "decode keyper addresses")
-		}
-		threshold, err := medley.Int32ToUint64Safe(keyperSet.Threshold)
-		if err != nil {
-			return errors.Wrap(err, "convert threshold")
-		}
-		pure, err := m.buildPureDKG(ctx, tx, keyperSetIndex, retryCounter, PhaseFinalizing, keypers, ownIndex, threshold)
+		pure, err := m.buildPureDKG(ctx, tx, keyperSetIndex, retryCounter, PhaseFinalizing, member.keypers, member.ownIndex, member.threshold)
 		if err != nil {
 			return errors.Wrap(err, "rebuild puredkg for success")
 		}
