@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -422,6 +423,13 @@ func TestIsTransient(t *testing.T) {
 		{"wrapped plain error", errors.Wrap(stderrors.New("boom"), "outer"), false},
 		{"rpc application error", &stubRPCError{msg: "already known", code: -32000}, false},
 		{"wrapped rpc application error", errors.Wrap(&stubRPCError{msg: "nonce too low", code: -32000}, "send transaction"), false},
+		{"http 429 rate limited", rpc.HTTPError{StatusCode: 429, Status: "429 Too Many Requests"}, true},
+		{"http 500 internal", rpc.HTTPError{StatusCode: 500, Status: "500 Internal Server Error"}, true},
+		{"http 502 bad gateway", rpc.HTTPError{StatusCode: 502, Status: "502 Bad Gateway"}, true},
+		{"http 503 unavailable", rpc.HTTPError{StatusCode: 503, Status: "503 Service Unavailable"}, true},
+		{"wrapped http 503", errors.Wrap(rpc.HTTPError{StatusCode: 503}, "send transaction"), true},
+		{"http 400 bad request", rpc.HTTPError{StatusCode: 400, Status: "400 Bad Request"}, false},
+		{"http 404 not found", rpc.HTTPError{StatusCode: 404, Status: "404 Not Found"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

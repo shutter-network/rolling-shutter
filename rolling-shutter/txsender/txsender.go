@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -162,7 +163,16 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 		Data:  row.Data,
 	})
 	if err != nil {
-		s.markFailedUnlessTransient(ctx, row.ID, row.Label, errors.Wrap(err, "estimate gas"))
+		// Gas estimation failure is ambiguous: a transient RPC error should be
+		// retried (leave the row pending), but a genuine revert means the tx
+		// would fail on-chain and the row should be marked failed.
+		cause := errors.Wrap(err, "estimate gas")
+		if isTransient(cause) {
+			log.Warn().Err(cause).Int64("id", row.ID).Str("label", row.Label).
+				Msg("tx outbox: transient chain-client error, will retry")
+			return
+		}
+		s.markFailed(ctx, row.ID, row.Label, cause)
 		return
 	}
 	// Multiply gas estimate to provide headroom for state changing between now
@@ -300,10 +310,14 @@ func (s *TxSender) checkReceipt(ctx context.Context, row corekeyperdb.TxOutbox) 
 // isTransient reports whether err is a known transient chain-client failure
 // that warrants leaving the outbox row for the next tick rather than terminally
 // failing it. It is intentionally a positive allowlist: unknown errors fall
-// through and are treated as terminal by callers. Other transient failures
-// (e.g. HTTP 5xx from the RPC endpoint) may exist and are not covered here;
-// extend the list if a class of transient error is observed terminally failing
-// rows in production.
+// through and are treated as terminal by callers.
+//
+// It covers transport-layer failures only. JSON-RPC application errors returned
+// by the node (e.g. "nonce too low", "replacement transaction underpriced") are
+// deliberately excluded: the SendTransaction retry path resets the row and
+// re-submits with a fresh nonce, so treating a deterministic rejection as
+// transient would loop forever. Extend the list if a class of transient error
+// is observed terminally failing rows in production.
 func isTransient(err error) bool {
 	if err == nil {
 		return false
@@ -322,21 +336,17 @@ func isTransient(err error) bool {
 	if errors.As(err, &netErr) {
 		return true
 	}
-	return false
-}
-
-// markFailedUnlessTransient records the row as failed unless cause is a known
-// transient error, in which case it is logged and the row is left in its
-// current state for the next tick. Use this at chain-call sites where the
-// default disposition is to mark failed; sites that already retry on all
-// errors keep their own warn-and-return pattern.
-func (s *TxSender) markFailedUnlessTransient(ctx context.Context, id int64, label string, cause error) {
-	if isTransient(cause) {
-		log.Warn().Err(cause).Int64("id", id).Str("label", label).
-			Msg("tx outbox: transient chain-client error, will retry")
-		return
+	// Non-2xx HTTP responses from the RPC endpoint surface as rpc.HTTPError
+	// (returned by value) and implement neither net.Error nor syscall.Errno.
+	// Treat 429 (rate limited) and 5xx (endpoint overloaded/unavailable) as
+	// transient; other status codes stay terminal.
+	var httpErr rpc.HTTPError
+	if errors.As(err, &httpErr) {
+		if httpErr.StatusCode == 429 || httpErr.StatusCode >= 500 {
+			return true
+		}
 	}
-	s.markFailed(ctx, id, label, cause)
+	return false
 }
 
 func (s *TxSender) markFailed(ctx context.Context, id int64, label string, cause error) {
