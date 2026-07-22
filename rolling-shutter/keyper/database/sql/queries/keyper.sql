@@ -189,6 +189,11 @@ UPDATE tx_outbox
 SET status = 'submitted', tx_hash = $2, nonce = $3, updated_at = NOW()
 WHERE id = $1;
 
+-- name: ResetTxToPending :exec
+UPDATE tx_outbox
+SET status = 'pending', tx_hash = NULL, nonce = NULL, error = NULL, updated_at = NOW()
+WHERE id = $1;
+
 -- name: MarkTxConfirmed :exec
 UPDATE tx_outbox
 SET status = 'confirmed', updated_at = NOW()

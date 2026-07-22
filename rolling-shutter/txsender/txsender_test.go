@@ -233,6 +233,47 @@ func TestSubmitRowMarksFailedWhenSendFails(t *testing.T) {
 		"tx_hash should be persisted (mark-before-send wrote it prior to send)")
 }
 
+// TestSubmitRowResetsToPendingOnTransientSend is the sibling of
+// TestSubmitRowMarksFailedWhenSendFails for the transient branch: when
+// SendTransaction returns a transient error after the row was marked submitted,
+// the row must be reset to `pending` with tx_hash, nonce and error cleared so
+// the next tick re-submits it with a fresh nonce.
+func TestSubmitRowResetsToPendingOnTransientSend(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	s, fc := newTestSender(t, dbpool)
+	// io.EOF is classified transient by isTransient.
+	fc.sendErr = io.EOF
+
+	queries := corekeyperdb.New(dbpool)
+	zero, err := bigIntToNumeric(big.NewInt(0))
+	assert.NilError(t, err)
+	id, err := queries.InsertPendingTx(ctx, corekeyperdb.InsertPendingTxParams{
+		ToAddress: common.HexToAddress("0x000000000000000000000000000000000000dead").Hex(),
+		Data:      []byte{0x01, 0x02, 0x03},
+		Value:     zero,
+	})
+	assert.NilError(t, err)
+
+	s.poll(ctx)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&fc.sendTransactionCallCount),
+		"SendTransaction should be invoked exactly once before the reset")
+	row, err := queries.GetTxOutboxByID(ctx, id)
+	assert.NilError(t, err)
+	assert.Equal(t, "pending", row.Status,
+		"row should be reset to pending after a transient SendTransaction error")
+	assert.Assert(t, !row.TxHash.Valid, "tx_hash should be cleared on reset")
+	assert.Assert(t, !row.Nonce.Valid, "nonce should be cleared on reset")
+	assert.Assert(t, !row.Error.Valid, "error should be cleared on reset")
+}
+
 // TestSubmitRowSkipsSendWhenMarkSubmittedFails verifies that if the DB update
 // to mark the row submitted fails, SendTransaction is never called. We force
 // the failure by dropping the tx_outbox table mid-flight, then driving

@@ -224,7 +224,20 @@ func (s *TxSender) submitRow(ctx context.Context, row corekeyperdb.TxOutbox) {
 	}
 
 	if err := s.cfg.Client.SendTransaction(ctx, signed); err != nil {
-		s.markFailedUnlessTransient(ctx, row.ID, row.Label, errors.Wrap(err, "send transaction"))
+		if isTransient(err) {
+			// Undo the mark-submitted above so the next tick re-submits with a
+			// fresh nonce. Without this the row would stay `submitted` with a tx
+			// hash that was never broadcast, and the confirm loop would poll for
+			// a receipt that can never arrive.
+			log.Warn().Err(err).Int64("id", row.ID).Str("label", row.Label).
+				Msg("tx outbox: transient send error, resetting to pending for retry")
+			if resetErr := queries.ResetTxToPending(ctx, row.ID); resetErr != nil {
+				log.Error().Err(resetErr).Int64("id", row.ID).Str("label", row.Label).
+					Msg("tx outbox: reset to pending failed; row stuck submitted")
+			}
+			return
+		}
+		s.markFailed(ctx, row.ID, row.Label, errors.Wrap(err, "send transaction"))
 		return
 	}
 

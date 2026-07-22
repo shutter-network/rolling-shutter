@@ -915,6 +915,17 @@ func (q *Queries) MarkTxSubmitted(ctx context.Context, arg MarkTxSubmittedParams
 	return err
 }
 
+const resetTxToPending = `-- name: ResetTxToPending :exec
+UPDATE tx_outbox
+SET status = 'pending', tx_hash = NULL, nonce = NULL, error = NULL, updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) ResetTxToPending(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, resetTxToPending, id)
+	return err
+}
+
 const selectDecryptionKeyShares = `-- name: SelectDecryptionKeyShares :many
 SELECT eon, epoch_id, keyper_index, decryption_key_share FROM decryption_key_share
 WHERE eon = $1 AND epoch_id = $2
