@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -17,6 +18,7 @@ import (
 
 	obskeyper "github.com/shutter-network/rolling-shutter/rolling-shutter/chainobserver/db/keyper"
 	corekeyperdb "github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/database"
+	"github.com/shutter-network/rolling-shutter/rolling-shutter/keyper/keypermetrics"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/medley"
 	"github.com/shutter-network/rolling-shutter/rolling-shutter/shdb"
 )
@@ -86,6 +88,7 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 	if blockNumber == 0 {
 		return nil
 	}
+	m.publishMetrics(ctx, blockNumber)
 	eons, summary, err := m.activeDKGs(ctx, blockNumber)
 	if err != nil {
 		return errors.Wrap(err, "list active DKGs")
@@ -107,6 +110,27 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 		}
 	}
 	return nil
+}
+
+// publishMetrics updates the Prometheus gauges the DKG manager owns for this
+// block
+func (m *Manager) publishMetrics(ctx context.Context, blockNumber uint64) {
+	keypermetrics.MetricsKeyperCurrentBlockL1.Set(float64(blockNumber))
+
+	keyperSets, err := obskeyper.New(m.cfg.DBPool).GetKeyperSets(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("DKG manager: failed to fetch keyper sets for is_keyper metric")
+		return
+	}
+	for _, keyperSet := range keyperSets {
+		isMember := 0.0
+		if keyperSet.Contains(m.cfg.OwnAddress) {
+			isMember = 1
+		}
+		keypermetrics.MetricsKeyperIsKeyper.
+			WithLabelValues(strconv.FormatInt(keyperSet.KeyperConfigIndex, 10)).
+			Set(isMember)
+	}
 }
 
 // errNotMember is returned by `resolveMembership` when the manager's address
