@@ -113,7 +113,7 @@ func (m *Manager) HandleBlock(ctx context.Context, blockNumber uint64) error {
 }
 
 // publishMetrics updates the Prometheus gauges the DKG manager owns for this
-// block
+// block.
 func (m *Manager) publishMetrics(ctx context.Context, blockNumber uint64) {
 	keypermetrics.MetricsKeyperCurrentBlockL1.Set(float64(blockNumber))
 
