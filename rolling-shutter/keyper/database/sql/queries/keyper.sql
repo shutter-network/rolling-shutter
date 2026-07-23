@@ -181,6 +181,9 @@ SELECT * FROM tx_outbox
 WHERE status = 'submitted'
 ORDER BY id;
 
+-- name: CountTxOutboxByStatus :many
+SELECT status, count(*) AS count FROM tx_outbox GROUP BY status;
+
 -- name: GetTxOutboxByID :one
 SELECT * FROM tx_outbox WHERE id = $1;
 

@@ -116,6 +116,27 @@ func (s *TxSender) poll(ctx context.Context) {
 	if err := s.processSubmitted(ctx); err != nil {
 		log.Error().Err(err).Msg("tx outbox: confirm phase failed")
 	}
+	s.updateOutboxMetrics(ctx)
+}
+
+// updateOutboxMetrics samples the tx_outbox queue depth by status and publishes
+// it to the Prometheus gauges. Statuses absent from the result set are reported
+// as 0, so the gauges self-zero when a queue drains. Metric sampling is
+// best-effort: a query failure is logged and the previous values are left in
+// place rather than disturbing the poll loop.
+func (s *TxSender) updateOutboxMetrics(ctx context.Context) {
+	counts, err := corekeyperdb.New(s.cfg.DBPool).CountTxOutboxByStatus(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("tx outbox: count rows for metrics")
+		return
+	}
+	byStatus := make(map[string]int64, len(counts))
+	for _, c := range counts {
+		byStatus[c.Status] = c.Count
+	}
+	metricsTxOutboxPending.Set(float64(byStatus["pending"]))
+	metricsTxOutboxSubmitted.Set(float64(byStatus["submitted"]))
+	metricsTxOutboxFailed.Set(float64(byStatus["failed"]))
 }
 
 // processPending picks up every pending row in id order and submits it. Rows
