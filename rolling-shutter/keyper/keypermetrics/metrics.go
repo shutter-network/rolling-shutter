@@ -29,6 +29,16 @@ var MetricsKeyperCurrentBlockL1 = prometheus.NewGauge(
 	},
 )
 
+var MetricsKeyperIsKeyper = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "shutter",
+		Subsystem: "keyper",
+		Name:      "is_keyper",
+		Help:      "Whether this node is a member of the given keyper set (1) or not (0)",
+	},
+	[]string{"keyper_set_index"},
+)
+
 var MetricsKeyperCurrentEon = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "shutter",
@@ -107,6 +117,7 @@ var MetricsExecutionClientVersion = prometheus.NewGaugeVec(
 
 func InitMetrics(dbpool *pgxpool.Pool, config kprconfig.Config) {
 	prometheus.MustRegister(MetricsKeyperCurrentBlockL1)
+	prometheus.MustRegister(MetricsKeyperIsKeyper)
 	prometheus.MustRegister(MetricsKeyperCurrentEon)
 	prometheus.MustRegister(MetricsKeyperEonStartBlock)
 	prometheus.MustRegister(MetricsKeyperCurrentPhase)
