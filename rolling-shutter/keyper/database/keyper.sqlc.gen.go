@@ -30,6 +30,35 @@ func (q *Queries) CountDecryptionKeyShares(ctx context.Context, arg CountDecrypt
 	return count, err
 }
 
+const countTxOutboxByStatus = `-- name: CountTxOutboxByStatus :many
+SELECT status, count(*) AS count FROM tx_outbox GROUP BY status
+`
+
+type CountTxOutboxByStatusRow struct {
+	Status string
+	Count  int64
+}
+
+func (q *Queries) CountTxOutboxByStatus(ctx context.Context) ([]CountTxOutboxByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countTxOutboxByStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountTxOutboxByStatusRow
+	for rows.Next() {
+		var i CountTxOutboxByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const existsDKGResultSuccess = `-- name: ExistsDKGResultSuccess :one
 SELECT EXISTS (
     SELECT 1 FROM dkg_result WHERE eon = $1 AND success = TRUE
