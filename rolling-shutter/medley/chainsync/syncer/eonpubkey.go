@@ -113,7 +113,7 @@ func (s *EonPubKeySyncer) logCallError(attrName string, err error) {
 
 func (s *EonPubKeySyncer) GetEonPubKeyForEon(ctx context.Context, opts *bind.CallOpts, eon uint64) (*event.EonPublicKey, error) {
 	var err error
-	opts, _, err = fixCallOpts(ctx, s.Client, opts)
+	opts, err = fixCallOpts(ctx, s.Client, opts)
 	if err != nil {
 		return nil, err
 	}

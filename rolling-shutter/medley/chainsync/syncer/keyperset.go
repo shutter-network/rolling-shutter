@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"github.com/shutter-network/shop-contracts/bindings"
@@ -21,6 +22,36 @@ func makeCallError(attrName string, err error) error {
 
 const channelSize = 10
 
+// keyperSetManager is the subset of *bindings.KeyperSetManager the
+// KeyperSetSyncer calls: the by-index enumeration reads and the KeyperSetAdded
+// watch. Pulling it out as an interface lets tests substitute a fake manager
+// with canned keyper sets and events without spinning up a simulated chain
+// (consistent with ADR 0007). Note the absence of GetKeyperSetIndexByBlock:
+// the syncer addresses keyper sets by index and never derives one from a block.
+type keyperSetManager interface {
+	GetNumKeyperSets(opts *bind.CallOpts) (uint64, error)
+	GetKeyperSetAddress(opts *bind.CallOpts, index uint64) (common.Address, error)
+	GetKeyperSetActivationBlock(opts *bind.CallOpts, index uint64) (uint64, error)
+	WatchKeyperSetAdded(
+		opts *bind.WatchOpts,
+		sink chan<- *bindings.KeyperSetManagerKeyperSetAdded,
+	) (gethevent.Subscription, error)
+}
+
+// keyperSetReader is the subset of a single deployed *bindings.KeyperSet
+// contract the syncer reads when building a KeyperSet event. Injectable via
+// keyperSetBinder so tests need not bind a real contract.
+type keyperSetReader interface {
+	IsFinalized(opts *bind.CallOpts) (bool, error)
+	GetMembers(opts *bind.CallOpts) ([]common.Address, error)
+	GetThreshold(opts *bind.CallOpts) (uint64, error)
+}
+
+// keyperSetBinder constructs a keyperSetReader for a KeyperSet contract address.
+// The production implementation binds a *bindings.KeyperSet; tests substitute an
+// in-memory fake.
+type keyperSetBinder func(addr common.Address) (keyperSetReader, error)
+
 type KeyperSetSyncer struct {
 	Client     client.Client
 	Contract   *bindings.KeyperSetManager
@@ -28,12 +59,37 @@ type KeyperSetSyncer struct {
 	StartBlock *number.BlockNumber
 	Handler    event.KeyperSetHandler
 
+	// manager is the source of manager-level reads and the KeyperSetAdded watch.
+	// Overridable for tests; production callers leave it nil and Start() fills in
+	// the bound Contract.
+	manager keyperSetManager
+	// bindKeyperSet constructs a keyperSetReader for a KeyperSet contract
+	// address. Overridable for tests; production callers leave it nil and Start()
+	// fills in the default binding-backed implementation over Client.
+	bindKeyperSet keyperSetBinder
+
 	keyperAddedCh chan *bindings.KeyperSetManagerKeyperSetAdded
+}
+
+// defaultKeyperSetBinder binds a *bindings.KeyperSet at the given address. This
+// is the production binder; tests override KeyperSetSyncer.bindKeyperSet with an
+// in-memory fake.
+func defaultKeyperSetBinder(backend bind.ContractBackend) keyperSetBinder {
+	return func(addr common.Address) (keyperSetReader, error) {
+		return bindings.NewKeyperSet(addr, backend)
+	}
 }
 
 func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) error {
 	if s.Handler == nil {
 		return errors.New("no handler registered")
+	}
+
+	if s.manager == nil {
+		s.manager = s.Contract
+	}
+	if s.bindKeyperSet == nil {
+		s.bindKeyperSet = defaultKeyperSetBinder(s.Client)
 	}
 
 	// the latest block still has to be fixed.
@@ -66,7 +122,7 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 		}
 	}
 	s.keyperAddedCh = make(chan *bindings.KeyperSetManagerKeyperSetAdded, channelSize)
-	subs, err := s.Contract.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
+	subs, err := s.manager.WatchKeyperSetAdded(watchOpts, s.keyperAddedCh)
 	if err != nil {
 		return err
 	}
@@ -81,6 +137,14 @@ func (s *KeyperSetSyncer) Start(ctx context.Context, runner service.Runner) erro
 	return nil
 }
 
+// getInitialKeyperSets performs the cold-start poll. It enumerates every
+// registered keyper set by index (0..GetNumKeyperSets()-1) and delivers each to
+// the handler, rather than asking which set is active at the start block. This
+// backfills the full history that the KeyperSetAdded watch — which only ever
+// delivers events at or after the start block — can never replay, and starts
+// cleanly when no set is active yet (an empty contract yields nothing). Keyper
+// sets are addressed by index; activation is a downstream scheduling concern.
+// See ADR 0010.
 func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.KeyperSet, error) {
 	opts := &bind.CallOpts{
 		Context:     ctx,
@@ -89,28 +153,15 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	bn := s.StartBlock.ToUInt64Ptr()
-	if bn == nil {
-		// this should not be the case
-		return nil, errors.New("start block is 'latest'")
-	}
 
-	initialKeyperSets := []*event.KeyperSet{}
-	// this blocknumber specifies the argument to the contract
-	// getter
-	ks, err := s.GetKeyperSetForBlock(ctx, opts, s.StartBlock)
-	if err != nil {
-		return nil, err
-	}
-	initialKeyperSets = append(initialKeyperSets, ks)
-
-	numKS, err := s.Contract.GetNumKeyperSets(opts)
+	numKS, err := s.manager.GetNumKeyperSets(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := ks.Eon + 1; i < numKS; i++ {
-		ks, err = s.GetKeyperSetByIndex(ctx, opts, i)
+	initialKeyperSets := make([]*event.KeyperSet, 0, numKS)
+	for i := uint64(0); i < numKS; i++ {
+		ks, err := s.GetKeyperSetByIndex(ctx, opts, i)
 		if err != nil {
 			return nil, err
 		}
@@ -121,60 +172,35 @@ func (s *KeyperSetSyncer) getInitialKeyperSets(ctx context.Context) ([]*event.Ke
 }
 
 func (s *KeyperSetSyncer) GetKeyperSetByIndex(ctx context.Context, opts *bind.CallOpts, index uint64) (*event.KeyperSet, error) {
-	opts, _, err := fixCallOpts(ctx, s.Client, opts)
+	opts, err := fixCallOpts(ctx, s.Client, opts)
 	if err != nil {
 		return nil, err
 	}
-	actBl, err := s.Contract.GetKeyperSetActivationBlock(opts, index)
+	actBl, err := s.manager.GetKeyperSetActivationBlock(opts, index)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve keyper set activation block")
 	}
-	addr, err := s.Contract.GetKeyperSetAddress(opts, index)
+	addr, err := s.manager.GetKeyperSetAddress(opts, index)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve keyper set address")
 	}
-	return s.newEvent(ctx, opts, addr, actBl)
+	return s.newEvent(opts, addr, actBl, index)
 }
 
-func (s *KeyperSetSyncer) GetKeyperSetForBlock(ctx context.Context, opts *bind.CallOpts, b *number.BlockNumber) (*event.KeyperSet, error) {
-	var atBlock uint64
-	var err error
-
-	opts, latestFromFix, err := fixCallOpts(ctx, s.Client, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	if b.Equal(number.LatestBlock) {
-		if latestFromFix == nil {
-			atBlock, err = s.Client.BlockNumber(ctx)
-			if err != nil {
-				return nil, errors.Wrap(err, "get current block-number")
-			}
-		} else {
-			atBlock = *latestFromFix
-		}
-	} else {
-		atBlock = b.Uint64()
-	}
-
-	idx, err := s.Contract.GetKeyperSetIndexByBlock(opts, atBlock)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not retrieve keyper set index at block %d", atBlock)
-	}
-	return s.GetKeyperSetByIndex(ctx, opts, idx)
-}
-
+// newEvent builds a KeyperSet event from the per-set contract reads. The
+// keyperSetIndex is passed in by the caller — the initial poll knows it from the
+// enumeration loop and the watch knows it from the event's Eon field — so no
+// call derives an index from an activation block.
 func (s *KeyperSetSyncer) newEvent(
-	_ context.Context,
 	opts *bind.CallOpts,
 	keyperSetContract common.Address,
 	activationBlock uint64,
+	keyperSetIndex uint64,
 ) (*event.KeyperSet, error) {
 	if err := guardCallOpts(opts, false); err != nil {
 		return nil, err
 	}
-	ks, err := bindings.NewKeyperSet(keyperSetContract, s.Client)
+	ks, err := s.bindKeyperSet(keyperSetContract)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not bind to KeyperSet contract")
 	}
@@ -195,15 +221,11 @@ func (s *KeyperSetSyncer) newEvent(
 	if err != nil {
 		return nil, makeCallError("Threshold", err)
 	}
-	eon, err := s.Contract.GetKeyperSetIndexByBlock(opts, activationBlock)
-	if err != nil {
-		return nil, makeCallError("KeyperSetIndexByBlock", err)
-	}
 	return &event.KeyperSet{
 		ActivationBlock: activationBlock,
 		Members:         members,
 		Threshold:       threshold,
-		Eon:             eon,
+		Eon:             keyperSetIndex,
 		Contract:        keyperSetContract,
 		AtBlockNumber:   number.BigToBlockNumber(opts.BlockNumber),
 	}, nil
@@ -218,10 +240,10 @@ func (s *KeyperSetSyncer) watchNewKeypersService(ctx context.Context, subsErr <-
 			}
 			opts := logToCallOpts(ctx, &newKeypers.Raw)
 			newKeyperSet, err := s.newEvent(
-				ctx,
 				opts,
 				newKeypers.KeyperSetContract,
 				newKeypers.ActivationBlock,
+				newKeypers.Eon,
 			)
 			if err != nil {
 				s.Log.Error(

@@ -26,7 +26,7 @@ type ShutterStateSyncer struct {
 }
 
 func (s *ShutterStateSyncer) GetShutterState(ctx context.Context, opts *bind.CallOpts) (*event.ShutterState, error) {
-	opts, _, err := fixCallOpts(ctx, s.Client, opts)
+	opts, err := fixCallOpts(ctx, s.Client, opts)
 	if err != nil {
 		return nil, err
 	}
