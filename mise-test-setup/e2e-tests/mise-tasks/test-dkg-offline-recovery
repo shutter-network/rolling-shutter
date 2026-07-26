@@ -6,7 +6,6 @@ from e2e_utils import utils, wait_for_dkg_failure, wait_for_dkg_success
 
 
 utils.run(["mise", "run", "clean"])
-utils.run(["mise", "run", "fund-keypers"])
 
 # Bootstrap: 2-of-4 initial DKG succeeds. This also establishes a previous
 # keyper set with threshold 2, which gates the next config vote.
@@ -20,12 +19,12 @@ utils.run(["docker", "compose", "stop", "keyper-2", "keyper-3"])
 utils.run(["mise", "run", "add-keyper-set", "--indices", "0,1,2,3", "--threshold", "3"])
 
 # Only 2 of 3 required keypers online → DKG must fail.
-wait_for_dkg_failure(keyper_set_index=2)
+wait_for_dkg_failure(keyper_set_index=1)
 
 # Bring keyper-2 online to reach threshold; the keyper logic retries DKG.
 utils.run(["docker", "compose", "up", "-d", "keyper-2"])
 
-# Use keyper_set_index=2 to avoid a false positive from eon 1's success row.
-wait_for_dkg_success(keyper_set_index=2)
+# Use keyper_set_index=1 to avoid a false positive from eon 0's success row.
+wait_for_dkg_success(keyper_set_index=1)
 
 utils.run(["mise", "run", "test-decryption"])

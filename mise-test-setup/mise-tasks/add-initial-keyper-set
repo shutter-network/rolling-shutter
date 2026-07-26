@@ -41,7 +41,7 @@ count_result = utils.run(
     ],
     capture_output=True,
 )
-if int(count_result.stdout.strip()) > 1:  # 0 is the guard keyper set
+if int(count_result.stdout.strip()) > 0:  # initial real set is index 0
     print("Initial keyper set already added; skipping")
     raise SystemExit(0)
 
