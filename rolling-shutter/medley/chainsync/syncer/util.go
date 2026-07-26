@@ -40,15 +40,15 @@ func guardCallOpts(opts *bind.CallOpts, allowLatest bool) error {
 	return nil
 }
 
-func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, *uint64, error) {
+func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bind.CallOpts, error) {
 	err := guardCallOpts(opts, false)
 	if err == nil {
-		return opts, nil, nil
+		return opts, nil
 	}
 	// query the current latest block and fix it
 	latest, queryErr := c.BlockNumber(ctx)
 	if queryErr != nil {
-		return nil, nil, errors.Wrap(err, "query latest block-number")
+		return nil, errors.Wrap(err, "query latest block-number")
 	}
 	blockNumber := number.NewBlockNumber(&latest)
 	if errors.Is(err, errNilCallOpts) {
@@ -56,11 +56,11 @@ func fixCallOpts(ctx context.Context, c client.Client, opts *bind.CallOpts) (*bi
 			Context:     ctx,
 			BlockNumber: blockNumber.Int,
 		}
-		return opts, &latest, nil
+		return opts, nil
 	}
 	if errors.Is(err, errLatestBlock) {
 		opts.BlockNumber = blockNumber.Int
-		return opts, &latest, nil
+		return opts, nil
 	}
-	return nil, nil, err
+	return nil, err
 }
