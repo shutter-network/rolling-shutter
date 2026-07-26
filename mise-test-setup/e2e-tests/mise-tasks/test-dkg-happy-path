@@ -20,18 +20,17 @@ def add_set_and_verify(
 
 
 utils.run(["mise", "run", "clean"])
-utils.run(["mise", "run", "fund-keypers"])
 
-# Keyper set 1 (initial): 0,1,2 / threshold 2.
+# Keyper set 0 (initial): 0,1,2 / threshold 2.
 utils.run(["mise", "run", "wait-for-initial-dkg"])
-utils.run(["mise", "run", "check-dkg", "--ksi", "1"])
+utils.run(["mise", "run", "check-dkg", "--ksi", "0"])
 utils.run(["mise", "run", "test-decryption"])
 
-# Keyper set 2: grow to 0,1,2,3 / threshold 3.
-add_set_and_verify("0,1,2,3", "3", 2)
+# Keyper set 1: grow to 0,1,2,3 / threshold 3.
+add_set_and_verify("0,1,2,3", "3", 1)
 
-# Keyper set 3: zero-overlap replacement 3,4,5 / threshold 2.
-add_set_and_verify("3,4,5", "2", 3, keyper_index=3)
+# Keyper set 2: zero-overlap replacement 3,4,5 / threshold 2.
+add_set_and_verify("3,4,5", "2", 2, keyper_index=3)
 
-# Keyper set 4: return to original 0,1,2 / threshold 2.
-add_set_and_verify("0,1,2", "2", 4)
+# Keyper set 3: return to original 0,1,2 / threshold 2.
+add_set_and_verify("0,1,2", "2", 3)

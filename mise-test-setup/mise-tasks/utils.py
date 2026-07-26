@@ -168,7 +168,7 @@ def cast_block_number() -> int:
 def get_latest_keyper_set_index() -> int:
     """Return the highest Keyper Set Index registered on-chain.
 
-    Index 0 is the bootstrap guard keyper set; real sets start at 1.
+    The initial real keyper set is index 0.
     """
     ksm = get_deployed_address("KeyperSetManager")
     count = int(cast_call(ksm, "getNumKeyperSets()(uint64)"))
