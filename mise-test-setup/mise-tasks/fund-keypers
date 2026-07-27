@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --script
-#MISE description="Fund keyper Ethereum addresses with ETH from ANVIL_KEY_0 if balance is zero"
+#MISE description="Fund keyper Ethereum addresses with ETH from ANVIL_KEY_1 if balance is zero"
 #MISE depends=["up-ethereum", "gen-keyper-configs"]
 
 import os
@@ -56,7 +56,7 @@ def cast_send_fund(address: str, value: str, private_key: str) -> None:
 
 data_dir = Path(os.environ["DATA_DIR"])
 num_keypers = int(os.environ["NUM_KEYPERS"])
-private_key = os.environ["ANVIL_KEY_0"]
+private_key = os.environ["ANVIL_KEY_1"]
 
 for index in range(num_keypers):
     config_path = data_dir / f"keyper-{index}.toml"
