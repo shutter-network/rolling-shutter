@@ -295,6 +295,103 @@ func TestProcessDKGWritesNothingPastMaxRetries(t *testing.T) {
 	}
 }
 
+// TestHandleBlockDefersDispatchOnPhaseBoundaryBlock is the end-to-end
+// wire-through for the one-block dispatch deferral: on the first block of the
+// Dealing window HandleBlock must write nothing (an RPC node may still serve
+// the previous block's state to eth_estimateGas at that point), and on the
+// window's second block the dealing action must fire as usual.
+func TestHandleBlockDefersDispatchOnPhaseBoundaryBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.Background()
+
+	dbpool, dbclose := testsetup.NewTestDBPool(ctx, t, corekeyperdb.Definition)
+	t.Cleanup(dbclose)
+
+	const (
+		keyperConfigIndex int64 = 17
+		activationBlock   int64 = 100
+		phaseLength       int64 = 10
+		leadLength        int64 = 40
+		// Retry 0 dealing window is [60, 70).
+		firstDealingBlock uint64 = 60
+	)
+
+	ownECDSA, err := crypto.GenerateKey()
+	assert.NilError(t, err)
+	ownAddr := crypto.PubkeyToAddress(ownECDSA.PublicKey)
+
+	coreQueries := corekeyperdb.New(dbpool)
+	err = coreQueries.InsertEon(ctx, corekeyperdb.InsertEonParams{
+		Eon:                   keyperConfigIndex,
+		ActivationBlockNumber: activationBlock,
+		KeyperConfigIndex:     keyperConfigIndex,
+		DkgContract:           sql.NullString{String: "0xd0000000000000000000000000000000000000aa", Valid: true},
+		PhaseLength:           sql.NullInt64{Int64: phaseLength, Valid: true},
+		LeadLength:            sql.NullInt64{Int64: leadLength, Valid: true},
+		MaxRetries:            10,
+	})
+	assert.NilError(t, err)
+
+	obsQueries := obskeyperdb.New(dbpool)
+	err = obsQueries.InsertKeyperSet(ctx, obskeyperdb.InsertKeyperSetParams{
+		KeyperConfigIndex:     keyperConfigIndex,
+		ActivationBlockNumber: activationBlock,
+		Keypers:               shdb.EncodeAddresses([]common.Address{ownAddr}),
+		Threshold:             1,
+	})
+	assert.NilError(t, err)
+
+	// The dealing dispatch encrypts the self-eval, which reads the ECIES key
+	// registry.
+	ownECIES := ecies.ImportECDSA(ownECDSA)
+	err = coreQueries.UpsertECIESKey(ctx, corekeyperdb.UpsertECIESKeyParams{
+		KeyperAddress:  shdb.EncodeAddress(ownAddr),
+		EciesPublicKey: shdb.EncodeEciesPublicKey(&ownECIES.PublicKey),
+	})
+	assert.NilError(t, err)
+
+	mgr := New(Config{
+		DBPool:            dbpool,
+		OwnAddress:        ownAddr,
+		ECIESPrivateKey:   ownECIES,
+		ECIESRegistryAddr: common.HexToAddress("0xe0000000000000000000000000000000000000bb"),
+	})
+
+	// First block of the Dealing window: dispatch must be deferred.
+	err = mgr.HandleBlock(ctx, firstDealingBlock)
+	assert.NilError(t, err)
+
+	pending, err := coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, 0, len(pending), "no tx_outbox row may be written on the phase boundary block")
+
+	sent, err := coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperSetIndex: keyperConfigIndex,
+		RetryCounter:   0,
+		Action:         ActionDealing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, !sent, "no dkg_sent_actions row may be written on the phase boundary block")
+
+	// Second block of the window: the dealing action fires.
+	err = mgr.HandleBlock(ctx, firstDealingBlock+1)
+	assert.NilError(t, err)
+
+	pending, err = coreQueries.GetPendingTxs(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(pending), "dealing tx_outbox row expected on the window's second block")
+
+	sent, err = coreQueries.ExistsDKGSentAction(ctx, corekeyperdb.ExistsDKGSentActionParams{
+		KeyperSetIndex: keyperConfigIndex,
+		RetryCounter:   0,
+		Action:         ActionDealing,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, sent, "dealing dkg_sent_actions row expected on the window's second block")
+}
+
 // TestHandleBlockSkipsSupersededKeyperSet is the end-to-end wire-through for
 // the supersession filter (Seam 2 case a): two Keyper Sets with activation
 // blocks 100 and 120; advancing to a block past the successor's activation
