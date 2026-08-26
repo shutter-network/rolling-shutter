@@ -90,6 +90,43 @@ func PhaseAt(activationBlock, dkgLeadLength, phaseLength, maxRetries, retryCount
 	}
 }
 
+// DispatchPhaseAt returns the phase whose action may be dispatched at
+// `currentBlock`. It matches PhaseAt except on the first block of each phase
+// window, where it returns PhaseNone so that dispatch is deferred to the
+// window's second block. Dispatch decisions go through this function rather
+// than PhaseAt so that the deferral cannot be forgotten at a call site.
+//
+// The deferral exists because gas estimation races the phase boundary: an RPC
+// node can announce block N via newHead while `eth_estimateGas` still executes
+// against the state of N-1. A message enqueued on the boundary block then
+// reverts with WrongPhase during estimation and is permanently marked failed.
+// Waiting one block gives the node's state a full block interval to catch up.
+// The contract window itself is unchanged, so with phaseLength L the remaining
+// L-1 blocks are ample for inclusion.
+//
+// Windows with phaseLength <= 2 are exempt: they have no block that is both
+// past the boundary and still has a successor inside the window, since a
+// transaction triggered by block B is included at B+1 at the earliest. For
+// those, dispatch happens on the window's first block, which is the only
+// choice that can land in-phase at all (L == 2) or the only block there is
+// (L == 1).
+func DispatchPhaseAt(activationBlock, dkgLeadLength, phaseLength, maxRetries, retryCounter, currentBlock uint64) Phase {
+	phase := PhaseAt(activationBlock, dkgLeadLength, phaseLength, maxRetries, retryCounter, currentBlock)
+	if phase == PhaseNone || phaseLength <= 2 {
+		return phase
+	}
+	// `phase != PhaseNone` guarantees the offset is inside the four windows,
+	// so it is non-negative and a zero remainder means "first block of a
+	// window". This mirrors `blocksInto` in the contract's DKGState script.
+	start := DKGStart(activationBlock, dkgLeadLength, phaseLength, retryCounter)
+	offset := int64(currentBlock) - start //nolint:gosec // G115: block number fits well within int64
+	pl := int64(phaseLength)              //nolint:gosec // G115: phase length fits well within int64
+	if offset%pl == 0 {
+		return PhaseNone
+	}
+	return phase
+}
+
 // CurrentRetryCounter derives the active retry counter from block arithmetic.
 // Each failed cycle advances the counter by one; the counter is never stored
 // in the database. A block before `DKGStart(..., 0)` returns 0 since the

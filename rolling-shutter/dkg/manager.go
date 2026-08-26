@@ -326,8 +326,8 @@ func (m *Manager) activeDKGs(ctx context.Context, blockNumber uint64) ([]corekey
 // acceptable — the maybe-function will see the stale snapshot for one block
 // and pick up the new state on the next dispatch.
 //
-// Returns nil for "nothing to do" (no active phase at this block, no initial
-// state for non-Dealing phases). Returns an error for missing per-eon
+// Returns nil for "nothing to do" (no active phase at this block, first block
+// of a phase window, no initial state for non-Dealing phases). Returns an error for missing per-eon
 // configuration (NULL `dkg_contract` or NULL `phase_length`/`lead_length`).
 // The caller logs but does not abort on error.
 func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNumber uint64) error {
@@ -354,7 +354,10 @@ func (m *Manager) processDKG(ctx context.Context, eon corekeyperdb.Eon, blockNum
 
 	retry := CurrentRetryCounter(params.activationBlock, params.leadLength, params.phaseLength, blockNumber)
 	retryInt64 := int64(retry) //nolint:gosec // G115: retry counter is bounded by the on-chain contract
-	blockPhase := PhaseAt(params.activationBlock, params.leadLength, params.phaseLength, params.maxRetries, retry, blockNumber)
+	// DispatchPhaseAt (not PhaseAt) so that no action fires on the first block
+	// of a phase window; see its doc comment for the gas-estimation race this
+	// avoids.
+	blockPhase := DispatchPhaseAt(params.activationBlock, params.leadLength, params.phaseLength, params.maxRetries, retry, blockNumber)
 	if blockPhase == PhaseNone {
 		return nil
 	}
